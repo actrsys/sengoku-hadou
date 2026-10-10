@@ -164,6 +164,8 @@ class UIInfoManager {
                 }
             });
         }
+        // 親モーダルの非表示を子画面側が待機できるよう、cover終了タスクを返す。
+        return coveredCloseTask || Promise.resolve(true);
     }
 
     _stopActiveListRendering() {
@@ -179,9 +181,6 @@ class UIInfoManager {
             listContainer._virtualScrollCleanup = null;
         }
 
-        // 子モーダルが現在のcoverになっている場合、呼び出し側はこのPromiseを待ってから
-        // coverを外せる。通常呼び出しは従来どおり戻り値を無視してよい。
-        return coveredCloseTask || Promise.resolve(true);
 
     }
 

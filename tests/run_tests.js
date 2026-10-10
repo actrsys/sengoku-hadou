@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r437');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r439');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6573,6 +6573,56 @@ test('スマホの一時資源解放では継続表示レイヤーを保持し�
 });
 
 
+test('PCの地図はCSS下地へ一元化し、スマホの縮小imgと画面座標は保持する', () => {
+    const css = read('css/style.css');
+    const map = read('js/ui_map.js');
+    assert.ok(css.includes("body.is-pc #map-container {\n    background-image: url('../data/images/map/japan_map.png');"));
+    assert.ok(css.includes('body.is-pc #map-base-image { display: none; }'));
+    assert.ok(css.includes('body:not(.is-pc) #map-base-image { transform: translateZ(0); backface-visibility: hidden; }'));
+    assert.ok(!css.includes('will-change: scroll-position'));
+    assert.ok(!css.includes('will-change: transform; backface-visibility: hidden;'));
+    assert.ok(map.includes('return `scale(${scale})`;'));
+    assert.ok(!map.includes('scale(${scale}) translateZ(0)'));
+    assert.ok(map.includes("document.body.classList.contains('is-pc') ? null : (this._mapBaseImage"));
+    assert.ok(map.includes("lowMemoryMobile ? './data/images/map/japan_map_lowmem.png' : './data/images/map/japan_map_mobile.png'"));
+});
+
+test('最終coverは背景復旧後の2フレームまで維持し、先行する古いcloseを通さない', async () => {
+    const source = read('js/ui.js');
+    const helper = source.slice(source.indexOf('waitForCoveredMapPaint() {'), source.indexOf('    hideLoadingScreen()'));
+    assert.ok(helper.includes('requestAnimationFrame(() => requestAnimationFrame(resolve))'));
+    assert.ok(helper.includes('if (waitForPaint) await this.waitForCoveredMapPaint()'));
+    assert.ok(helper.includes('Number(tokens.get(coverEl) || 0) !== token'));
+    assert.ok(helper.includes('epoch !== Number(this._coveredCloseEpoch || 0)'));
+    // rAFを管理可能なキューに置き換え、1フレーム目にcoverが消えないことを実行検証。
+    const pending = [];
+    const ctx = createContext({ requestAnimationFrame: callback => { pending.push(callback); return pending.length; },
+        setTimeout, clearTimeout, document: { hidden: false, querySelectorAll: () => [] } });
+    // 画面全体のconstructorは起動させず、対象メソッドだけソースから抽出して実行する。
+    const functionStart = source.indexOf('    waitForCoveredMapPaint() {');
+    const functionEnd = source.indexOf('    hideLoadingScreen()', functionStart);
+    const methods = source.slice(functionStart, functionEnd);
+    vm.runInContext('class TestUI {' + methods + '} this.TestUI = TestUI;', ctx);
+    const ui = new ctx.TestUI();
+    const cover = { classList: new FakeClassList() };
+    let recovered = 0;
+    const closed = ui.closeCoveredViewAfterRecovery(cover, { recoverUnderCover: () => { recovered++; } });
+    assert.strictEqual(recovered, 1);
+    assert.strictEqual(cover.classList.contains('hidden'), false);
+    assert.strictEqual(pending.length, 1);
+    pending.shift()();
+    assert.strictEqual(cover.classList.contains('hidden'), false);
+    assert.strictEqual(pending.length, 1);
+    pending.shift()();
+    await closed;
+    assert.strictEqual(cover.classList.contains('hidden'), true);
+    const obsolete = ui.closeCoveredViewAfterRecovery(cover, { recoverUnderCover: () => {} });
+    ui.prepareCoveredViewForOpen(cover);
+    pending.shift()(); pending.shift()();
+    assert.strictEqual(await obsolete, false);
+    assert.strictEqual(cover.classList.contains('hidden'), false);
+});
+
 test('通常モーダル復帰では健全な地図compositorを作り直さずdisplay none境界だけ全復旧する', () => {
     const map = read('js/ui_map.js');
     const events = read('js/event/common_events.js');
@@ -8200,6 +8250,50 @@ test('戦争準備の連続画面はAIガードを遷移先UIだけが所有し�
     assert.ok(msgAt >= 0 && guardAt > msgAt && visibleAt > guardAt, '専用迎撃モーダルは内容準備後・可視化直前だけAIガードを引き渡す');
 });
 
+test('UIInfoManagerの起動初期化で未定義変数を参照せず、coveredCloseTaskは正しいスコープから返す', async () => {
+    // r437/r438では _stopActiveListRendering() 内に closeCommonModal() の return が混入。
+    // ゲーム起動時に UIInfoManager.constructor -> closeCommonModal() から呼ばれ、
+    // selector-list が実在するブラウザだけ ReferenceError が発生して操作不能になった。
+    const selectorList = {
+        _virtualScrollHandler: () => {},
+        _virtualScrollCleanup() { this.cleaned = true; },
+        removeEventListener(type) { assert.strictEqual(type, 'scroll'); this.unbound = true; }
+    };
+    const selectorModal = { classList: new FakeClassList(['hidden']) };
+    const ctx = createContext({
+        document: { getElementById: id => id === 'selector-list' ? selectorList : null },
+        SelectorModalView: class {
+            constructor() {}
+            getElements() { return { modal: selectorModal }; }
+            close() {}
+        }
+    });
+    loadScript(ctx, 'js/ui_info.js');
+    vm.runInContext('this.UIInfoManager = UIInfoManager;', ctx);
+    const ui = { resumeBackgroundUpdates() {} };
+    const manager = new ctx.UIInfoManager(ui, { phase: 'title' });
+    assert.ok(manager, '実DOMにselector-listがある場合もUIInfoManagerの起動が中断しない');
+    assert.ok(selectorList.unbound && selectorList.cleaned, '一覧の遅延処理を解放してから次へ進む');
+    assert.strictEqual(manager._stopActiveListRendering(), undefined, '一覧解除はcoverの非同期戻り値を持たない');
+    const simpleClose = manager.closeCommonModal();
+    assert.ok(simpleClose && typeof simpleClose.then === 'function', '通常の終了でも待機可能なPromiseを返す');
+    assert.strictEqual(await simpleClose, true);
+
+    selectorModal.classList.remove('hidden');
+    const coveredResult = Promise.resolve('covered');
+    let closed = false;
+    ui.closeCoveredViewAfterRecovery = (_modal, opts) => {
+        assert.strictEqual(_modal, selectorModal);
+        opts.recoverUnderCover();
+        closed = true;
+        return coveredResult;
+    };
+    const task = manager.closeCommonModal();
+    assert.strictEqual(task, coveredResult, '一覧自身ではなくcloseCommonModalがcover終了タスクを返す');
+    assert.ok(closed);
+    assert.strictEqual(await task, 'covered');
+});
+
 test('共通武将一覧のAIガード所有権はモーダル寿命で1回だけ取得・解放する', () => {
     const info = read('js/ui_info.js');
     const busho = read('js/ui_info_busho.js');
@@ -8266,7 +8360,7 @@ test('背景復帰を伴う全画面UIはcoverをpaintまで保持し再表示�
     const helper = ui.slice(helperStart, helperEnd);
     assert.ok(helperStart >= 0);
     assert.ok(helper.includes('options.waitForPaint === true'), '背景復帰を別窓口で開始済みの子modalも明示的にpaint待ちできる');
-    assert.ok(helper.includes('await this.waitForNextPaint()'), '固定msではなく実paintを終了境界にする');
+    assert.ok(helper.includes('await this.waitForCoveredMapPaint()'), 'coverは2回のrAFを跨いでから外す');
     assert.ok(helper.includes('epoch !== Number(this._coveredCloseEpoch || 0)'), 'タイトル/ロード等の画面世代を跨いだcloseを破棄する');
     assert.ok(helper.includes('Number(tokens.get(coverEl) || 0) !== token'), '同じ固定DOMを再表示した場合の旧closeを破棄する');
     assert.ok(ui.includes('prepareCoveredViewForOpen(coverEl)'), '固定DOMの再表示も同じ寿命窓口を使う');

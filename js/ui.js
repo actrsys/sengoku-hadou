@@ -1857,6 +1857,16 @@ class UIManager {
         });
     }
 
+    // 地図を覆っている最終モーダルを外す時だけ、背景復旧後の描画機会を
+    // 確実に1回通す。rAF内のsetTimeout(0)はブラウザによって合成commitより
+    // 先に走るため、2回目のrAFまでcoverを維持する（固定msの待機はしない）。
+    waitForCoveredMapPaint() {
+        if (typeof requestAnimationFrame !== 'function') return this.waitForNextPaint();
+        return new Promise(resolve => {
+            requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
+    }
+
     // 背面の地図/Canvasを復旧するモーダル終了は、coverを残したまま復旧し、
     // その状態を1回paintしてからcoverを外す。同期的に「resume→hidden」とすると、
     // WebView/Chromiumでは巨大Canvasの再合成とcover消去が同じcommitへ入り、
@@ -1899,7 +1909,7 @@ class UIManager {
                 console.error('画面復帰中の背景更新に失敗しました:', e);
             }
 
-            if (waitForPaint) await this.waitForNextPaint();
+            if (waitForPaint) await this.waitForCoveredMapPaint();
 
             // タイトル復帰・ロード・同じ固定DOMの再表示が先に来た場合は、
             // 古いclose予約から新しい画面を消さない。
