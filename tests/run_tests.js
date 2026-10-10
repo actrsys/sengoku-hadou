@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r442');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r444');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4815,7 +4815,7 @@ test('SaveManager がスロット読込・保存時刻抽出の公開窓口を�
     assert.ok(source.includes('isLoadableSaveData(data)'));
     assert.ok(source.includes('const hasData = this.isLoadableSaveData(data);'));
     assert.ok(source.includes("async hasAnyLoadableSaveData(prefixes = ['sengoku_save_slot', 'sengoku_autosave_slot'])"));
-    assert.ok(source.includes('async refreshLoadAvailability()'));
+    assert.ok(source.includes('async refreshLoadAvailability(options = {})'));
 });
 
 test('タイトルとシステムのロード可否はSaveManagerの実ロード可否判定を共用する', () => {
@@ -4826,7 +4826,7 @@ test('タイトルとシステムのロード可否はSaveManagerの実ロード
     const at = ui.indexOf('async checkSaveDataForTitle(options = {})');
     const block = ui.slice(at, at + 1200);
     assert.ok(at >= 0);
-    assert.ok(block.includes('this.game.saveManager.refreshLoadAvailability()'));
+    assert.ok(block.includes('this.game.saveManager.refreshLoadAvailability({ isCurrent })'));
     assert.ok(!block.includes('loadFromDB('), 'タイトルUIがDBキーの存在を直接見ない');
     assert.ok(block.includes('btn.disabled = !hasData'));
     assert.ok(catalog.includes("canExecute: (game) => game.hasSaveData === true"));
@@ -14071,7 +14071,7 @@ test('r430ではセーブ復元完了まで入力抑止を維持し旧復元を�
     const titleSaveEnd = ui.indexOf('\n    forceResetModals(', titleSaveAt);
     const titleSaveBlock = ui.slice(titleSaveAt, titleSaveEnd > titleSaveAt ? titleSaveEnd : titleSaveAt + 1800);
     assert.ok(titleSaveBlock.includes("const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true;"));
-    assert.ok(titleSaveBlock.includes('hasData = await this.game.saveManager.refreshLoadAvailability();'));
+    assert.ok(titleSaveBlock.includes('hasData = await this.game.saveManager.refreshLoadAvailability({ isCurrent });'));
     assert.ok((titleSaveBlock.match(/if \(!isCurrent\(\)\) return false;/g) || []).length >= 2, 'ロード可否確認の前後でタイトル遷移世代を確認する');
 
     const loadRequestAt = save.indexOf('_captureLoadRequestFlow()');
@@ -14379,6 +14379,145 @@ test('r442 失効した領域BFSの遅延完了は新しい城IDマップを公�
     releaseYield();
     await work;
     assert.strictEqual(manager.castlePixelMap, currentMap, '旧BFS結果が新マップへ公開されない');
+});
+
+
+test('r443 セーブ一覧は外部保存データのHTMLと画像属性の混入を防ぐ', async () => {
+    const elements = new Map();
+    const makeElement = id => ({
+        id,
+        classList: new FakeClassList(),
+        children: [],
+        innerHTML: '',
+        appendChild(child) { this.children.push(child); },
+        set innerText(value) { this._text = value; }
+    });
+    for (const id of ['saveload-modal', 'saveload-title', 'saveload-list', 'saveload-tabs', 'saveload-tab-manual', 'saveload-tab-auto']) {
+        elements.set(id, makeElement(id));
+    }
+    const document = {
+        body: { classList: new FakeClassList(['is-pc']) },
+        getElementById(id) { return elements.get(id) || null; },
+        createElement() { return makeElement('new'); }
+    };
+    const unsafeText = '<img src=x onerror="attack()">';
+    const fakeSavedData = {
+        scenarioName: '1570年<script>attack()</script>',
+        saveTime: '2026/10/11 " onclick="attack()',
+        year: 1570, month: 4, gameStartYear: 1570,
+        clans: [{ id: 1, name: unsafeText }], playerClanId: 1,
+        mapThumbnail: 'x" onerror="attack()'
+    };
+    const ctx = createContext({
+        document,
+        setTimeout: callback => { callback(); return 1; },
+        requestAnimationFrame: callback => { callback(); return 1; }
+    });
+    loadScript(ctx, 'js/save_load_view.js');
+    const ui = { updateCustomScrollbars() {} };
+    const game = { phase: 'title', saveManager: { async readSaveSlots(prefix) {
+        return Array.from({length: 5}, (_, i) => ({
+            originalSlotNo: i + 1,
+            data: i === 0 && prefix === 'sengoku_save_slot' ? fakeSavedData : null,
+            hasData: i === 0 && prefix === 'sengoku_save_slot',
+            saveTimestamp: i === 0 && prefix === 'sengoku_save_slot' ? 100 : 0
+        }));
+    } } };
+    const view = new ctx.SaveLoadView(ui, game);
+    assert.strictEqual(view._safeSlotThumbnail('data:image/jpeg;base64,AA=='), 'data:image/jpeg;base64,AA==');
+    assert.strictEqual(view._safeSlotThumbnail('data:image/svg+xml;base64,AAA='), null);
+    view.open('load');
+    await new Promise(resolve => setImmediate(resolve));
+    const list = elements.get('saveload-list');
+    const row = list.children.find(x => x.className && x.className.includes('saveload-slot-btn') && x.innerHTML.includes('1570年'));
+    assert.ok(row, '保存データを一覧に表示できる');
+    assert.ok(row.innerHTML.includes('&lt;img'), '勢力名のタグを文字として表示する');
+    assert.ok(row.innerHTML.includes('&lt;script&gt;'), 'シナリオ名のタグを文字として表示する');
+    assert.ok(row.innerHTML.includes('&quot;'), '保存日時中の属性区切りを無害化する');
+    assert.ok(!row.innerHTML.includes('<script>') && !row.innerHTML.includes('<img src=x'), '動的HTMLタグを作らない');
+    assert.ok(!row.innerHTML.includes('src="x"'), '任意のサムネイルURLを属性に入れない');
+});
+
+
+test('r443 タイトルで失効した保存確認は最新のロード可能状態を書き換えない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    const game = { hasSaveData: true };
+    const manager = new ctx.SaveManager(game);
+    let releaseOld;
+    manager.hasAnyLoadableSaveData = () => new Promise(resolve => { releaseOld = resolve; });
+    let current = true;
+    const oldCheck = manager.refreshLoadAvailability({ isCurrent: () => current });
+    current = false; // 旧タイトルが閉じられた／別のゲームが起動した
+    releaseOld(false); // 旧タイトルで取った「セーブなし」という古い結果
+    assert.strictEqual(await oldCheck, null);
+    assert.strictEqual(game.hasSaveData, true, '旧確認結果で新しいセーブのロード可否を消さない');
+    manager.hasAnyLoadableSaveData = async () => false;
+    assert.strictEqual(await manager.refreshLoadAvailability({ isCurrent: () => true }), false);
+    assert.strictEqual(game.hasSaveData, false, '最新の確認では従来どおりフラグを更新する');
+});
+
+
+// r444: 縮小地図の読み込み待ちを挟んでゲームが切り替わっても、別シナリオの
+// ヘッダーと実データを合成して保存しない。
+test('r444 手動セーブの画像待機中にシナリオが変われば混在スナップショットを破棄する', async () => {
+    const ctx = createContext({
+        SCENARIOS: [
+            { folder: '1560_okehazama', name: '1560年 桶狭間' },
+            { folder: '1570_anegawa', name: '1570年 姉川' }
+        ]
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    let generation = 17;
+    const oldCastle = { id: 1, era: 'old' };
+    const newCastle = { id: 2, era: 'new' };
+    const game = {
+        year: 1560, month: 5, gameStartYear: 1560, gameStartMonth: 5,
+        scenarioFolder: '1560_okehazama', castles: [oldCastle], bushos: [],
+        princesses: [], clans: [], provinces: [], legions: [],
+        playerClanId: 1, mapWidth: 1200, mapHeight: 800,
+        turnQueue: [oldCastle], currentIndex: 0, flags: {},
+        kunishuSystem: { kunishus: [] }, aiOperationManager: { save() { return {}; } },
+        historySystem: { serialize() { return []; } },
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationLatest: value => value === generation
+        }
+    };
+    const manager = new ctx.SaveManager(game);
+    let completeThumbnail;
+    manager.generateSaveMapImage = () => new Promise(resolve => { completeThumbnail = resolve; });
+    const pending = manager._createSaveDataObj();
+    assert.strictEqual(typeof completeThumbnail, 'function');
+    // ロード/別シナリオ開始により既存の寿命世代が無効化される。
+    generation++;
+    game.scenarioFolder = '1570_anegawa';
+    game.year = 1570;
+    game.castles = [newCastle];
+    completeThumbnail('thumbnail from old scenario');
+    assert.strictEqual(await pending, null, '旧1560メタ情報+新1570本体の混在セーブを生成しない');
+});
+
+// r444: 手動セーブ/オートセーブ/ファイル書き出しは同じガードを共用する。
+// 完了した処理が他の保存中バリアを解除してはならない。
+test('r444 保存処理が重なっても最後の保存完了まで入力ガードを保持する', () => {
+    const elements = new Map();
+    const doc = {
+        getElementById: id => elements.get(id) || null,
+        createElement: id => ({ ...fakeElement(id), appendChild() {} }),
+        body: { appendChild(el) { elements.set(el.id, el); } }
+    };
+    const ctx = createContext({ document: doc });
+    loadScript(ctx, 'js/save_manager.js');
+    const manager = new ctx.SaveManager({});
+    manager.showSaveGuard();
+    manager.showSaveGuard();
+    const guard = elements.get('save-guard');
+    assert.ok(guard && !guard.classList.contains('hidden'));
+    manager.hideSaveGuard();
+    assert.strictEqual(guard.classList.contains('hidden'), false, '別のセーブが進行中なら閉じない');
+    manager.hideSaveGuard();
+    assert.strictEqual(guard.classList.contains('hidden'), true, '最後のセーブ完了で閉じる');
 });
 
 Promise.all(pendingTests).then(() => {

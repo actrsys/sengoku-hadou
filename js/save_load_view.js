@@ -13,6 +13,20 @@ class SaveLoadView {
         this._renderGeneration = 0;
     }
 
+    // セーブは外部ファイルから復元され得る。保存名やシナリオ名をHTMLとして解釈させない。
+    // 画面構造は従来のテンプレートを維持し、差し込む文字列だけをエスケープする。
+    _escapeSlotText(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[char]);
+    }
+
+    // ゲームが生成する縮小図はbase64画像。任意のURL・SVG・属性混入は表示しない。
+    _safeSlotThumbnail(value) {
+        const src = typeof value === 'string' ? value : '';
+        return /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(src) ? src : null;
+    }
+
     invalidatePendingRenders() {
         this._openGeneration++;
         this._renderGeneration++;
@@ -174,11 +188,18 @@ class SaveLoadView {
 
                 // ★追加：保存しておいた写真があれば表示します
                 let mapImageHtml = `<div class="saveload-map-placeholder">NO DATA</div>`;
-                if (hasData && d.mapThumbnail) {
-                    mapImageHtml = `<img src="${d.mapThumbnail}" class="saveload-map-thumb">`;
+                const safeThumbnail = hasData ? this._safeSlotThumbnail(d.mapThumbnail) : null;
+                if (safeThumbnail) {
+                    mapImageHtml = `<img src="${safeThumbnail}" class="saveload-map-thumb">`;
                 }
 
                 if (hasData) {
+                    // 動的文字列は表示用に変換し、マークアップを組み立てる前に無害化する。
+                    clanStr = this._escapeSlotText(clanStr);
+                    scenarioStr = this._escapeSlotText(scenarioStr);
+                    saveTimeStr = this._escapeSlotText(saveTimeStr);
+                    dateStr = this._escapeSlotText(dateStr);
+                    passedYearsStr = this._escapeSlotText(passedYearsStr);
                     // ★変更：最新スロットには専用のクラス（印）を追加してCSSでお化粧します
                     btn.className = 'saveload-slot-btn' + (isGlobalLatest ? ' global-latest-slot' : '');
                     btn.disabled = false; 

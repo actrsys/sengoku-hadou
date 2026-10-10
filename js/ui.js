@@ -1946,7 +1946,7 @@ class UIManager {
         let hasData = false;
         try {
             if (this.game?.saveManager && typeof this.game.saveManager.refreshLoadAvailability === 'function') {
-                hasData = await this.game.saveManager.refreshLoadAvailability();
+                hasData = await this.game.saveManager.refreshLoadAvailability({ isCurrent });
             }
         } catch (e) {
             console.error('セーブデータ確認エラー:', e);

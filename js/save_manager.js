@@ -9,9 +9,12 @@ const SAVE_SCHEMA_VERSION = 2;
 class SaveManager {
     constructor(game) {
         this.game = game;
+        // ファイル保存・手動保存・オートセーブが重なっても、最後の保存が終わるまで入力を遮る。
+        this._saveGuardCount = 0;
     }
 
     showSaveGuard() {
+        this._saveGuardCount++;
         let el = document.getElementById('save-guard');
         if (!el) {
             el = document.createElement('div');
@@ -28,6 +31,8 @@ class SaveManager {
     }
 
     hideSaveGuard() {
+        this._saveGuardCount = Math.max(0, this._saveGuardCount - 1);
+        if (this._saveGuardCount !== 0) return;
         const el = document.getElementById('save-guard');
         if (el) {
             el.classList.add('hidden');
@@ -280,6 +285,10 @@ class SaveManager {
 
     // どんな方法でセーブする時も、この魔法で「今のゲームの全データ」をひとまとめにします
     async _createSaveDataObj(options = {}) {
+        // 縮小地図は画像の読み込みをawaitする。待機中のタイトル復帰・別ロードで
+        // メタ情報だけ旧シナリオ、城・武将だけ新シナリオになる保存を防ぐ。
+        const saveFlow = this._captureLoadRequestFlow();
+        const savedScenarioFolder = this.game.scenarioFolder;
         let scenarioIndex = SCENARIOS.findIndex(s => s.folder === this.game.scenarioFolder);
         let scenarioName = "不明なシナリオ";
         let scenarioNo = "";
@@ -297,6 +306,9 @@ class SaveManager {
         // フルサイズCanvas→縮小Canvasの同時生成は、低メモリ端末では大きな瞬間負荷になります。
         const includeThumbnail = options.includeThumbnail !== false;
         const mapThumbnail = includeThumbnail ? await this.generateSaveMapImage() : null;
+        if ((saveFlow && !saveFlow.isLatest()) || this.game.scenarioFolder !== savedScenarioFolder) {
+            return null; // 古いゲームの保存を成立させない。呼出元が書込を中止する。
+        }
 
         return { 
             saveSchemaVersion: SAVE_SCHEMA_VERSION,
@@ -647,12 +659,13 @@ class SaveManager {
         this.showSaveGuard(); // ★追加：保存中のバリアを張ります
         try {
             const data = await this._createSaveDataObj(); // ★待つように変更
+            if (!data) return; // 保存準備中に別シナリオへ遷移した場合は書き込まない。
             const encryptedData = this._encryptData(data); // ★暗号化します
             const blob = new Blob([encryptedData], {type: 'application/octet-stream'}); // ★バイナリデータとして保存します
             const url = URL.createObjectURL(blob); 
             const a = document.createElement('a'); 
             a.href = url; 
-            a.download = `sengoku_save_${this.game.year}_${this.game.month}.sav`; // ★拡張子を.savに変更します
+            a.download = `sengoku_save_${data.year}_${data.month}.sav`; // ★拡張子を.savに変更します
             a.click(); 
             URL.revokeObjectURL(url); 
         } finally {
@@ -712,6 +725,7 @@ class SaveManager {
         this.showSaveGuard(); // ★追加：保存中のバリアを張ります
         try {
             const data = await this._createSaveDataObj(); // ★待つように変更
+            if (!data) return; // 保存準備中に別シナリオへ遷移した場合は書き込まない。
             const encryptedData = this._encryptData(data); // ★暗号化します
             await saveToDB("sengoku_save_slot" + slotNo, encryptedData);
             this.game.hasSaveData = true; // ★追加：セーブしたので「データあり」の印をつけます
@@ -801,6 +815,7 @@ class SaveManager {
             // JSON.stringify→巨大文字列→TextEncoder→巨大Uint8Array という一時的な二重・三重保持も避けます。
             // SaveManagerは現在仕様として、手動のUint8Arrayと低メモリ用オートセーブのオブジェクトを両方扱います。
             const data = await this._createSaveDataObj({ includeThumbnail: false });
+            if (!data) return;
             await saveToDB("sengoku_autosave_slot" + autoSaveIndex, data);
             // オートセーブもロード可能データなので、システムメニューのロード可否へ即時反映します。
             this.game.hasSaveData = true;
@@ -863,8 +878,11 @@ class SaveManager {
         return false;
     }
 
-    async refreshLoadAvailability() {
+    async refreshLoadAvailability(options = {}) {
+        const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true;
         const hasData = await this.hasAnyLoadableSaveData();
+        // タイトルの古い確認結果で、新しく作成したセーブや別画面の状態を上書きしない。
+        if (!isCurrent()) return null;
         this.game.hasSaveData = hasData;
         return hasData;
     }
