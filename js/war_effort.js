@@ -953,13 +953,13 @@ Object.assign(WarManager.prototype, {
 
                                                         onResult('field', finalDefAssignments, interceptRice, finalAtkAssignments, interceptHorses, interceptGuns);
                                                     },
-                                                    () => { this.game.ui.hideAIGuardTemporarily(); modal.classList.remove('hidden'); }
+                                                    () => { modal.classList.remove('hidden'); }
                                                     );
                                                 },
                                                 returnToParentSelector: true
                                             });
                                         },
-                                        onCancel: () => { this.game.ui.hideAIGuardTemporarily(); modal.classList.remove('hidden'); }
+                                        onCancel: () => { modal.classList.remove('hidden'); }
                                     });
                                 };
                                 document.getElementById('btn-siege').onclick = () => { 

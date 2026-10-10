@@ -12,6 +12,9 @@ class UIInfoManager {
         this._deferredModalTimer = null;
         this._deferredModalStabilityTimer = null;
         this._activePersistentTransitionKey = '';
+        // AI処理中に共通武将一覧を開いた時のAIガード一時非表示は、一覧の再描画ではなく
+        // 共通モーダルの表示寿命で1回だけ所有する。タブ切替やソートの再描画で参照カウントを増やさない。
+        this._commonModalOwnsAIGuardHide = false;
         this.closeCommonModal(); // 履歴や状態変数の初期化
     }
     
@@ -36,6 +39,21 @@ class UIInfoManager {
         return true;
     }
 
+    _acquireCommonModalAIGuardHide() {
+        if (this._commonModalOwnsAIGuardHide) return;
+        if (!this.ui || typeof this.ui.hideAIGuardTemporarily !== 'function') return;
+        const before = Number(this.ui.guardHiddenCount || 0);
+        this.ui.hideAIGuardTemporarily();
+        const after = Number(this.ui.guardHiddenCount || 0);
+        this._commonModalOwnsAIGuardHide = after > before;
+    }
+
+    _releaseCommonModalAIGuardHide() {
+        if (!this._commonModalOwnsAIGuardHide) return;
+        this._commonModalOwnsAIGuardHide = false;
+        if (this.ui && typeof this.ui.restoreAIGuard === 'function') this.ui.restoreAIGuard();
+    }
+
     closeCommonModal() {
         this._commonModalSuspendedForChild = false;
         this._cancelDeferredModalTransition();
@@ -51,6 +69,7 @@ class UIInfoManager {
         const canDiagnose = this.game && this.game.phase !== 'title' && typeof this.game.writeSystemDiagnostic === 'function';
         if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:start');
         if (this.selectorView) this.selectorView.close();
+        this._releaseCommonModalAIGuardHide();
         if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:selector_done');
         
         // リストを完全に閉じる時に背景更新を再開します。強制リロード調査では

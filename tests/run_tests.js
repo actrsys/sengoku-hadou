@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r434');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r435');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -8181,6 +8181,32 @@ test('戦争準備の連続画面はAIガードを遷移先UIだけが所有し�
     const guardAt = interceptBlock.indexOf('this.game.ui.hideAIGuardTemporarily();', msgAt);
     const visibleAt = interceptBlock.indexOf("modal.classList.remove('hidden');", guardAt);
     assert.ok(msgAt >= 0 && guardAt > msgAt && visibleAt > guardAt, '専用迎撃モーダルは内容準備後・可視化直前だけAIガードを引き渡す');
+});
+
+test('共通武将一覧のAIガード所有権はモーダル寿命で1回だけ取得・解放する', () => {
+    const info = read('js/ui_info.js');
+    const busho = read('js/ui_info_busho.js');
+    const war = read('js/war_effort.js');
+
+    assert.ok(info.includes('this._commonModalOwnsAIGuardHide = false'));
+    assert.ok(info.includes('_acquireCommonModalAIGuardHide()'));
+    assert.ok(info.includes('_releaseCommonModalAIGuardHide()'));
+    const closeStart = info.indexOf('closeCommonModal() {');
+    const closeEnd = info.indexOf('\n    _stopActiveListRendering()', closeStart);
+    const closeBlock = info.slice(closeStart, closeEnd);
+    assert.ok(closeBlock.includes('this._releaseCommonModalAIGuardHide();'), '共通モーダルを閉じる時に自身のAIガード所有分だけ解放する');
+
+    const renderStart = busho.indexOf('_renderBushoSelector(actionType');
+    const renderEnd = busho.indexOf('const getClanById', renderStart);
+    const renderBlock = busho.slice(renderStart, renderEnd);
+    assert.ok(renderBlock.includes('this._acquireCommonModalAIGuardHide();'), '武将一覧は共通モーダル所有窓口を使う');
+    assert.ok(!renderBlock.includes('this.ui.hideAIGuardTemporarily();'), '一覧再描画ごとにガード参照カウントを増やさない');
+
+    const interceptStart = war.indexOf('const showInterceptDialog = async (onResult) => {');
+    const interceptEnd = war.indexOf('// ★追加：籠城戦に入った時のメッセージ', interceptStart);
+    const interceptBlock = war.slice(interceptStart, interceptEnd);
+    assert.ok(!/onCancel:\s*\(\)\s*=>\s*\{\s*this\.game\.ui\.hideAIGuardTemporarily\(\)/.test(interceptBlock), '迎撃選択へ戻る時に専用モーダルの既存所有分を二重取得しない');
+    assert.ok(!/\(\)\s*=>\s*\{\s*this\.game\.ui\.hideAIGuardTemporarily\(\);\s*modal\.classList\.remove\('hidden'\)/.test(interceptBlock), '部隊分割取消でも迎撃モーダル復帰時にガードを積み増さない');
 });
 
 test('外交の使者選択画面は次の会話が可視化されるまで保持する', () => {

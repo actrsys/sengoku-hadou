@@ -756,7 +756,9 @@ Object.assign(UIInfoManager.prototype, {
     },
     
     _renderBushoSelector(actionType, targetId, extraData, onBack, scrollPos = 0) {
-        this.ui.hideAIGuardTemporarily(); 
+        // 共通モーダルの表示寿命につき1回だけAIガードを引き渡す。
+        // タブ／範囲／ソート変更による同じ一覧の再描画では参照カウントを積み増さない。
+        this._acquireCommonModalAIGuardHide();
         
         // 武将・拠点・勢力のID索引は GameManager が正本として保持しています。
         // 一覧を描くたびに4000人規模の Map を重複生成すると、古いスマホではタブ切替時の
