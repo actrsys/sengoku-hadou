@@ -19,6 +19,9 @@ class Clan {
         Object.assign(this, data);
         this.id = Number(this.id);
         this.leaderId = Number(this.leaderId);
+        // 大名の本拠地は所在（Busho.castleId）とは別。出陣・一時滞在で変化させない。
+        // 新規シナリオではGameManagerが確定し、以後はセーブに含めて維持する。
+        this.homeCastleId = Number(data.homeCastleId || 0);
         // data.color, data.name 等はCSVから自動で割り当たります
         
         // ★元々の大名家の名前を覚える箱を用意します（同名被り回避用）

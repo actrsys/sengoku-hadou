@@ -208,6 +208,11 @@ class AIStaffing {
                 this.game.factionSystem.handleMove(castellan, castle.id, bestCastle.id);
             }
             this.game.affiliationSystem.moveCastle(castellan, bestCastle.id);
+            // AIによる正式な居城移転だけ本拠地を更新する。出陣・占領の移動では変更しない。
+            if (castellan.isDaimyo) {
+                const clan = this.game.getClan(clanId);
+                if (clan) clan.homeCastleId = Number(bestCastle.id);
+            }
             castellan.isActionDone = true;
             
             return true; // 引越し完了の合図
@@ -333,11 +338,9 @@ class AIStaffing {
         });
 
         const occupiedProvinces = new Set();
-        const daimyo = this.game.getClanDaimyo(clanId);
-        if (daimyo && daimyo.castleId) {
-            const dCastle = this.game.getCastle(daimyo.castleId);
-            if(dCastle) occupiedProvinces.add(dCastle.provinceId);
-        }
+        // 行軍中の大名が占領先に滞在しても、本拠地の国は変わらない。
+        const daimyoHomeCastle = this.game.getDaimyoHomeCastle(clanId);
+        if (daimyoHomeCastle) occupiedProvinces.add(daimyoHomeCastle.provinceId);
         const clanLegions = this.game.legions.filter(l => l.clanId === clanId);
         clanLegions.forEach(l => {
             const cmd = this.game.getBusho(l.commanderId);
@@ -349,6 +352,9 @@ class AIStaffing {
         
         // ★大名や国主がいない国が候補。またはに、すでにいたとしても「直轄拠点が6つ以上」残っている国なら候補にします
         const candidateCastles = myDirectCastles.filter(c => {
+            // 本拠地は同国に直轄拠点が6つ以上あっても決して分配しない。
+            // 周辺の直轄拠点については従来の候補ルールを変えない。
+            if (daimyoHomeCastle && Number(c.id) === Number(daimyoHomeCastle.id)) return false;
             if (c.provinceId === 0) return false;
             // 誰もいない国ならOK
             if (!occupiedProvinces.has(c.provinceId)) return true;

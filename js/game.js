@@ -525,6 +525,10 @@ class GameManager {
                 if (!isScenarioLoadLatest()) return;
             }
             
+            // 開始時点の史実補正・イベントを反映した後で本拠地を確定する。
+            // 後の出陣や占領による一時移動とは区別し、セーブにも残す。
+            this.initializeDaimyoHomeCastles();
+
             // ★ここから追加：大名家の表示名を更新して同名被りを防ぎます！
             this.updateClanDisplayNames();
             
@@ -1217,6 +1221,31 @@ class GameManager {
     async endMonth() { return this.turnManager.endMonth(); }
     checkAllActionsDone() { return this.turnManager.checkAllActionsDone(); }
 
+    // 大名の本拠地の正本。現在の所在とは異なる場合がある。
+    // 本拠地が失われた時だけ、現在地の直轄拠点→他の直轄拠点の順で再選定する。
+    // 軍団領を勝手に直轄化したり、国主を解任したりはしない。
+    getDaimyoHomeCastle(clanId) {
+        const clan = this.getClan(clanId);
+        if (!clan) return null;
+        const isOwnedDirect = castle => castle
+            && Number(castle.ownerClan) === Number(clanId)
+            && Number(castle.legionId) === 0;
+        const stored = this.getCastle(clan.homeCastleId);
+        if (isOwnedDirect(stored)) return stored;
+        const daimyo = this.getClanDaimyo(clanId);
+        const present = daimyo ? this.getCastle(daimyo.castleId) : null;
+        const replacement = isOwnedDirect(present) ? present
+            : this.getClanCastles(clanId).find(isOwnedDirect);
+        clan.homeCastleId = replacement ? Number(replacement.id) : 0;
+        return replacement || null;
+    }
+
+    initializeDaimyoHomeCastles() {
+        for (const clan of this.clans) {
+            if (Number(clan.id) > 0 && !clan.isDestroyed) this.getDaimyoHomeCastle(clan.id);
+        }
+    }
+
     changeLeader(clanId, newLeaderId) { 
         this.getClanBushos(clanId).forEach(b => b.isDaimyo = false); 
         const newLeader = this.getBusho(newLeaderId); 
@@ -1229,6 +1258,10 @@ class GameManager {
             const daimyoCastle = this.getCastle(newLeader.castleId);
             if (daimyoCastle) {
                 daimyoCastle.legionId = 0;
+                const clan = this.getClan(clanId);
+                if (clan && Number(daimyoCastle.ownerClan) === Number(clanId)) {
+                    clan.homeCastleId = Number(daimyoCastle.id);
+                }
             }
         } 
         this.updateAllCastlesLords();

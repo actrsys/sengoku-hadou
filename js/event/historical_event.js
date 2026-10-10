@@ -1781,6 +1781,13 @@ window.GameEvents.push({
                 window.EventAction.moveBusho(game, nobunaga, 3);
                 window.EventAction.appointCastellan(game, nobunaga, inabayama);
             }
+            // AIによる正式な岐阜への居城移転を本拠地記録へ反映する。
+            const clan = game.getClan(odaClanId);
+            if (clan && Number(nobunaga.castleId) === 3
+                && Number(inabayama.ownerClan) === Number(odaClanId)
+                && Number(inabayama.legionId) === 0) {
+                clan.homeCastleId = Number(inabayama.id);
+            }
         }
 
         // ⑧ 画面にイベントが起きたことのメッセージを出してお知らせします
@@ -1891,6 +1898,13 @@ window.GameEvents.push({
             if (motoyasu.castleId !== 12) {
                 window.EventAction.moveBusho(game, motoyasu, 12);
                 window.EventAction.appointCastellan(game, motoyasu, hikuma);
+            }
+            // これは出陣ではなく史実イベントによる正式な居城移転。
+            const clan = game.getClan(matsudairaClanId);
+            if (clan && Number(motoyasu.castleId) === 12
+                && Number(hikuma.ownerClan) === Number(matsudairaClanId)
+                && Number(hikuma.legionId) === 0) {
+                clan.homeCastleId = Number(hikuma.id);
             }
         }
 

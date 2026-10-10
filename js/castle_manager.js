@@ -30,6 +30,14 @@ class CastleManager {
 
         this.setOwnerIdRaw(castle, newOwnerId);
         castle.legionId = Number(newLegionId); // 攻撃側の軍団IDになる
+        // 元の本拠地を失った場合は記録だけ失効させる。次の本拠地取得時に
+        // 残存する直轄拠点から再選定する（軍団領の強制接収はしない）。
+        if (oldOwnerId !== Number(newOwnerId)) {
+            const oldClan = this.game.getClan(oldOwnerId);
+            if (oldClan && Number(oldClan.homeCastleId) === Number(castle.id)) {
+                oldClan.homeCastleId = 0;
+            }
+        }
 
         // 石山城と尾山城のこっそり改名イベント
         if (castle.id === 33 || castle.id === 74) {
