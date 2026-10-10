@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>武将能力ランダム生成</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+        }
+        .control-panel {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #ffffff;
+            border: 1px solid #cccccc;
+            border-radius: 5px;
+        }
+        select {
+            font-size: 16px;
+            padding: 5px;
+            margin-right: 15px;
+        }
+        .instruction {
+            color: #666666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            background-color: #ffffff;
+        }
+        th, td {
+            border: 1px solid #cccccc;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #eeeeee;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>戦国覇道 - 武将能力ランダム生成</h2>
+
+    <div class="control-panel">
+        <label>全体の強さ：</label>
+        <select id="overallStrength">
+            <option value="超弱">超弱</option>
+            <option value="弱">弱</option>
+            <option value="中" selected>中</option>
+            <option value="強">強</option>
+            <option value="超強">超強</option>
+        </select>
+
+        <label>武将のタイプ：</label>
+        <select id="generalType">
+            <option value="バランス" selected>バランス (平均的)</option>
+            <option value="勇将">勇将 (統率高・武力中)</option>
+            <option value="猛将">猛将 (統率中・武力高)</option>
+            <option value="英雄">英雄 (統率高・武力高)</option>
+            <option value="文官">文官 (内政高)</option>
+            <option value="特使">特使 (外交高)</option>
+            <option value="奉行">奉行 (内政高・外交高)</option>
+            <option value="剣豪">剣豪 (武力高・外交中)</option>
+            <option value="傾奇者">傾奇者 (極端に変化)</option>
+        </select>
+
+        <label>智謀：</label>
+        <select id="intelligenceLevel">
+            <option value="超弱">超弱</option>
+            <option value="弱">弱</option>
+            <option value="中" selected>中</option>
+            <option value="強">強</option>
+            <option value="超強">超強</option>
+        </select>
+
+        <label>魅力：</label>
+        <select id="charmLevel">
+            <option value="超弱">超弱</option>
+            <option value="弱">弱</option>
+            <option value="中" selected>中</option>
+            <option value="強">強</option>
+            <option value="超強">超強</option>
+        </select>
+
+        <button onclick="generateStats()" style="font-size: 16px; padding: 5px 15px; margin-left: 10px; cursor: pointer;">実行</button>
+
+        <div class="instruction">
+            ※ 「実行」ボタンを押すか、画面のどこかでキーボードの「Backspace」キーを押すと能力が新しく作られます。
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>leadership<br>(統率)</th>
+                <th>strength<br>(武力)</th>
+                <th>politics<br>(内政)</th>
+                <th>diplomacy<br>(外交)</th>
+                <th>intelligence<br>(智謀)</th>
+                <th>charm<br>(魅力)</th>
+                <th>innovation<br>(革新)</th>
+                <th>cooperation<br>(協調)</th>
+                <th>ambition<br>(野心)</th>
+                <th>duty<br>(義理)</th>
+                <th>affinity<br>(相性)</th>
+                <th>personality<br>(性格)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td id="val_leadership">-</td>
+                <td id="val_strength">-</td>
+                <td id="val_politics">-</td>
+                <td id="val_diplomacy">-</td>
+                <td id="val_intelligence">-</td>
+                <td id="val_charm">-</td>
+                <td id="val_innovation">-</td>
+                <td id="val_cooperation">-</td>
+                <td id="val_ambition">-</td>
+                <td id="val_duty">-</td>
+                <td id="val_affinity">-</td>
+                <td id="val_personality">-</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        // 指定した範囲（最小値〜最大値）の中から、ランダムな数字を1つ選んで返す機能
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        // 数値が10より小さくならないように、80より大きくならないように整える機能
+        function clamp(value) {
+            if (value < 10) return 10;
+            if (value > 80) return 80;
+            return value;
+        }
+
+        // メインのステータス生成機能
+        function generateStats() {
+            // プルダウンで選ばれている文字を読み取る
+            const overall = document.getElementById('overallStrength').value;
+            const type = document.getElementById('generalType').value;
+            const intel = document.getElementById('intelligenceLevel').value;
+            const charmLevel = document.getElementById('charmLevel').value;
+
+            // 「全体の強さ」に合わせて、基本となる数字の範囲を決める（最大80に変更して再計算）
+            let minBase = 10;
+            let maxBase = 80;
+
+            if (overall === "超弱") { minBase = 10; maxBase = 20; }
+            if (overall === "弱")   { minBase = 20; maxBase = 35; }
+            if (overall === "中")   { minBase = 35; maxBase = 50; }
+            if (overall === "強")   { minBase = 50; maxBase = 65; }
+            if (overall === "超強") { minBase = 65; maxBase = 80; }
+
+            // とりあえず全員、基本の範囲内でランダムに能力を決める（智謀と魅力は後で上書きするので除外）
+            let stats = {
+                leadership: getRandomInt(minBase, maxBase),
+                strength: getRandomInt(minBase, maxBase),
+                politics: getRandomInt(minBase, maxBase),
+                diplomacy: getRandomInt(minBase, maxBase),
+                innovation: getRandomInt(minBase, maxBase),
+                cooperation: getRandomInt(minBase, maxBase),
+                ambition: getRandomInt(minBase, maxBase),
+                duty: getRandomInt(minBase, maxBase),
+            };
+
+            // 「武将のタイプ」に合わせて、特定の能力にボーナスを足す
+            if (type === "バランス") {
+                // バランスは特別なボーナスを足さず、そのままの数字を使います
+            }
+            if (type === "勇将") {
+                stats.leadership += 20; // 統率を大きくアップ
+                stats.strength += 10;   // 武力を少しアップ
+            }
+            if (type === "猛将") {
+                stats.leadership += 10; 
+                stats.strength += 20;   
+            }
+            if (type === "英雄") {
+                stats.leadership += 20; 
+                stats.strength += 20;   
+            }
+            if (type === "文官") {
+                stats.politics += 25;   // 内政を大きくアップ
+            }
+            if (type === "特使") {
+                stats.diplomacy += 25;  // 外交を大きくアップ
+            }
+            if (type === "奉行") {
+                stats.politics += 15;   
+                stats.diplomacy += 15;  
+            }
+            if (type === "剣豪") {
+                stats.strength += 25;   // 武力を一番大きくアップ
+                stats.diplomacy += 15;  // 外交を二番目に大きくアップ
+            }
+            if (type === "傾奇者") {
+                // 傾奇者は全体の強さを無視して、能力を10から80の間でランダムに暴れさせます
+                stats.leadership = getRandomInt(10, 80);
+                stats.strength = getRandomInt(10, 80);
+                stats.politics = getRandomInt(10, 80);
+                stats.diplomacy = getRandomInt(10, 80);
+                stats.innovation = getRandomInt(10, 80);
+                stats.cooperation = getRandomInt(10, 80);
+                stats.ambition = getRandomInt(10, 80);
+                stats.duty = getRandomInt(10, 80);
+            }
+
+            // 5段階のプルダウンに合わせて数字を決める機能
+
+            // 5段階のプルダウンに合わせて数字を決める機能
+            function getStatByLevel(level) {
+                if (level === "超弱") return getRandomInt(10, 20);
+                if (level === "弱")   return getRandomInt(20, 35);
+                if (level === "中")   return getRandomInt(35, 50);
+                if (level === "強")   return getRandomInt(50, 65);
+                if (level === "超強") return getRandomInt(65, 80);
+                return getRandomInt(35, 50);
+            }
+
+            // 智謀と魅力を設定する
+            stats.intelligence = getStatByLevel(intel);
+            stats.charm = getStatByLevel(charmLevel);
+
+            // すべての数字が、最低10、最大90の間に収まるように調整する
+            stats.leadership = clamp(stats.leadership);
+            stats.strength = clamp(stats.strength);
+            stats.politics = clamp(stats.politics);
+            stats.diplomacy = clamp(stats.diplomacy);
+            stats.charm = clamp(stats.charm);
+            stats.innovation = clamp(stats.innovation);
+            stats.cooperation = clamp(stats.cooperation);
+            stats.ambition = clamp(stats.ambition);
+            stats.duty = clamp(stats.duty);
+
+            // 性格のリストからランダムに1つ選ぶ
+            const personalities = ["aggressive", "balanced", "hermit", "conservative"];
+            const randomPersonality = personalities[Math.floor(Math.random() * personalities.length)];
+
+            // 相性を1〜100の間で決める（相性は10〜90の制限から外しています。制限したければclampを通します）
+            const randomAffinity = getRandomInt(1, 100);
+
+            // 画面の表に、作った数字を書き込む
+            document.getElementById('val_leadership').textContent = stats.leadership;
+            document.getElementById('val_strength').textContent = stats.strength;
+            document.getElementById('val_politics').textContent = stats.politics;
+            document.getElementById('val_diplomacy').textContent = stats.diplomacy;
+            document.getElementById('val_intelligence').textContent = stats.intelligence;
+            document.getElementById('val_charm').textContent = stats.charm;
+            document.getElementById('val_innovation').textContent = stats.innovation;
+            document.getElementById('val_cooperation').textContent = stats.cooperation;
+            document.getElementById('val_ambition').textContent = stats.ambition;
+            document.getElementById('val_duty').textContent = stats.duty;
+            document.getElementById('val_affinity').textContent = randomAffinity;
+            document.getElementById('val_personality').textContent = randomPersonality;
+        }
+
+        // バックスペースキーが押されたら、上の機能を動かす設定
+        document.addEventListener('keydown', function(event) {
+            // もし押されたキーが「Backspace」だったら
+            if (event.key === 'Backspace') {
+                // 文字を入力する箱（テキストボックスなど）の中にいる時は、文字を消す動きを優先させる
+                if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                    return; 
+                }
+                
+                // ブラウザの「戻る」機能が動いてしまわないように止める
+                event.preventDefault();
+                
+                // 能力を作る機能を呼び出す
+                generateStats();
+            }
+        });
+
+        // ページを開いた時に、最初から1人分作っておく
+        generateStats();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><!-- APP_CSS --></head>
+<body>
+<div id="game-screen" style="position:absolute;left:0;top:80px;width:360px;height:640px;overflow:hidden;background:#203020;">
+  <div id="app" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+    <button id="under-button" style="width:140px;height:50px;">背面ボタン</button>
+  </div>
+  <div id="watch-return-reserved-notice">観戦終了を予約しました<br>現在の処理が終わるまで待機します</div>
+  <div id="ending-screen"></div>
+</div>
+<script>window.__underClicks=0;document.getElementById('under-button').addEventListener('click',()=>window.__underClicks++);</script>
+</body></html>

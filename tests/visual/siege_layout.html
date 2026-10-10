@@ -1,0 +1,210 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;background:#111;overflow:hidden}#game-screen{position:absolute;left:0;top:0;overflow:hidden}</style><!-- APP_CSS --></head><body><div id="game-screen">        <div id="war-modal" class="modal">
+            <div class="modal-content war-modal-content">
+                
+                <div class="war-screen responsive-war-layout">
+                    
+                    <div class="responsive-war-left">
+                        <div id="war-top-bar" class="war-top-bar">
+                            <span id="war-date-info"></span>
+                            <span id="war-weather-info">☀ 晴れ</span>
+                        </div>
+                        <div class="war-wall-container">
+                            <div class="war-wall-side left">
+                                <h2 class="war-title" id="war-title-name"></h2>
+                            </div>
+                            <div class="war-wall-center">
+                                <span class="war-wall-label">城防御</span>
+                                <div class="war-wall-hexagon-wrap">
+                                    <div class="war-wall-hexagon-inner">
+                                        <span id="war-def-wall-info"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="war-wall-side right">
+                                <span id="war-turn-info"></span>
+                            </div>
+                        </div>
+                        <div id="war-visual-area" class="war-visual responsive-war-visual">
+                            <div id="war-weather-layer" class="hidden"></div>
+                            
+                            <div class="war-side-wrapper war-attack-side">
+                                <div class="war-reinf-col">
+                                    
+                                    <!-- 【攻撃側・応援軍】（メイン軍と同じ勢力からの援軍） -->
+                                    <div id="war-atk-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box atk-self">
+                                        <div class="responsive-army-title">
+                                            <span id="war-atk-self-reinf-org">---</span>
+                                        </div>
+                                        <div id="war-atk-self-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container">
+                                                <div id="war-atk-self-reinf-face-container">
+                                                    <img id="war-atk-self-reinf-face" class="responsive-war-face" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+                                                </div>
+                                                <div id="war-atk-self-reinf-empty-icon" class="hidden empty-icon">なし</div>
+                                            </div>
+                                            
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-atk-self-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row-group">
+                                                    <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-atk-self-reinf-training">---</span></div>
+                                                    <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-atk-self-reinf-morale">---</span></div>
+                                                </div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-atk-self-reinf-rice">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-atk-self-reinf-horses">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-atk-self-reinf-guns">---</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 【攻撃側・友軍】（メイン軍とは異なる同盟国や諸勢力からの援軍） -->
+                                    <div id="war-atk-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box atk-ally">
+                                        <div class="responsive-army-title">
+                                            <span id="war-atk-ally-reinf-org">---</span>
+                                        </div>
+                                        <div id="war-atk-ally-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container">
+                                                <div id="war-atk-ally-reinf-face-container">
+                                                    <img id="war-atk-ally-reinf-face" class="responsive-war-face" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+                                                </div>
+                                                <div id="war-atk-ally-reinf-empty-icon" class="hidden empty-icon">なし</div>
+                                            </div>
+                                            
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-atk-ally-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row-group">
+                                                    <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-atk-ally-reinf-training">---</span></div>
+                                                    <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-atk-ally-reinf-morale">---</span></div>
+                                                </div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-atk-ally-reinf-rice">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-atk-ally-reinf-horses">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-atk-ally-reinf-guns">---</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                                
+                                <!-- 【攻撃側・メイン軍】 -->
+                                <div class="army-box attacker responsive-army-box main-army-box">
+                                    <h3 class="army-title responsive-army-title"><span id="war-atk-name"></span></h3>
+                                    <div class="stat-busho main-busho-label"><span id="war-atk-busho"></span></div>
+                                    <div class="responsive-army-content">
+                                        <img id="war-atk-face" class="war-face hidden responsive-war-face" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
+                                        <div class="responsive-army-stats">
+                                            <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-atk-soldier" class="stat-val-large"></span></div>
+                                            <div class="stat-row-group">
+                                                <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-atk-training"></span></div>
+                                                <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-atk-morale"></span></div>
+                                            </div>
+                                            <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-atk-rice"></span></div>
+                                            <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-atk-horses"></span></div>
+                                            <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-atk-guns"></span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="war-side-wrapper war-defense-side">
+                            
+                                <!-- 【守備側・メイン軍】 -->
+                                <div class="army-box defender responsive-army-box main-army-box">
+                                    <h3 class="army-title responsive-army-title"><span id="war-def-name"></span></h3>
+                                    <div class="stat-busho main-busho-label"><span id="war-def-busho"></span></div>
+                                    <div class="responsive-army-content">
+                                        <img id="war-def-face" class="war-face hidden responsive-war-face" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
+                                        <div class="responsive-army-stats">
+                                            <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-def-soldier" class="stat-val-large"></span></div>
+                                            <div class="stat-row-group">
+                                                <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-def-training"></span></div>
+                                                <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-def-morale"></span></div>
+                                            </div>
+                                            <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-def-rice"></span></div>
+                                            <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-def-horses"></span></div>
+                                            <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-def-guns"></span></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="war-reinf-col">
+                                    
+                                    <!-- 【守備側・応援軍】（メイン軍と同じ勢力からの援軍） -->
+                                    <div id="war-def-self-reinf-card" class="war-side-info war-reinf-card responsive-army-box def-self">
+                                        <div class="responsive-army-title">
+                                            <span id="war-def-self-reinf-org">---</span>
+                                        </div>
+                                        <div id="war-def-self-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container">
+                                                <div id="war-def-self-reinf-face-container">
+                                                    <img id="war-def-self-reinf-face" class="responsive-war-face" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+                                                </div>
+                                                <div id="war-def-self-reinf-empty-icon" class="hidden empty-icon">なし</div>
+                                            </div>
+                                            
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-def-self-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row-group">
+                                                    <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-def-self-reinf-training">---</span></div>
+                                                    <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-def-self-reinf-morale">---</span></div>
+                                                </div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-def-self-reinf-rice">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-def-self-reinf-horses">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-def-self-reinf-guns">---</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 【守備側・友軍】（メイン軍とは異なる同盟国や諸勢力からの援軍） -->
+                                    <div id="war-def-ally-reinf-card" class="war-side-info war-reinf-card responsive-army-box def-ally">
+                                        <div class="responsive-army-title">
+                                            <span id="war-def-ally-reinf-org">---</span>
+                                        </div>
+                                        <div id="war-def-ally-reinf-busho" class="stat-busho reinf-busho-label">---</div>
+                                        <div class="reinf-content-wrap">
+                                            <div class="reinf-face-container">
+                                                <div id="war-def-ally-reinf-face-container">
+                                                    <img id="war-def-ally-reinf-face" class="responsive-war-face" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+                                                </div>
+                                                <div id="war-def-ally-reinf-empty-icon" class="hidden empty-icon">なし</div>
+                                            </div>
+                                            
+                                            <div class="responsive-army-stats">
+                                                <div class="stat-row"><div><span class="label-pc">兵士</span><span class="label-sp">兵</span></div><span id="war-def-ally-reinf-soldier" class="stat-val-large">---</span></div>
+                                                <div class="stat-row-group">
+                                                    <div class="stat-row"><div><span class="label-pc">訓練</span><span class="label-sp">練</span></div><span id="war-def-ally-reinf-training">---</span></div>
+                                                    <div class="stat-row"><div><span class="label-pc">士気</span><span class="label-sp">士</span></div><span id="war-def-ally-reinf-morale">---</span></div>
+                                                </div>
+                                                <div class="stat-row"><div><span class="label-pc">兵糧</span><span class="label-sp">糧</span></div><span id="war-def-ally-reinf-rice">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">軍馬</span><span class="label-sp">馬</span></div><span id="war-def-ally-reinf-horses">---</span></div>
+                                                <div class="stat-row"><div><span class="label-pc">鉄砲</span><span class="label-sp">砲</span></div><span id="war-def-ally-reinf-guns">---</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                            
+                        </div>
+                        
+                        <div class="war-controls-shell">
+                            <div id="war-controls" class="war-controls-area"><div class="war-controls-buttons"><button class="cmd-btn active-cmd">総攻撃</button><button class="cmd-btn">火計</button><button class="cmd-btn">挑発</button><button class="cmd-btn">鼓舞</button><button class="cmd-btn">破壊</button><button class="cmd-btn back">撤退</button></div><div class="war-controls-desc"><div class="war-command-desc-title">総攻撃</div><div>全軍で城へ攻めかかります。兵の損害は大きくなりますが、守備兵と城防御へ大きな打撃を狙えます。</div><div class="war-command-desc-confirm">もう一度押すと実行します。</div></div></div>
+                            
+                            <div id="war-ai-guard" class="hidden">
+                                <div class="loading-spinner war-ai-spinner"></div>
+                                <span id="war-ai-guard-text">敵軍思考中...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="war-log" class="responsive-war-log"></div>
+                </div>
+            </div>
+        </div>
+
+</div><script>
+const vals={"war-date-info": "1568年 3月", "war-weather-info": "☀ 晴れ", "war-title-name": "稲葉山城 攻城戦", "war-def-wall-info": "184", "war-turn-info": "第 4 日", "war-atk-name": "織田家 攻撃本隊", "war-atk-busho": "織田信長", "war-atk-soldier": "4,820", "war-atk-training": "87", "war-atk-morale": "82", "war-atk-rice": "7,240", "war-atk-horses": "1,880", "war-atk-guns": "1,420", "war-def-name": "斎藤家 守備本隊", "war-def-busho": "斎藤龍興", "war-def-soldier": "3,160", "war-def-training": "72", "war-def-morale": "76", "war-def-rice": "4,860", "war-def-horses": "540", "war-def-guns": "380", "war-atk-self-reinf-org": "織田家 援軍", "war-atk-self-reinf-busho": "柴田勝家", "war-atk-self-reinf-soldier": "1,240", "war-atk-self-reinf-training": "81", "war-atk-self-reinf-morale": "85", "war-atk-self-reinf-rice": "2,100", "war-atk-self-reinf-horses": "620", "war-atk-self-reinf-guns": "120", "war-atk-ally-reinf-org": "徳川家 援軍", "war-atk-ally-reinf-busho": "本多忠勝", "war-atk-ally-reinf-soldier": "980", "war-atk-ally-reinf-training": "84", "war-atk-ally-reinf-morale": "88", "war-atk-ally-reinf-rice": "1,540", "war-atk-ally-reinf-horses": "500", "war-atk-ally-reinf-guns": "80", "war-def-self-reinf-org": "斎藤家 援軍", "war-def-self-reinf-busho": "氏家直元", "war-def-self-reinf-soldier": "760", "war-def-self-reinf-training": "70", "war-def-self-reinf-morale": "73", "war-def-self-reinf-rice": "1,120", "war-def-self-reinf-horses": "170", "war-def-self-reinf-guns": "50", "war-def-ally-reinf-org": "浅井家 援軍", "war-def-ally-reinf-busho": "遠藤直経", "war-def-ally-reinf-soldier": "640", "war-def-ally-reinf-training": "77", "war-def-ally-reinf-morale": "79", "war-def-ally-reinf-rice": "940", "war-def-ally-reinf-horses": "240", "war-def-ally-reinf-guns": "0"}; for(const [id,v] of Object.entries(vals)){const el=document.getElementById(id);if(el)el.textContent=v;}
+const turn=document.getElementById('war-turn-info'); if(turn) turn.innerHTML='第 <span class="turn-number">4</span> 日';
+
+</script></body></html>
