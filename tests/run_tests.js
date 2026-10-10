@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r429');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r432');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4823,7 +4823,7 @@ test('タイトルとシステムのロード可否はSaveManagerの実ロード
     const catalog = read('js/command_catalog.js');
     const save = read('js/save_manager.js');
     const game = read('js/game.js');
-    const at = ui.indexOf('async checkSaveDataForTitle()');
+    const at = ui.indexOf('async checkSaveDataForTitle(options = {})');
     const block = ui.slice(at, at + 1200);
     assert.ok(at >= 0);
     assert.ok(block.includes('this.game.saveManager.refreshLoadAvailability()'));
@@ -8148,11 +8148,43 @@ test('結果画面との引き渡しは結果を先に表示し背景復帰も�
     const closeStart = ui.indexOf('\n    closeResultModal() {', showStart);
     const showBlock = ui.slice(showStart, closeStart);
     assert.ok(showBlock.indexOf("this.resultModal.classList.remove('hidden')") < showBlock.indexOf('this._closePendingDialogHandoffNow()'), '結果画面を可視化してから旧会話を閉じる');
-    assert.ok(showBlock.indexOf('this._closePendingDialogHandoffNow()') < showBlock.indexOf('this.pauseBackgroundUpdates()'), '背景リソース整理より先に引き渡し先を表示する');
+    assert.ok(showBlock.indexOf('this._closePendingDialogHandoffNow()') < showBlock.indexOf("typeof updateBehindCover === 'function'"), '旧会話を結果へ引き渡してから背景更新へ進む');
+    assert.ok(showBlock.indexOf("typeof updateBehindCover === 'function'") < showBlock.indexOf('this.pauseBackgroundUpdates()'), '背景更新は結果画面の覆いの下・背景停止前に行う');
 
     const closeEnd = ui.indexOf('showQuantityModal(', closeStart);
     const closeBlock = ui.slice(closeStart, closeEnd > closeStart ? closeEnd : closeStart + 2400);
     assert.ok(closeBlock.indexOf('this.resumeBackgroundUpdates()') < closeBlock.indexOf("this.resultModal.classList.add('hidden')"), '背景を復帰してから結果画面を隠す');
+});
+
+
+test('会話・コマンド・評定から結果へ進む時は重い背景更新や元画面終了を結果画面の下で行う', () => {
+    const diplomacy = read('js/diplomacy.js');
+    const command = read('js/command_system.js');
+    const kunishu = read('js/kunishu_system.js');
+    const court = read('js/courtRank_system.js');
+    const council = read('js/legion_council_view.js');
+
+    const dipStart = diplomacy.indexOf('showDiplomacyResult(');
+    const dipEnd = diplomacy.indexOf('\n    /**', dipStart + 1);
+    const dipBlock = diplomacy.slice(dipStart, dipEnd);
+    assert.ok(dipBlock.includes('const refreshBehindResult ='));
+    assert.ok(dipBlock.includes('showResultModal(msg, onClose, null, refreshBehindResult)'));
+    assert.ok(!/if \(doerClanId === this\.game\.playerClanId\)[\s\S]*?renderMap\(\);[\s\S]*?showResultModal\(msg/.test(dipBlock), '外交は結果表示前に地図を再描画しない');
+
+    const finishStart = command.indexOf('finishCommand(msg');
+    const finishEnd = command.indexOf('// ==========================================', finishStart);
+    const finishBlock = command.slice(finishStart, finishEnd);
+    assert.ok(finishBlock.includes('showResultModal(msg, null, null, refreshBehindResult)'));
+    assert.ok(finishBlock.includes('} else {\n            refreshBehindResult();'), '結果が無いコマンドだけ通常画面を直接更新する');
+
+    assert.ok(kunishu.includes('showResultModal(resultMsg, null, null, () => {'), '諸勢力取込も結果の下で地図を更新する');
+    assert.ok(kunishu.includes('`${doer.name}が${kunishuName}と親善を行いました\\n友好度が上昇しました`,\n            null,\n            null,\n            () => {'), '諸勢力親善も結果の下でヘッダーを更新する');
+    assert.ok(court.includes('null,\n            () => {\n                this.game.ui.updatePanelHeader();'), '朝廷献上も結果の下でヘッダーを更新する');
+
+    const councilStart = council.indexOf('confirmFinish()');
+    const councilEnd = council.indexOf('\n    }\n}', councilStart);
+    const councilBlock = council.slice(councilStart, councilEnd);
+    assert.ok(councilBlock.indexOf('this.ui.beginVisualHandoff(() => this.close())') < councilBlock.indexOf('this.ui.showResultModal('), '評定は結果画面を引き渡し先として元画面を保持する');
 });
 
 
@@ -8854,7 +8886,8 @@ test('新規開始ではAI作戦4種と人事評価キャッシュをすべて�
 
     const game = read('js/game.js');
     const startAt = game.indexOf('startNewGame(options = {})');
-    const startBlock = game.slice(startAt, startAt + 2600);
+    const startEnd = game.indexOf('    startWatchGame()', startAt);
+    const startBlock = game.slice(startAt, startEnd);
     assert.ok(startBlock.includes('this.aiOperationManager.resetAllState();'));
     assert.ok(startBlock.includes('this.aiStaffing.resetCaches();'));
 
@@ -8868,7 +8901,8 @@ test('新規開始ではAI作戦4種と人事評価キャッシュをすべて�
 test('ロード時も前ゲームのAI人事評価キャッシュを破棄する', () => {
     const save = read('js/save_manager.js');
     const restoreAt = save.indexOf('async _restoreSaveDataObj(d)');
-    const block = save.slice(restoreAt, restoreAt + 2600);
+    const restoreEnd = save.indexOf('    // ==========================================\n    // セーブ実行部分', restoreAt);
+    const block = save.slice(restoreAt, restoreEnd);
     assert.ok(block.includes('this.game.aiStaffing.resetCaches();'));
 });
 
@@ -8887,7 +8921,8 @@ test('強制モーダルリセットは状態マークタイマーを破棄し�
     assert.ok(resetBlock.includes('this._statusCarouselTimer = null;'));
     assert.ok(resetBlock.includes('options.skipBackgroundRecovery === true'));
     const titleAt = ui.indexOf('async returnToTitle(options = {})');
-    const titleBlock = ui.slice(titleAt, titleAt + 1500);
+    const titleEnd = ui.indexOf('\n    showDaimyoConfirmModal(', titleAt);
+    const titleBlock = ui.slice(titleAt, titleEnd > titleAt ? titleEnd : titleAt + 3600);
     assert.ok(titleBlock.includes('this.forceResetModals({ skipBackgroundRecovery: true });'));
 });
 
@@ -10519,7 +10554,7 @@ test('地図拠点DOMは同一シナリオ中に再利用し表示内容だけ�
 
 test('顔画像アイドル先読みはシナリオ世代tokenで旧batchを継続しない', () => {
     const game = read('js/game.js');
-    const preloadAt = game.indexOf('preloadFaceIcons()');
+    const preloadAt = game.indexOf('\n    preloadFaceIcons() {');
     const preloadBlock = game.slice(preloadAt, preloadAt + 4200);
     assert.ok(preloadBlock.includes('const preloadGeneration = Number(this._facePreloadGeneration || 0) + 1;'));
     assert.ok(preloadBlock.includes('if (!isCurrentGeneration() || startIndex >= urls.length) return;'));
@@ -11887,14 +11922,16 @@ test('攻城戦の進行timerは戦争世代をまたいで次の戦争や次タ
 });
 
 
-test('旧ターンの0ms継続はタイトル・ロード後にphase境界を越えて進行しない', () => {
+test('旧ターンの0ms継続はタイトル・ロード後にturn-flow世代境界を越えて進行しない', () => {
     const turn = read('js/turn_manager.js');
     const processAt = turn.indexOf('async processTurn()');
-    const processBlock = turn.slice(processAt, processAt + 900);
-    assert.ok(processBlock.includes("if (game.phase !== 'game' || game.isRestoringSave) return;"));
+    const processBlock = turn.slice(processAt, processAt + 1100);
+    assert.ok(processBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);'));
+    assert.ok(processBlock.includes('if (!isCurrentFlow()) return;'));
     const finishAt = turn.indexOf('async finishTurn()');
-    const finishBlock = turn.slice(finishAt, finishAt + 500);
-    assert.ok(finishBlock.includes("if (game.phase !== 'game' || game.isRestoringSave) return;"));
+    const finishBlock = turn.slice(finishAt, finishAt + 800);
+    assert.ok(finishBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);'));
+    assert.ok(finishBlock.includes('if (!isCurrentFlow()) return;'));
 });
 
 
@@ -12114,29 +12151,66 @@ test('共通スマホ長押しはカスタムスクロールを奪わずOS割込
     assert.ok(block.includes("document.addEventListener('visibilitychange'"), 'アプリ非表示でも未発火長押しを破棄する');
 });
 
-test('ターン処理はダイアログ待ち中のロードで旧Castle参照を再開しない', () => {
+test('通常ターン本体もawait後にTurnManager世代を再確認し旧処理を新シナリオへ戻さない', () => {
     const turn = read('js/turn_manager.js');
     const at = turn.indexOf('async processTurn()');
     const end = turn.indexOf('async finishTurn()', at);
     const block = turn.slice(at, end);
-    assert.ok(block.includes("if (game.phase !== 'game' || game.isRestoringSave) return;"), 'processTurn開始時に復元中を弾く');
+    assert.ok(block.includes('const turnFlowGeneration = Number(this._turnFlowGeneration || 0);'));
+    assert.ok(block.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);'));
     assert.ok(block.includes('const expectedTurnIndex = Number(game.currentIndex);'));
     assert.ok(block.includes('const castle = game.turnQueue[expectedTurnIndex];'));
     const waitAt = block.indexOf('await game.ui.waitForDialogs();', block.indexOf('const expectedTurnIndex'));
-    const recheckAt = block.indexOf("if (game.phase !== 'game' || game.isRestoringSave) return;", waitAt);
+    const recheckAt = block.indexOf('if (!isCurrentFlow()) return;', waitAt);
     const sameTurnAt = block.indexOf('game.turnQueue[expectedTurnIndex] !== castle', waitAt);
     const ownerAt = block.indexOf('const ownerId = Number(castle.ownerClan);', waitAt);
-    assert.ok(waitAt >= 0 && recheckAt > waitAt, 'waitForDialogs後にロード寿命を再確認する');
+    assert.ok(waitAt >= 0 && recheckAt > waitAt, 'waitForDialogs後にturn-flow世代を再確認する');
     assert.ok(sameTurnAt > recheckAt, '待機前と同じturnQueue要素か確認する');
     assert.ok(ownerAt > sameTurnAt, '所有者分類はawait後の現在値から計算する');
     const monthWaitAt = block.indexOf('await game.ui.waitForDialogs();');
     const monthEndAt = block.indexOf('await game.endMonth();');
-    assert.ok(block.indexOf("if (game.phase !== 'game' || game.isRestoringSave) return;", monthWaitAt) < monthEndAt, '月末遷移も待機後に復元中を弾く');
+    assert.ok(block.indexOf('if (!isCurrentFlow()) return;', monthWaitAt) < monthEndAt, '月末遷移も待機後に同じ世代だけ続行する');
+    const autoSaveAt = block.indexOf('await game.executeAutoSave();');
+    assert.ok(autoSaveAt >= 0 && block.indexOf('if (!isCurrentFlow()) return;', autoSaveAt) > autoSaveAt, 'オートセーブ完了後も旧ターン世代を再開しない');
 
     const finishAt = turn.indexOf('async finishTurn()');
-    const finishBlock = turn.slice(finishAt, finishAt + 1200);
-    assert.ok(finishBlock.includes("if (game.phase !== 'game' || game.isRestoringSave) return;"), 'finishTurnも復元中に旧ターンを進めない');
+    const finishEnd = turn.indexOf('async endMonth()', finishAt);
+    const finishBlock = turn.slice(finishAt, finishEnd);
+    assert.ok(finishBlock.includes('const turnFlowGeneration = Number(this._turnFlowGeneration || 0);'));
+    const watchAt = finishBlock.indexOf("await game.tryProcessQueuedWatchReturn('turn_complete')");
+    assert.ok(watchAt >= 0 && finishBlock.indexOf('if (!isCurrentFlow()) return;', watchAt) > watchAt, '観戦復帰待ち後も旧finishTurnを新世代へ継続しない');
 });
+
+test('旧processTurnは待機中に世代が変われば新シナリオのendMonthを呼ばない', async () => {
+    const ctx = createContext({ setTimeout, clearTimeout, Promise });
+    loadScript(ctx, 'js/turn_manager.js');
+    let releaseDialogs = null;
+    let endMonthCalls = 0;
+    const game = {
+        phase: 'game',
+        isRestoringSave: false,
+        aiTimer: null,
+        selectionMode: null,
+        currentIndex: 0,
+        turnQueue: [],
+        isProcessingAI: false,
+        warManager: { state: { active: false } },
+        ui: { waitForDialogs: () => new Promise(resolve => { releaseDialogs = resolve; }) },
+        writeSystemDiagnostic() {},
+        async endMonth() { endMonthCalls++; }
+    };
+    const manager = new ctx.TurnManager(game);
+    game.turnManager = manager;
+    const oldTurn = manager.processTurn();
+    manager.abortForScenarioTransition();
+    // 新シナリオがすでにgameまで到達した状態を再現する。phaseだけでは旧awaitを識別できない。
+    game.phase = 'game';
+    game.isRestoringSave = false;
+    releaseDialogs();
+    await oldTurn;
+    assert.strictEqual(endMonthCalls, 0);
+});
+
 
 test('月初浪人移動は隣接索引を使い旧候補順と乱数契約を維持する', () => {
     const affiliation = read('js/affiliation_system.js');
@@ -12181,8 +12255,8 @@ test('月初月末とAI予約はシナリオ世代をまたいでロード・タ
     const scheduleBlock = turn.slice(scheduleAt, turn.indexOf('async processTurn()', scheduleAt));
     assert.ok(scheduleBlock.includes('const turnFlowGeneration = Number(this._turnFlowGeneration || 0);'));
     assert.ok(scheduleBlock.includes('if (!this._isTurnFlowCurrent(turnFlowGeneration)) return;'));
-    assert.ok(game.includes('this.turnManager.abortForScenarioTransition();'), '新規開始で旧ターン世代を切る');
-    assert.ok(save.includes('this.game.turnManager.abortForScenarioTransition();'), 'ロード復元開始で旧ターン世代を切る');
+    assert.ok(game.includes('turnManager.abortForScenarioTransition();'), '新規開始・シナリオ読込で旧ターン世代を切る');
+    assert.ok(save.includes('turnManager.abortForScenarioTransition();'), 'ロード復元開始で旧ターン世代を切る');
     const titleAt = ui.indexOf('async returnToTitle(options = {})');
     const titleBlock = ui.slice(titleAt, titleAt + 2200);
     assert.ok(titleBlock.indexOf('this.game.turnManager.abortForScenarioTransition();') < titleBlock.indexOf('await this.waitForNextPaint();'), 'タイトル復帰は最初のawaitより先に旧ターン世代を切る');
@@ -13676,4 +13750,101 @@ test('CommandSystemの通常入力可否は観戦・AI・委任・他勢力タ�
         enemy: false,
         selecting: false
     });
+});
+
+test('r430では開始前の非同期遷移もTurnManager世代だけで旧awaitを遮断する', () => {
+    const turn = read('js/turn_manager.js');
+    const latestAt = turn.indexOf('isTurnFlowGenerationLatest(generation)');
+    const latestBlock = turn.slice(latestAt, latestAt + 260);
+    assert.ok(latestAt >= 0, 'phaseに依存しない世代比較APIを持つ');
+    assert.ok(latestBlock.includes('this._turnFlowGeneration'));
+    assert.ok(!latestBlock.includes("phase === 'game'"), '開始前の読込でも使える純粋な世代比較にする');
+    assert.ok(!latestBlock.includes('isRestoringSave'), '復元中でも世代そのものは比較できる');
+
+    const game = read('js/game.js');
+    const startAt = game.indexOf('async startNewGame(options = {})');
+    const loadAt = game.indexOf('async loadScenario(folder, options = {})', startAt);
+    const startBlock = game.slice(startAt, loadAt);
+    assert.ok(startBlock.includes('captureTurnFlowGeneration()'), '新規開始で世代tokenを捕捉する');
+    const defsAwait = startBlock.indexOf('await DataManager.loadScenarioDefinitions();');
+    const defsRecheck = startBlock.indexOf('if (!isStartFlowLatest()) return;', defsAwait);
+    assert.ok(defsAwait >= 0 && defsRecheck > defsAwait, 'シナリオ一覧await後に旧開始処理を止める');
+
+    const loadEnd = game.indexOf('\n    preloadFaceIcons()', loadAt);
+    const loadBlock = game.slice(loadAt, loadEnd);
+    assert.ok(loadBlock.includes('turnManager.abortForScenarioTransition();'), 'シナリオ読込自体を新しい遷移境界にする');
+    assert.ok(loadBlock.includes('const scenarioLoadGeneration = turnManager.captureTurnFlowGeneration();'));
+    const dataAwait = loadBlock.indexOf('const data = await DataManager.loadAll(folder');
+    const dataRecheck = loadBlock.indexOf('if (!isScenarioLoadLatest()) return;', dataAwait);
+    assert.ok(dataAwait >= 0 && dataRecheck > dataAwait, '重いシナリオロード後に世代を再確認する');
+    assert.ok(loadBlock.includes('if (isScenarioLoadLatest() && this.ui) this.ui.updateLoadingProgress'), '旧ロードは進捗UIも上書きしない');
+    assert.ok(loadBlock.includes("await this.eventManager.processEvents('game_start');"));
+    assert.ok(loadBlock.includes('await this.ui.prepareMapBaseImage(this.mapWidth, this.mapHeight);'));
+    assert.ok((loadBlock.match(/if \(!isScenarioLoadLatest\(\)\) return;/g) || []).length >= 6, '主要await境界を横断して世代を再確認する');
+});
+
+test('r430ではセーブ復元完了まで入力抑止を維持し旧復元を新状態へ戻さない', () => {
+    const save = read('js/save_manager.js');
+    const at = save.indexOf('async _restoreSaveDataObj(d)');
+    const end = save.indexOf('\n    // ==========================================\n    // セーブ実行部分', at);
+    const block = save.slice(at, end);
+    assert.ok(block.includes('const restoreFlowGeneration = turnManager.captureTurnFlowGeneration();'));
+    assert.ok(block.includes('const isRestoreFlowLatest = () => turnManager.isTurnFlowGenerationLatest(restoreFlowGeneration);'));
+    const restoreCaptureAt = block.indexOf('const restoreFlowGeneration = turnManager.captureTurnFlowGeneration();');
+    const restoreDefsAwaitAt = block.indexOf('await DataManager.loadScenarioDefinitions();');
+    const restoreDefsRecheckAt = block.indexOf('if (!isRestoreFlowLatest()) return false;', restoreDefsAwaitAt);
+    assert.ok(restoreCaptureAt >= 0 && restoreDefsAwaitAt > restoreCaptureAt, 'セーブ復元は最初のawaitより前に遷移世代を所有する');
+    assert.ok(restoreDefsRecheckAt > restoreDefsAwaitAt, 'シナリオ定義読込後にも旧復元を停止する');
+    assert.ok((block.match(/if \(!isRestoreFlowLatest\(\)\) return false;/g) || []).length >= 9, '定義・画像・地図・設定・描画のawait後に旧復元を止める');
+
+    const ageAt = block.indexOf('this.game.lifeSystem.updateAllBushosAge();');
+    const releaseFlagAt = block.lastIndexOf('this.game.isRestoringSave = false;');
+    const cutinAt = block.indexOf('await this.game.ui.showCutin(`ロード完了:');
+    assert.ok(ageAt >= 0 && releaseFlagAt > ageAt, '武将復元直後には入力抑止を解除しない');
+    assert.ok(cutinAt >= 0 && releaseFlagAt > cutinAt, '完了カットイン待ちの後で初めて復元フラグを解除する');
+    assert.ok(block.includes('turnManager.scheduleTurnFlowContinuation(() => this.game.processTurn(), 0,'), '復元後のターン再開もTurnManagerへ戻す');
+    assert.ok(!block.includes('\n        this.game.processTurn();'), '復元末尾からprocessTurnを直接呼ばない');
+
+    const ui = read('js/ui.js');
+    const titleAt = ui.indexOf('async returnToTitle(options = {})');
+    const titleEnd = ui.indexOf('\n    showDaimyoConfirmModal(', titleAt);
+    const titleBlock = ui.slice(titleAt, titleEnd > titleAt ? titleEnd : titleAt + 3600);
+    assert.ok(titleBlock.includes('const titleFlowGeneration = turnManager.captureTurnFlowGeneration();'), 'タイトル復帰も同じTurnManager世代を所有する');
+    assert.ok(titleBlock.includes('const isTitleFlowLatest = () => turnManager.isTurnFlowGenerationLatest(titleFlowGeneration);'));
+    assert.ok(titleBlock.includes('await this.checkSaveDataForTitle({ isCurrent: isTitleFlowLatest });'), 'セーブ有無確認のawaitも旧タイトル復帰から新状態へ作用させない');
+    assert.ok((titleBlock.match(/if \(!isTitleFlowLatest\(\)\) return;/g) || []).length >= 3, 'タイトル復帰の主要await後に世代を再確認する');
+    assert.ok(titleBlock.includes('if (this.game) this.game.isRestoringSave = false;'), 'タイトル復帰が旧復元の入力抑止を持ち越さない');
+
+    const titleSaveAt = ui.indexOf('async checkSaveDataForTitle(options = {})');
+    const titleSaveEnd = ui.indexOf('\n    forceResetModals(', titleSaveAt);
+    const titleSaveBlock = ui.slice(titleSaveAt, titleSaveEnd > titleSaveAt ? titleSaveEnd : titleSaveAt + 1800);
+    assert.ok(titleSaveBlock.includes("const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true;"));
+    assert.ok(titleSaveBlock.includes('hasData = await this.game.saveManager.refreshLoadAvailability();'));
+    assert.ok((titleSaveBlock.match(/if \(!isCurrent\(\)\) return false;/g) || []).length >= 2, 'ロード可否確認の前後でタイトル遷移世代を確認する');
+
+    const loadRequestAt = save.indexOf('_captureLoadRequestFlow()');
+    const loadRequestEnd = save.indexOf('\n    async _recoverFromFailedRestore()', loadRequestAt);
+    const loadRequestBlock = save.slice(loadRequestAt, loadRequestEnd > loadRequestAt ? loadRequestEnd : loadRequestAt + 900);
+    assert.ok(loadRequestBlock.includes('captureTurnFlowGeneration()'));
+    assert.ok(loadRequestBlock.includes('isTurnFlowGenerationLatest(generation)'));
+    assert.ok(!loadRequestBlock.includes('abortForScenarioTransition()'), '保存媒体の読込待ちは現行ゲームを切らず、世代確認だけで旧要求を破棄する');
+
+    const localAt = save.indexOf('async loadGameFromLocal(slotNo = 1');
+    const localEnd = save.indexOf('\n    // ★追加：オートセーブ', localAt);
+    const localBlock = save.slice(localAt, localEnd);
+    const dbAwaitAt = localBlock.indexOf('rawData = await loadFromDB(prefix + slotNo);');
+    const dbRecheckAt = localBlock.indexOf('if (!requestFlow.isLatest()) return;', dbAwaitAt);
+    assert.ok(localBlock.includes('const requestFlow = this._captureLoadRequestFlow();'));
+    assert.ok(dbAwaitAt >= 0 && dbRecheckAt > dbAwaitAt, 'IndexedDB待ち後に旧ロード要求を止める');
+
+    const continueAt = save.indexOf('async continueGame()');
+    const continueBlock = save.slice(continueAt, continueAt + 1800);
+    assert.ok(continueBlock.includes('const requestFlow = this._captureLoadRequestFlow();'));
+    assert.ok(continueBlock.includes('if (!requestFlow.isLatest()) return;'));
+
+    const recoveryAt = save.indexOf('async _recoverFromFailedRestore()');
+    const recoveryEnd = save.indexOf('\n    // どんな方法でセーブする時も', recoveryAt);
+    const recoveryBlock = save.slice(recoveryAt, recoveryEnd);
+    assert.ok(recoveryBlock.includes('const recoveryGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration'));
+    assert.ok(recoveryBlock.includes('if (!isRecoveryLatest()) return;'), '失敗通知のawait後に古い回復処理からタイトルへ戻さない');
 });

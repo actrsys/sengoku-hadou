@@ -2086,12 +2086,16 @@ class DiplomacyManager {
         if (historyText) this._recordDiplomacyHistory(historyText, historyClanIds);
 
         if (isPlayerInvolved) {
-            if (doerClanId === this.game.playerClanId) {
-                this.game.ui.updatePanelHeader();
-                this.game.ui.renderCommandMenu();
-                this.game.ui.renderMap();
-            }
-            this.game.ui.showResultModal(msg, onClose);
+            const refreshBehindResult = doerClanId === this.game.playerClanId
+                ? () => {
+                    this.game.ui.updatePanelHeader();
+                    this.game.ui.renderCommandMenu();
+                    this.game.ui.renderMap();
+                }
+                : null;
+            // 最後の外交会話を閉じる前に結果画面を成立させ、その覆いの下で地図等を更新する。
+            // 大きなCanvas再合成を会話の最終フレームへ重ねず、会話→結果を一枚でhandoffする。
+            this.game.ui.showResultModal(msg, onClose, null, refreshBehindResult);
         } else if (aiMsg !== "") {
             this.game.ui.showDialog(aiMsg, false, onClose);
         } else {

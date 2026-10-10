@@ -411,10 +411,15 @@ class CourtRankSystem {
         doer.achievementTotal += this.calcTributeAchievement(gold);
         this.game.factionSystem.updateRecognition(doer, 10);
         
-        this.game.ui.showResultModal(`${doer.name}を使者として、朝廷に金${gold}を献上しました！`);
-        
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
+        this.game.ui.showResultModal(
+            `${doer.name}を使者として、朝廷に金${gold}を献上しました！`,
+            null,
+            null,
+            () => {
+                this.game.ui.updatePanelHeader();
+                this.game.ui.renderCommandMenu();
+            }
+        );
     }
     
     // ★追加：朝廷和睦の実行処理を一元化（プレイヤー・AI共通）

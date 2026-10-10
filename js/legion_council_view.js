@@ -292,9 +292,16 @@ class LegionCouncilView {
     confirmFinish() {
         this.ui.showDialog('この内容で国主への命令を確定し、評定を終えますか？', true, () => {
             const changed = this.system.commitPolicies(this.game.playerClanId, this.draft);
-            this.close();
-            this.ui.showResultModal(`評定を終えました。\n${changed > 0 ? `${changed}軍団の方針を変更しました。` : '方針の変更はありません。'}`);
-            if (typeof this.ui.renderCommandMenu === 'function') this.ui.renderCommandMenu();
+            // 評定画面は結果画面が可視化されるまで保持し、背景だけが露出する瞬間を作らない。
+            this.ui.beginVisualHandoff(() => this.close());
+            this.ui.showResultModal(
+                `評定を終えました。\n${changed > 0 ? `${changed}軍団の方針を変更しました。` : '方針の変更はありません。'}`,
+                null,
+                null,
+                () => {
+                    if (typeof this.ui.renderCommandMenu === 'function') this.ui.renderCommandMenu();
+                }
+            );
         }, null, {
             okText: '命令を確定',
             okClass: 'btn-primary',

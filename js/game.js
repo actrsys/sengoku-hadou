@@ -268,9 +268,17 @@ class GameManager {
     
     async startNewGame(options = {}) {
         const startInWatchMode = !!(options && options.watchMode);
-        if (this.turnManager && typeof this.turnManager.abortForScenarioTransition === 'function') {
-            this.turnManager.abortForScenarioTransition();
+        const turnManager = this.turnManager;
+        if (turnManager && typeof turnManager.abortForScenarioTransition === 'function') {
+            turnManager.abortForScenarioTransition();
         }
+        const startFlowGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration()
+            : null;
+        const isStartFlowLatest = () => startFlowGeneration !== null
+            && turnManager
+            && typeof turnManager.isTurnFlowGenerationLatest === 'function'
+            && turnManager.isTurnFlowGenerationLatest(startFlowGeneration);
         if (this.warManager && typeof this.warManager.abortForScenarioTransition === 'function') {
             this.warManager.abortForScenarioTransition();
         }
@@ -282,6 +290,7 @@ class GameManager {
         
         // ★前回のゲームの記憶やフラグを綺麗にお掃除します！
         this.isProcessingAI = false; // AI思考中フラグを解除！
+        this.isRestoringSave = false; // 古いセーブ復元が中断されていても新規開始へ持ち越さない
         this.isWatchMode = false; // ★追加：観戦モードも解除！
         this.originalPlayerClanId = null;
         this.hasAutoSavedThisMonth = false;
@@ -323,7 +332,9 @@ class GameManager {
         
         try {
             await DataManager.loadScenarioDefinitions();
+            if (!isStartFlowLatest()) return;
         } catch (error) {
+            if (!isStartFlowLatest()) return;
             console.error(error);
             if (this.ui) {
                 this.ui.showDialog("シナリオ一覧の読み込みに失敗しました。", false, () => {
@@ -332,7 +343,9 @@ class GameManager {
             }
             return;
         }
+        if (!isStartFlowLatest()) return;
         this.ui.showScenarioSelection(SCENARIOS, (folder) => {
+            if (!isStartFlowLatest()) return;
             this.loadScenario(folder, { startInWatchMode });
         });
     }
@@ -345,6 +358,21 @@ class GameManager {
     
     async loadScenario(folder, options = {}) {
         const startInWatchMode = !!(options && options.startInWatchMode);
+        // シナリオ選択後を新しい遷移境界とする。二重決定やタイトル復帰が入った場合、
+        // 先に始まったloadScenarioのawait後処理を新しい状態へ戻さない。
+        const turnManager = this.turnManager;
+        if (!turnManager || typeof turnManager.abortForScenarioTransition !== 'function'
+            || typeof turnManager.captureTurnFlowGeneration !== 'function'
+            || typeof turnManager.isTurnFlowGenerationLatest !== 'function') return;
+        turnManager.abortForScenarioTransition();
+        const scenarioLoadGeneration = turnManager.captureTurnFlowGeneration();
+        const isScenarioLoadLatest = () => turnManager.isTurnFlowGenerationLatest(scenarioLoadGeneration);
+        if (this.warManager && typeof this.warManager.abortForScenarioTransition === 'function') {
+            this.warManager.abortForScenarioTransition();
+        }
+        if (this.fieldWarManager && typeof this.fieldWarManager.abortForScenarioTransition === 'function') {
+            this.fieldWarManager.abortForScenarioTransition();
+        }
         // 直接再読込される経路でも旧マップを保持したまま新しいTypedArrayを作らない。
         this.releaseScenarioMapResources();
         if (this.ui && typeof this.ui.resetMapViewState === 'function') {
@@ -354,15 +382,17 @@ class GameManager {
         if (this.ui) this.ui.showLoadingScreen('シナリオを準備しています', 0);
         // 古いスマホでもロード画面を確実に1フレーム描いてから重い処理へ入ります。
         if (this.ui && typeof this.ui.waitForNextPaint === 'function') await this.ui.waitForNextPaint();
+        if (!isScenarioLoadLatest()) return;
 
         try {
             document.getElementById('title-screen').classList.add('hidden'); 
 
             const data = await DataManager.loadAll(folder, {
                 onProgress: (value, label) => {
-                    if (this.ui) this.ui.updateLoadingProgress(Math.round(value * 0.72), label);
+                    if (isScenarioLoadLatest() && this.ui) this.ui.updateLoadingProgress(Math.round(value * 0.72), label);
                 }
-            }); 
+            });
+            if (!isScenarioLoadLatest()) return;
             this.scenarioDefinition = data.scenario || DataManager.getScenarioDefinition(folder) || null;
             this.clans = data.clans; this.castles = data.castles; this.bushos = data.bushos;
             // 地図IDマップはDataManagerとUIで同じTypedArrayを共有し、巨大な複製を作りません。
@@ -410,12 +440,14 @@ class GameManager {
             if (this.eventManager && typeof this.eventManager.applyScenarioStartHistoricalSettlements === 'function') {
                 if (this.ui) this.ui.updateLoadingProgress(73, '開始時点までの史実を反映しています');
                 await this.eventManager.applyScenarioStartHistoricalSettlements();
+                if (!isScenarioLoadLatest()) return;
             }
 
             if (this.ui) this.ui.updateLoadingProgress(74, '寿命・登場状態を初期化しています');
             // 討死武将の初期延命はモデル生成時ではなく、寿命専門部署で一度だけ適用します。
             this.lifeSystem.initializeBattleDeathLifespans(this.year);
             if (this.ui && typeof this.ui.waitForNextPaint === 'function') await this.ui.waitForNextPaint();
+            if (!isScenarioLoadLatest()) return;
             
             // ★ここを書き足し！：諸勢力の頭領がいないかチェックして、いなければ自動で作ってもらいます！
             this.kunishuSystem.generateMissingLeaders();
@@ -489,6 +521,7 @@ class GameManager {
             // ★ここから追加：ゲーム開始時の特別なイベント（寿命の延長など）を実行します！
             if (this.eventManager) {
                 await this.eventManager.processEvents('game_start');
+                if (!isScenarioLoadLatest()) return;
             }
             
             // ★ここから追加：大名家の表示名を更新して同名被りを防ぎます！
@@ -515,6 +548,7 @@ class GameManager {
             // ゲーム画面を先に出して地図だけ後から現れる状態を作らない。
             if (this.ui && typeof this.ui.prepareMapBaseImage === 'function') {
                 await this.ui.prepareMapBaseImage(this.mapWidth, this.mapHeight);
+                if (!isScenarioLoadLatest()) return;
             }
             if (this.ui) this.ui.updateLoadingProgress(96, '地図を描画しています');
             this.ui.renderMap();
@@ -523,6 +557,7 @@ class GameManager {
             // レイアウト・Canvas描画を端末へ反映させてからロード画面を閉じます。
             if (this.ui) this.ui.updateLoadingProgress(100, '準備完了');
             if (this.ui && typeof this.ui.waitForNextPaint === 'function') await this.ui.waitForNextPaint();
+            if (!isScenarioLoadLatest()) return;
             if (this.ui) this.ui.hideLoadingScreen();
 
             // 観戦開始はロード画面を閉じてから。0ms継続もTurnManagerの世代管理へ結び、
@@ -532,6 +567,7 @@ class GameManager {
             }
             
         } catch (e) {
+            if (!isScenarioLoadLatest()) return;
             if (startInWatchMode) {
                 this.isWatchMode = false;
                 this.originalPlayerClanId = null;

@@ -59,6 +59,13 @@ class TurnManager {
         return this._isTurnFlowCurrent(generation);
     }
 
+    // シナリオ読込・セーブ復元など phase==='game' になる前の非同期処理向け。
+    // 世代番号そのものだけを比較し、isRestoringSave / phase の意味判定は呼び出し側の責務に残す。
+    // これにより、同じTurnManagerの寿命境界を使いつつ「復元中なので常にfalse」という矛盾を避ける。
+    isTurnFlowGenerationLatest(generation) {
+        return Number(this._turnFlowGeneration || 0) === Number(generation);
+    }
+
     // timerを持たない会話・選択Promiseも、ロード／タイトル復帰で旧awaitを残さず終了するための通知窓口。
     // 正常終了時は返したunsubscribeで即座に購読を外し、長時間プレイ中に購読者を蓄積しない。
     subscribeTurnFlowAbort(generation, callback) {
@@ -396,13 +403,15 @@ class TurnManager {
 
     async processTurn() {  // ★最初に async を付けます！
         const game = this.game;
+        const turnFlowGeneration = Number(this._turnFlowGeneration || 0);
+        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);
         if (game.aiTimer) {
             clearTimeout(game.aiTimer);
             game.aiTimer = null;
         }
         // タイトル復帰・ロード開始後に旧ターンのsetTimeout(0)が発火しても、
         // 旧turnQueueを裏で進めない。phaseは画面より上位のゲーム寿命境界として扱う。
-        if (game.phase !== 'game' || game.isRestoringSave) return;
+        if (!isCurrentFlow()) return;
     
         // ★最強ストッパー１：合戦中やマップ選択中にフライングで呼ばれたら絶対に弾く！
         if (game.warManager && game.warManager.state && game.warManager.state.active) return;
@@ -415,7 +424,7 @@ class TurnManager {
                 await game.ui.waitForDialogs();
             }
             // ロード開始などで待機中の旧月末処理が解放された場合は、復元途中の状態へ進入しません。
-            if (game.phase !== 'game' || game.isRestoringSave) return;
+            if (!isCurrentFlow()) return;
             // ★ここから追加：全部終わって翌月に行く前に、安心感のために数字を「MAX/MAX」にしておきます！
             if (game.isProcessingAI && game.ui && game.turnQueue.length > 0) {
                 game.ui.restoreAIGuardText(true); // ★強制表示
@@ -424,7 +433,7 @@ class TurnManager {
                 // endMonth() 側でも同じ表示を保証するため、ここでは空白状態を作らない。
                 await new Promise(resolve => setTimeout(resolve, 300));
             }
-            if (game.phase !== 'game' || game.isRestoringSave) return;
+            if (!isCurrentFlow()) return;
             game.writeSystemDiagnostic('month_transition:before_endMonth');
             await game.endMonth(); // ← ★「await」を書き足します！
             return; 
@@ -480,7 +489,7 @@ class TurnManager {
 
         // waitForDialogs() はロード時のforceResetModals()でも解放されます。
         // 待機前の旧turnQueue要素を復元後のゲームへ持ち込まないよう、寿命と同一要素を再確認します。
-        if (game.phase !== 'game' || game.isRestoringSave) return;
+        if (!isCurrentFlow()) return;
         if (Number(game.currentIndex) !== expectedTurnIndex || game.turnQueue[expectedTurnIndex] !== castle) return;
         
         // 所有者判定も待機後の現在値を正本にする。会話待ちの間にイベント等で所属が変わっても古い分類を使わない。
@@ -519,6 +528,8 @@ class TurnManager {
                         // 保存が終わってから操作を返します。
                         game.writeSystemDiagnostic('player_turn:before_autosave', castle);
                         await game.executeAutoSave();
+                        if (!isCurrentFlow()) return;
+                        if (Number(game.currentIndex) !== expectedTurnIndex || game.turnQueue[expectedTurnIndex] !== castle) return;
                         game.writeSystemDiagnostic('player_turn:after_autosave', castle);
                     }
                 }
@@ -551,8 +562,10 @@ class TurnManager {
 
     async finishTurn() { 
         const game = this.game;
+        const turnFlowGeneration = Number(this._turnFlowGeneration || 0);
+        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);
         this._cancelAllActionsDonePromptTimer();
-        if (game.phase !== 'game' || game.isRestoringSave) return;
+        if (!isCurrentFlow()) return;
         const wasProcessingAI = game.isProcessingAI;
     
         // ★最強ストッパー２：合戦中やマップ選択中なら、絶対にターンを勝手に終わらせない！
@@ -596,6 +609,7 @@ class TurnManager {
         // Round26：戦争・外交・turn_endイベントまで含めて「今の拠点1件」が完全終了した地点です。
         // 観戦終了予約があれば次の拠点へ進まず、ここで初めて帰還確認を開きます。
         if (await game.tryProcessQueuedWatchReturn('turn_complete')) return;
+        if (!isCurrentFlow()) return;
     
         // ★追加：ターンが終わって次に行く時も、スマホがパンクしないように一瞬「息継ぎ」をさせます！
         this._scheduleTurnFlowContinuation(() => game.processTurn(), 0, { expectedIndex: game.currentIndex });

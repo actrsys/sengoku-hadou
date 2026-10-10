@@ -953,9 +953,15 @@ class KunishuSystem {
         doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
         this.game.factionSystem.updateRecognition(doer, 15);
 
-        this.game.ui.showResultModal(`${doer.name}が${kunishuName}と親善を行いました\n友好度が上昇しました`);
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
+        this.game.ui.showResultModal(
+            `${doer.name}が${kunishuName}と親善を行いました\n友好度が上昇しました`,
+            null,
+            null,
+            () => {
+                this.game.ui.updatePanelHeader();
+                this.game.ui.renderCommandMenu();
+            }
+        );
     }
     
     // 諸勢力「取込」の成功率（0～100%）を計算する正本です。
@@ -997,6 +1003,7 @@ class KunishuSystem {
         const totalProb = this.calcIncorporateProbability(doer, kunishu, this.game.playerClanId);
         const isSuccess = (Math.random() * 100) < totalProb;
         
+        let resultMsg = '';
         if (isSuccess) {
             castle.soldiers = Math.min(99999, castle.soldiers + kunishu.soldiers);
             castle.horses = Math.min(99999, (castle.horses || 0) + (kunishu.horses || 0));
@@ -1018,21 +1025,23 @@ class KunishuSystem {
                     clanIds: [this.game.playerClanId], category: 'kunishu', inferCurrentTurn: false
                 });
             }
-            this.game.ui.showResultModal(`${doer.name}の説得により、${kunishuName}が我が傘下に加わりました！`);
+            resultMsg = `${doer.name}の説得により、${kunishuName}が我が傘下に加わりました！`;
             
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.3) + 30;
             this.game.factionSystem.updateRecognition(doer, 30);
         } else {
             const kunishuName = kunishu.getName(this.game);
-            this.game.ui.showResultModal(`${doer.name}は${kunishuName}に合流を提案しましたが、\n丁重に断られてしまいました……`);
+            resultMsg = `${doer.name}は${kunishuName}に合流を提案しましたが、\n丁重に断られてしまいました……`;
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
         }
 
         doer.isActionDone = true;
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
-        this.game.ui.renderMap();
+        this.game.ui.showResultModal(resultMsg, null, null, () => {
+            this.game.ui.updatePanelHeader();
+            this.game.ui.renderCommandMenu();
+            this.game.ui.renderMap();
+        });
     }
     
     // 諸勢力を攻めて壊滅させるための処理

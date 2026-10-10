@@ -1854,10 +1854,12 @@ class UIManager {
 
     // タイトル画面の「続きから／ロード」は、実際に読み込める保存データがある時だけ有効にします。
     // DBの存在確認・復号・現行形式の検査は SaveManager を正本とし、UIは結果の表示だけを担当します。
-    async checkSaveDataForTitle() {
+    async checkSaveDataForTitle(options = {}) {
+        const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true;
         const continueBtn = document.getElementById('continue-btn');
         const loadBtn = document.getElementById('load-btn');
-        if (!continueBtn && !loadBtn) return;
+        if (!continueBtn && !loadBtn) return false;
+        if (!isCurrent()) return false;
 
         let hasData = false;
         try {
@@ -1869,6 +1871,8 @@ class UIManager {
             if (this.game) this.game.hasSaveData = false;
         }
 
+        if (!isCurrent()) return false;
+
         const applyState = btn => {
             if (!btn) return;
             btn.disabled = !hasData;
@@ -1877,6 +1881,7 @@ class UIManager {
         };
         applyState(continueBtn);
         applyState(loadBtn);
+        return true;
     }
 
     forceResetModals(options = {}) {
@@ -2058,7 +2063,7 @@ class UIManager {
         this.info.showFactionList(clanId, isDirect);
     }
 
-    showResultModal(msg, onClose = null, customFooterHtml = null) { 
+    showResultModal(msg, onClose = null, customFooterHtml = null, updateBehindCover = null) { 
         this.hideAIGuardTemporarily(); 
         
         if (this.resultBody) {
@@ -2082,6 +2087,17 @@ class UIManager {
         if (this.resultModal) this.resultModal.classList.remove('hidden'); 
         this.completeVisualHandoff();
         this._closePendingDialogHandoffNow();
+
+        // 結果へ遷移する直前に地図・ヘッダー・コマンドを更新すると、巨大Canvasの再合成が
+        // 旧会話や旧モーダルの最終フレームへ重なり、低速端末でちらついて見えることがある。
+        // 遷移先を可視化して旧画面を引き渡した後、その覆いの下で必要な背景更新だけを行う。
+        if (typeof updateBehindCover === 'function') {
+            try {
+                updateBehindCover();
+            } catch (e) {
+                console.error('結果画面下の背景更新に失敗しました:', e);
+            }
+        }
 
         // 背景停止に伴うモバイル向けリソース整理も、結果画面で覆ってから行います。
         this.pauseBackgroundUpdates();
@@ -2248,10 +2264,18 @@ class UIManager {
         else this.updateLoadingProgress(10, 'タイトル画面へ戻っています');
         // ロード画面を1フレーム出すawaitより先に通常ターン世代を切る。
         // 旧月初/月末やAI予約が、この待ち時間に再開して現在状態へ触れないようにする。
-        if (this.game && this.game.turnManager && typeof this.game.turnManager.abortForScenarioTransition === 'function') {
-            this.game.turnManager.abortForScenarioTransition();
-        }
+        const turnManager = this.game && this.game.turnManager;
+        if (!turnManager || typeof turnManager.abortForScenarioTransition !== 'function'
+            || typeof turnManager.captureTurnFlowGeneration !== 'function'
+            || typeof turnManager.isTurnFlowGenerationLatest !== 'function') return;
+        turnManager.abortForScenarioTransition();
+        const titleFlowGeneration = turnManager.captureTurnFlowGeneration();
+        const isTitleFlowLatest = () => turnManager.isTurnFlowGenerationLatest(titleFlowGeneration);
+        // タイトル画面は復元処理の外側。旧ロードがawait中でも、この遷移が所有権を取った時点で
+        // 入力抑止用フラグを持ち越さない。旧ロード側は世代不一致で以後の処理を停止する。
+        if (this.game) this.game.isRestoringSave = false;
         await this.waitForNextPaint();
+        if (!isTitleFlowLatest()) return;
 
         if (this.game && this.game.warManager && typeof this.game.warManager.abortForScenarioTransition === 'function') {
             this.game.warManager.abortForScenarioTransition();
@@ -2277,9 +2301,11 @@ class UIManager {
         }
 
         this.updateLoadingProgress(75, 'セーブデータを確認しています');
-        await this.checkSaveDataForTitle();
+        await this.checkSaveDataForTitle({ isCurrent: isTitleFlowLatest });
+        if (!isTitleFlowLatest()) return;
         this.updateLoadingProgress(100, '準備完了');
         await this.waitForNextPaint();
+        if (!isTitleFlowLatest()) return;
 
         this.hideLoadingScreen();
     }

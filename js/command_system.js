@@ -26,20 +26,21 @@ class CommandSystem {
 
     /**
      * コマンド実行後のUI更新とメッセージ表示を一元管理する魔法です
-     * マップの更新を先に行い、画面表示を最新にしてから結果メッセージを出します。
+     * 結果メッセージがある場合は結果画面を先に成立させ、その覆いの下でメイン画面を更新します。
      * @param {string} msg - 結果画面に表示するメッセージ（不要な場合は null）
      * @param {boolean} needsMapUpdate - マップの再描画が必要かどうか
      * @param {string} logMsg - 履歴に残すログメッセージ（不要な場合は null）
      */
     finishCommand(msg, needsMapUpdate = false, logMsg = null) {
-        // 1. まず画面の表示を最新の状態に更新します
-        this.game.ui.updatePanelHeader();
-        this.game.ui.renderCommandMenu();
-        if (needsMapUpdate) {
-            this.game.ui.renderMap();
-        }
-        
-        // 2. ログを残します。全国履歴へ切り替えても主語が失われないよう、実際の大名家名を明記します。
+        const refreshBehindResult = () => {
+            this.game.ui.updatePanelHeader();
+            this.game.ui.renderCommandMenu();
+            if (needsMapUpdate) {
+                this.game.ui.renderMap();
+            }
+        };
+
+        // ログを残します。全国履歴へ切り替えても主語が失われないよう、実際の大名家名を明記します。
         if (logMsg) {
             const playerClan = this.game.getClan ? this.game.getClan(this.game.playerClanId) : null;
             const clanName = playerClan ? playerClan.name : '自家';
@@ -51,10 +52,13 @@ class CommandSystem {
             const historyText = tagged ? `${tagged[1]}${historyBody}` : historyBody;
             this.game.ui.log(historyText, { clanIds: [this.game.playerClanId], category: 'command', inferCurrentTurn: false });
         }
-        
-        // 3. 全ての更新が終わってから、最後にメッセージを表示して背景をストップさせます！
+
         if (msg) {
-            this.game.ui.showResultModal(msg);
+            // 結果画面を先に成立させ、その覆いの下でメイン画面を最新化する。
+            // renderMap() を結果表示前に走らせて、直前UIの最終フレームを揺らさない。
+            this.game.ui.showResultModal(msg, null, null, refreshBehindResult);
+        } else {
+            refreshBehindResult();
         }
     }
 

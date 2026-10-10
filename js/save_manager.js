@@ -224,7 +224,26 @@ class SaveManager {
         return true;
     }
 
+    _captureLoadRequestFlow() {
+        const turnManager = this.game && this.game.turnManager;
+        if (!turnManager || typeof turnManager.captureTurnFlowGeneration !== 'function'
+            || typeof turnManager.isTurnFlowGenerationLatest !== 'function') return null;
+        const generation = turnManager.captureTurnFlowGeneration();
+        return {
+            generation,
+            isLatest: () => turnManager.isTurnFlowGenerationLatest(generation)
+        };
+    }
+
     async _recoverFromFailedRestore() {
+        const turnManager = this.game && this.game.turnManager;
+        const recoveryGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration()
+            : null;
+        const isRecoveryLatest = () => recoveryGeneration === null
+            || (turnManager
+                && typeof turnManager.isTurnFlowGenerationLatest === 'function'
+                && turnManager.isTurnFlowGenerationLatest(recoveryGeneration));
         this.game.isRestoringSave = false;
         this.game.isProcessingAI = false;
         this.game.isWatchMode = false;
@@ -249,11 +268,13 @@ class SaveManager {
                 await new Promise(resolve => this.game.ui.showDialog(message, false, resolve));
             }
 
+            if (!isRecoveryLatest()) return;
             if (typeof this.game.ui.returnToTitle === 'function') {
                 await this.game.ui.returnToTitle();
                 return;
             }
         }
+        if (!isRecoveryLatest()) return;
         this.game.phase = 'title';
     }
 
@@ -363,12 +384,25 @@ class SaveManager {
     
     // どんな方法でロードした時も、この魔法で「受け取ったデータ」をゲーム内に展開します
     async _restoreSaveDataObj(d) {
-        await DataManager.loadScenarioDefinitions();
-        this._validateSaveDataStructure(d);
-        this.game.isRestoringSave = true;
-        if (this.game.turnManager && typeof this.game.turnManager.abortForScenarioTransition === 'function') {
-            this.game.turnManager.abortForScenarioTransition();
+        // 復元処理は最初のawaitより前に遷移世代を所有する。
+        // シナリオ定義の読込待ち中にタイトル復帰や別ロードが始まっても、
+        // 古い復元が後からabortForScenarioTransition()して新しい遷移を奪い返さないようにする。
+        const turnManager = this.game.turnManager;
+        if (!turnManager || typeof turnManager.abortForScenarioTransition !== 'function'
+            || typeof turnManager.captureTurnFlowGeneration !== 'function'
+            || typeof turnManager.isTurnFlowGenerationLatest !== 'function') {
+            throw new Error('ターン寿命管理を初期化できないため、セーブ復元を中止します');
         }
+        turnManager.abortForScenarioTransition();
+        const restoreFlowGeneration = turnManager.captureTurnFlowGeneration();
+        const isRestoreFlowLatest = () => turnManager.isTurnFlowGenerationLatest(restoreFlowGeneration);
+        this.game.isRestoringSave = true;
+
+        try {
+        await DataManager.loadScenarioDefinitions();
+        if (!isRestoreFlowLatest()) return false;
+        this._validateSaveDataStructure(d);
+        if (!isRestoreFlowLatest()) return false;
         if (this.game.ui) this.game.ui.updateLoadingProgress(5, 'セーブデータを復元しています');
         if (this.game.warManager && typeof this.game.warManager.abortForScenarioTransition === 'function') {
             this.game.warManager.abortForScenarioTransition();
@@ -443,7 +477,9 @@ class SaveManager {
             img.onerror = () => finish(false);
             img.src = './data/images/map/japan_map.png';
         });
+        if (!isRestoreFlowLatest()) return false;
         if (this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') await this.game.ui.waitForNextPaint();
+        if (!isRestoreFlowLatest()) return false;
 
         this.game.castles = d.castles.map(c => new Castle(c)); 
         this.game.bushos = d.bushos.map(b => new Busho(b));
@@ -455,15 +491,19 @@ class SaveManager {
         // 保存データには巨大なpixel mapを入れず、ロード時に種点→国ID→領土IDの順で低メモリ再生成します。
         if (this.game.ui) this.game.ui.updateLoadingProgress(35, '拠点の位置を解析しています');
         await DataManager.loadCastleSeedPoints('./data/images/map/japan_colorcode_map.png', this.game.castles, {
-            onProgress: ratio => this.game.ui && this.game.ui.updateLoadingProgress(35 + ratio * 10, '拠点の位置を解析しています')
+            onProgress: ratio => isRestoreFlowLatest() && this.game.ui && this.game.ui.updateLoadingProgress(35 + ratio * 10, '拠点の位置を解析しています')
         });
+        if (!isRestoreFlowLatest()) return false;
         await DataManager.loadProvinceMap('./data/images/map/japan_provinces.png', this.game.provinces, {
-            onProgress: ratio => this.game.ui && this.game.ui.updateLoadingProgress(47 + ratio * 14, '国境データを解析しています')
+            onProgress: ratio => isRestoreFlowLatest() && this.game.ui && this.game.ui.updateLoadingProgress(47 + ratio * 14, '国境データを解析しています')
         });
+        if (!isRestoreFlowLatest()) return false;
         await DataManager.buildCastleTerritoryMap(this.game.castles, this.game.provinces, {
-            onProgress: ratio => this.game.ui && this.game.ui.updateLoadingProgress(62 + ratio * 18, '勢力領域を準備しています')
+            onProgress: ratio => isRestoreFlowLatest() && this.game.ui && this.game.ui.updateLoadingProgress(62 + ratio * 18, '勢力領域を準備しています')
         });
+        if (!isRestoreFlowLatest()) return false;
         if (this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') await this.game.ui.waitForNextPaint();
+        if (!isRestoreFlowLatest()) return false;
         
         FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
 
@@ -490,6 +530,7 @@ class SaveManager {
         this.game.clans = d.clans.map(c => new Clan(c));
         
         const commonData = await DataManager.loadCommonData();
+        if (!isRestoreFlowLatest()) return false;
         const courtRanks = commonData.courtRanks.map(row => new CourtRank(row));
         this.game.courtRankSystem.setRankData(courtRanks);
 
@@ -506,7 +547,6 @@ class SaveManager {
         }
 
         this.game.updateAllCastlesLords();
-        this.game.isRestoringSave = false;
         this.game.lifeSystem.updateAllBushosAge();
 
         // セーブ時に歴史常駐効果が有効でも、現在のユーザー設定が歴史イベントOFFなら
@@ -514,6 +554,7 @@ class SaveManager {
         if (window.UserSettings && window.UserSettings.historicalEvent === false
             && this.game.eventManager && typeof this.game.eventManager.onHistoricalEventSettingChanged === 'function') {
             await this.game.eventManager.onHistoricalEventSettingChanged(false);
+            if (!isRestoreFlowLatest()) return false;
         }
 
         this.game.updateClanDisplayNames();
@@ -532,11 +573,13 @@ class SaveManager {
         // 以前の「寸法確認用の一時Image」が読み込み済みでも、表示用Imageは別なのでここで明示的に待つ。
         if (this.game.ui && typeof this.game.ui.prepareMapBaseImage === 'function') {
             await this.game.ui.prepareMapBaseImage(this.game.mapWidth, this.game.mapHeight);
+            if (!isRestoreFlowLatest()) return false;
         }
         if (this.game.ui) this.game.ui.updateLoadingProgress(96, '地図を描画しています');
         this.game.ui.renderMap();
         if (this.game.ui) this.game.ui.updateLoadingProgress(100, '準備完了');
         if (this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') await this.game.ui.waitForNextPaint();
+        if (!isRestoreFlowLatest()) return false;
 
         if (window.AudioManager) {
             window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
@@ -546,7 +589,21 @@ class SaveManager {
         if (this.game.ui) this.game.ui.hideLoadingScreen();
 
         await this.game.ui.showCutin(`ロード完了: ${this.game.year}年 ${this.game.month}月`);
-        this.game.processTurn();
+        if (!isRestoreFlowLatest()) return false;
+
+        // 復元中フラグは、地図・カットインを含む全awaitが終わるまで維持する。
+        // ここから先だけ通常入力とTurnManagerの通常進行を再開できる。
+        this.game.isRestoringSave = false;
+        turnManager.scheduleTurnFlowContinuation(() => this.game.processTurn(), 0, {
+            expectedIndex: Number(this.game.currentIndex)
+        });
+        return true;
+        } catch (error) {
+            // 復元中に別のロード／タイトル復帰が世代を更新した後で旧awaitがrejectしても、
+            // 古い復元の失敗回復処理で新しい状態をタイトルへ巻き戻さない。
+            if (!isRestoreFlowLatest()) return false;
+            throw error;
+        }
     }
 
     // ==========================================
@@ -604,18 +661,23 @@ class SaveManager {
     loadGameFromFile(e) { 
         const file = e.target.files[0]; if (!file) return; 
         e.target.value = '';
+        const requestFlow = this._captureLoadRequestFlow();
+        if (!requestFlow) return;
         if (this.game.ui) this.game.ui.showLoadingScreen('セーブデータを確認しています', 0);
         
         const reader = new FileReader(); 
         reader.onload = async (evt) => {
+            if (!requestFlow.isLatest()) return;
             let restoreStarted = false;
             try { 
                 const uint8 = new Uint8Array(evt.target.result); // ★バイナリデータとして受け取ります
                 const d = this._decryptData(uint8); // ★復号化します
                 this._validateSaveDataStructure(d); // ゲーム状態へ触る前に構造・主要参照を検査します
+                if (!requestFlow.isLatest()) return;
                 restoreStarted = true;
                 await this._restoreSaveDataObj(d);
             } catch(err) { 
+                if (!requestFlow.isLatest() && !this.game.isRestoringSave) return;
                 console.error(err); 
                 if (restoreStarted) {
                     await this._recoverFromFailedRestore();
@@ -628,6 +690,7 @@ class SaveManager {
             } 
         }; 
         reader.onerror = () => {
+            if (!requestFlow.isLatest()) return;
             if (this.game.ui) {
                 this.game.ui.hideLoadingScreen();
                 this.game.ui.showDialog("セーブファイルを読み取れませんでした。", false);
@@ -663,6 +726,10 @@ class SaveManager {
 
     // スロットからロード (IndexedDB)
     async loadGameFromLocal(slotNo = 1, prefix = "sengoku_save_slot") { 
+        // DB読込自体はまだゲーム状態を置換しないが、待ち時間に別遷移が始まった場合は
+        // 古いロード要求が後から復元を開始しないよう、要求開始時のTurnManager世代を保持する。
+        const requestFlow = this._captureLoadRequestFlow();
+        if (!requestFlow) return;
         // ★追加：ロードが始まった瞬間にロード画面で蓋をします！
         if (this.game.ui) this.game.ui.showLoadingScreen();
 
@@ -670,8 +737,10 @@ class SaveManager {
         try {
             rawData = await loadFromDB(prefix + slotNo);
         } catch (e) {
+            if (!requestFlow.isLatest()) return;
             console.error("ロードエラー:", e);
         }
+        if (!requestFlow.isLatest()) return;
 
         if (!rawData) {
             if (this.game.ui) {
@@ -690,9 +759,11 @@ class SaveManager {
                 d = rawData;
             }
             this._validateSaveDataStructure(d); // ゲーム状態へ触る前に構造・主要参照を検査します
+            if (!requestFlow.isLatest()) return;
             restoreStarted = true;
             await this._restoreSaveDataObj(d);
         } catch(err) { 
+            if (!requestFlow.isLatest() && !this.game.isRestoringSave) return;
             console.error(err); 
             if (restoreStarted) {
                 await this._recoverFromFailedRestore();
@@ -815,6 +886,10 @@ class SaveManager {
 
     // ★追加：最新のセーブデータを自動で見つけて読み込む魔法 (続きから)
     async continueGame() {
+        // 「続きから」のスロット探索中にも別の開始／タイトル遷移が起こり得るため、
+        // 探索開始時の世代だけを保持し、古い検索結果からロードを開始しない。
+        const requestFlow = this._captureLoadRequestFlow();
+        if (!requestFlow) return;
         // ★追加：探している間に操作されないようにロード画面で蓋をします！
         if (this.game.ui) this.game.ui.showLoadingScreen();
 
@@ -827,6 +902,7 @@ class SaveManager {
 
         for (const prefix of prefixes) {
             const slots = await this.readSaveSlots(prefix);
+            if (!requestFlow.isLatest()) return;
             for (const slot of slots) {
                 if (!slot.hasData) continue;
                 const time = slot.saveTimestamp;
@@ -839,8 +915,9 @@ class SaveManager {
         }
 
         // 一番新しいデータが見つかったら、それを読み込みます！
+        if (!requestFlow.isLatest()) return;
         if (latestSlot !== -1) {
-            this.loadGameFromLocal(latestSlot, latestPrefix);
+            await this.loadGameFromLocal(latestSlot, latestPrefix);
         } else {
             if (this.game.ui) {
                 this.game.ui.hideLoadingScreen(); // ★データがなくてやめる時は蓋を開けます
