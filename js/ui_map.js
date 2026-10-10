@@ -71,11 +71,11 @@ Object.assign(UIManager.prototype, {
         }
     },
 
-    // 地図全体を常時3Dレイヤー化すると、PCでも巨大な背面テクスチャが
-    // 全画面モーダルとの合成切替時に破棄・再確保され、地図画像だけ一瞬白抜けする。
-    // PC/スマホ共通で2D scaleを正本とし、固定のtranslateZ(0)とwill-changeを重ねない。
-    _getMapScaleTransform(scale) {
-        return `scale(${scale})`;
+    // ★Round 13：巨大マップの強制GPUレイヤー化はPCだけに限定します。
+    // 古いスマホでは scale() だけの方が合成メモリを増やしにくく安定します。
+    _getMapScaleTransform(scale, forcePcGpu = false) {
+        const isPC = document.body.classList.contains('is-pc');
+        return (isPC || forcePcGpu) ? `scale(${scale}) translateZ(0)` : `scale(${scale})`;
     },
 
     // ★Round 13：スクロール範囲用spacerを一元管理します。
@@ -544,8 +544,7 @@ Object.assign(UIManager.prototype, {
         // 静的3層を「同じDOM・同じ兄弟位置」のまま一度だけ付け直し、合成面を再提示する。
         // nextSiblingを保持して元の位置へ戻すため、道路SVG・城カードとの重なり順は変えない。
         const layers = [
-            // PCの地図下地はCSS background。非表示のimgを付け直す必要はない。
-            document.body.classList.contains('is-pc') ? null : (this._mapBaseImage || document.getElementById('map-base-image')),
+            this._mapBaseImage || document.getElementById('map-base-image'),
             document.getElementById('clan-color-overlay'),
             document.getElementById('snow-overlay')
         ].filter(Boolean);
@@ -1070,7 +1069,7 @@ Object.assign(UIManager.prototype, {
                 this.mapEl.style.left = `${currentMarginX}px`;
                 this.mapEl.style.top = `${currentMarginY}px`;
                 this.mapEl.style.transformOrigin = '0 0';
-                this.mapEl.style.transform = this._getMapScaleTransform(currentScale);
+                this.mapEl.style.transform = this._getMapScaleTransform(currentScale, true);
 
                 sc.scrollLeft = currentScrollLeft;
                 sc.scrollTop = currentScrollTop;

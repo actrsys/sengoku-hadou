@@ -427,24 +427,14 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
    メインマップ・城関連
    ========================================================= */
 #map-wrapper { flex: 1; position: relative; background-color: #81c784; overflow: hidden; display: flex; justify-content: center; align-items: center; touch-action: none; }
-#map-scroll-container { width: 100%; height: 100%; overflow: auto; display: flex; flex-direction: column; padding: 0; box-sizing: border-box; -webkit-overflow-scrolling: touch; overscroll-behavior: none; -ms-overflow-style: none; scrollbar-width: none; will-change: auto; }
+#map-scroll-container { width: 100%; height: 100%; overflow: auto; display: flex; flex-direction: column; padding: 0; box-sizing: border-box; -webkit-overflow-scrolling: touch; overscroll-behavior: none; -ms-overflow-style: none; scrollbar-width: none; will-change: scroll-position; }
 #map-scroll-container::-webkit-scrollbar { display: none; }
 #map-scroll-container.grab { cursor: grab; }
 #map-scroll-container.grabbing { cursor: grabbing; }
 
-#map-container { position: relative; background-color: #d9e0d7; background-image: none; transform-origin: 0 0; margin: 0; flex: none; will-change: auto; backface-visibility: visible; }
-/* PCでは静的地図をmap-container自身の背景へ描画する。
-   3140x2440の巨大なimgを、transform中の親とは別の合成面として保持しない。
-   城カードやCanvasの合成面が更新されても、下地が個別に欠けて白背景になるリスクを減らす。
-   スマホは既存の縮小<img>を継続し、端末別の低メモリ対策を変更しない。 */
-body.is-pc #map-container {
-    background-image: url('../data/images/map/japan_map.png');
-    background-position: 0 0;
-    background-size: 100% 100%;
-    background-repeat: no-repeat;
-}
-body.is-pc #map-base-image { display: none; }
-body:not(.is-pc) #map-container.base-map-image-ready { background-image: none; }
+#map-container { position: relative; background-color: #d9e0d7; background-image: none; transform-origin: 0 0; margin: 0; flex: none; will-change: transform; backface-visibility: hidden; }
+/* ★Round14：decode済みの常駐<img>が準備できた後はCSS背景を二重描画しません。 */
+#map-container.base-map-image-ready { background-image: none; }
 #map-base-image {
     position: absolute;
     left: 0;

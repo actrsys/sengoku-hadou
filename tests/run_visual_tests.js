@@ -1615,57 +1615,6 @@ async function validateTitleMenuStability(cdp) {
     console.log('✓ タイトル 通常/情報メニュー差し替え時のロゴ・先頭ボタン位置固定 visual/layout regression');
 }
 
-async function validateMapCompositor(cdp) {
-    // 実物の3140x2440地図画像、共通CSS、勢力Canvas、城カード、coverを使って
-    // PC・スマホ・低メモリスマホそれぞれの合成下地が残ることを確認する。
-    // テストランナーはabout:blank上にfixtureを描画するため、外部URLへの遷移を使わず
-    // 実画像をdata URIで埋め込む。HTTP/fileの権限差でブラウザ試験が揺れないようにする。
-    const imgUrl = 'data:image/png;base64,' + fs.readFileSync(path.join(ROOT, 'data', 'images', 'map', 'japan_map.png')).toString('base64');
-    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8')
-        .replace("url('../data/images/map/japan_map.png')", `url('${imgUrl}')`);
-    const html = fs.readFileSync(path.join(ROOT, 'tests', 'visual', 'map_compositor.html'), 'utf8')
-        .replace('<link rel="stylesheet" href="../../css/style.css">', `<style>${css}</style>`)
-        .replace('src="../../data/images/map/japan_map.png"', `src="${imgUrl}"`);
-    await cdp.call('Runtime.evaluate', {
-        expression: `document.open(); document.write(${JSON.stringify(html)}); document.close(); true`,
-        returnByValue: true
-    });
-    const cases = [
-        { width: 1280, height: 720, pc: true, low: false },
-        { width: 390, height: 844, pc: false, low: false },
-        { width: 360, height: 640, pc: false, low: true }
-    ];
-    for (const c of cases) {
-        await cdp.call('Emulation.setDeviceMetricsOverride', {
-            width: c.width, height: c.height, deviceScaleFactor: 1, mobile: !c.pc
-        });
-        const result = await cdp.call('Runtime.evaluate', {
-            expression: `new Promise(async (resolve, reject) => {
-                const start = Date.now();
-                while(typeof window.verifyMapLayers !== 'function' && Date.now() - start < 8000) await new Promise(r => setTimeout(r, 30));
-                if(typeof window.verifyMapLayers !== 'function') { reject(Error('map fixture did not load')); return; }
-                try { resolve(await window.verifyMapLayers(${c.pc}, ${c.low})); }
-                catch(e) { reject(e); }
-            })`,
-            returnByValue: true, awaitPromise: true
-        });
-        assert.ok(result.result && !result.exceptionDetails, '地図の実ブラウザ描画テストが例外終了しました: ' + JSON.stringify(result));
-        const row = result.result.value;
-        assert.strictEqual(row.pc, c.pc);
-        assert.strictEqual(row.imgNaturalWidth, 3140, '原寸地図画像のロードが成功する');
-        assert.strictEqual(row.imgDisplay, c.pc ? 'none' : 'block', 'PCはCSS下地、スマホはImage下地');
-        assert.strictEqual(row.background.startsWith('url("data:image/png;base64,'), c.pc, 'PCだけmap-containerの背景画像を使用');
-        assert.strictEqual(row.scrollDisplay, 'flex', '最終coverを閉じた際に地図スクロールを復旧');
-        assert.ok(row.castlePresent, 'cover切替を繰り返しても城カードDOMは消失しない');
-        assert.strictEqual(row.scrollLeft, 100, 'スクロールX座標を保持する');
-        assert.strictEqual(row.scrollTop, 100, 'スクロールY座標を保持する');
-        const shot = await cdp.call('Page.captureScreenshot', { format: 'png', fromSurface: true });
-        assert.ok(Buffer.from(shot.data, 'base64').length > 18000, '地図が単色背景のみになっていない');
-    }
-    console.log('✓ PC・スマホ・低メモリスマホ 実画像/Canvas/城カード + モーダル20回切替 visual regression');
-}
-
-
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -1735,7 +1684,6 @@ async function main() {
         await validateFieldTerrainLayout(cdp);
         await validateSiegeLayout(cdp);
         await validateTitleMenuStability(cdp);
-        await validateMapCompositor(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');
