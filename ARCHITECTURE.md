@@ -1419,3 +1419,10 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 白抜け対策の `_refreshPersistentMapCompositeLayers()` は、通常のモーダル開閉や同一シナリオの `renderMap()` ごとに無条件実行しない。健全なCanvasを毎回DOMからremove/insertすると対策自身が全画面フラッシュを生むため、`display:none`、OS/page復帰、context/backing-store欠損など、実際にcompositor無効化リスクがある境界だけで再提示する。通常復帰は軽量な勢力色Canvas健全性検査に失敗した場合だけ再描画・再提示する。
 - `forceResetModals()` は保留中のcovered-close世代を無効化する。これによりタイトル復帰・ロード・シナリオ切替で旧モーダルのpaint待ちが完了しても、新しいUIへ作用しない。
 - この改修は表示ライフサイクルと描画資源復旧の順序だけを対象とし、ゲームルール・外交・シナリオBIN・共通データ・画像・CSSレイアウト値は変更しない。コード修正を伴うため版番号を `r437` とする。
+
+## r438: メイン地図の静的下地とcover終了時の合成安定化
+- r437のcover→背景復旧→非表示のhandoffは維持する。ただし `requestAnimationFrame(() => setTimeout(resolve,0))` は環境によってrAF直後のタイマーが実描画commitに先行し得るため、**最終coverの終了**だけ2段階のrAFを通す `waitForCoveredMapPaint()` を用いる。固定ms待機、追加の暗幕、地図の全面再生成は行わない。既存の世代tokenと再表示キャンセルの規則を保持する。
+- PCでは3140×2440の地図下地を独立の常駐 `img` 合成面として表示する代わりに、同じPNGを **`#map-container` 自身のCSS背景**として描画する。画像の読み込み・decode待ち・シナリオ寿命・静的地図DOMの正本は既存の `Image` オブジェクトで維持し、PCだけそのimgの**表示を停止**してGPU下地を二重保持しない。地図座標・ズーム・領土Canvas・道路SVG・城カードの重なり順は維持する。
+- PCの巨大スクロール容器／地図全体の永続 `will-change` / `backface-visibility:hidden` と強制 `translateZ(0)` の組合せは、モーダル開閉によるレイヤー再構成で背景画像の巨大な合成面だけが空白になる負担を増やす。スクロール・拡縮は従来のCSS 2D `scale()` で行い、静的レイヤーを無条件に付け直さない。強制復旧時もPCで非表示のimgは無用にremove/insertしない。
+- スマホでは軽量化済み `japan_map_mobile.png` / `japan_map_lowmem.png` の継続img表示を保持し、低メモリ端末での `background-paused` / 戦闘時の `display:none` / Canvas健全性検査と復旧予約を変更しない。PCだけの背景切替をスマホへ広げず、既存checkerboarding対策とメモリ上限を優先する。
+- この改修は静的地図の合成配置と最終cover解除タイミングに限定し、シナリオ、武将・城の判定、ゲームルール・演出時間・画面縦横比・データ/画像素材は変更しない。版番号をr438とする。
