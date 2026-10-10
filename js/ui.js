@@ -1138,12 +1138,6 @@ class UIManager {
         let okBtn = document.getElementById('dialog-btn-ok');
         let cancelBtn = document.getElementById('dialog-btn-cancel');
 
-        // ★Round12：連続会話中はAIガードの一時非表示カウントを積み増さず、シーケンス全体で1回だけ保持します。
-        if (!this._dialogGuardHeld) {
-            this.hideAIGuardTemporarily();
-            this._dialogGuardHeld = true;
-        }
-
         if (!modal) {
             if (dialog.isConfirm) {
                 if (confirm(dialog.msg)) { if (dialog.onOk) dialog.onOk(); } else { if (dialog.onCancel) dialog.onCancel(); }
@@ -1489,6 +1483,15 @@ class UIManager {
                     footer.appendChild(closeB);
                 }
             }
+        }
+
+        // ★r433：最初の会話へ入る時も、顔画像decodeやDOM準備が終わるまでは現在のAIガードを維持します。
+        // 先にガードを透明化して await すると、低速端末では会話が出る前に地図だけが露出するため、
+        // 世代確認と全DOM準備を終えた同一処理単位の最後で会話へ引き渡します。
+        // 連続会話中は従来どおりシーケンス全体で1回だけ保持します。
+        if (!this._dialogGuardHeld) {
+            this.hideAIGuardTemporarily();
+            this._dialogGuardHeld = true;
         }
 
         // 引き渡し先の会話を先に可視化してから、使者選択など直前の画面を閉じます。

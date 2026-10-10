@@ -3132,9 +3132,8 @@ Object.assign(WarManager.prototype, {
         }
 
         if (defClanId === pid && !defCastle.isDelegated) {
-            // ★修正：元に戻して、マップ選択前には念押しでガードを外すだけにします
-            this.game.ui.hideAIGuardTemporarily(); 
-            
+            // 共通会話が可視化直前にAIガードを引き渡す。呼び出し側で先に透明化すると、
+            // 顔画像decode待ちの間に地図だけが露出するため、ここでは触らない。
             this.game.ui.showDialog("他の拠点から援軍を出陣させますか？", true, 
                 () => {
                     this.game.ui.hideAIGuardTemporarily(); 
@@ -3229,8 +3228,7 @@ Object.assign(WarManager.prototype, {
         const allyCastles = [...new Set(allyForceCandidates.map(fc => fc.castle))];
 
         if (defClanId === pid && !defCastle.isDelegated) {
-            this.game.ui.hideAIGuardTemporarily(); 
-            
+            // 最初の会話を出す責務はUIManager側に任せ、表示前のガード解除を先取りしない。
             this.game.ui.showDialog("他勢力に援軍を要請しますか？", true, 
                 () => {
                     this.game.ui.hideAIGuardTemporarily(); 

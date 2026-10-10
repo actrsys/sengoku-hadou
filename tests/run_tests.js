@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r432');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r433');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -8124,6 +8124,29 @@ test('外交の非同期会話遷移は固定時間で旧ダイアログを閉�
     assert.ok(execBlock.includes('finally'));
     assert.ok(execBlock.includes('ui.completeVisualHandoff()'), '例外や無表示終了でも使者選択画面を残さない');
     assert.ok(execBlock.includes('ui.endDialogHandoffHold()'));
+});
+
+test('会話開始時は顔画像decode完了までAIガードを維持し可視化直前にhandoffする', () => {
+    const ui = read('js/ui.js');
+    const start = ui.indexOf('async processDialogQueue()');
+    const end = ui.indexOf('getStatusBarHTML(', start);
+    const block = ui.slice(start, end);
+    const faceAwait = block.indexOf('await dialog.faceLoadPromise');
+    const generationCheck = block.indexOf('dialogGeneration !== Number(this._dialogGeneration || 0)');
+    const guardAcquire = block.indexOf('if (!this._dialogGuardHeld)');
+    const visible = block.indexOf("modal.classList.remove('hidden');");
+    assert.ok(faceAwait >= 0, '顔画像の準備完了を待つ');
+    assert.ok(generationCheck > faceAwait, 'decode後に旧世代を破棄する');
+    assert.ok(guardAcquire > generationCheck, '旧decodeがAIガード状態を変更しない');
+    assert.ok(guardAcquire < visible, 'AIガードは会話を可視化する直前にだけ引き渡す');
+    assert.ok(!block.slice(0, faceAwait).includes('hideAIGuardTemporarily()'), 'decode待ちの前に背景遮蔽を外さない');
+
+    const war = read('js/war_effort.js');
+    const selfPrompt = war.slice(war.indexOf('if (defClanId === pid && !defCastle.isDelegated)'), war.indexOf('} else {', war.indexOf('if (defClanId === pid && !defCastle.isDelegated)')));
+    assert.ok(!/hideAIGuardTemporarily\(\)[\s\S]*?showDialog\("他の拠点から援軍を出陣させますか？"/.test(selfPrompt), '守備側自軍援軍の確認も会話より先にガードを外さない');
+    const allyPromptAt = war.indexOf('showDialog("他勢力に援軍を要請しますか？"');
+    const allyPromptPrefix = war.slice(Math.max(0, allyPromptAt - 240), allyPromptAt);
+    assert.ok(!allyPromptPrefix.includes('hideAIGuardTemporarily()'), '守備側同盟援軍の確認も会話より先にガードを外さない');
 });
 
 test('外交の使者選択画面は次の会話が可視化されるまで保持する', () => {
