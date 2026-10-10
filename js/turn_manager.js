@@ -396,6 +396,9 @@ class TurnManager {
                 await game.aiEngine.execAI(castle);
             } catch (error) {
                 console.error('AI Error caught:', error);
+                // 遷移後に旧AIが遅延rejectしても、新しいターンを進めない。
+                if (!this._isTurnFlowCurrent(turnFlowGeneration)
+                    || game.turnQueue[game.currentIndex] !== castle) return;
                 game.finishTurn();
             }
         }, delay);
@@ -543,13 +546,21 @@ class TurnManager {
                 game.writeSystemDiagnostic('player_turn:after_render', castle);
                 game.ui.scrollToActiveCastle(castle);
                 
+                // ターン開始ダイアログ・軍師助言・before_commandイベントのコールバックは
+                // タイトル復帰や別ロード後にも遅れて完了し得る。元のターンだけがUIを開ける。
+                const isExpectedPlayerTurn = () => isCurrentFlow()
+                    && Number(game.currentIndex) === expectedTurnIndex
+                    && game.turnQueue[expectedTurnIndex] === castle;
                 game.ui.showTurnStartDialog(castle, () => {
+                    if (!isExpectedPlayerTurn()) return;
                     game.gunshiSystem.checkAndShowAdvice(castle, async () => {
+                        if (!isExpectedPlayerTurn()) return;
                         // ★イベント追加：コマンドの選択前（手動操作時）
                         if (game.eventManager) {
                             await game.eventManager.processEvents('before_command', castle);
+                            if (!isExpectedPlayerTurn()) return;
                         }
-                        game.ui.showControlPanel(castle); 
+                        game.ui.showControlPanel(castle);
                         game.writeSystemDiagnostic('player_turn:ready', castle);
                     });
                 });

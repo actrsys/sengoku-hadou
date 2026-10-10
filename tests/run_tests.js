@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r439');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r441');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -13043,14 +13043,7 @@ test('PC共通リストの連続ドラッグは前回release timerで新しい�
     assert.ok(!block.includes("\n                    setTimeout(() => {\n                        hasListDragged = false;"), '寿命管理されない旧100ms timerを残さない');
 });
 
-Promise.all(pendingTests).then(() => {
-    console.log(`\n${passed} passed, ${failed} failed`);
-    if (failed > 0) process.exit(1);
-}).catch(error => {
-    _recordTestFailure('非同期テストランナー', error);
-    console.log(`\n${passed} passed, ${failed} failed`);
-    process.exit(1);
-});
+
 
 
 
@@ -14106,4 +14099,118 @@ test('r430ではセーブ復元完了まで入力抑止を維持し旧復元を�
     const recoveryBlock = save.slice(recoveryAt, recoveryEnd);
     assert.ok(recoveryBlock.includes('const recoveryGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration'));
     assert.ok(recoveryBlock.includes('if (!isRecoveryLatest()) return;'), '失敗通知のawait後に古い回復処理からタイトルへ戻さない');
+});
+
+// r440: 完全版ZIPから管理用Excelを落としたままテストが通る事故を防ぐ。
+// ゲーム内データの変更や数式の再計算は行わない。
+test('r440 配布データ: BINに登録された全シナリオの管理用Excelと主要数式が存在する', () => {
+    const { verifyReleaseDataSources, checkWorkbook } = require('../tools/verify_release_sources.js');
+    const rows = verifyReleaseDataSources(ROOT);
+    const folders = readBinJson('data/scenarios/index.bin').scenarios.map(s => s.folder);
+    assert.strictEqual(rows.length, folders.length + 1);
+    assert.ok(rows.some(row => row.name === '共通' && row.formulaCount >= 1000));
+    for (const folder of folders) {
+        assert.ok(rows.some(row => row.name === folder && row.formulaCount >= 1200), `${folder} の数式付きExcel正本を含める`);
+    }
+    assert.throws(
+        () => checkWorkbook(path.join(ROOT, '管理用Excel', '存在しないシナリオ.xlsm'), 'scenario'),
+        /管理用Excelがありません/,
+        '管理用Excel欠落をテスト失敗として検出する'
+    );
+});
+
+
+// r441: 旧ターンの非同期イベント/AI例外が、シナリオ遷移後のUIとターンを触らない。
+test('r441 プレイヤーターンのbefore_command待機中に遷移すると旧コマンド画面を再表示しない', async () => {
+    const ctx = createContext({ document: { body: { classList: new FakeClassList(['is-pc']) } } });
+    loadScript(ctx, 'js/turn_manager.js');
+    for (const aborted of [false, true]) {
+        const castle = { id: 10, ownerClan: 1, isDone: false, isDelegated: false };
+        let proceed = null;
+        let resolveEvent = null;
+        let panelCount = 0;
+        const game = {
+            phase: 'game', isRestoringSave: false, selectionMode: null,
+            currentIndex: 0, turnQueue: [castle], playerClanId: 1,
+            isProcessingAI: false, hasAutoSavedThisMonth: true,
+            warManager: { state: { active: false } },
+            getClan: () => ({ id: 1 }),
+            writeSystemDiagnostic() {},
+            ui: {
+                waitForDialogs: async () => {},
+                aiGuard: { classList: new FakeClassList() },
+                renderMap() {}, scrollToActiveCastle() {},
+                showTurnStartDialog(_castle, callback) { proceed = callback; },
+                showControlPanel() { panelCount++; }
+            },
+            gunshiSystem: { checkAndShowAdvice(_castle, callback) { callback(); } },
+            eventManager: { processEvents() { return new Promise(resolve => { resolveEvent = resolve; }); } }
+        };
+        const manager = vm.runInContext('new TurnManager(window.__testGame)', Object.assign(ctx, { __testGame: game }));
+        game.turnManager = manager;
+        await manager.processTurn();
+        assert.strictEqual(typeof proceed, 'function', '通常ターン開始ダイアログが開く');
+        proceed();
+        assert.strictEqual(typeof resolveEvent, 'function', 'before_commandを待機する');
+        if (aborted) {
+            manager.abortForScenarioTransition();
+            game.phase = 'title';
+        }
+        resolveEvent();
+        await new Promise(resolve => setImmediate(resolve));
+        assert.strictEqual(panelCount, aborted ? 0 : 1,
+            aborted ? '旧イベント完了による古いコマンド再表示を禁止' : '正常終了時は従来どおりコマンドを表示');
+    }
+});
+
+test('r441 AI例外処理も世代中断後には新しいターンを終了させない', async () => {
+    let timerCallback = null;
+    const ctx = createContext({
+        console: { log() {}, warn() {}, error() {} },
+        document: { body: { classList: new FakeClassList(['is-pc']) } },
+        setTimeout: callback => { timerCallback = callback; return 42; },
+        clearTimeout() {}
+    });
+    loadScript(ctx, 'js/turn_manager.js');
+    const castle = { id: 10, ownerClan: 2 };
+    let failAI = null;
+    let finished = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false,
+        currentIndex: 0, turnQueue: [castle],
+        aiTimer: null, warManager: { state: { active: false } },
+        ui: {
+            clearCommandMenu() {},
+            aiGuard: { classList: new FakeClassList() },
+            restoreAIGuardText() {}, updateAIProgress() {}
+        },
+        aiEngine: { execAI() { return new Promise((resolve, reject) => { failAI = reject; }); } },
+        finishTurn() { finished++; }
+    };
+    ctx.__testGame = game;
+    const manager = vm.runInContext('new TurnManager(window.__testGame)', ctx);
+    game.turnManager = manager;
+    manager._scheduleAITurn(castle);
+    const task = timerCallback();
+    assert.strictEqual(typeof failAI, 'function', 'AI非同期処理を開始した');
+    manager.abortForScenarioTransition();
+    game.phase = 'title';
+    failAI(new Error('旧AI処理の遅延例外'));
+    await task;
+    assert.strictEqual(finished, 0, '旧AI例外は次シナリオのfinishTurnを実行しない');
+});
+
+test('r441 テストランナーの非同期終了待ちは全test定義の後で行う', () => {
+    const source = read('tests/run_tests.js');
+    assert.ok(source.lastIndexOf('Promise.all(pendingTests).then(') > source.lastIndexOf("test('"),
+        '途中で待機を開始すると後続の非同期テストを取りこぼす');
+});
+
+Promise.all(pendingTests).then(() => {
+    console.log(`\n${passed} passed, ${failed} failed`);
+    if (failed > 0) process.exit(1);
+}).catch(error => {
+    _recordTestFailure('非同期テストランナー', error);
+    console.log(`\n${passed} passed, ${failed} failed`);
+    process.exit(1);
 });

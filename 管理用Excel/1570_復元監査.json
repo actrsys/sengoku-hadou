@@ -1,0 +1,816 @@
+{
+  "result": "復元版（オリジナル原本の完全再現ではない）",
+  "input_bin": "r439 data/scenarios/1570_anegawa/scenario.bin",
+  "input_template": "1560_okehazama(1).xlsm",
+  "unchanged_formula_count_elsewhere": 26487,
+  "numeric_castle_formulas_expanded": 1252,
+  "numeric_castle_formulas_with_1570_adjustments": 79,
+  "total_formulas_retained": 27739,
+  "record_count": {
+    "warriorsState": 4042,
+    "princessState": 29,
+    "clansState": 121,
+    "castlesState": 252,
+    "diplomacy": 278,
+    "kunishus": 87,
+    "legions": 70
+  },
+  "special_adjustments": [
+    {
+      "row": 62,
+      "id": 74,
+      "field": "soldiers",
+      "column": "L",
+      "current": 4133,
+      "formulaResult": 4017,
+      "delta": 116,
+      "baseFormula": "300 + ROUND((((P62/15)+(Y62/10))*(SQRT(AA62)/100+1)+O62)/((COUNTIF(I:I, I62)/30)+1), 0)"
+    },
+    {
+      "row": 63,
+      "id": 19,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2047,
+      "formulaResult": 2211,
+      "delta": -164,
+      "baseFormula": "300 + ROUND((((P63/15)+(Y63/10))*(SQRT(AA63)/100+1)+O63)/((COUNTIF(I:I, I63)/30)+1), 0)"
+    },
+    {
+      "row": 66,
+      "id": 241,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1026,
+      "formulaResult": 1013,
+      "delta": 13,
+      "baseFormula": "300 + ROUND((((P66/15)+(Y66/10))*(SQRT(AA66)/100+1)+O66)/((COUNTIF(I:I, I66)/30)+1), 0)"
+    },
+    {
+      "row": 67,
+      "id": 79,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1883,
+      "formulaResult": 1854,
+      "delta": 29,
+      "baseFormula": "300 + ROUND((((P67/15)+(Y67/10))*(SQRT(AA67)/100+1)+O67)/((COUNTIF(I:I, I67)/30)+1), 0)"
+    },
+    {
+      "row": 70,
+      "id": 9,
+      "field": "rice",
+      "column": "P",
+      "current": 11951,
+      "formulaResult": 14388,
+      "delta": -2437,
+      "baseFormula": "ROUND((T70 * 2.5) * SQRT(Z70)\n,0) + (O70 * 2)"
+    },
+    {
+      "row": 81,
+      "id": 31,
+      "field": "gold",
+      "column": "O",
+      "current": 2306,
+      "formulaResult": 1806,
+      "delta": 500,
+      "baseFormula": "ROUND(500+((AA81*0.01)+(Z81/3)+(V81/10))*6,0)"
+    },
+    {
+      "row": 88,
+      "id": 249,
+      "field": "gold",
+      "column": "O",
+      "current": 1884,
+      "formulaResult": 1384,
+      "delta": 500,
+      "baseFormula": "ROUND(500+((AA88*0.01)+(Z88/3)+(V88/10))*6,0)"
+    },
+    {
+      "row": 89,
+      "id": 46,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2806,
+      "formulaResult": 2882,
+      "delta": -76,
+      "baseFormula": "300 + ROUND((((P89/15)+(Y89/10))*(SQRT(AA89)/100+1)+O89)/((COUNTIF(I:I, I89)/30)+1), 0)"
+    },
+    {
+      "row": 90,
+      "id": 252,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1759,
+      "formulaResult": 1803,
+      "delta": -44,
+      "baseFormula": "300 + ROUND((((P90/15)+(Y90/10))*(SQRT(AA90)/100+1)+O90)/((COUNTIF(I:I, I90)/30)+1), 0)"
+    },
+    {
+      "row": 91,
+      "id": 65,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2277,
+      "formulaResult": 1980,
+      "delta": 297,
+      "baseFormula": "300 + ROUND((((P91/15)+(Y91/10))*(SQRT(AA91)/100+1)+O91)/((COUNTIF(I:I, I91)/30)+1), 0)"
+    },
+    {
+      "row": 102,
+      "id": 99,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2153,
+      "formulaResult": 2210,
+      "delta": -57,
+      "baseFormula": "300 + ROUND((((P102/15)+(Y102/10))*(SQRT(AA102)/100+1)+O102)/((COUNTIF(I:I, I102)/30)+1), 0)"
+    },
+    {
+      "row": 103,
+      "id": 69,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2267,
+      "formulaResult": 2218,
+      "delta": 49,
+      "baseFormula": "300 + ROUND((((P103/15)+(Y103/10))*(SQRT(AA103)/100+1)+O103)/((COUNTIF(I:I, I103)/30)+1), 0)"
+    },
+    {
+      "row": 104,
+      "id": 67,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1990,
+      "formulaResult": 1948,
+      "delta": 42,
+      "baseFormula": "300 + ROUND((((P104/15)+(Y104/10))*(SQRT(AA104)/100+1)+O104)/((COUNTIF(I:I, I104)/30)+1), 0)"
+    },
+    {
+      "row": 105,
+      "id": 41,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2673,
+      "formulaResult": 2614,
+      "delta": 59,
+      "baseFormula": "300 + ROUND((((P105/15)+(Y105/10))*(SQRT(AA105)/100+1)+O105)/((COUNTIF(I:I, I105)/30)+1), 0)"
+    },
+    {
+      "row": 106,
+      "id": 10,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2235,
+      "formulaResult": 2187,
+      "delta": 48,
+      "baseFormula": "300 + ROUND((((P106/15)+(Y106/10))*(SQRT(AA106)/100+1)+O106)/((COUNTIF(I:I, I106)/30)+1), 0)"
+    },
+    {
+      "row": 107,
+      "id": 97,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2133,
+      "formulaResult": 2087,
+      "delta": 46,
+      "baseFormula": "300 + ROUND((((P107/15)+(Y107/10))*(SQRT(AA107)/100+1)+O107)/((COUNTIF(I:I, I107)/30)+1), 0)"
+    },
+    {
+      "row": 108,
+      "id": 93,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2472,
+      "formulaResult": 2417,
+      "delta": 55,
+      "baseFormula": "300 + ROUND((((P108/15)+(Y108/10))*(SQRT(AA108)/100+1)+O108)/((COUNTIF(I:I, I108)/30)+1), 0)"
+    },
+    {
+      "row": 109,
+      "id": 14,
+      "field": "soldiers",
+      "column": "L",
+      "current": 4248,
+      "formulaResult": 4149,
+      "delta": 99,
+      "baseFormula": "300 + ROUND((((P109/15)+(Y109/10))*(SQRT(AA109)/100+1)+O109)/((COUNTIF(I:I, I109)/30)+1), 0)"
+    },
+    {
+      "row": 110,
+      "id": 236,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2201,
+      "formulaResult": 2153,
+      "delta": 48,
+      "baseFormula": "300 + ROUND((((P110/15)+(Y110/10))*(SQRT(AA110)/100+1)+O110)/((COUNTIF(I:I, I110)/30)+1), 0)"
+    },
+    {
+      "row": 111,
+      "id": 98,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1757,
+      "formulaResult": 1720,
+      "delta": 37,
+      "baseFormula": "300 + ROUND((((P111/15)+(Y111/10))*(SQRT(AA111)/100+1)+O111)/((COUNTIF(I:I, I111)/30)+1), 0)"
+    },
+    {
+      "row": 112,
+      "id": 101,
+      "field": "gold",
+      "column": "O",
+      "current": 1608,
+      "formulaResult": 1408,
+      "delta": 200,
+      "baseFormula": "ROUND(500+((AA112*0.01)+(Z112/3)+(V112/10))*6,0)"
+    },
+    {
+      "row": 113,
+      "id": 13,
+      "field": "gold",
+      "column": "O",
+      "current": 3032,
+      "formulaResult": 2532,
+      "delta": 500,
+      "baseFormula": "ROUND(500+((AA113*0.01)+(Z113/3)+(V113/10))*6,0)"
+    },
+    {
+      "row": 113,
+      "id": 13,
+      "field": "rice",
+      "column": "P",
+      "current": 14490,
+      "formulaResult": 11962,
+      "delta": 2528,
+      "baseFormula": "ROUND((T113 * 2.5) * SQRT(Z113)\n,0) + (O113 * 2)"
+    },
+    {
+      "row": 116,
+      "id": 12,
+      "field": "rice",
+      "column": "P",
+      "current": 10749,
+      "formulaResult": 11986,
+      "delta": -1237,
+      "baseFormula": "ROUND((T116 * 2.5) * SQRT(Z116)\n,0) + (O116 * 2)"
+    },
+    {
+      "row": 116,
+      "id": 12,
+      "field": "soldiers",
+      "column": "L",
+      "current": 3743,
+      "formulaResult": 3952,
+      "delta": -209,
+      "baseFormula": "300 + ROUND((((P116/15)+(Y116/10))*(SQRT(AA116)/100+1)+O116)/((COUNTIF(I:I, I116)/30)+1), 0)"
+    },
+    {
+      "row": 117,
+      "id": 48,
+      "field": "rice",
+      "column": "P",
+      "current": 12032,
+      "formulaResult": 10842,
+      "delta": 1190,
+      "baseFormula": "ROUND((T117 * 2.5) * SQRT(Z117)\n,0) + (O117 * 2)"
+    },
+    {
+      "row": 120,
+      "id": 73,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1754,
+      "formulaResult": 1728,
+      "delta": 26,
+      "baseFormula": "300 + ROUND((((P120/15)+(Y120/10))*(SQRT(AA120)/100+1)+O120)/((COUNTIF(I:I, I120)/30)+1), 0)"
+    },
+    {
+      "row": 121,
+      "id": 7,
+      "field": "soldiers",
+      "column": "L",
+      "current": 3201,
+      "formulaResult": 3149,
+      "delta": 52,
+      "baseFormula": "300 + ROUND((((P121/15)+(Y121/10))*(SQRT(AA121)/100+1)+O121)/((COUNTIF(I:I, I121)/30)+1), 0)"
+    },
+    {
+      "row": 122,
+      "id": 11,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2183,
+      "formulaResult": 2149,
+      "delta": 34,
+      "baseFormula": "300 + ROUND((((P122/15)+(Y122/10))*(SQRT(AA122)/100+1)+O122)/((COUNTIF(I:I, I122)/30)+1), 0)"
+    },
+    {
+      "row": 123,
+      "id": 57,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1180,
+      "formulaResult": 1164,
+      "delta": 16,
+      "baseFormula": "300 + ROUND((((P123/15)+(Y123/10))*(SQRT(AA123)/100+1)+O123)/((COUNTIF(I:I, I123)/30)+1), 0)"
+    },
+    {
+      "row": 124,
+      "id": 180,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1339,
+      "formulaResult": 1320,
+      "delta": 19,
+      "baseFormula": "300 + ROUND((((P124/15)+(Y124/10))*(SQRT(AA124)/100+1)+O124)/((COUNTIF(I:I, I124)/30)+1), 0)"
+    },
+    {
+      "row": 125,
+      "id": 251,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1207,
+      "formulaResult": 1191,
+      "delta": 16,
+      "baseFormula": "300 + ROUND((((P125/15)+(Y125/10))*(SQRT(AA125)/100+1)+O125)/((COUNTIF(I:I, I125)/30)+1), 0)"
+    },
+    {
+      "row": 126,
+      "id": 77,
+      "field": "gold",
+      "column": "O",
+      "current": 992,
+      "formulaResult": 1292,
+      "delta": -300,
+      "baseFormula": "ROUND(500+((AA126*0.01)+(Z126/3)+(V126/10))*6,0)+300"
+    },
+    {
+      "row": 126,
+      "id": 77,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1407,
+      "formulaResult": 1387,
+      "delta": 20,
+      "baseFormula": "300 + ROUND((((P126/15)+(Y126/10))*(SQRT(AA126)/100+1)+O126)/((COUNTIF(I:I, I126)/30)+1), 0)"
+    },
+    {
+      "row": 127,
+      "id": 47,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1741,
+      "formulaResult": 1715,
+      "delta": 26,
+      "baseFormula": "300 + ROUND((((P127/15)+(Y127/10))*(SQRT(AA127)/100+1)+O127)/((COUNTIF(I:I, I127)/30)+1), 0)"
+    },
+    {
+      "row": 128,
+      "id": 44,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1811,
+      "formulaResult": 1903,
+      "delta": -92,
+      "baseFormula": "300 + ROUND((((P128/15)+(Y128/10))*(SQRT(AA128)/100+1)+O128)/((COUNTIF(I:I, I128)/30)+1), 0)"
+    },
+    {
+      "row": 129,
+      "id": 49,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1136,
+      "formulaResult": 1121,
+      "delta": 15,
+      "baseFormula": "300 + ROUND((((P129/15)+(Y129/10))*(SQRT(AA129)/100+1)+O129)/((COUNTIF(I:I, I129)/30)+1), 0)"
+    },
+    {
+      "row": 130,
+      "id": 78,
+      "field": "soldiers",
+      "column": "L",
+      "current": 938,
+      "formulaResult": 926,
+      "delta": 12,
+      "baseFormula": "300 + ROUND((((P130/15)+(Y130/10))*(SQRT(AA130)/100+1)+O130)/((COUNTIF(I:I, I130)/30)+1), 0)"
+    },
+    {
+      "row": 131,
+      "id": 80,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2257,
+      "formulaResult": 2441,
+      "delta": -184,
+      "baseFormula": "300 + ROUND((((P131/15)+(Y131/10))*(SQRT(AA131)/100+1)+O131)/((COUNTIF(I:I, I131)/30)+1), 0)"
+    },
+    {
+      "row": 133,
+      "id": 3,
+      "field": "soldiers",
+      "column": "L",
+      "current": 3060,
+      "formulaResult": 3082,
+      "delta": -22,
+      "baseFormula": "300 + ROUND((((P133/15)+(Y133/10))*(SQRT(AA133)/100+1)+O133)/((COUNTIF(I:I, I133)/30)+1), 0)"
+    },
+    {
+      "row": 135,
+      "id": 36,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1701,
+      "formulaResult": 1675,
+      "delta": 26,
+      "baseFormula": "300 + ROUND((((P135/15)+(Y135/10))*(SQRT(AA135)/100+1)+O135)/((COUNTIF(I:I, I135)/30)+1), 0)"
+    },
+    {
+      "row": 136,
+      "id": 183,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1507,
+      "formulaResult": 1485,
+      "delta": 22,
+      "baseFormula": "300 + ROUND((((P136/15)+(Y136/10))*(SQRT(AA136)/100+1)+O136)/((COUNTIF(I:I, I136)/30)+1), 0)"
+    },
+    {
+      "row": 137,
+      "id": 50,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1326,
+      "formulaResult": 1307,
+      "delta": 19,
+      "baseFormula": "300 + ROUND((((P137/15)+(Y137/10))*(SQRT(AA137)/100+1)+O137)/((COUNTIF(I:I, I137)/30)+1), 0)"
+    },
+    {
+      "row": 138,
+      "id": 182,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1543,
+      "formulaResult": 1521,
+      "delta": 22,
+      "baseFormula": "300 + ROUND((((P138/15)+(Y138/10))*(SQRT(AA138)/100+1)+O138)/((COUNTIF(I:I, I138)/30)+1), 0)"
+    },
+    {
+      "row": 142,
+      "id": 186,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1866,
+      "formulaResult": 1913,
+      "delta": -47,
+      "baseFormula": "300 + ROUND((((P142/15)+(Y142/10))*(SQRT(AA142)/100+1)+O142)/((COUNTIF(I:I, I142)/30)+1), 0)"
+    },
+    {
+      "row": 143,
+      "id": 23,
+      "field": "soldiers",
+      "column": "L",
+      "current": 3081,
+      "formulaResult": 3165,
+      "delta": -84,
+      "baseFormula": "300 + ROUND((((P143/15)+(Y143/10))*(SQRT(AA143)/100+1)+O143)/((COUNTIF(I:I, I143)/30)+1), 0)"
+    },
+    {
+      "row": 144,
+      "id": 35,
+      "field": "gold",
+      "column": "O",
+      "current": 2010,
+      "formulaResult": 2310,
+      "delta": -300,
+      "baseFormula": "ROUND(500+((AA144*0.01)+(Z144/3)+(V144/10))*6,0)+300"
+    },
+    {
+      "row": 144,
+      "id": 35,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2527,
+      "formulaResult": 2487,
+      "delta": 40,
+      "baseFormula": "300 + ROUND((((P144/15)+(Y144/10))*(SQRT(AA144)/100+1)+O144)/((COUNTIF(I:I, I144)/30)+1), 0)"
+    },
+    {
+      "row": 145,
+      "id": 177,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1561,
+      "formulaResult": 1080,
+      "delta": 481,
+      "baseFormula": "300 + ROUND((((P145/15)+(Y145/10))*(SQRT(AA145)/100+1)+O145)/((COUNTIF(I:I, I145)/30)+1), 0)"
+    },
+    {
+      "row": 146,
+      "id": 28,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2169,
+      "formulaResult": 2226,
+      "delta": -57,
+      "baseFormula": "300 + ROUND((((P146/15)+(Y146/10))*(SQRT(AA146)/100+1)+O146)/((COUNTIF(I:I, I146)/30)+1), 0)"
+    },
+    {
+      "row": 147,
+      "id": 246,
+      "field": "gold",
+      "column": "O",
+      "current": 952,
+      "formulaResult": 1252,
+      "delta": -300,
+      "baseFormula": "ROUND(500+((AA147*0.01)+(Z147/3)+(V147/10))*6,0)+300"
+    },
+    {
+      "row": 147,
+      "id": 246,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1145,
+      "formulaResult": 1129,
+      "delta": 16,
+      "baseFormula": "300 + ROUND((((P147/15)+(Y147/10))*(SQRT(AA147)/100+1)+O147)/((COUNTIF(I:I, I147)/30)+1), 0)"
+    },
+    {
+      "row": 148,
+      "id": 27,
+      "field": "gold",
+      "column": "O",
+      "current": 1106,
+      "formulaResult": 1406,
+      "delta": -300,
+      "baseFormula": "ROUND(500+((AA148*0.01)+(Z148/3)+(V148/10))*6,0)+300"
+    },
+    {
+      "row": 148,
+      "id": 27,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2189,
+      "formulaResult": 1502,
+      "delta": 687,
+      "baseFormula": "300 + ROUND((((P148/15)+(Y148/10))*(SQRT(AA148)/100+1)+O148)/((COUNTIF(I:I, I148)/30)+1), 0)"
+    },
+    {
+      "row": 149,
+      "id": 40,
+      "field": "gold",
+      "column": "O",
+      "current": 1044,
+      "formulaResult": 1344,
+      "delta": -300,
+      "baseFormula": "ROUND(500+((AA149*0.01)+(Z149/3)+(V149/10))*6,0)+300"
+    },
+    {
+      "row": 149,
+      "id": 40,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1371,
+      "formulaResult": 1351,
+      "delta": 20,
+      "baseFormula": "300 + ROUND((((P149/15)+(Y149/10))*(SQRT(AA149)/100+1)+O149)/((COUNTIF(I:I, I149)/30)+1), 0)"
+    },
+    {
+      "row": 150,
+      "id": 26,
+      "field": "rice",
+      "column": "P",
+      "current": 8011,
+      "formulaResult": 9996,
+      "delta": -1985,
+      "baseFormula": "ROUND((T150 * 2.5) * SQRT(Z150)\n,0) + (O150 * 2)"
+    },
+    {
+      "row": 152,
+      "id": 39,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2895,
+      "formulaResult": 2848,
+      "delta": 47,
+      "baseFormula": "300 + ROUND((((P152/15)+(Y152/10))*(SQRT(AA152)/100+1)+O152)/((COUNTIF(I:I, I152)/30)+1), 0)"
+    },
+    {
+      "row": 153,
+      "id": 53,
+      "field": "soldiers",
+      "column": "L",
+      "current": 1963,
+      "formulaResult": 1933,
+      "delta": 30,
+      "baseFormula": "300 + ROUND((((P153/15)+(Y153/10))*(SQRT(AA153)/100+1)+O153)/((COUNTIF(I:I, I153)/30)+1), 0)"
+    },
+    {
+      "row": 154,
+      "id": 34,
+      "field": "soldiers",
+      "column": "L",
+      "current": 2148,
+      "formulaResult": 2114,
+      "delta": 34,
+      "baseFormula": "300 + ROUND((((P154/15)+(Y154/10))*(SQRT(AA154)/100+1)+O154)/((COUNTIF(I:I, I154)/30)+1), 0)"
+    },
+    {
+      "row": 157,
+      "id": 181,
+      "field": "gold",
+      "column": "O",
+      "current": 1084,
+      "formulaResult": 2084,
+      "delta": -1000,
+      "baseFormula": "ROUND(500+((AA157*0.01)+(Z157/3)+(V157/10))*6,0)"
+    },
+    {
+      "row": 157,
+      "id": 181,
+      "field": "rice",
+      "column": "P",
+      "current": 9805,
+      "formulaResult": 7683,
+      "delta": 2122,
+      "baseFormula": "ROUND((T157 * 2.5) * SQRT(Z157)\n,0) + (O157 * 2)"
+    },
+    {
+      "row": 158,
+      "id": 33,
+      "field": "soldiers",
+      "column": "L",
+      "current": 4761,
+      "formulaResult": 4626,
+      "delta": 135,
+      "baseFormula": "300 + ROUND((((P158/15)+(Y158/10))*(SQRT(AA158)/100+1)+O158)/((COUNTIF(I:I, I158)/30)+1), 0)"
+    },
+    {
+      "row": 166,
+      "id": 82,
+      "field": "rice",
+      "column": "P",
+      "current": 7916,
+      "formulaResult": 5516,
+      "delta": 2400,
+      "baseFormula": "ROUND((T166 * 2.5) * SQRT(Z166)\n,0) + (O166 * 2)"
+    },
+    {
+      "row": 167,
+      "id": 22,
+      "field": "gold",
+      "column": "O",
+      "current": 1812,
+      "formulaResult": 1012,
+      "delta": 800,
+      "baseFormula": "ROUND(500+((AA167*0.01)+(Z167/3)+(V167/10))*6,0)-300"
+    },
+    {
+      "row": 167,
+      "id": 22,
+      "field": "rice",
+      "column": "P",
+      "current": 5320,
+      "formulaResult": 7354,
+      "delta": -2034,
+      "baseFormula": "ROUND((T167 * 2.5) * SQRT(Z167)\n,0) + (O167 * 2)"
+    },
+    {
+      "row": 179,
+      "id": 106,
+      "field": "gold",
+      "column": "O",
+      "current": 1152,
+      "formulaResult": 952,
+      "delta": 200,
+      "baseFormula": "ROUND(500+((AA179*0.01)+(Z179/3)+(V179/10))*6,0)-100"
+    },
+    {
+      "row": 180,
+      "id": 240,
+      "field": "gold",
+      "column": "O",
+      "current": 1024,
+      "formulaResult": 824,
+      "delta": 200,
+      "baseFormula": "ROUND(500+((AA180*0.01)+(Z180/3)+(V180/10))*6,0)-100"
+    },
+    {
+      "row": 181,
+      "id": 107,
+      "field": "gold",
+      "column": "O",
+      "current": 1208,
+      "formulaResult": 1008,
+      "delta": 200,
+      "baseFormula": "ROUND(500+((AA181*0.01)+(Z181/3)+(V181/10))*6,0)-100"
+    },
+    {
+      "row": 182,
+      "id": 108,
+      "field": "gold",
+      "column": "O",
+      "current": 1780,
+      "formulaResult": 1380,
+      "delta": 400,
+      "baseFormula": "ROUND(500+((AA182*0.01)+(Z182/3)+(V182/10))*6,0)-300"
+    },
+    {
+      "row": 183,
+      "id": 109,
+      "field": "gold",
+      "column": "O",
+      "current": 744,
+      "formulaResult": 944,
+      "delta": -200,
+      "baseFormula": "ROUND(500+((AA183*0.01)+(Z183/3)+(V183/10))*6,0)-100"
+    },
+    {
+      "row": 185,
+      "id": 110,
+      "field": "gold",
+      "column": "O",
+      "current": 1240,
+      "formulaResult": 1040,
+      "delta": 200,
+      "baseFormula": "ROUND(500+((AA185*0.01)+(Z185/3)+(V185/10))*6,0)-100"
+    },
+    {
+      "row": 193,
+      "id": 119,
+      "field": "gold",
+      "column": "O",
+      "current": 1090,
+      "formulaResult": 890,
+      "delta": 200,
+      "baseFormula": "ROUND(500+((AA193*0.01)+(Z193/3)+(V193/10))*6,0)-100"
+    },
+    {
+      "row": 207,
+      "id": 132,
+      "field": "gold",
+      "column": "O",
+      "current": 1836,
+      "formulaResult": 836,
+      "delta": 1000,
+      "baseFormula": "ROUND(500+((AA207*0.01)+(Z207/3)+(V207/10))*6,0)"
+    },
+    {
+      "row": 220,
+      "id": 143,
+      "field": "gold",
+      "column": "O",
+      "current": 1328,
+      "formulaResult": 2228,
+      "delta": -900,
+      "baseFormula": "ROUND(500+((AA220*0.01)+(Z220/3)+(V220/10))*6,0)+1000"
+    },
+    {
+      "row": 229,
+      "id": 152,
+      "field": "gold",
+      "column": "O",
+      "current": 3314,
+      "formulaResult": 2314,
+      "delta": 1000,
+      "baseFormula": "ROUND(500+((AA229*0.01)+(Z229/3)+(V229/10))*6,0)+1000"
+    },
+    {
+      "row": 232,
+      "id": 151,
+      "field": "gold",
+      "column": "O",
+      "current": 1180,
+      "formulaResult": 1980,
+      "delta": -800,
+      "baseFormula": "ROUND(500+((AA232*0.01)+(Z232/3)+(V232/10))*6,0)+1000"
+    },
+    {
+      "row": 236,
+      "id": 158,
+      "field": "gold",
+      "column": "O",
+      "current": 1428,
+      "formulaResult": 1228,
+      "delta": 200,
+      "baseFormula": "ROUND(500+((AA236*0.01)+(Z236/3)+(V236/10))*6,0)"
+    },
+    {
+      "row": 240,
+      "id": 165,
+      "field": "gold",
+      "column": "O",
+      "current": 1286,
+      "formulaResult": 986,
+      "delta": 300,
+      "baseFormula": "ROUND(500+((AA240*0.01)+(Z240/3)+(V240/10))*6,0)"
+    }
+  ],
+  "risks": [
+    "1570年原本の手入力メモ・補助列・独自書式はBINにないため復元されていない。",
+    "再計算の再現性は、城の主要数式1252セルについて1560年BINと計算結果が完全一致した算式モデルで検証。Excel実機での再計算実行は未確認。",
+    "差分補正された79セルは1560年の元の数式を土台にした補正式であり、元の1570年式とは同一性未証明。",
+    "参照シートは1560年添付原本のもの。共通マスターとIDが一致するが名称表示はエクセル方式。"
+  ]
+}
