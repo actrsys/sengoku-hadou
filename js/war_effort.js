@@ -713,8 +713,6 @@ Object.assign(WarManager.prototype, {
                     targetInfoStr = `${defDaimyoName}の${defCastle.name}の攻略のため、`;
                 }
                 
-                this.game.ui.hideAIGuardTemporarily();
-                
                 let resolveConfirmed = null;
                 const showReq = () => {
                     const choices = [
@@ -737,7 +735,6 @@ Object.assign(WarManager.prototype, {
                     showReq();
                 });
                 
-                this.game.ui.restoreAIGuard();
                 if (!isConfirmed) {
                     const hc = selfReinforcementData.castle;
                     hc.soldiers = Math.min(99999, hc.soldiers + selfReinforcementData.soldiers);
@@ -894,10 +891,6 @@ Object.assign(WarManager.prototype, {
                     await processDefReinforcement(this.state.defReinforcement, false);
                     // ==========================================
 
-                    if (defClan === pid && !defCastle.isDelegated && !defCastle.isKunishu) {
-                        this.game.ui.hideAIGuardTemporarily();
-                    }
-                    
                     const totalDefSoldiers = defCastle.soldiers + (this.state.defReinforcement ? this.state.defReinforcement.soldiers : 0) + (this.state.defSelfReinforcement ? this.state.defSelfReinforcement.soldiers : 0);
                     // ★追加: 迎撃メッセージ（見た目）のためだけに合計を計算します！
                     const totalAtkSoldiers = atkSoldierCount + (this.state.reinforcement ? this.state.reinforcement.soldiers : 0) + (this.state.selfReinforcement ? this.state.selfReinforcement.soldiers : 0);
@@ -910,10 +903,11 @@ Object.assign(WarManager.prototype, {
                         } else {
                             const modal = document.getElementById('intercept-confirm-modal');
                             if (modal) {
+                                // 迎撃確認は共通会話ではなく専用モーダルなので、内容を先に準備し、
+                                // 可視化の直前だけ自分でAIガードを引き渡す。
+                                document.getElementById('intercept-msg').innerText = `${atkArmyName}の${atkBushos[0].name}が攻めてきました！\n敵軍: ${totalAtkSoldiers} 対 自軍: ${totalDefSoldiers}\n迎撃（野戦）しますか？籠城しますか？`;
                                 this.game.ui.hideAIGuardTemporarily();
                                 modal.classList.remove('hidden');
-                                // ★変更: ここで計算した「敵軍の合計数」を表示します
-                                document.getElementById('intercept-msg').innerText = `${atkArmyName}の${atkBushos[0].name}が攻めてきました！\n敵軍: ${totalAtkSoldiers} 対 自軍: ${totalDefSoldiers}\n迎撃（野戦）しますか？籠城しますか？`;
                                 
                                 document.getElementById('btn-intercept').onclick = async () => { 
                                     modal.classList.add('hidden'); 
@@ -1222,10 +1216,9 @@ Object.assign(WarManager.prototype, {
                 }); 
                 };
 
-                if (defClan === pid) {
-                    this.game.ui.hideAIGuardTemporarily();
-                }
-                
+                // 援軍確認・迎撃確認は各表示先がAIガードのhandoffを所有する。
+                // ここで先に透明化すると、会話の顔画像準備中などに地図が露出し、
+                // 共通会話側とのhideカウントも二重化するため触らない。
                 // ★修正：イベントなどで既に自軍の援軍が設定されている場合は、上書きせずにそのまま進めます！
                 if (this.state.defSelfReinforcement) {
                     startAllyReinforcement();
@@ -3136,13 +3129,11 @@ Object.assign(WarManager.prototype, {
             // 顔画像decode待ちの間に地図だけが露出するため、ここでは触らない。
             this.game.ui.showDialog("他の拠点から援軍を出陣させますか？", true, 
                 () => {
-                    this.game.ui.hideAIGuardTemporarily(); 
                     this.game.ui.showDefSelfReinforcementSelector(candidateCastles, defCastle, (reinfData) => {
                         onComplete(reinfData);
                     });
                 },
                 () => {
-                    this.game.ui.hideAIGuardTemporarily();
                     onComplete(null); 
                 },
                 { okText: '援軍を出す', cancelText: '出さない', closeBeforeOk: true, closeBeforeCancel: true }
@@ -3231,11 +3222,9 @@ Object.assign(WarManager.prototype, {
             // 最初の会話を出す責務はUIManager側に任せ、表示前のガード解除を先取りしない。
             this.game.ui.showDialog("他勢力に援軍を要請しますか？", true, 
                 () => {
-                    this.game.ui.hideAIGuardTemporarily(); 
                     this.game.ui.showDefReinforcementSelector(allyCastles, defCastle, onComplete);
                 },
                 () => {
-                    this.game.ui.hideAIGuardTemporarily();
                     onComplete(); 
                 },
                 { okText: '要請する', cancelText: '要請しない', closeBeforeOk: true, closeBeforeCancel: true }

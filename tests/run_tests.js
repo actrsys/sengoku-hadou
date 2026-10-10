@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r433');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r434');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -8147,6 +8147,40 @@ test('会話開始時は顔画像decode完了までAIガードを維持し可視
     const allyPromptAt = war.indexOf('showDialog("他勢力に援軍を要請しますか？"');
     const allyPromptPrefix = war.slice(Math.max(0, allyPromptAt - 240), allyPromptAt);
     assert.ok(!allyPromptPrefix.includes('hideAIGuardTemporarily()'), '守備側同盟援軍の確認も会話より先にガードを外さない');
+});
+
+
+test('戦争準備の連続画面はAIガードを遷移先UIだけが所有し先行解除を重ねない', () => {
+    const war = read('js/war_effort.js');
+
+    const atkReqStart = war.indexOf('if (selfReinforcementData && selfReinforcementData.castle.ownerClan === pid');
+    const atkReqEnd = war.indexOf('atkCastle.soldiers = Math.max', atkReqStart);
+    const atkReq = war.slice(atkReqStart, atkReqEnd);
+    assert.ok(atkReqStart >= 0 && atkReqEnd > atkReqStart, '攻撃側委任軍の自軍援軍確認ブロックを取得できる');
+    assert.ok(!atkReq.includes('hideAIGuardTemporarily()'), '共通会話を出す前にAIガードを先行解除しない');
+    assert.ok(!atkReq.includes('restoreAIGuard()'), '共通会話が所有するAIガードを呼び出し側で二重管理しない');
+
+    const selfStart = war.indexOf('checkDefenderSelfReinforcement(defCastle, onComplete)');
+    const selfEnd = war.indexOf('// ★守備側が援軍を呼べるかチェックする機能', selfStart);
+    const selfBlock = war.slice(selfStart, selfEnd);
+    assert.ok(selfStart >= 0 && selfEnd > selfStart, '守備側自軍援軍ブロックを取得できる');
+    assert.ok(!selfBlock.includes('hideAIGuardTemporarily()'), '確認会話から拠点選択・取消へ移る時も未所有のガードを追加しない');
+
+    const allyStart = war.indexOf('checkDefenderReinforcement(defCastle, atkClanId, onComplete)');
+    const allyEnd = war.indexOf('executeDefSelfReinforcementAuto(', allyStart);
+    const allyBlock = war.slice(allyStart, allyEnd);
+    assert.ok(allyStart >= 0 && allyEnd > allyStart, '守備側他勢力援軍ブロックを取得できる');
+    assert.ok(!allyBlock.includes('hideAIGuardTemporarily()'), '他勢力援軍の確認から選択・取消へ移る時も先行解除しない');
+
+    const interceptStart = war.indexOf('const showInterceptDialog = async (onResult) => {');
+    const interceptEnd = war.indexOf('// ★追加：籠城戦に入った時のメッセージ', interceptStart);
+    const interceptBlock = war.slice(interceptStart, interceptEnd);
+    assert.ok(interceptStart >= 0 && interceptEnd > interceptStart, '迎撃選択ブロックを取得できる');
+    assert.ok(!/if \(defClan === pid\)\s*\{\s*this\.game\.ui\.hideAIGuardTemporarily\(\);\s*\}/.test(interceptBlock), '援軍確認より前の包括的な先行解除を置かない');
+    const msgAt = interceptBlock.indexOf("document.getElementById('intercept-msg').innerText");
+    const guardAt = interceptBlock.indexOf('this.game.ui.hideAIGuardTemporarily();', msgAt);
+    const visibleAt = interceptBlock.indexOf("modal.classList.remove('hidden');", guardAt);
+    assert.ok(msgAt >= 0 && guardAt > msgAt && visibleAt > guardAt, '専用迎撃モーダルは内容準備後・可視化直前だけAIガードを引き渡す');
 });
 
 test('外交の使者選択画面は次の会話が可視化されるまで保持する', () => {
