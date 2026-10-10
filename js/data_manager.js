@@ -145,14 +145,18 @@ class DataManager {
 
     static async loadAll(folderName, options = {}) {
         const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
-        const progress = (value, label) => { if (onProgress) onProgress(Math.max(0, Math.min(100, Number(value) || 0)), label || ''); };
+        // GameManagerが所有する遷移世代を照会するだけ。DataManager側に別の世代正本を増やさない。
+        const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true;
+        const progress = (value, label) => { if (isCurrent() && onProgress) onProgress(Math.max(0, Math.min(100, Number(value) || 0)), label || ''); };
         try {
             progress(4, 'シナリオデータを読み込んでいます');
             await this.loadScenarioDefinitions();
+            if (!isCurrent()) return null;
             const selectedScenario = this.getScenarioDefinition(folderName);
             if (!selectedScenario) throw new Error(`未登録のシナリオです: ${folderName}`);
             const path = `./data/scenarios/${folderName}/scenario.bin`;
             const [common, scenarioBundle] = await Promise.all([this.loadCommonData(), this.fetchCompressedJson(path)]);
+            if (!isCurrent()) return null;
             this.assertDataBundle(scenarioBundle, 'sengoku-scenario-v1');
             const scenario = { ...selectedScenario, ...(scenarioBundle.scenario || {}) };
             if (String(scenario.folder || '') !== folderName) throw new Error(`scenario.bin のfolderが一致しません: ${scenario.folder}`);
@@ -161,6 +165,7 @@ class DataManager {
 
             progress(20, 'データを展開しています');
             await this.yieldToBrowser();
+            if (!isCurrent()) return null;
             let clanRows = this.mergeMasterAndState(common.clansMaster, scenarioBundle.clansState, '勢力', { enabledOnly: true });
             clanRows = this.applyDiplomacyToClanRows(clanRows, scenarioBundle.diplomacy);
             const castleRows = this.mergeMasterAndState(common.castlesMaster, scenarioBundle.castlesState, '拠点', { enabledOnly: true });
@@ -179,16 +184,21 @@ class DataManager {
             this.joinData(clans, castles, bushos, princesses, legions);
             progress(34, '地図データを準備しています');
             await this.yieldToBrowser();
+            if (!isCurrent()) return null;
 
             try {
-                await this.loadCastleSeedPoints('./data/images/map/japan_colorcode_map.png', castles, { onProgress: ratio => progress(36 + ratio * 12, '拠点の位置を解析しています') });
-            } catch (e) { console.log('城位置画像の解析をスキップしました'); }
+                await this.loadCastleSeedPoints('./data/images/map/japan_colorcode_map.png', castles, { isCurrent, onProgress: ratio => progress(36 + ratio * 12, '拠点の位置を解析しています') });
+            } catch (e) { if (isCurrent()) console.log('城位置画像の解析をスキップしました'); }
+            if (!isCurrent()) return null;
             try {
-                await this.loadProvinceMap('./data/images/map/japan_provinces.png', provinces, { onProgress: ratio => progress(48 + ratio * 18, '国境データを解析しています') });
-                await this.buildCastleTerritoryMap(castles, provinces, { onProgress: ratio => progress(66 + ratio * 20, '勢力領域を準備しています') });
-            } catch (e) { console.log('領土地図の解析をスキップしました'); }
+                await this.loadProvinceMap('./data/images/map/japan_provinces.png', provinces, { isCurrent, onProgress: ratio => progress(48 + ratio * 18, '国境データを解析しています') });
+                if (!isCurrent()) return null;
+                await this.buildCastleTerritoryMap(castles, provinces, { isCurrent, onProgress: ratio => progress(66 + ratio * 20, '勢力領域を準備しています') });
+            } catch (e) { if (isCurrent()) console.log('領土地図の解析をスキップしました'); }
+            if (!isCurrent()) return null;
             progress(88, 'ゲームデータを仕上げています');
             await this.yieldToBrowser();
+            if (!isCurrent()) return null;
             return { scenario, clans, castles, bushos, kunishus, courtRanks, princesses, provinces, legions, mapWidth: this.mapImageWidth, mapHeight: this.mapImageHeight };
         } catch (error) {
             console.error(error);
@@ -482,11 +492,13 @@ class DataManager {
     // ============================================
     static async scanImageByStrips(url, onStrip, options = {}) {
         const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+        const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true;
         const img = await this.loadImageElement(url);
         if (!img) return null;
 
         let canvas = null;
         try {
+            if (!isCurrent()) return null;
             const width = img.naturalWidth || img.width;
             const height = img.naturalHeight || img.height;
             if (!width || !height) return null;
@@ -501,16 +513,19 @@ class DataManager {
             if (!ctx) return null;
 
             for (let yStart = 0; yStart < height; yStart += stripHeightBase) {
+                if (!isCurrent()) return null;
                 const stripHeight = Math.min(stripHeightBase, height - yStart);
                 ctx.clearRect(0, 0, width, canvas.height);
                 ctx.drawImage(img, 0, yStart, width, stripHeight, 0, 0, width, stripHeight);
                 let imageData = ctx.getImageData(0, 0, width, stripHeight);
                 await onStrip(imageData.data, width, stripHeight, yStart, height);
                 imageData = null;
+                if (!isCurrent()) return null;
                 if (onProgress) onProgress((yStart + stripHeight) / height);
                 await this.yieldToBrowser();
             }
 
+            if (!isCurrent()) return null;
             return { width, height };
         } finally {
             // getContext / drawImage / getImageData / onStrip の失敗時も巨大資源を解放する。
@@ -556,6 +571,7 @@ class DataManager {
             }
         }, options);
 
+        if (typeof options.isCurrent === 'function' && !options.isCurrent()) return;
         if (!result) {
             console.warn('カラーマップの画像の読み込みに失敗しました！');
             return;
@@ -607,6 +623,7 @@ class DataManager {
             }
         }, options);
 
+        if (typeof options.isCurrent === 'function' && !options.isCurrent()) return;
         if (!result) {
             console.warn('地方マップ画像の読み込みに失敗しました！');
             this.provincePixelMap = null;
@@ -628,6 +645,8 @@ class DataManager {
     // 国IDマップと城の種点から、各国の全ピクセルを最寄りの城へ割り当てます。
     // r83までの巨大BFSキュー（地図全画素分のInt32Array）は使わず、常駐は国ID＋城IDの2本だけです。
     static async buildCastleTerritoryMap(castles, provinces = [], options = {}) {
+        const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true;
+        if (!isCurrent()) return;
         const width = Number(this.mapImageWidth) || 0;
         const height = Number(this.mapImageHeight) || 0;
         const provinceMap = this.provincePixelMap;
@@ -725,6 +744,7 @@ class DataManager {
                 if (onProgress) onProgress(Math.min(0.9, (head / territoryPixelCount) * 0.9));
                 nextYield += yieldEvery;
                 await this.yieldToBrowser();
+                if (!isCurrent()) return;
             }
         }
 
@@ -754,6 +774,7 @@ class DataManager {
             }
             if (onProgress) onProgress(0.9 + (yEnd / height) * 0.1);
             await this.yieldToBrowser();
+            if (!isCurrent()) return;
         }
 
         // 一時BFSキューはここで参照を切り、ゲーム中は国ID＋城IDの2本だけを保持します。
@@ -765,6 +786,7 @@ class DataManager {
             const b = boundsByCastleId[id];
             return b ? { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : null;
         });
+        if (!isCurrent()) return;
         this.castlePixelMap = output;
         this.castlePixelBounds = boundsByCastleId;
         this.castlePixelCenters = centersByCastleId;

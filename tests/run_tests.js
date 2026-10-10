@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r441');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r442');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -14204,6 +14204,181 @@ test('r441 テストランナーの非同期終了待ちは全test定義の後�
     const source = read('tests/run_tests.js');
     assert.ok(source.lastIndexOf('Promise.all(pendingTests).then(') > source.lastIndexOf("test('"),
         '途中で待機を開始すると後続の非同期テストを取りこぼす');
+});
+
+
+// r442: ロードAの失敗後にロードBが進行していても、AのcatchがBを初期化しない。
+test('r442 古いロード失敗は新しいロード復元を巻き戻さない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    const game = { isRestoringSave: false, phase: 'game', ui: { showLoadingScreen() {} } };
+    let generation = 0;
+    game.turnManager = {
+        captureTurnFlowGeneration: () => generation,
+        isTurnFlowGenerationLatest: token => token === generation,
+        abortForScenarioTransition: () => { generation++; }
+    };
+    const manager = new ctx.SaveManager(game);
+    manager._validateSaveDataStructure = () => true;
+    let oldReject, newResolve;
+    manager._restoreSaveDataObj = () => {
+        game.turnManager.abortForScenarioTransition();
+        game.isRestoringSave = true;
+        if (generation === 1) return new Promise((resolve, reject) => { oldReject = reject; });
+        return new Promise(resolve => { newResolve = resolve; });
+    };
+    let recovered = 0;
+    manager._recoverFromFailedRestore = async () => {
+        recovered++;
+        game.isRestoringSave = false;
+        game.phase = 'title';
+    };
+    ctx.__mockLoadFromDB = async () => ({ dummy: true });
+    vm.runInContext('loadFromDB = window.__mockLoadFromDB;', ctx);
+    const first = manager.loadGameFromLocal(1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(typeof oldReject, 'function', '最初の復元が待機中');
+    const second = manager.loadGameFromLocal(2);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(typeof newResolve, 'function', '次の復元が待機中');
+    oldReject(new Error('古いロードの遅延失敗'));
+    await first;
+    assert.strictEqual(recovered, 0, '古い復元失敗の回復処理で新しいロードを消さない');
+    assert.strictEqual(game.isRestoringSave, true, '新しいロードが復元中であることを維持する');
+    assert.strictEqual(game.phase, 'game');
+    newResolve(true);
+    await second;
+});
+
+
+// r442: game.loadScenarioが古い結果を捨てても、DataManager内部のグローバル年月と地図は保護が必要。
+test('r442 古いシナリオ読込は新しいシナリオの開始年月を上書きしない', async () => {
+    const ctx = createContext({ MainParams: { StartYear: 0, StartMonth: 0 } });
+    loadScript(ctx, 'js/data_manager.js');
+    const DataManager = ctx.DataManager;
+    ctx.ScenarioDefinitions.push(
+        { folder: 'old', name: 'old', startYear: 1560, startMonth: 5 },
+        { folder: 'new', name: 'new', startYear: 1570, startMonth: 6 }
+    );
+    DataManager.loadScenarioDefinitions = async () => ctx.ScenarioDefinitions;
+    DataManager.loadCommonData = async () => ({ clansMaster: [], castlesMaster: [], warriorsMaster: [], princessMaster: [], courtRanks: [], provinces: [] });
+    DataManager.assertDataBundle = () => {};
+    DataManager.joinData = () => {};
+    DataManager.yieldToBrowser = async () => {};
+    DataManager.loadCastleSeedPoints = async () => {};
+    DataManager.loadProvinceMap = async () => {};
+    DataManager.buildCastleTerritoryMap = async () => {};
+    let completeOld;
+    DataManager.fetchCompressedJson = path => {
+        const folder = path.includes('/old/') ? 'old' : 'new';
+        const data = { scenario: { folder, startYear: folder === 'old' ? 1560 : 1570, startMonth: folder === 'old' ? 5 : 6 },
+            clansState: [], castlesState: [], warriorsState: [], princessState: [], diplomacy: [] };
+        if (folder === 'old') return new Promise(resolve => { completeOld = () => resolve(data); });
+        return Promise.resolve(data);
+    };
+    let selected = 'old';
+    const oldTask = DataManager.loadAll('old', { isCurrent: () => selected === 'old' });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(typeof completeOld, 'function');
+    selected = 'new';
+    await DataManager.loadAll('new', { isCurrent: () => selected === 'new' });
+    assert.strictEqual(ctx.MainParams.StartYear, 1570);
+    completeOld();
+    await oldTask;
+    assert.strictEqual(ctx.MainParams.StartYear, 1570, '古い遅延応答で1570を1560へ戻さない');
+    assert.strictEqual(ctx.MainParams.StartMonth, 6);
+});
+
+test('r442 中断された国境画像解析は新しい国IDマップを上書きしない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/data_manager.js');
+    const DataManager = ctx.DataManager;
+    DataManager.provincePixelMap = new Uint8Array([9]);
+    DataManager.provincePixelCount = 1;
+    DataManager.mapImageWidth = 1;
+    DataManager.mapImageHeight = 1;
+    let finishOld;
+    DataManager.scanImageByStrips = () => new Promise(resolve => { finishOld = resolve; });
+    let current = true;
+    const task = DataManager.loadProvinceMap('oldmap', [], { isCurrent: () => current });
+    assert.strictEqual(typeof finishOld, 'function');
+    current = false;
+    finishOld({ width: 1, height: 1 });
+    await task;
+    assert.strictEqual(DataManager.provincePixelMap[0], 9, '失効した地図解析の結果を公開しない');
+    assert.strictEqual(DataManager.provincePixelCount, 1);
+});
+
+
+test('r442 ファイルロードでも古い復元失敗は新しいロードを巻き戻さない', async () => {
+    const fileTasks = [];
+    class StubFileReader {
+        readAsArrayBuffer() {
+            fileTasks.push(this.onload({ target: { result: new ArrayBuffer(1) } }));
+        }
+    }
+    const ctx = createContext({ FileReader: StubFileReader });
+    loadScript(ctx, 'js/save_manager.js');
+    const game = { phase: 'game', isRestoringSave: false, ui: { showLoadingScreen() {} } };
+    let generation = 0;
+    game.turnManager = {
+        captureTurnFlowGeneration: () => generation,
+        isTurnFlowGenerationLatest: n => n === generation,
+        abortForScenarioTransition: () => { generation++; }
+    };
+    const manager = new ctx.SaveManager(game);
+    manager._decryptData = () => ({ dummy: true });
+    manager._validateSaveDataStructure = () => true;
+    let rejectOld, resolveNew;
+    manager._restoreSaveDataObj = () => {
+        game.turnManager.abortForScenarioTransition();
+        game.isRestoringSave = true;
+        return generation === 1
+            ? new Promise((resolve, reject) => { rejectOld = reject; })
+            : new Promise(resolve => { resolveNew = resolve; });
+    };
+    let recoverCount = 0;
+    manager._recoverFromFailedRestore = async () => {
+        recoverCount++;
+        game.phase = 'title';
+        game.isRestoringSave = false;
+    };
+    manager.loadGameFromFile({ target: { files: [{}], value: 'old' } });
+    assert.strictEqual(typeof rejectOld, 'function');
+    manager.loadGameFromFile({ target: { files: [{}], value: 'new' } });
+    assert.strictEqual(typeof resolveNew, 'function');
+    rejectOld(new Error('古い読込の遅延エラー'));
+    await fileTasks[0];
+    assert.strictEqual(recoverCount, 0);
+    assert.strictEqual(game.isRestoringSave, true);
+    assert.strictEqual(game.phase, 'game');
+    resolveNew(true);
+    await fileTasks[1];
+});
+
+
+test('r442 失効した領域BFSの遅延完了は新しい城IDマップを公開しない', async () => {
+    const ctx = createContext({ document: { body: { classList: new FakeClassList(['is-pc']) } } });
+    loadScript(ctx, 'js/data_manager.js');
+    const manager = ctx.DataManager;
+    manager.mapImageWidth = 2;
+    manager.mapImageHeight = 1;
+    manager.provincePixelMap = new Uint8Array([1, 1]);
+    manager.provincePixelCount = 2;
+    let releaseYield;
+    manager.yieldToBrowser = () => new Promise(resolve => { releaseYield = resolve; });
+    let active = true;
+    const work = manager.buildCastleTerritoryMap(
+        [{ id: 1, provinceId: 1, pixelX: 0, pixelY: 0 }],
+        [{ id: 1 }], { isCurrent: () => active }
+    );
+    assert.strictEqual(typeof releaseYield, 'function', '領域作成が中間yieldを待っている');
+    const currentMap = new Uint8Array([7, 7]);
+    manager.castlePixelMap = currentMap;
+    active = false;
+    releaseYield();
+    await work;
+    assert.strictEqual(manager.castlePixelMap, currentMap, '旧BFS結果が新マップへ公開されない');
 });
 
 Promise.all(pendingTests).then(() => {

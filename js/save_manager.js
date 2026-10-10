@@ -491,14 +491,17 @@ class SaveManager {
         // 保存データには巨大なpixel mapを入れず、ロード時に種点→国ID→領土IDの順で低メモリ再生成します。
         if (this.game.ui) this.game.ui.updateLoadingProgress(35, '拠点の位置を解析しています');
         await DataManager.loadCastleSeedPoints('./data/images/map/japan_colorcode_map.png', this.game.castles, {
+            isCurrent: isRestoreFlowLatest,
             onProgress: ratio => isRestoreFlowLatest() && this.game.ui && this.game.ui.updateLoadingProgress(35 + ratio * 10, '拠点の位置を解析しています')
         });
         if (!isRestoreFlowLatest()) return false;
         await DataManager.loadProvinceMap('./data/images/map/japan_provinces.png', this.game.provinces, {
+            isCurrent: isRestoreFlowLatest,
             onProgress: ratio => isRestoreFlowLatest() && this.game.ui && this.game.ui.updateLoadingProgress(47 + ratio * 14, '国境データを解析しています')
         });
         if (!isRestoreFlowLatest()) return false;
         await DataManager.buildCastleTerritoryMap(this.game.castles, this.game.provinces, {
+            isCurrent: isRestoreFlowLatest,
             onProgress: ratio => isRestoreFlowLatest() && this.game.ui && this.game.ui.updateLoadingProgress(62 + ratio * 18, '勢力領域を準備しています')
         });
         if (!isRestoreFlowLatest()) return false;
@@ -669,15 +672,20 @@ class SaveManager {
         reader.onload = async (evt) => {
             if (!requestFlow.isLatest()) return;
             let restoreStarted = false;
+            let restoreFlow = null;
             try { 
                 const uint8 = new Uint8Array(evt.target.result); // ★バイナリデータとして受け取ります
                 const d = this._decryptData(uint8); // ★復号化します
                 this._validateSaveDataStructure(d); // ゲーム状態へ触る前に構造・主要参照を検査します
                 if (!requestFlow.isLatest()) return;
                 restoreStarted = true;
-                await this._restoreSaveDataObj(d);
+                // _restoreSaveDataObjは最初のawaitより前にTurnManager世代を取得する。
+                // 呼び出しごとにその世代を保持し、後発ロードのisRestoringSaveを所有権と誤認しない。
+                const restorePromise = this._restoreSaveDataObj(d);
+                restoreFlow = this._captureLoadRequestFlow();
+                await restorePromise;
             } catch(err) { 
-                if (!requestFlow.isLatest() && !this.game.isRestoringSave) return;
+                if (!(restoreStarted ? restoreFlow : requestFlow)?.isLatest()) return;
                 console.error(err); 
                 if (restoreStarted) {
                     await this._recoverFromFailedRestore();
@@ -751,6 +759,7 @@ class SaveManager {
         }
 
         let restoreStarted = false;
+        let restoreFlow = null;
         try {
             let d;
             if (rawData instanceof Uint8Array) {
@@ -761,9 +770,11 @@ class SaveManager {
             this._validateSaveDataStructure(d); // ゲーム状態へ触る前に構造・主要参照を検査します
             if (!requestFlow.isLatest()) return;
             restoreStarted = true;
-            await this._restoreSaveDataObj(d);
+            const restorePromise = this._restoreSaveDataObj(d);
+            restoreFlow = this._captureLoadRequestFlow();
+            await restorePromise;
         } catch(err) { 
-            if (!requestFlow.isLatest() && !this.game.isRestoringSave) return;
+            if (!(restoreStarted ? restoreFlow : requestFlow)?.isLatest()) return;
             console.error(err); 
             if (restoreStarted) {
                 await this._recoverFromFailedRestore();

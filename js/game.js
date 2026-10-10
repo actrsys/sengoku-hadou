@@ -388,6 +388,7 @@ class GameManager {
             document.getElementById('title-screen').classList.add('hidden'); 
 
             const data = await DataManager.loadAll(folder, {
+                isCurrent: isScenarioLoadLatest,
                 onProgress: (value, label) => {
                     if (isScenarioLoadLatest() && this.ui) this.ui.updateLoadingProgress(Math.round(value * 0.72), label);
                 }
