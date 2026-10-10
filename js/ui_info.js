@@ -55,6 +55,7 @@ class UIInfoManager {
     }
 
     closeCommonModal() {
+        const wasSuspendedForChild = !!this._commonModalSuspendedForChild;
         this._commonModalSuspendedForChild = false;
         this._cancelDeferredModalTransition();
         // 閉じた画面の遅延描画・仮想スクロール処理を即座に無効化します。
@@ -67,17 +68,36 @@ class UIInfoManager {
         this.modalHistory = [];
         this.currentModalInfo = null;
         const canDiagnose = this.game && this.game.phase !== 'title' && typeof this.game.writeSystemDiagnostic === 'function';
+        const selectorElements = this.selectorView && typeof this.selectorView.getElements === 'function' ? this.selectorView.getElements() : null;
+        const selectorModal = selectorElements ? selectorElements.modal : null;
+        const canCoverRecovery = !!(selectorModal && !selectorModal.classList.contains('hidden') && !wasSuspendedForChild);
+        let coveredCloseTask = null;
         if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:start');
-        if (this.selectorView) this.selectorView.close();
+
+        // 一覧DOMは通常地図の復帰前に解放してメモリピークを抑えるが、全画面のmodal backdropは
+        // 1paintだけ残す。巨大Canvasの再合成中に地図そのものを露出させない。
+        if (this.selectorView) this.selectorView.close({ hide: !canCoverRecovery });
         this._releaseCommonModalAIGuardHide();
         if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:selector_done');
         
-        // リストを完全に閉じる時に背景更新を再開します。強制リロード調査では
-        // この復帰処理の前後を分けて記録し、原因を推測で断定しないようにします。
+        // リストを完全に閉じる時に背景更新を再開します。表示中のselector-modalをcoverに使える場合は、
+        // 背景復旧を1回paintしてからcoverを外す。子画面へ退避済みでselectorが既にhiddenなら従来どおり
+        // 同期復帰し、子画面側の表示責務へ任せる。
         if (this.ui && typeof this.ui.resumeBackgroundUpdates === 'function') {
             if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:recovery_start');
-            this.ui.resumeBackgroundUpdates('ui:modal_close');
-            if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:recovery_done');
+            if (canCoverRecovery && typeof this.ui.closeCoveredViewAfterRecovery === 'function') {
+                coveredCloseTask = this.ui.closeCoveredViewAfterRecovery(selectorModal, {
+                    recoverUnderCover: () => this.ui.resumeBackgroundUpdates('ui:modal_close'),
+                    afterHide: () => {
+                        if (canDiagnose && this.game && this.game.phase !== 'title' && typeof this.game.writeSystemDiagnostic === 'function') {
+                            this.game.writeSystemDiagnostic('ui:modal_close:recovery_done');
+                        }
+                    }
+                });
+            } else {
+                this.ui.resumeBackgroundUpdates('ui:modal_close');
+                if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:recovery_done');
+            }
         }
         // 武将一覧などで使う状態のリセット
         this.bushoCurrentTab = 'stats';
@@ -158,6 +178,11 @@ class UIInfoManager {
             listContainer._virtualScrollCleanup();
             listContainer._virtualScrollCleanup = null;
         }
+
+        // 子モーダルが現在のcoverになっている場合、呼び出し側はこのPromiseを待ってから
+        // coverを外せる。通常呼び出しは従来どおり戻り値を無視してよい。
+        return coveredCloseTask || Promise.resolve(true);
+
     }
 
     _cancelDeferredModalTransition() {

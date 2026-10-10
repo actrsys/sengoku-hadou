@@ -51,16 +51,26 @@ class InterviewView {
 
     _ensureOpen() {
         if (!this.modal || !this.modal.classList.contains('hidden')) return;
-        this.modal.classList.remove('hidden');
+        if (typeof this.ui.prepareCoveredViewForOpen === 'function') this.ui.prepareCoveredViewForOpen(this.modal);
+        else this.modal.classList.remove('hidden');
         if (typeof this.ui.pauseBackgroundUpdates === 'function') this.ui.pauseBackgroundUpdates();
     }
 
     close() {
         if (!this.modal || this.modal.classList.contains('hidden')) return;
         this._clearMessageAdvance();
+        if (this.ui && typeof this.ui.closeCoveredViewAfterRecovery === 'function') {
+            this.ui.closeCoveredViewAfterRecovery(this.modal, {
+                recoverUnderCover: () => {
+                    if (typeof this.ui.resumeBackgroundUpdates === 'function') this.ui.resumeBackgroundUpdates('interview_close');
+                },
+                afterHide: () => this._clearView()
+            });
+            return;
+        }
+        if (typeof this.ui.resumeBackgroundUpdates === 'function') this.ui.resumeBackgroundUpdates('interview_close');
         this.modal.classList.add('hidden');
         this._clearView();
-        if (typeof this.ui.resumeBackgroundUpdates === 'function') this.ui.resumeBackgroundUpdates();
     }
 
     _clearView() {

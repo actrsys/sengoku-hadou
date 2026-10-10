@@ -95,7 +95,12 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         }
 
         // PCは余裕があるため従来表示を維持。スマホだけ巨大マップを一時的に外します。
-        if (!isPC && scroll) scroll.style.display = 'none';
+        if (!isPC && scroll) {
+            // display:noneをまたぐ復帰はcompositor-only白抜けの危険境界。通常モーダルと区別して
+            // 次のresumeで一度だけ正規の全復旧／静的層再提示を行う。
+            if (ui) ui._mapPresentationNeedsFullRecovery = true;
+            scroll.style.display = 'none';
+        }
         if (diagPrefix) writeDiag(game, `${diagPrefix}:main_map_suspended`);
 
         // display:none をcompositorへ反映してからイベント地図を作ります。
@@ -562,25 +567,33 @@ window.EventMapEffects = window.EventMapEffects || (() => {
     const cleanupOverlay = async (mapOverlay) => {
         const restoreState = mapOverlay ? mapOverlay._eventMapRestoreState : null;
         if (mapOverlay) {
+            // 巨大Canvas/Imageだけを先に解放し、全画面の暗幕shellは残す。
+            // 先にoverlay自体をremoveしてからpaintすると、スマホでは通常地図もdisplay:noneのままなので
+            // その1フレームが黒/白抜けとして露出する。
             mapOverlay.querySelectorAll('canvas').forEach(c => {
                 try { c.width = 1; c.height = 1; } catch (e) {}
             });
             mapOverlay.querySelectorAll('img').forEach(img => {
                 try { img.src = ''; } catch (e) {}
             });
-            if (mapOverlay.parentNode) mapOverlay.parentNode.removeChild(mapOverlay);
         }
         // イベント専用の巨大RGBAキャッシュは持たず、共有IDマップはゲーム本体側で継続利用します。
 
-        // Canvas/GPU面の解放をブラウザへ反映してから通常マップを戻します。
-        await nextPaint();
+        // 重いイベント地図の解放を暗幕の下で1回paintしてから通常マップを戻す。
+        if (mapOverlay && mapOverlay.parentNode) await nextPaint();
         if (restoreState) {
             if (!restoreState.isPC && restoreState.scroll) {
                 restoreState.scroll.style.display = restoreState.oldDisplay;
             }
             if (restoreState.pausedByUs && restoreState.ui && typeof restoreState.ui.resumeBackgroundUpdates === 'function') {
-                restoreState.ui.resumeBackgroundUpdates();
+                restoreState.ui.resumeBackgroundUpdates('event_map_close');
             }
+        }
+
+        // 通常地図のcompositor復帰も暗幕で覆ったままpaintし、その後で初めて暗幕を外す。
+        if (mapOverlay && mapOverlay.parentNode) {
+            await nextPaint();
+            if (mapOverlay.parentNode) mapOverlay.parentNode.removeChild(mapOverlay);
         }
         await new Promise(resolve => setTimeout(resolve, 0));
     };

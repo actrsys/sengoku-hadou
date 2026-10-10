@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r435');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r437');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2391,7 +2391,7 @@ test('数量画面は閉じる時に保留UI更新を破棄しBack処理を専�
     const bootstrap = read('js/app_bootstrap.js');
     assert.ok(slider.includes('const cancelQuantityUIUpdate = () => {'), '数量UIの保留更新を取消す窓口を持つ');
     assert.ok(slider.includes('if (window.cancelAnimationFrame) window.cancelAnimationFrame(quantityUiRaf);'), 'requestAnimationFrameを閉じる時に取消す');
-    assert.ok(slider.includes('cancelQuantityUIUpdate();\n            this.ui.quantityModal.classList.add'), 'モーダルを隠す前に旧画面の更新を止める');
+    assert.ok(slider.includes('cancelQuantityUIUpdate();') && slider.includes('const finishQuantityModalClose = () => {') && slider.includes("this.ui.quantityModal.classList.add('hidden')"), 'モーダル終了経路で旧画面の保留更新を止めてから非表示へ進む');
     assert.ok(!bootstrap.includes("bind('quantity-back-btn'"), '起動時の単純hideでUISliderのonCancel/guard復帰を横取りしない');
     assert.ok(slider.includes('（取引上限：<span class="slider-emphasis">'), '取引上限の補足も既存の日本語表記へ揃える');
 });
@@ -6558,15 +6558,32 @@ test('スマホの一時資源解放では継続表示レイヤーを保持し�
     assert.ok(map.includes('ctx.getImageData(probe.x, probe.y, 1, 1).data[3] <= 0'), '全Canvas readbackをせず複数の1pixelだけ確認する');
     assert.ok(map.includes('recoverPersistentMapPresentation(forceFull = false)'));
     assert.ok(map.includes('this.updateClanColors();'), '部分欠落検出時はhash無効化だけで終わらずその場で再描画する');
-    assert.ok(map.includes('_refreshPersistentMapCompositeLayers()'), 'backing storeが健全でもcompositor白抜けを再提示できる窓口を持つ');
-    assert.ok(map.includes('this.mapEl.removeChild(layer)') && map.includes('this.mapEl.insertBefore(layer, nextSibling)'), '同じDOMを元位置へ付け直して巨大Canvasの全再計算を避ける');
-    assert.ok(map.includes('if (canReuseCastleLayer) this._refreshPersistentMapCompositeLayers();'), 'renderMapで静的層を再利用する画面切替も合成面を再提示する');
+    assert.ok(map.includes('_refreshPersistentMapCompositeLayers()'), 'display:none/OS復帰など危険境界ではcompositor白抜けを再提示できる窓口を持つ');
+    assert.ok(map.includes('this.mapEl.removeChild(layer)') && map.includes('this.mapEl.insertBefore(layer, nextSibling)'), '必要時だけ同じDOMを元位置へ付け直して巨大Canvasの全再計算を避ける');
+    assert.ok(map.includes('let needsCompositeRefresh = forced || !clanHealthy;'), '通常モーダル復帰とcompositor再提示を分離する');
+    assert.ok(map.includes('if (needsCompositeRefresh && this._refreshPersistentMapCompositeLayers())'), '危険境界または実Canvas欠損時だけ合成面を再提示する');
+    assert.ok(map.includes('if (canReuseCastleLayer && this._mapPresentationNeedsFullRecovery)'), '同一シナリオの通常renderMapでは静的層を毎回付け直さない');
+    assert.ok(!map.includes('if (canReuseCastleLayer) this._refreshPersistentMapCompositeLayers();'), '通常renderMapごとの無条件compositor再生成を残さない');
     assert.ok(ui.includes('this._schedulePersistentMapPresentationRecovery(false)'), 'モーダルが実際に閉じた次フレームでも地図表示を再確認する');
     assert.ok(ui.includes('this._mapPresentationNeedsFullRecovery = true'), 'display:noneをまたぐ経路は全復旧を予約する');
     assert.ok(map.includes("document.addEventListener('visibilitychange'"), 'OS/ブラウザ画面切替も復旧境界にする');
     assert.ok(map.includes("window.addEventListener('pageshow'"));
     assert.ok(map.includes("canvas.addEventListener('contextlost'"));
     assert.ok(css.includes('body:not(.is-pc).mobile-memory-guard .castle-card'));
+});
+
+
+test('通常モーダル復帰では健全な地図compositorを作り直さずdisplay none境界だけ全復旧する', () => {
+    const map = read('js/ui_map.js');
+    const events = read('js/event/common_events.js');
+    const recoverStart = map.indexOf('    recoverPersistentMapPresentation(forceFull = false) {');
+    const recoverEnd = map.indexOf('    _schedulePersistentMapPresentationRecovery(', recoverStart);
+    const recoverBlock = map.slice(recoverStart, recoverEnd);
+    assert.ok(recoverBlock.includes('let needsCompositeRefresh = forced || !clanHealthy;'));
+    assert.ok(recoverBlock.includes('if (needsCompositeRefresh && this._refreshPersistentMapCompositeLayers())'));
+    assert.ok(map.includes('if (canReuseCastleLayer && this._mapPresentationNeedsFullRecovery)'));
+    assert.ok(events.includes('ui._mapPresentationNeedsFullRecovery = true;'), 'イベント専用地図で通常地図をdisplay:noneにする境界は全復旧を予約する');
+    assert.ok(events.indexOf('ui._mapPresentationNeedsFullRecovery = true;') < events.indexOf("scroll.style.display = 'none';"), 'display:noneより先に復旧予約を立てる');
 });
 
 test('雪CanvasはAI思考中も保持しつつ古いスマホでは低メモリ・必要時描画に限定する', () => {
@@ -8235,10 +8252,54 @@ test('結果画面との引き渡しは結果を先に表示し背景復帰も�
     assert.ok(showBlock.indexOf("typeof updateBehindCover === 'function'") < showBlock.indexOf('this.pauseBackgroundUpdates()'), '背景更新は結果画面の覆いの下・背景停止前に行う');
 
     const closeEnd = ui.indexOf('showQuantityModal(', closeStart);
-    const closeBlock = ui.slice(closeStart, closeEnd > closeStart ? closeEnd : closeStart + 2400);
-    assert.ok(closeBlock.indexOf('this.resumeBackgroundUpdates()') < closeBlock.indexOf("this.resultModal.classList.add('hidden')"), '背景を復帰してから結果画面を隠す');
+    const closeBlock = ui.slice(closeStart, closeEnd > closeStart ? closeEnd : closeStart + 2800);
+    assert.ok(closeBlock.includes('this.closeCoveredViewAfterRecovery(this.resultModal'), '結果画面自身を背景復帰中のcoverとして保持する');
+    assert.ok(closeBlock.includes('recoverUnderCover: () => this.resumeBackgroundUpdates()'), '結果画面の下で背景復帰を開始する');
+    assert.ok(closeBlock.includes('afterHide: () => {'), '実paint後にだけ結果画面終了後処理へ進む');
 });
 
+
+test('背景復帰を伴う全画面UIはcoverをpaintまで保持し再表示で旧closeを無効化する', () => {
+    const ui = read('js/ui.js');
+    const helperStart = ui.indexOf('closeCoveredViewAfterRecovery(coverEl, options = {})');
+    const helperEnd = ui.indexOf('\n    hideLoadingScreen()', helperStart);
+    const helper = ui.slice(helperStart, helperEnd);
+    assert.ok(helperStart >= 0);
+    assert.ok(helper.includes('options.waitForPaint === true'), '背景復帰を別窓口で開始済みの子modalも明示的にpaint待ちできる');
+    assert.ok(helper.includes('await this.waitForNextPaint()'), '固定msではなく実paintを終了境界にする');
+    assert.ok(helper.includes('epoch !== Number(this._coveredCloseEpoch || 0)'), 'タイトル/ロード等の画面世代を跨いだcloseを破棄する');
+    assert.ok(helper.includes('Number(tokens.get(coverEl) || 0) !== token'), '同じ固定DOMを再表示した場合の旧closeを破棄する');
+    assert.ok(ui.includes('prepareCoveredViewForOpen(coverEl)'), '固定DOMの再表示も同じ寿命窓口を使う');
+});
+
+test('親一覧から開いた数量画面は背景復帰paintまで最後のcoverを外さない', () => {
+    const slider = read('js/ui_slider.js');
+    const start = slider.indexOf('this.ui.quantityConfirmBtn.onclick = async () => {');
+    const end = slider.indexOf("const cancelBtn = this.ui.quantityModal.querySelector('.btn-secondary')", start);
+    const confirmBlock = slider.slice(start, end);
+    assert.ok(start >= 0);
+    const closeParentAt = confirmBlock.indexOf('this.ui.info.closeCommonModal();');
+    const coveredAt = confirmBlock.indexOf('closeCoveredViewAfterRecovery(this.ui.quantityModal');
+    const waitAt = confirmBlock.indexOf('waitForPaint: true');
+    const actionAt = Math.max(confirmBlock.indexOf('extraData.onConfirm(inputs)'), confirmBlock.indexOf('handleQuantitySelection(type'));
+    assert.ok(closeParentAt >= 0 && coveredAt > closeParentAt && waitAt > coveredAt, '親一覧終了で始まる地図復帰を数量modalで覆ってpaint待ちする');
+    assert.ok(actionAt > waitAt, 'cover終了後の同一継続で次処理へ進む');
+    const cancelStart = slider.indexOf('cancelBtn.onclick = () => {', end);
+    const cancelBlock = slider.slice(cancelStart, cancelStart + 900);
+    assert.ok(cancelBlock.indexOf('resumeCommonModalFromChild()') < cancelBlock.indexOf('closeQuantityModal();'), '取消は戻り先の親一覧を先に成立させてから子modalを閉じる');
+});
+
+test('イベント専用地図は通常地図を復帰・paintしてから暗幕を外す', () => {
+    const events = read('js/event/common_events.js');
+    const start = events.indexOf('const cleanupOverlay = async (mapOverlay) => {');
+    const end = events.indexOf('\n    return {', start);
+    const block = events.slice(start, end);
+    assert.ok(start >= 0);
+    const restoreAt = block.indexOf("resumeBackgroundUpdates('event_map_close')");
+    const finalPaintAt = block.indexOf('await nextPaint();', restoreAt);
+    const removeAt = block.indexOf('mapOverlay.parentNode.removeChild(mapOverlay)', restoreAt);
+    assert.ok(restoreAt >= 0 && finalPaintAt > restoreAt && removeAt > finalPaintAt, '通常地図compositorの復帰paintを暗幕で覆った後にだけremoveする');
+});
 
 test('会話・コマンド・評定から結果へ進む時は重い背景更新や元画面終了を結果画面の下で行う', () => {
     const diplomacy = read('js/diplomacy.js');
@@ -9201,12 +9262,14 @@ test('野戦終了時は通常地図復帰より先に重い戦場DOMを解放�
     const field = read('js/field_war.js');
     const finishAt = field.indexOf('const finishProcess = async () => {');
     assert.ok(finishAt >= 0);
-    const block = field.slice(finishAt, finishAt + 1600);
+    const block = field.slice(finishAt, finishAt + 2200);
     const releaseAt = block.indexOf('this.releaseFieldWarVisualResources();');
-    const resumeAt = block.indexOf("this.game.ui.resumeMainMapAfterBattle('field-war')");
+    const coveredCloseAt = block.indexOf('closeCoveredViewAfterRecovery(this.modal');
+    const resumeAt = block.indexOf("ui.resumeMainMapAfterBattle('field-war')");
     assert.ok(releaseAt >= 0);
+    assert.ok(coveredCloseAt >= 0, '野戦modalを通常地図復帰中のcoverとして保持する');
     assert.ok(resumeAt >= 0);
-    assert.ok(releaseAt < resumeAt, '戦場DOM解放を通常地図復帰より先に行う');
+    assert.ok(releaseAt < coveredCloseAt && coveredCloseAt < resumeAt, '戦場DOM解放後、modalの覆いの下で通常地図を復帰する');
 
     const releaseDefAt = field.indexOf('\n    releaseFieldWarVisualResources() {');
     const releaseBlock = field.slice(releaseDefAt, releaseDefAt + 1800);
@@ -10050,7 +10113,7 @@ test('共通一覧は詳細遷移・終了時に仮想スクロールの参照�
     assert.ok(releaseBlock.includes("listContainer.removeEventListener('scroll', listContainer._virtualScrollHandler)"));
     assert.ok(releaseBlock.includes("images[i].removeAttribute('src')"));
     assert.ok(releaseBlock.includes("listContainer.innerHTML = '';"));
-    const closeStart = selector.indexOf('close() {');
+    const closeStart = selector.indexOf('close(options = {}) {');
     const closeBlock = selector.slice(closeStart, closeStart + 1000);
     assert.ok(closeBlock.includes('this.releaseListContent({ resetScroll: true });'));
 });
@@ -11998,12 +12061,31 @@ test('攻城戦の進行timerは戦争世代をまたいで次の戦争や次タ
     assert.ok(war.includes('this._scheduleWarCallback(() => this.resolveWarAction(action.type, action.extraVal), 0);'));
     assert.ok(war.includes('this._scheduleWarCallback(() => { this.resolveAutoWar(); }, 100);'));
     assert.ok(effort.includes('const warGeneration = this._beginWarLifecycle();'));
-    assert.ok(effort.includes('if (!this._isWarLifecycleCurrent(warGeneration, false)) return;'));
+    assert.ok(effort.includes('const isCurrentWar = () => this._isWarLifecycleCurrent(warGeneration, false);'));
+    assert.ok(effort.includes('if (!isCurrentWar()) return;'));
     assert.ok(effort.includes('this._scheduleWarCallback(() => {'));
     assert.ok(effort.includes('}, 100, false);'), '戦後の威信更新とfinishTurnも旧戦争世代では実行しない');
     assert.ok(effort.includes('if (!this.state.active || this._warEnding) return;'), '終了処理の多重開始も同期的に防ぐ');
 });
 
+
+test('開戦準備中のawaitと迎撃コールバックは旧戦争世代から新シナリオへ復帰しない', () => {
+    const effort = read('js/war_effort.js');
+    const startAt = effort.indexOf('async startWar(');
+    const endAt = effort.indexOf('\n    // ★ここから追加：援軍が途中で', startAt);
+    assert.ok(startAt >= 0 && endAt > startAt);
+    const block = effort.slice(startAt, endAt);
+    assert.ok(block.includes('const isCurrentWar = () => this._isWarLifecycleCurrent(warGeneration, false);'), '開戦処理全体で同じ戦争世代を固定する');
+    assert.ok(block.includes('await this.game.ui.showDialogAsync(startMsg);\n                    if (!isCurrentWar()) return;'), '開戦会話後に旧戦争を止める');
+    assert.ok(block.includes('if (!isCurrentWar() || openingBlinkCompleted === false) return;'), '開戦点滅後も世代を再確認する');
+    assert.ok(block.includes('if (!isCurrentWar()) return;\n            }\n\n            // 出陣で兵糧需要'), 'プレイヤーカットイン後も世代を再確認する');
+    assert.ok(block.includes('const isConfirmed = await new Promise(resolve => {') && block.includes('if (!isCurrentWar()) return;\n                \n                if (!isConfirmed)'), '援軍確認待ちの後に旧戦争を止める');
+    assert.ok(block.includes("await this.game.eventManager.processEvents('before_battle', this.state);\n                if (!isCurrentWar()) return;"), '戦闘前イベント後に世代を再確認する');
+    assert.ok(block.includes("reason: 'battle_start',\n                    anchor: 'territory'\n                });\n                if (!isCurrentWar()) return;"), '戦場カメラ待ちの後に世代を再確認する');
+    assert.ok(block.includes('showInterceptDialog(async (choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {\n                    if (!isCurrentWar()) return;\n                    this.game.ui.restoreAIGuard();'), '旧迎撃コールバックは新画面のAIガードへ触れない');
+    assert.ok(block.includes('this.game.fieldWarManager.startFieldWar(this.state, async (resultType) => {\n                            if (!isCurrentWar()) return;'), '旧野戦完了コールバックも新戦争へ復帰しない');
+    assert.ok(block.includes("await this.game.eventManager.processEvents('before_siege_war', this.state);\n                                    if (!isCurrentWar()) return;"), '野戦から攻城戦へ移るイベント待ちにも世代境界を置く');
+});
 
 test('旧ターンの0ms継続はタイトル・ロード後にturn-flow世代境界を越えて進行しない', () => {
     const turn = read('js/turn_manager.js');
@@ -12416,7 +12498,7 @@ test('地図戦闘演出はシナリオ切替でrAFと固定Canvasを中断し�
     assert.ok(map.includes("if (typeof this.abortMapEffectsForScenarioTransition === 'function') {"), 'resetMapViewStateから地図演出を中断する');
     assert.ok(map.includes('if (!isCurrentEffect()) return false;'), 'focus待ち後にも旧演出を開始しない');
     assert.ok(map.includes('const runHalfway = () => {\n                if (halfwayDone || !isCurrentEffect()) return;'), '中断済み制圧演出は所有変更callbackを呼ばない');
-    assert.ok(war.includes('if (openingBlinkCompleted === false) return;'));
+    assert.ok(war.includes('if (!isCurrentWar() || openingBlinkCompleted === false) return;'));
     assert.ok(war.includes('if (resultBlinkCompleted === false) return;'));
     assert.ok((war.match(/if \(captureCompleted === false\) return;/g) || []).length >= 3);
     assert.ok(indep.includes('if (independenceBlinkCompleted === false) return;'));

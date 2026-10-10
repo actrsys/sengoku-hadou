@@ -325,6 +325,12 @@ class UIManager {
         this._dialogHandoffHoldCount = 0;
         this._dialogHandoffCloseFn = null;
         this._visualHandoffCloseFn = null;
+        // モーダルを閉じる時は、背面の巨大地図を復旧した同じJSタスク内で
+        // そのままcoverをdisplay:noneにしない。WebView/Chromiumは次のpaintまで
+        // compositor反映が間に合わないことがあるため、coverごとに遅延closeを管理する。
+        this._coveredCloseEpoch = 0;
+        this._coveredCloseTokens = new WeakMap();
+        this._coveredClosePromises = new WeakMap();
         // 月初／月末の処理ラベルは、会話が閉じた直後に即復帰すると
         // 次の会話との間で「月末処理中…」等が一瞬だけ見える。
         // 実際に静かな処理が続いた時だけ再表示するため、会話後の短い猶予をUI側で一元管理する。
@@ -1851,6 +1857,69 @@ class UIManager {
         });
     }
 
+    // 背面の地図/Canvasを復旧するモーダル終了は、coverを残したまま復旧し、
+    // その状態を1回paintしてからcoverを外す。同期的に「resume→hidden」とすると、
+    // WebView/Chromiumでは巨大Canvasの再合成とcover消去が同じcommitへ入り、
+    // 一瞬の白抜け/黒抜け/全画面フラッシュとして見えることがある。
+    // 固定ms待ちは使わず、実paintを境界にする。
+    cancelCoveredClose(coverEl) {
+        if (!coverEl) return;
+        const tokens = this._coveredCloseTokens || (this._coveredCloseTokens = new WeakMap());
+        tokens.set(coverEl, Number(tokens.get(coverEl) || 0) + 1);
+        if (this._coveredClosePromises) this._coveredClosePromises.delete(coverEl);
+    }
+
+    prepareCoveredViewForOpen(coverEl) {
+        if (!coverEl) return;
+        this.cancelCoveredClose(coverEl);
+        coverEl.classList.remove('hidden');
+    }
+
+    closeCoveredViewAfterRecovery(coverEl, options = {}) {
+        if (!coverEl) return Promise.resolve(false);
+        const promises = this._coveredClosePromises || (this._coveredClosePromises = new WeakMap());
+        const existing = promises.get(coverEl);
+        if (existing) return existing;
+
+        const tokens = this._coveredCloseTokens || (this._coveredCloseTokens = new WeakMap());
+        const token = Number(tokens.get(coverEl) || 0) + 1;
+        tokens.set(coverEl, token);
+        const epoch = Number(this._coveredCloseEpoch || 0);
+        const recoverUnderCover = typeof options.recoverUnderCover === 'function' ? options.recoverUnderCover : null;
+        const beforeRecovery = typeof options.beforeRecovery === 'function' ? options.beforeRecovery : null;
+        const afterHide = typeof options.afterHide === 'function' ? options.afterHide : null;
+        const waitForPaint = options.waitForPaint === true || (options.waitForPaint !== false && !!recoverUnderCover);
+
+        let task = null;
+        task = (async () => {
+            try {
+                if (beforeRecovery) beforeRecovery();
+                if (recoverUnderCover) recoverUnderCover();
+            } catch (e) {
+                console.error('画面復帰中の背景更新に失敗しました:', e);
+            }
+
+            if (waitForPaint) await this.waitForNextPaint();
+
+            // タイトル復帰・ロード・同じ固定DOMの再表示が先に来た場合は、
+            // 古いclose予約から新しい画面を消さない。
+            if (epoch !== Number(this._coveredCloseEpoch || 0)) return false;
+            if (Number(tokens.get(coverEl) || 0) !== token) return false;
+
+            coverEl.classList.add('hidden');
+            try {
+                if (afterHide) afterHide();
+            } catch (e) {
+                console.error('画面終了後処理に失敗しました:', e);
+            }
+            return true;
+        })().finally(() => {
+            if (promises.get(coverEl) === task) promises.delete(coverEl);
+        });
+        promises.set(coverEl, task);
+        return task;
+    }
+
     hideLoadingScreen() {
         if (this.globalLoadingScreen) this.globalLoadingScreen.classList.add('hidden');
     }
@@ -1888,6 +1957,11 @@ class UIManager {
     }
 
     forceResetModals(options = {}) {
+        // 1paint待ちのcover終了も画面寿命に含める。ロード/タイトル復帰後に旧closeが
+        // 新しい固定DOMを隠したり、旧結果callbackを走らせないよう世代ごと破棄する。
+        this._coveredCloseEpoch = Number(this._coveredCloseEpoch || 0) + 1;
+        this._coveredCloseTokens = new WeakMap();
+        this._coveredClosePromises = new WeakMap();
         // 共通会話も固定DOMを共有する非同期Viewとして扱う。顔画像decode・handoff・自動閉じを
         // 現在世代から切り離し、強制切替後に古い会話が復活／新しい会話を自動操作しないようにする。
         this._dialogGeneration = Number(this._dialogGeneration || 0) + 1;
@@ -2087,7 +2161,7 @@ class UIManager {
         }
         // 結果画面を先に可視化してから、直前の会話画面を閉じます。
         // これにより会話→結果の間に背景だけが露出するフレームを作りません。
-        if (this.resultModal) this.resultModal.classList.remove('hidden'); 
+        if (this.resultModal) this.prepareCoveredViewForOpen(this.resultModal); 
         this.completeVisualHandoff();
         this._closePendingDialogHandoffNow();
 
@@ -2108,34 +2182,35 @@ class UIManager {
     }
     
     closeResultModal() { 
-        // 背景の復帰・再描画を結果画面で覆ったまま完了させてから閉じます。
-        // 先にモーダルを消すと、低速端末で黒い背景が一瞬見えることがあります。
-        this.resumeBackgroundUpdates();
-        if (this.resultModal) this.resultModal.classList.add('hidden'); 
-        this.restoreAIGuard(); 
+        if (!this.resultModal || this.resultModal.classList.contains('hidden')) return;
 
-        // ★今回追加：もし外交用のBGMが鳴っていたら、結果画面を閉じた瞬間に元のBGMに戻します！
-        if (window.AudioManager && window.AudioManager.currentBgmName === 'SC_ex_Scene3_Odyssey.ogg') {
-            window.AudioManager.restoreMemorizedBgm();
-        }
+        // 結果画面自身をcoverとして残したまま背景地図を復旧し、その状態を実際に1回paintしてから
+        // result-modalを外す。同じJSタスク内の resume→display:none ではcompositorが追いつかず、
+        // 低速端末で全画面フラッシュとして見えることがある。
+        const cb = this.onResultModalClose;
+        this.onResultModalClose = null;
+        this.closeCoveredViewAfterRecovery(this.resultModal, {
+            recoverUnderCover: () => this.resumeBackgroundUpdates(),
+            afterHide: () => {
+                this.restoreAIGuard();
 
-        // 小窓を閉じる時に、必ず「いつもの閉じるボタン」に戻しておきます！
-        const footer = document.getElementById('result-footer');
-        if (footer) {
-            // ★変更：青色（btn-primary）からグレー（btn-secondary）に変更します！
-            footer.innerHTML = `<button class="btn-secondary result-close-dynamic">閉じる</button>`;
-            const closeBtn = footer.querySelector('.result-close-dynamic');
-            if (closeBtn) closeBtn.addEventListener('click', () => this.closeResultModal());
-        }
-        // ★書き足すのはここまで！
-        
-        if (this.onResultModalClose) {
-            const cb = this.onResultModalClose;
-            this.onResultModalClose = null;
-            cb();
-        } else if (this.game) {
-            this.game.checkAllActionsDone();
-        }
+                // 外交用BGMは、結果画面が実際に閉じた時点で平時へ戻します。
+                if (window.AudioManager && window.AudioManager.currentBgmName === 'SC_ex_Scene3_Odyssey.ogg') {
+                    window.AudioManager.restoreMemorizedBgm();
+                }
+
+                // 次回表示へ動的footerを持ち越さない。
+                const footer = document.getElementById('result-footer');
+                if (footer) {
+                    footer.innerHTML = `<button class="btn-secondary result-close-dynamic">閉じる</button>`;
+                    const closeBtn = footer.querySelector('.result-close-dynamic');
+                    if (closeBtn) closeBtn.addEventListener('click', () => this.closeResultModal());
+                }
+
+                if (cb) cb();
+                else if (this.game) this.game.checkAllActionsDone();
+            }
+        });
     }
     
     closeSelector() { 
@@ -3131,7 +3206,7 @@ class UIManager {
             if (typeof this.suspendMainMapForBattle === 'function') {
                 this.suspendMainMapForBattle('siege-war');
             }
-            this.warModal.classList.remove('hidden');
+            this.prepareCoveredViewForOpen(this.warModal);
             // ★追加：攻城戦が始まる時に、平時のコマンドリストを綺麗にお掃除して非表示にします！
             if (typeof this.clearCommandMenu === 'function') {
                 this.clearCommandMenu();
@@ -3139,32 +3214,41 @@ class UIManager {
         } else {
             // 固定war DOMを閉じる時点で、旧メッセージのtimer/callbackを次の戦闘から切り離す。
             this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;
-            this.warModal.classList.add('hidden');
-            if (typeof this.resumeMainMapAfterBattle === 'function') {
-                this.resumeMainMapAfterBattle('siege-war');
-            }
 
-            // スマホでは戦争モーダルの表示/非表示で地図の可視領域寸法が微妙に変わる場合があります。
-            // 戦争中にカメラを固定している場合は、モーダルを閉じたDOM状態で同じ戦場中心へ
-            // 即時補正します。focusMapOnCastleはclientWidth/Height参照時に同期レイアウトを行うため、
-            // 次の描画フレームより前に正しい位置へ戻せます。
-            const warState = this.game && this.game.warManager ? this.game.warManager.state : null;
-            if (warState && warState.battleCameraLocked && Number(warState.battleFocusCastleId) > 0 && typeof this.focusMapOnCastle === 'function') {
-                this.focusMapOnCastle(Number(warState.battleFocusCastleId), {
-                    transition: 'instant',
-                    reason: 'battle_modal_close',
-                    anchor: 'territory',
-                    diagnostic: false,
-                    lockInteraction: false
+            const finishWarCoverClose = () => {
+                // スマホでは戦争モーダルの表示/非表示で地図の可視領域寸法が微妙に変わる場合があります。
+                // coverを外したDOM状態で同じ戦場中心へ即時補正します。
+                const warState = this.game && this.game.warManager ? this.game.warManager.state : null;
+                if (warState && warState.battleCameraLocked && Number(warState.battleFocusCastleId) > 0 && typeof this.focusMapOnCastle === 'function') {
+                    this.focusMapOnCastle(Number(warState.battleFocusCastleId), {
+                        transition: 'instant',
+                        reason: 'battle_modal_close',
+                        anchor: 'territory',
+                        diagnostic: false,
+                        lockInteraction: false
+                    });
+                }
+
+                // 戦争が終わって画面を閉じる時に、カードの「部隊がいたよシール」を全部外します。
+                const allCards = document.querySelectorAll('.responsive-army-box, .army-box');
+                allCards.forEach(card => {
+                    this._cancelEmptyCardAnimation(card);
+                    card.dataset.hasUnit = 'false';
                 });
-            }
+            };
 
-            // ★追加：戦争が終わって画面を閉じる時に、カードの「部隊がいたよシール」を全部ひっぺがします
-            const allCards = document.querySelectorAll('.responsive-army-box, .army-box');
-            allCards.forEach(card => {
-                this._cancelEmptyCardAnimation(card);
-                card.dataset.hasUnit = 'false';
-            });
+            if (!this.warModal.classList.contains('hidden') && typeof this.closeCoveredViewAfterRecovery === 'function') {
+                this.closeCoveredViewAfterRecovery(this.warModal, {
+                    recoverUnderCover: () => {
+                        if (typeof this.resumeMainMapAfterBattle === 'function') this.resumeMainMapAfterBattle('siege-war');
+                    },
+                    afterHide: finishWarCoverClose
+                });
+            } else {
+                if (typeof this.resumeMainMapAfterBattle === 'function') this.resumeMainMapAfterBattle('siege-war');
+                this.warModal.classList.add('hidden');
+                finishWarCoverClose();
+            }
         }
     }
     

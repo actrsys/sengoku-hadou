@@ -56,7 +56,8 @@ class UISliderManager {
             this.ui.quantityModal.classList.remove('multi-slider-mode');
         }
 
-        this.ui.quantityModal.classList.remove('hidden'); 
+        if (typeof this.ui.prepareCoveredViewForOpen === 'function') this.ui.prepareCoveredViewForOpen(this.ui.quantityModal);
+        else this.ui.quantityModal.classList.remove('hidden'); 
         if (this.ui.quantityContainer) this.ui.quantityContainer.innerHTML = '';
         if (this.ui.charityTypeSelector) this.ui.charityTypeSelector.classList.add('hidden');
         if (this.ui.tradeTypeInfo) this.ui.tradeTypeInfo.classList.add('hidden'); 
@@ -546,9 +547,7 @@ class UISliderManager {
         
         checkValidQuantity(); 
 
-        const closeQuantityModal = () => {
-            // input直後に予約された旧画面の更新が、次に開いた数量画面へ遅れて当たらないよう破棄します。
-            cancelQuantityUIUpdate();
+        const finishQuantityModalClose = () => {
             this.ui.quantityModal.classList.add('hidden');
             if (quantityOwnsAIGuardHide) this.ui.restoreAIGuard();
             if (this.ui.quantityConfirmBtn) {
@@ -557,11 +556,42 @@ class UISliderManager {
             }
         };
 
-        this.ui.quantityConfirmBtn.onclick = () => {
-            closeQuantityModal();
+        const closeQuantityModal = () => {
+            // input直後に予約された旧画面の更新が、次に開いた数量画面へ遅れて当たらないよう破棄します。
+            cancelQuantityUIUpdate();
+            if (typeof this.ui.cancelCoveredClose === 'function') this.ui.cancelCoveredClose(this.ui.quantityModal);
+            finishQuantityModalClose();
+        };
+
+        this.ui.quantityConfirmBtn.onclick = async () => {
+            // 親selectorを一時退避して開いた数量画面では、数量画面自身を最後のcoverとして使う。
+            // 親を閉じると背景復帰（巨大地図Canvasの再合成）が始まるため、そのpaintが完了する前に
+            // quantity-modalを消すと一瞬だけ白/黒の地図が露出する。背景を1paint復帰させてから閉じ、
+            // 同じmicrotask内で次処理へ進むことで、次画面が同期表示される経路も空白frameを作らない。
+            cancelQuantityUIUpdate();
+            if (this.ui.quantityConfirmBtn) {
+                this.ui.quantityConfirmBtn.disabled = true;
+                this.ui.quantityConfirmBtn.style.opacity = 0.5;
+            }
+
             if (parentSelectorSuspended && this.ui.info && typeof this.ui.info.closeCommonModal === 'function') {
                 this.ui.info.closeCommonModal();
+                if (typeof this.ui.closeCoveredViewAfterRecovery === 'function') {
+                    const closed = await this.ui.closeCoveredViewAfterRecovery(this.ui.quantityModal, {
+                        // closeCommonModal()が既に背景復帰を同期開始しているので、ここではcoverを
+                        // その復帰paintまで保持するだけでよい。
+                        waitForPaint: true,
+                        afterHide: finishQuantityModalClose
+                    });
+                    if (!closed) return;
+                } else {
+                    await (typeof this.ui.waitForNextPaint === 'function' ? this.ui.waitForNextPaint() : Promise.resolve());
+                    finishQuantityModalClose();
+                }
+            } else {
+                closeQuantityModal();
             }
+
             if (extraData && extraData.onConfirm) {
                 extraData.onConfirm(inputs);
             } else {
@@ -572,10 +602,13 @@ class UISliderManager {
         const cancelBtn = this.ui.quantityModal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
-                closeQuantityModal();
+                // 戻り先の親selectorを先に再表示し、その後で子modalを外す。同期処理内でも
+                // 「子を消してから親を出す」という逆順を作らず、destination-firstを徹底する。
+                cancelQuantityUIUpdate();
                 if (parentSelectorSuspended && this.ui.info && typeof this.ui.info.resumeCommonModalFromChild === 'function') {
                     this.ui.info.resumeCommonModalFromChild();
                 }
+                closeQuantityModal();
                 if (extraData && extraData.onCancel) {
                     extraData.onCancel(); 
                 }

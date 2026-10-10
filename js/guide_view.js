@@ -42,17 +42,25 @@ class GuideView {
         this.didPauseBackground = !isTitleVisible && !!(this.ui && typeof this.ui.pauseBackgroundUpdates === 'function');
         if (this.didPauseBackground) this.ui.pauseBackgroundUpdates();
 
-        this.modal.classList.remove('hidden');
+        if (this.ui && typeof this.ui.prepareCoveredViewForOpen === 'function') this.ui.prepareCoveredViewForOpen(this.modal);
+        else this.modal.classList.remove('hidden');
         if (this.closeBtn) this.closeBtn.focus();
     }
 
     close() {
         if (!this.modal || this.modal.classList.contains('hidden')) return;
-        this.modal.classList.add('hidden');
-        if (this.didPauseBackground && this.ui && typeof this.ui.resumeBackgroundUpdates === 'function') {
+        const shouldResume = !!this.didPauseBackground;
+        this.didPauseBackground = false;
+        if (shouldResume && this.ui && typeof this.ui.closeCoveredViewAfterRecovery === 'function') {
+            this.ui.closeCoveredViewAfterRecovery(this.modal, {
+                recoverUnderCover: () => this.ui.resumeBackgroundUpdates('guide_close')
+            });
+            return;
+        }
+        if (shouldResume && this.ui && typeof this.ui.resumeBackgroundUpdates === 'function') {
             this.ui.resumeBackgroundUpdates('guide_close');
         }
-        this.didPauseBackground = false;
+        this.modal.classList.add('hidden');
     }
 
     _getArticle(articleId) {

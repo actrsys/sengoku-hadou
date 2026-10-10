@@ -84,20 +84,33 @@ class LegionCouncilView {
         if (this.date) this.date.textContent = `${this.game.year}年 ${this.game.month}月`;
 
         this.renderSeats();
-        this.modal.classList.remove('hidden');
+        if (typeof this.ui.prepareCoveredViewForOpen === 'function') this.ui.prepareCoveredViewForOpen(this.modal);
+        else this.modal.classList.remove('hidden');
         if (typeof this.ui.pauseBackgroundUpdates === 'function') this.ui.pauseBackgroundUpdates();
     }
 
     close() {
         this.closeOrderEditor();
+        const resetState = () => {
+            this.draft = {};
+            this.members = [];
+            this.editingMode = null;
+            this.editingLegionNo = null;
+            this.editingPolicy = null;
+            this.editingTouched.clear();
+        };
+        if (this.modal && !this.modal.classList.contains('hidden') && this.ui && typeof this.ui.closeCoveredViewAfterRecovery === 'function') {
+            this.ui.closeCoveredViewAfterRecovery(this.modal, {
+                recoverUnderCover: () => {
+                    if (typeof this.ui.resumeBackgroundUpdates === 'function') this.ui.resumeBackgroundUpdates('legion_council_close');
+                },
+                afterHide: resetState
+            });
+            return;
+        }
+        if (typeof this.ui.resumeBackgroundUpdates === 'function') this.ui.resumeBackgroundUpdates('legion_council_close');
         if (this.modal) this.modal.classList.add('hidden');
-        this.draft = {};
-        this.members = [];
-        this.editingMode = null;
-        this.editingLegionNo = null;
-        this.editingPolicy = null;
-        this.editingTouched.clear();
-        if (typeof this.ui.resumeBackgroundUpdates === 'function') this.ui.resumeBackgroundUpdates();
+        resetState();
     }
 
     _policySummaryHtml(policy) {

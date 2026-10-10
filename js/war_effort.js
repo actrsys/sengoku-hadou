@@ -549,11 +549,12 @@ Object.assign(WarManager.prototype, {
         // すべての開戦経路の最終安全網。上限計算そのものは TroopAllocationService だけを正本にする。
         atkSoldierCount = TroopAllocationService.clampArmySoldiers(atkSoldierCount, atkBushos, atkCastle.soldiers);
         const warGeneration = this._beginWarLifecycle();
+        const isCurrentWar = () => this._isWarLifecycleCurrent(warGeneration, false);
         // ★追加：戦争全体の「開始処理前」の合図を出します
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_war', { atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses, atkGuns, reinforcementData, selfReinforcementData });
         }
-        if (!this._isWarLifecycleCurrent(warGeneration, false)) return;
+        if (!isCurrentWar()) return;
         
         this.state = this.state || {};
         this.state.active = true;
@@ -648,6 +649,7 @@ Object.assign(WarManager.prototype, {
 
                     // ★修正：諸勢力に対する鎮圧や反乱の時も、開始メッセージをしっかり出して結果を知らせます！
                     await this.game.ui.showDialogAsync(startMsg);
+                    if (!isCurrentWar()) return;
 
                     // ★追加：メッセージを閉じた後からバリアを張ります！
                     if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
@@ -668,7 +670,7 @@ Object.assign(WarManager.prototype, {
                     
                     // ★１秒間点滅させます
                     const openingBlinkCompleted = await this.game.ui.playBattleBlink(defCastle.id, atkColor, defColor, 1000);
-                    if (openingBlinkCompleted === false) return;
+                    if (!isCurrentWar() || openingBlinkCompleted === false) return;
                     
                     // ★追加：点滅が終わったらバリアを外します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard();
@@ -683,6 +685,7 @@ Object.assign(WarManager.prototype, {
                 } else {
                     await this.game.ui.showCutin(`${atkArmyName}の${atkBushos[0].name}が\n${defCastle.name}に攻め込みました！`);
                 }
+                if (!isCurrentWar()) return;
             }
 
             // 出陣で兵糧需要が増えるため、金1で得られる兵糧量が下がります。
@@ -734,6 +737,7 @@ Object.assign(WarManager.prototype, {
                     resolveConfirmed = resolve;
                     showReq();
                 });
+                if (!isCurrentWar()) return;
                 
                 if (!isConfirmed) {
                     const hc = selfReinforcementData.castle;
@@ -777,7 +781,9 @@ Object.assign(WarManager.prototype, {
                 }
             };
             await processReinforcement(selfReinforcementData, true);
+            if (!isCurrentWar()) return;
             await processReinforcement(reinforcementData, false);
+            if (!isCurrentWar()) return;
             
             let defBusho = null;
             if (defCastle.isKunishu) {
@@ -830,6 +836,7 @@ Object.assign(WarManager.prototype, {
             if (this.game.eventManager) {
                 // イベントマネージャー（受付）を経由させることでフラグが保存されます
                 await this.game.eventManager.processEvents('before_battle', this.state);
+                if (!isCurrentWar()) return;
             }
 
             // 戦闘前イベントが別地点へカメラを動かす可能性もあるため、その完了後に
@@ -841,6 +848,7 @@ Object.assign(WarManager.prototype, {
                     reason: 'battle_start',
                     anchor: 'territory'
                 });
+                if (!isCurrentWar()) return;
                 this.state.battleCameraLocked = true;
             }
 
@@ -888,7 +896,9 @@ Object.assign(WarManager.prototype, {
                         }
                     };
                     await processDefReinforcement(this.state.defSelfReinforcement, true);
+                    if (!isCurrentWar()) return;
                     await processDefReinforcement(this.state.defReinforcement, false);
+                    if (!isCurrentWar()) return;
                     // ==========================================
 
                     const totalDefSoldiers = defCastle.soldiers + (this.state.defReinforcement ? this.state.defReinforcement.soldiers : 0) + (this.state.defSelfReinforcement ? this.state.defSelfReinforcement.soldiers : 0);
@@ -912,6 +922,7 @@ Object.assign(WarManager.prototype, {
                                 document.getElementById('btn-intercept').onclick = async () => { 
                                     modal.classList.add('hidden'); 
                                     await this.game.ui.showCutin(`迎撃のため、${defCastle.name}から打って出ます！`);
+                                    if (!isCurrentWar()) return;
                                     
                                     this.game.ui.openBushoSelector('def_intercept_deploy', defCastle.id, {
                                         onConfirm: (selectedBushoIds) => {
@@ -1199,6 +1210,7 @@ Object.assign(WarManager.prototype, {
                                 } else {
                                     await this.game.ui.showCutin(interceptMsg);
                                 }
+                                if (!isCurrentWar()) return;
 
                                 const defHorses = (defCastle.horses || 0) < defCastle.soldiers * 0.2 ? 0 : (defCastle.horses || 0);
                                 const defGuns = (defCastle.guns || 0) < defCastle.soldiers * 0.2 ? 0 : (defCastle.guns || 0);
@@ -1252,11 +1264,13 @@ Object.assign(WarManager.prototype, {
                 } else {
                     await this.game.ui.showCutin(siegeMsg);
                 }
+                return isCurrentWar();
             };
 
             // ★追加：戦争全体の「開始処理後」の合図を出します
             if (this.game.eventManager) {
                 await this.game.eventManager.processEvents('start_war', this.state);
+                if (!isCurrentWar()) return;
             }
 
             console.log("【チェック】諸勢力の鎮圧戦ですか？: " + (this.state.isKunishuSubjugation ? "はい" : "いいえ"));
@@ -1264,18 +1278,21 @@ Object.assign(WarManager.prototype, {
 
             if (typeof window.FieldWarManager === 'undefined') {
                 console.log("野戦のシステムが見つからないため、強制的に籠城戦になります！");
-                await showSiegeMessage();
+                if (await showSiegeMessage() === false || !isCurrentWar()) return;
 
                 // ★追加：籠城戦の「戦争開始前」と「戦闘開始後」の合図を出します
                 if (this.game.eventManager) {
                     await this.game.eventManager.processEvents('before_siege_war', this.state);
+                    if (!isCurrentWar()) return;
                     await this.game.eventManager.processEvents('start_siege_war', this.state);
+                    if (!isCurrentWar()) return;
                 }
 
                 this.startSiegeWarPhase();
             } else {
                 console.log("野戦ができる状態なので、選択フェーズに入ります！");
                 showInterceptDialog(async (choice, defAssignments, defRice, atkAssignments, interceptHorses = 0, interceptGuns = 0) => {
+                    if (!isCurrentWar()) return;
                     this.game.ui.restoreAIGuard();
                     
                     // ★削除: 守備側の援軍を強制合流させる魔法（applyDefReinf）を完全に消しました！
@@ -1296,6 +1313,7 @@ Object.assign(WarManager.prototype, {
 
                         if (!this.game.fieldWarManager) this.game.fieldWarManager = new window.FieldWarManager(this.game);
                         this.game.fieldWarManager.startFieldWar(this.state, async (resultType) => {
+                            if (!isCurrentWar()) return;
                             defCastle.soldiers += this.state.defender.fieldSoldiers;
                             defCastle.rice += this.state.defFieldRice; 
                             defCastle.horses = (defCastle.horses || 0) + (this.state.defender.fieldHorses || 0);
@@ -1308,24 +1326,28 @@ Object.assign(WarManager.prototype, {
                                 }
                                 this.endWar(true);
                             } else if (resultType === 'attacker_win' || resultType === 'defender_retreat' || resultType === 'draw_to_siege') {
-                                await showSiegeMessage();
+                                if (await showSiegeMessage() === false || !isCurrentWar()) return;
 
                                 // ★追加：野戦から籠城戦に移る時の「戦争開始前」と「戦闘開始後」の合図を出します
                                 if (this.game.eventManager) {
                                     await this.game.eventManager.processEvents('before_siege_war', this.state);
+                                    if (!isCurrentWar()) return;
                                     await this.game.eventManager.processEvents('start_siege_war', this.state);
+                                    if (!isCurrentWar()) return;
                                 }
 
                                 this.startSiegeWarPhase();
                             } else this.endWar(false);
                         });
                     } else {
-                        await showSiegeMessage();
+                        if (await showSiegeMessage() === false || !isCurrentWar()) return;
 
                         // ★追加：初めから籠城戦を選んだ時の「戦争開始前」と「戦闘開始後」の合図を出します
                         if (this.game.eventManager) {
                             await this.game.eventManager.processEvents('before_siege_war', this.state);
+                            if (!isCurrentWar()) return;
                             await this.game.eventManager.processEvents('start_siege_war', this.state);
+                            if (!isCurrentWar()) return;
                         }
 
                         this.startSiegeWarPhase();
@@ -1333,7 +1355,7 @@ Object.assign(WarManager.prototype, {
                 });
             }
         } catch(e) {
-            if (!this._isWarLifecycleCurrent(warGeneration, false)) return;
+            if (!isCurrentWar()) return;
             console.error("StartWar Error:", e); 
             if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true); 
 

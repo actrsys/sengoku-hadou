@@ -695,7 +695,10 @@ class FieldWarManager {
         this.mapEl = document.getElementById('fw-map');
         this.logEl = document.getElementById('fw-log');
         
-        if (this.modal) this.modal.classList.remove('hidden');
+        if (this.modal) {
+            if (this.game.ui && typeof this.game.ui.prepareCoveredViewForOpen === 'function') this.game.ui.prepareCoveredViewForOpen(this.modal);
+            else this.modal.classList.remove('hidden');
+        }
         if (this.logEl) this.logEl.innerHTML = '';
         
         const totalW = (this.cols - 1) * (this.hexW * 0.75) + this.hexW;
@@ -2910,19 +2913,25 @@ class FieldWarManager {
         
         const finishProcess = async () => {
             if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration, false)) return;
-            if (this.modal) this.modal.classList.add('hidden');
 
-            // 古いスマホでは、非表示の野戦DOMを保持したまま通常地図を復帰すると
-            // 240HEX・部隊DOMと通常地図Canvasが同時常駐して一時メモリの山になる。
-            // 戦闘計算の書き戻しが完了したこの地点で、表示資源だけ先に解放する。
+            // 古いスマホでは、通常地図を戻す前に240HEX・部隊DOMを解放してメモリピークを抑える。
+            // ただしfield-war-modalの全画面backdrop自体は残し、背面地図の復旧中に画面を露出させない。
             this.releaseFieldWarVisualResources();
-            
-            // 戦闘用の共通窓口だけが、最後の戦闘所有者が閉じた時に背景を戻します。
-            if (this.game.ui && typeof this.game.ui.resumeMainMapAfterBattle === 'function') {
-                this.game.ui.resumeMainMapAfterBattle('field-war');
-            } else if (this.game.ui && typeof this.game.ui.resumeBackgroundUpdates === 'function') {
-                this.game.ui.resumeBackgroundUpdates();
+
+            const ui = this.game.ui;
+            if (this.modal && !this.modal.classList.contains('hidden') && ui && typeof ui.closeCoveredViewAfterRecovery === 'function') {
+                await ui.closeCoveredViewAfterRecovery(this.modal, {
+                    recoverUnderCover: () => {
+                        if (typeof ui.resumeMainMapAfterBattle === 'function') ui.resumeMainMapAfterBattle('field-war');
+                        else if (typeof ui.resumeBackgroundUpdates === 'function') ui.resumeBackgroundUpdates('field_war_close');
+                    }
+                });
+            } else {
+                if (ui && typeof ui.resumeMainMapAfterBattle === 'function') ui.resumeMainMapAfterBattle('field-war');
+                else if (ui && typeof ui.resumeBackgroundUpdates === 'function') ui.resumeBackgroundUpdates('field_war_close');
+                if (this.modal) this.modal.classList.add('hidden');
             }
+            if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration, false)) return;
             
             // ★野戦の画面を閉じたあとにイベントを発火させます（裏に隠れて操作不能になるのを防ぐため）
             if (this.game.eventManager) {

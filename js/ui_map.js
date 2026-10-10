@@ -569,6 +569,10 @@ Object.assign(UIManager.prototype, {
         );
         const clanHealthy = !forced && this._isClanColorOverlayHealthy();
         let recovered = false;
+        // compositor再提示はDOMのremove/insertを伴うため、通常のモーダル開閉ごとに実行しない。
+        // display:none・OS復帰・実Canvas欠損など「表示面が壊れ得る境界」だけで必要とする。
+        // これを毎回行うと、白抜け対策そのものがモーダル終了時の全画面フラッシュ要因になる。
+        let needsCompositeRefresh = forced || !clanHealthy;
 
         // display:noneをまたいだ復帰・OSの画面切替後は、Canvas内容がCPU側に残っていても
         // compositor側だけ部分欠落する端末があるため、強制予約時はhash一致を信用せず全描画する。
@@ -577,6 +581,7 @@ Object.assign(UIManager.prototype, {
             this._invalidatePersistentMapCanvasesForRecovery(false);
             if (typeof this.updateClanColors === 'function') this.updateClanColors();
             recovered = true;
+            needsCompositeRefresh = true;
         }
 
         if (hasHeavySnow) {
@@ -588,14 +593,15 @@ Object.assign(UIManager.prototype, {
                 this._lastSnowOverlay = null;
                 if (typeof this.updateSnowOverlay === 'function') this.updateSnowOverlay();
                 recovered = true;
+                needsCompositeRefresh = true;
             }
         }
 
-        // getImageDataでは検知できない「backing storeは健全だがcompositorだけ白抜け」も
-        // 画面復帰時には直す必要がある。pixel再計算の有無にかかわらず静的層を再提示する。
-        // これはDOMを作り直さず同じImage/Canvasを付け直すだけなので、通常モーダル復帰で
-        // 3140x2440級の勢力色を毎回フル再生成する負荷は増やさない。
-        if (this._refreshPersistentMapCompositeLayers()) recovered = true;
+        // getImageDataでは検知できない「backing storeは健全だがcompositorだけ白抜け」は、
+        // display:none・OS復帰など明示的な危険境界では同じDOMを再提示して直す。
+        // 通常モーダルは地図をDOMから外していないため、健全なCanvasを毎回remove/insertしない。
+        // これにより白抜け対策を維持しつつ、通常の閉じる操作でcompositorを作り直すちらつきを避ける。
+        if (needsCompositeRefresh && this._refreshPersistentMapCompositeLayers()) recovered = true;
         return recovered;
     },
 
@@ -1986,10 +1992,12 @@ Object.assign(UIManager.prototype, {
         this.updateSnowOverlay(); // ★大雪の表示を更新します！
         this.updateClanColors(); // ★勢力の色で地図を塗る魔法を実行します！
 
-        // 同一シナリオのrenderMapでは静的DOM/Canvasを再利用するため、hash一致だけでは
-        // 画面遷移中に生じたcompositor白抜けを直せない。pixel再計算は行わず、
-        // 既存の表示層だけを同じ位置へ再提示してから通常の一時演出を更新する。
-        if (canReuseCastleLayer) this._refreshPersistentMapCompositeLayers();
+        // 同一シナリオの通常renderMapでは、健全な静的3層を毎回remove/insertしない。
+        // display:none・OS復帰などで全復旧予約が立っている時だけ正規の復旧窓口を通し、
+        // routineな地図更新がcompositor再生成による全画面フラッシュを起こさないようにする。
+        if (canReuseCastleLayer && this._mapPresentationNeedsFullRecovery) {
+            this.recoverPersistentMapPresentation(false);
+        }
 
         // ★追加：駆虎呑狼などで、キープして光らせる魔法を実行します！
         this.updateKeepHighlight();

@@ -176,7 +176,8 @@ class SelectorModalView {
         if (!elements || !elements.listContainer) return null;
 
         const { modal, titleEl, contextEl, tabsEl, pagerEl, confirmBtn, assistBtn, backBtn } = elements;
-        modal.classList.remove('hidden');
+        if (this.ui && typeof this.ui.prepareCoveredViewForOpen === 'function') this.ui.prepareCoveredViewForOpen(modal);
+        else modal.classList.remove('hidden');
         this.resetListRowFit();
 
         if (titleEl) titleEl.textContent = title;
@@ -280,12 +281,12 @@ class SelectorModalView {
         if (resetScroll) listContainer.scrollTop = 0;
     }
 
-    close() {
+    close(options = {}) {
         const elements = this.getElements();
         if (!elements) return;
 
         const { modal, contextEl, tabsEl, pagerEl, confirmBtn, assistBtn, backBtn } = elements;
-        modal.classList.add('hidden');
+        if (options.hide !== false) modal.classList.add('hidden');
 
         // 非表示にするだけだと、仮想スクロールのクロージャや画像DOMが大量データへの参照を
         // 保持したままになります。通常地図を復帰する前に画面内容を解放し、古いスマホの
