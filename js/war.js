@@ -453,6 +453,23 @@ class WarManager {
         } else { this._scheduleWarCallback(() => { this.resolveAutoWar(); }, 100); }
     }
     
+    // 通常攻撃・反撃の両方で、実際に失った兵数に比例して装備も損耗させる。
+    // ダメージ倍率・装備損耗率は従来の通常攻撃と同一。
+    applyWarArmyCasualties(army, requestedDamage) {
+        if (!army) return 0;
+        const oldSoldiers = Math.max(0, Number(army.soldiers) || 0);
+        const damage = Math.min(oldSoldiers, Math.max(0, Math.floor(Number(requestedDamage) || 0)));
+        if (damage <= 0) return 0;
+        const oldHorses = army.horses || 0;
+        const oldGuns = army.guns || 0;
+        const horseRate = Math.min(1.0, oldHorses / Math.max(1, oldSoldiers));
+        const gunRate = Math.min(1.0, oldGuns / Math.max(1, oldSoldiers));
+        army.soldiers = oldSoldiers - damage;
+        army.horses = Math.max(0, oldHorses - Math.floor(damage * horseRate));
+        army.guns = Math.max(0, oldGuns - Math.floor(damage * gunRate));
+        return damage;
+    }
+
     distributeDamage(isTargetDefSide, totalDamage) {
         const s = this.state;
         let targetArmies = [];
@@ -474,22 +491,10 @@ class WarManager {
         let actualTotalDmg = 0;
         let damageDetails = {}; 
         
-        // ★今回追加：兵士が減る時に、馬や鉄砲も一緒に減らす専用の内部魔法です！
         const applyDamageToArmy = (army, role, dmgToTake) => {
-            let S_old = army.soldiers;
-            let H_old = army.horses || 0;
-            let G_old = army.guns || 0;
-            
-            // ここで余剰分を守るバリア（Math.min(1.0, ...)）を張ります
-            let horseEquipRate = Math.min(1.0, H_old / Math.max(1, S_old));
-            let gunEquipRate = Math.min(1.0, G_old / Math.max(1, S_old));
-            
-            army.soldiers -= dmgToTake;
-            army.horses = Math.max(0, H_old - Math.floor(dmgToTake * horseEquipRate));
-            army.guns = Math.max(0, G_old - Math.floor(dmgToTake * gunEquipRate));
-            
-            actualTotalDmg += dmgToTake;
-            damageDetails[role] += dmgToTake;
+            const actualDamage = this.applyWarArmyCasualties(army, dmgToTake);
+            actualTotalDmg += actualDamage;
+            damageDetails[role] += actualDamage;
         };
 
         if (targetArmies.length > 0) {
@@ -1806,7 +1811,7 @@ class WarManager {
             actualCounterDmg = Math.min(activeSoldiers, calculatedCounterDmg);
             let activeArmyObj = getArmyObj(s.turn);
             if (activeArmyObj) {
-                activeArmyObj.soldiers -= actualCounterDmg;
+                this.applyWarArmyCasualties(activeArmyObj, actualCounterDmg);
                 // 反撃を受けた時の士気低下のメモ
                 moraleDiffs[s.turn] -= Math.round(Math.sqrt(actualCounterDmg) / 2);
             }

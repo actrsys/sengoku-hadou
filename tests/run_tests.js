@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r459');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r460');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -15731,6 +15731,38 @@ test('r459 攻城戦の損害再配分で余剰ダメージが消失しない', 
             }
         }
     }
+});
+
+// r460: 攻城戦の反撃も通常被害と同じ装備損耗を適用する。
+test('r460 攻城戦の反撃で兵・軍馬・鉄砲の損耗が一致する', () => {
+    const ctx = createContext({WarParams: {War: {}}});
+    loadScript(ctx, 'js/war.js');
+    const War = vm.runInContext('WarManager', ctx);
+    const manager = new War({});
+    const army = {soldiers: 1000, horses: 800, guns: 500};
+    assert.strictEqual(manager.applyWarArmyCasualties(army, 200), 200);
+    assert.deepStrictEqual([army.soldiers, army.horses, army.guns], [800, 640, 400],
+        '200人の損害に相応する軍馬・鉄砲も減る');
+    const wiped = {soldiers: 10, horses: 10, guns: 6};
+    assert.strictEqual(manager.applyWarArmyCasualties(wiped, 20), 10);
+    assert.deepStrictEqual([wiped.soldiers, wiped.horses, wiped.guns], [0, 0, 0],
+        '兵数を超える反撃を受けても装備が不正に残らない');
+    const noLoss = {soldiers: 300, horses: 120, guns: 100};
+    assert.strictEqual(manager.applyWarArmyCasualties(noLoss, 0), 0);
+    assert.deepStrictEqual([noLoss.soldiers, noLoss.horses, noLoss.guns], [300, 120, 100]);
+    const state = {
+        attacker: {soldiers: 1000, horses: 800, guns: 500},
+        defender: {soldiers: 300, horses: 50, guns: 20},
+        deadSoldiers: {attacker: 0, defender: 0}
+    };
+    manager.state = state;
+    const dist = manager.distributeDamage(false, 200);
+    assert.strictEqual(dist.total, 200);
+    assert.deepStrictEqual([state.attacker.soldiers, state.attacker.horses, state.attacker.guns],
+        [800, 640, 400], '通常攻撃も同一の共通処理で損耗する');
+    const src = read('js/war.js');
+    assert.ok(src.includes('this.applyWarArmyCasualties(activeArmyObj, actualCounterDmg)'),
+        '本番の反撃経路でも共通処理を必ず使用する');
 });
 
 Promise.all(pendingTests).then(() => {
