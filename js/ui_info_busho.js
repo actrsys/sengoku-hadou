@@ -124,7 +124,7 @@ Object.assign(UIInfoManager.prototype, {
             }
         }
         
-        const faceSrc = busho.faceIcon ? `data/images/faceicons/${busho.faceIcon}` : 'data/images/faceicons/unknown_face.webp';
+        const faceSrc = this._safeFaceIconPath(busho.faceIcon);
         let faceHtml = `<img src="${faceSrc}" class="daimyo-detail-face busho-detail-face" alt="">`;
 
         // 詳細1描画の間だけ、所属・主君関連の正本参照を共有します。
@@ -186,7 +186,7 @@ Object.assign(UIInfoManager.prototype, {
                     });
                     if (highestRank) {
                         let displayName = highestRank.rankName2 || highestRank.rankName1 || "";
-                        if (displayName) rankName = `<span class="busho-detail-rank">${displayName}</span>`;
+                        if (displayName) rankName = `<span class="busho-detail-rank">${this._escapePlainText(displayName)}</span>`;
                     }
                 }
             }
@@ -284,16 +284,16 @@ Object.assign(UIInfoManager.prototype, {
         const yomiStr = busho.yomi ? busho.yomi : "";
         
         // ★修正：箱で分けるのではなく、純粋に文字として「少しだけ空く空白文字（&ensp;）」を挟み込みます
-        let displayYomi = yomiStr;
-        let displayName = busho.name;
+        let displayYomi = this._escapePlainText(yomiStr);
+        let displayName = this._escapePlainText(busho.name);
         
         if (busho.givenName) {
             if (busho.familyYomi && busho.givenYomi) {
                 // 読みが分かれている場合は、間に半角スペース幅の空白文字を入れます
-                displayYomi = busho.familyYomi + "&ensp;" + busho.givenYomi;
+                displayYomi = this._escapePlainText(busho.familyYomi) + "&ensp;" + this._escapePlainText(busho.givenYomi);
             }
             // 名前が分かれている場合は、間に半角スペース幅の空白文字を入れます
-            displayName = busho.familyName + "&ensp;" + busho.givenName;
+            displayName = this._escapePlainText(busho.familyName) + "&ensp;" + this._escapePlainText(busho.givenName);
         }
 
         let rightContentHtml = '';
@@ -453,7 +453,7 @@ Object.assign(UIInfoManager.prototype, {
                                 ${rankName}
                             </div>
                             <div class="busho-detail-meta pc-meta">
-                                <span>${affiliationName}</span>
+                                <span>${this._escapePlainText(affiliationName)}</span>
                                 <span>${bushoRankName}</span>
                             </div>
                         </div>
@@ -468,7 +468,7 @@ Object.assign(UIInfoManager.prototype, {
                                     ${rankName}
                                 </div>
                                 <div class="busho-detail-meta sp-meta">
-                                    <span>${affiliationName}</span>
+                                    <span>${this._escapePlainText(affiliationName)}</span>
                                     <span>${bushoRankName}</span>
                                 </div>
                             </div>

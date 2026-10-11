@@ -121,14 +121,15 @@ class LegionCouncilView {
 
     _seatHtml(member) {
         const policy = this.draft[member.legionNo] || member.policy;
-        const face = member.commander.faceIcon || 'unknown_face.webp';
         const labels = ['', '第一', '第二', '第三', '第四', '第五', '第六', '第七', '第八'];
-        const name = member.commander.name || '不明';
+        // 保存データ由来の名前・顔ファイル名はHTMLテンプレートへ直接埋め込まない。
+        // 名前はrenderSeatsでtextContent/setAttributeへ、画像は許可されたファイル名だけをsrcへ設定する。
+        const legionNo = Number(member.legionNo);
         return `
-            <div class="legion-council-seat" data-legion-no="${member.legionNo}" role="button" tabindex="0" aria-label="${labels[member.legionNo]}国主 ${name} の命令を開く">
-                <div class="legion-council-seat-heading">${labels[member.legionNo]}国主</div>
-                <img class="legion-council-face" src="data/images/faceicons/${face}" alt="">
-                <div class="legion-council-name">${name}</div>
+            <div class="legion-council-seat" data-legion-no="${legionNo}" role="button" tabindex="0">
+                <div class="legion-council-seat-heading">${labels[legionNo]}国主</div>
+                <img class="legion-council-face" src="data/images/faceicons/unknown_face.webp" alt="">
+                <div class="legion-council-name"></div>
                 <div class="legion-council-policy-summary">${this._policySummaryHtml(policy)}</div>
                 <div class="legion-council-seat-hint">選択して命令を変更</div>
             </div>`;
@@ -141,15 +142,27 @@ class LegionCouncilView {
         this.leftSeats.innerHTML = left.map(m => this._seatHtml(m)).join('');
         this.rightSeats.innerHTML = right.map(m => this._seatHtml(m)).join('');
 
-        this.modal.querySelectorAll('.legion-council-face').forEach(img => {
-            img.onerror = () => {
-                img.onerror = null;
-                img.src = 'data/images/faceicons/unknown_face.webp';
-            };
-        });
-
         this.modal.querySelectorAll('.legion-council-seat').forEach(seat => {
-            const open = () => this.openOrderEditor(Number(seat.dataset.legionNo));
+            const legionNo = Number(seat.dataset.legionNo);
+            const member = this.members.find(m => m.legionNo === legionNo);
+            const labels = ['', '第一', '第二', '第三', '第四', '第五', '第六', '第七', '第八'];
+            const name = String(member && member.commander && member.commander.name || '不明');
+            const nameEl = seat.querySelector('.legion-council-name');
+            if (nameEl) nameEl.textContent = name;
+            seat.setAttribute('aria-label', `${labels[legionNo]}国主 ${name} の命令を開く`);
+
+            const img = seat.querySelector('.legion-council-face');
+            if (img) {
+                const candidate = member && member.commander && member.commander.faceIcon;
+                const face = typeof candidate === 'string' && /^[A-Za-z0-9_-]+\.(?:webp|png|jpe?g)$/.test(candidate)
+                    ? candidate : 'unknown_face.webp';
+                img.src = `data/images/faceicons/${face}`;
+                img.onerror = () => {
+                    img.onerror = null;
+                    img.src = 'data/images/faceicons/unknown_face.webp';
+                };
+            }
+            const open = () => this.openOrderEditor(legionNo);
             seat.onclick = open;
             seat.onkeydown = event => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;

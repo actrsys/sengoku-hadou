@@ -3,6 +3,21 @@
  * リストなどの情報ウインドウの表示を管理するファイルです
  */
 class UIInfoManager {
+    // セーブファイル由来の名称・履歴など、表示専用の値をHTMLテンプレートへ渡す境界。
+    // 装飾HTMLを受け取る既存のcellsとは区別し、外部データをHTMLとして解釈しない。
+    _escapePlainText(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[char]);
+    }
+
+    // 顔画像は同梱ファイル名だけを許可。セーブデータが相対パスやHTML属性を持っても解釈しない。
+    _safeFaceIconPath(value) {
+        const name = typeof value === 'string' ? value : '';
+        const safeName = /^[A-Za-z0-9_-]+\.(?:webp|png|jpe?g)$/.test(name) ? name : 'unknown_face.webp';
+        return `data/images/faceicons/${safeName}`;
+    }
+
     constructor(ui, game) {
         // 元のui.jsとgameの情報を覚えておきます
         this.ui = ui;
@@ -1069,7 +1084,7 @@ class UIInfoManager {
             else if (leader.innovation <= 33) { ideology = "保守"; ideologyClass = "ideology-hoshu"; }
         }
 
-        let faceSrc = leader && leader.faceIcon ? `data/images/faceicons/${leader.faceIcon}` : "data/images/faceicons/unknown_face.webp";
+        let faceSrc = this._safeFaceIconPath(leader && leader.faceIcon);
 
         const makeRow = (label, value) => {
             const longLabelClass = label.length >= 3 ? ' is-long-label' : '';
@@ -1077,7 +1092,7 @@ class UIInfoManager {
         };
         const makeEmptyRow = () => `<div class="info-detail-stat-box is-placeholder"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
-        const clanYomi = clan.yomi || "";
+        const clanYomi = this._escapePlainText(clan.yomi || "");
         const ideologyHtml = `<div class="daimyo-detail-ideology info-detail-ideology ${ideologyClass}">${ideology}</div>`;
 
         if (listContainer) {
@@ -1096,12 +1111,12 @@ class UIInfoManager {
                             <div class="info-detail-title-row">
                                 <div class="info-detail-title-block">
                                     <span class="info-detail-yomi">${clanYomi}</span>
-                                    <span class="info-detail-name">${clan.name}</span>
+                                    <span class="info-detail-name">${this._escapePlainText(clan.name)}</span>
                                 </div>
                             </div>
                             <!-- 大名＆イデオロギー -->
                             <div class="info-detail-subinfo">
-                                <div class="info-detail-owner-line">大名 <span class="info-detail-owner-value">${leaderName}</span></div>
+                                <div class="info-detail-owner-line">大名 <span class="info-detail-owner-value">${this._escapePlainText(leaderName)}</span></div>
                                 ${ideologyHtml}
                             </div>
                         </div>
@@ -2627,7 +2642,7 @@ class UIInfoManager {
 
         let faceHtml = "";
         if (leader && leader.faceIcon) {
-            faceHtml = `<img src="data/images/faceicons/${leader.faceIcon}" class="daimyo-confirm-face" data-hide-on-error="true">`;
+            faceHtml = `<img src="${this._safeFaceIconPath(leader.faceIcon)}" class="daimyo-confirm-face" data-hide-on-error="true">`;
         } else {
             faceHtml = `<div class="daimyo-confirm-face daimyo-confirm-face-empty"></div>`;
         }
@@ -2654,13 +2669,13 @@ class UIInfoManager {
                                     <!-- 勢力名 -->
                                     <div class="daimyo-confirm-title-row">
                                         <div class="info-detail-title-block">
-                                            <span class="daimyo-confirm-yomi">${clanYomi}</span>
-                                            <span class="daimyo-confirm-name">${clanName}</span>
+                                            <span class="daimyo-confirm-yomi">${this._escapePlainText(clanYomi)}</span>
+                                            <span class="daimyo-confirm-name">${this._escapePlainText(clanName)}</span>
                                         </div>
                                     </div>
                                     <!-- 大名 -->
                                     <div class="daimyo-confirm-subinfo">
-                                        <div class="daimyo-confirm-owner">大名 <span class="daimyo-confirm-owner-value">${leader ? leader.name : "不明"}</span></div>
+                                        <div class="daimyo-confirm-owner">大名 <span class="daimyo-confirm-owner-value">${this._escapePlainText(leader ? leader.name : "不明")}</span></div>
                                     </div>
                                 </div>
                             </div>
@@ -2773,7 +2788,7 @@ class UIInfoManager {
 
         const ideologyHtml = `<div class="daimyo-detail-ideology info-detail-ideology ${ideologyClass}">${ideology}</div>`;
 
-        let faceSrc = leader && leader.faceIcon ? `data/images/faceicons/${leader.faceIcon}` : "data/images/faceicons/unknown_face.webp";
+        let faceSrc = this._safeFaceIconPath(leader && leader.faceIcon);
 
         const makeRow = (label, value) => {
             const longLabelClass = label.length >= 3 ? ' is-long-label' : '';
@@ -2806,7 +2821,7 @@ class UIInfoManager {
                             </div>
                             <!-- 頭領＆イデオロギー -->
                             <div class="info-detail-subinfo">
-                                <div class="info-detail-owner-line">頭領 <span class="info-detail-owner-value">${leaderName}</span></div>
+                                <div class="info-detail-owner-line">頭領 <span class="info-detail-owner-value">${this._escapePlainText(leaderName)}</span></div>
                                 ${ideologyHtml}
                             </div>
                         </div>
@@ -3076,7 +3091,7 @@ class UIInfoManager {
             }
             items.push({
                 onClick: null,
-                cells: [String(entry?.text || '')],
+                cells: [this._escapePlainText(entry?.text || '')],
                 itemClass: "history-list-item"
             });
         });

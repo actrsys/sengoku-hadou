@@ -689,6 +689,13 @@ class SaveManager {
     loadGameFromFile(e) { 
         const file = e.target.files[0]; if (!file) return; 
         e.target.value = '';
+        // 外部セーブは信用できない。FileReader・復号用バッファ・JSON.parseで
+        // 同じデータを複数回メモリ保持するため、異常に大きいファイルは読込前に拒否する。
+        const MAX_SAVE_IMPORT_BYTES = 32 * 1024 * 1024;
+        if (Number.isFinite(file.size) && file.size > MAX_SAVE_IMPORT_BYTES) {
+            if (this.game.ui) this.game.ui.showDialog('セーブファイルが大きすぎるため、読み込みを中止しました。', false);
+            return;
+        }
         const requestFlow = this._captureLoadRequestFlow();
         if (!requestFlow) return;
         if (this.game.ui) this.game.ui.showLoadingScreen('セーブデータを確認しています', 0);

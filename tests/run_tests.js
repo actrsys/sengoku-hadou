@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r473');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r477');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -16340,6 +16340,318 @@ test('r473 謀反の逃亡先探索は共有する勢力別拠点索引の順序
     assert.strictEqual(selectedCastleId, near.id, '友好勢力の最寄り拠点を選ぶ既存仕様は維持する');
     assert.deepStrictEqual(sharedAllyCastles.map(c => c.id), originalOrder,
         '近い拠点を探すために共有索引自体を並べ替えない');
+});
+
+// r474: 外部セーブ由来の履歴本文は信頼できない文字列。テンプレートHTMLへ直挿ししない。
+test('r474 行動履歴の本文はHTMLとして実行・展開されない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ui_info.js');
+    const proto = vm.runInContext('UIInfoManager', ctx).prototype;
+    const info = Object.create(proto);
+    const raw = '<img src=x onerror="window.__hacked=true"> & 正常';
+    info.game = {
+        playerClanId: 1,
+        historySystem: { getEntries: () => [{ year: 1560, month: 4, text: raw, clanIds: [1], category: 'general' }] }
+    };
+    info.historyCurrentScope = 'clan';
+    let output = null;
+    info._renderListModal = config => { output = config; };
+    info._renderHistoryList();
+    assert.ok(output && output.items.length === 2);
+    const html = output.items[1].cells[0];
+    assert.ok(html.includes('&lt;img src=x onerror=&quot;window.__hacked=true&quot;&gt;'), '外部由来タグをテキストとして扱う');
+    assert.ok(html.includes('&amp; 正常'), '&を含む本文も保持し正しくエスケープする');
+    assert.ok(!html.includes('<img'), '危険なタグを生成しない');
+});
+
+test('r474 武将詳細の外部セーブ由来名称と顔アイコン名は表示用に無害化する', () => {
+    const info = read('js/ui_info_busho.js');
+    const core = read('js/ui_info.js');
+    assert.ok(core.includes('_escapePlainText(value)'), '専用テキストエスケープを持つ');
+    assert.ok(info.includes('this._escapePlainText(busho.name)'), '武将名をテキストとして描画する');
+    assert.ok(info.includes('this._escapePlainText(affiliationName)'), '所属勢力名をテキストとして描画する');
+    assert.ok(info.includes('this._safeFaceIconPath(busho.faceIcon)'), '顔アイコンのファイル名を制限する');
+});
+
+test('r474 HTMLのCSPは外部スクリプト・インラインイベント・外部通信を既定で許可しない', () => {
+    const html = read('index.html');
+    const csp = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)"/);
+    assert.ok(csp, 'CSPをHTML先頭で指定する');
+    assert.ok(csp[1].includes("script-src 'self'"));
+    assert.ok(csp[1].includes("connect-src 'self'"));
+    assert.ok(csp[1].includes("object-src 'none'"));
+    assert.ok(!csp[1].includes("'unsafe-eval'") && !csp[1].includes("script-src 'self' 'unsafe-inline'"));
+});
+
+test('r474 異常に大きい外部セーブはFileReader開始前に拒否する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    const SaveManagerClass = vm.runInContext('SaveManager', ctx);
+    let shown = '';
+    const manager = new SaveManagerClass({ ui: { showDialog(msg) { shown = msg; } } });
+    const input = { target: { files: [{ size: 33 * 1024 * 1024 }], value: 'unsafe.sav' } };
+    manager._captureLoadRequestFlow = () => { throw new Error('巨大ファイルの判定後に復元準備をしない'); };
+    manager.loadGameFromFile(input);
+    assert.strictEqual(input.target.value, '', '入力は再選択できるよう初期化する');
+    assert.ok(shown.includes('大きすぎる'), '通常ダイアログで拒否を説明する');
+});
+
+// r475: 国主評定のHTMLは保存値から構築しない。文字と顔の境界を実際のrenderSeatsで確認する。
+test('r475 国主評定で細工された国主名・顔ファイル名をHTMLへ埋め込まない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/legion_council_view.js');
+    const Council = vm.runInContext('LegionCouncilView', ctx);
+    const view = Object.create(Council.prototype);
+    const unsafeName = '<img src=x onerror="window.__owned=1">';
+    const createSeat = legionNo => {
+        const name = { textContent: '' };
+        const face = { src: '', onerror: null };
+        return {
+            dataset: { legionNo: String(legionNo) },
+            attrs: {}, name, face,
+            querySelector(selector) {
+                if (selector === '.legion-council-name') return name;
+                if (selector === '.legion-council-face') return face;
+                return null;
+            },
+            setAttribute(key, value) { this.attrs[key] = value; },
+            addEventListener() {}
+        };
+    };
+    const seats = [createSeat(1), createSeat(5)];
+    view.leftSeats = { innerHTML: '' };
+    view.rightSeats = { innerHTML: '' };
+    view.modal = { querySelectorAll(selector) {
+        return selector === '.legion-council-seat' ? seats : [];
+    } };
+    view.members = [
+        { legionNo: 1, commander: { name: unsafeName, faceIcon: 'a.webp" onerror="window.__owned=1' }, policy: { allowOffense: true, allowNewHostility: true } },
+        { legionNo: 5, commander: { name: '山本勘助', faceIcon: 'yamamoto_kansuke.webp' }, policy: { allowOffense: false, allowNewHostility: true } }
+    ];
+    view.draft = {};
+    view.renderSeats();
+    assert.ok(!view.leftSeats.innerHTML.includes('<img src=x'), '国主名をHTMLテンプレートに直挿ししない');
+    assert.ok(!view.leftSeats.innerHTML.includes('onerror=\"window.__owned=1'), '顔ファイル名で属性を追加させない');
+    assert.strictEqual(seats[0].name.textContent, unsafeName, '国主名の原文はテキストとして保持する');
+    assert.ok(seats[0].attrs['aria-label'].includes(unsafeName), 'アクセシビリティ名も属性APIで設定する');
+    assert.strictEqual(seats[0].face.src, 'data/images/faceicons/unknown_face.webp', '不正な顔指定は同梱の不明顔へ');
+    assert.strictEqual(seats[1].name.textContent, '山本勘助');
+    assert.strictEqual(seats[1].face.src, 'data/images/faceicons/yamamoto_kansuke.webp', '正しい顔画像は従来どおり');
+    assert.ok(view.rightSeats.innerHTML.includes('第五国主'), '座席と軍団番号の既存レイアウトは維持する');
+    seats[1].face.onerror();
+    assert.strictEqual(seats[1].face.src, 'data/images/faceicons/unknown_face.webp', '画像読み込み失敗時も従来の代替表示');
+});
+
+
+test('r475 拠点詳細はセーブ由来の名前・よみ・城主・顔をHTMLとして解釈しない', () => {
+    const dangerous = '<svg onload="window.__owned=1">';
+    const ctx = createContext({
+        document: { body: { classList: { contains: () => true } }, getElementById: () => null },
+        EconomyRules: {
+            calcBaseGoldIncome: () => 10, calcBaseRiceIncome: () => 10,
+            isPortCastle: () => false, isProdCastle: () => false
+        },
+        BushoStatusRules: { isRonin: () => false, isActive: () => true }
+    });
+    loadScript(ctx, 'js/ui_info.js');
+    loadScript(ctx, 'js/ui_info_kyoten.js');
+    const info = Object.create(vm.runInContext('UIInfoManager', ctx).prototype);
+    const castle = {
+        id: 1, ownerClan: 1, castellanId: 2, name: dangerous, yomi: dangerous,
+        provinceId: 3, legionId: 0, kokudaka: 200, commerce: 100, peoplesLoyalty: 90,
+        training: 50, morale: 50, defense: 100, gold: 100, rice: 100, population: 200,
+        horses: 10, guns: 10, soldiers: 1000
+    };
+    const container = { style: {}, className: '', innerHTML: '', scrollTop: 0, querySelector: () => null };
+    info._openInfoShell = () => ({ listContainer: container });
+    info.game = {
+        getCastle: () => castle,
+        getClan: () => ({ name: dangerous }),
+        getBusho: () => ({ name: dangerous, faceIcon: 'a.webp" onerror="window.__owned=1' }),
+        getProvince: () => ({ province: dangerous, provinceYomi: dangerous }),
+        getCastleBushos: () => []
+    };
+    info._renderCastleDetail(1);
+    assert.ok(container.innerHTML.includes('&lt;svg onload=&quot;window.__owned=1&quot;&gt;'), '地名・人名は原文を文字として表示');
+    assert.ok(!container.innerHTML.includes('<svg onload='), '悪意あるタグがHTMLへ出ない');
+    assert.ok(!container.innerHTML.includes('src="data/images/faceicons/a.webp" onerror='), '画像属性へコードを注入できない');
+    assert.ok(container.innerHTML.includes('src="data/images/faceicons/unknown_face.webp"'), '不正な顔画像は代替画像');
+});
+
+test('r475 大名選択の確認画面は勢力名・武将名・顔の属性混入を防ぐ', () => {
+    const dangerous = '<img src=x onerror="window.__owned=1">';
+    const ctx = createContext({
+        document: {
+            body: { classList: { add() {}, remove() {} } },
+            getElementById: () => null,
+            querySelector: () => null
+        },
+        LifeStatusRules: { isPresent: () => true }
+    });
+    loadScript(ctx, 'js/ui_info.js');
+    const info = Object.create(vm.runInContext('UIInfoManager', ctx).prototype);
+    const body = { innerHTML: '' };
+    info.ui = {
+        daimyoConfirmModal: { classList: { add() {}, remove() {} } },
+        daimyoConfirmBody: body,
+        updateCastleGlows() {}
+    };
+    info._bindImageFallbacks = () => {};
+    info.game = {
+        getClanCastles: () => [], getClanBushos: () => [],
+        getClan: () => ({ yomi: dangerous, princessIds: [] })
+    };
+    info.showDaimyoConfirmModal(1, dangerous, 10, { name: dangerous, faceIcon: 'icon.png" onerror="window.__owned=1' }, () => {});
+    assert.ok(body.innerHTML.includes('&lt;img src=x'), '勢力名や武将名をエスケープする');
+    assert.ok(!body.innerHTML.includes('<img src=x onerror='), '保存値をHTMLタグにしない');
+    assert.ok(body.innerHTML.includes('src="data/images/faceicons/unknown_face.webp"'), '不正な顔パスは無害化');
+});
+
+
+// r476: UIManagerの文字列表示経路を共通化し、不正タグがDOMノードに変化しないことを直接確認する。
+test('r476 会話・結果・攻城戦の文面はタグを解釈せず、改行と決着強調を保持する', () => {
+    const createdTags = [];
+    const mockNode = (tag, text = '') => ({
+        tag, text, className: '', children: [],
+        replaceChildren(...children) { this.children = children; },
+        appendChild(child) { this.children.push(child); }
+    });
+    const ctx = createContext({
+        document: {
+            createElement(tag) { createdTags.push(tag); return mockNode(tag); },
+            createTextNode(text) { return mockNode('#text', text); }
+        }
+    });
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const ui = Object.create(UI.prototype);
+    const sink = mockNode('div');
+    const malicious = '織田<svg onload="window.__owned=1"> & 説明<br>二行目\n三行目';
+    ui._renderPlainMessage(sink, malicious);
+    assert.deepStrictEqual(createdTags, ['br', 'br'], '改行以外の要素を生成してはいけない');
+    assert.strictEqual(sink.children.filter(node => node.tag === 'br').length, 2);
+    assert.ok(sink.children.some(node => node.tag === '#text' && node.text.includes('<svg onload=')), 'タグを文字のまま保持する');
+    assert.ok(sink.children.some(node => node.tag === '#text' && node.text.includes(' & 説明')));
+    createdTags.length = 0;
+    ui._renderPlainMessage(sink, `<span class="war-critical-message">敗北：${malicious}</span>`, true);
+    assert.deepStrictEqual(createdTags, ['br', 'br', 'span']);
+    assert.strictEqual(sink.children[0].className, 'war-critical-message', '正規の重要強調だけ残す');
+    assert.ok(sink.children[0].children.some(node => node.tag === '#text' && node.text.includes('<svg onload=')));
+});
+
+test('r476 戦闘ログと結果画面の実表示経路はHTMLパーサへ外部文字列を渡さない', () => {
+    const mockNode = tag => ({
+        tag, children: [],
+        replaceChildren(...children) { this.children = children; },
+        appendChild(child) { this.children.push(child); },
+        get innerHTML() { return ''; },
+        set innerHTML(value) { throw new Error(`HTMLの解釈は禁止: ${value}`); }
+    });
+    const ctx = createContext({
+        document: {
+            createElement: mockNode,
+            createTextNode: text => ({ tag: '#text', text }),
+            getElementById: () => null
+        }
+    });
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const ui = Object.create(UI.prototype);
+    const log = { children: [], scrollHeight: 60, scrollTop: 0, appendChild(el) { this.children.push(el); } };
+    ui.game = { warManager: { state: { active: true, isPlayerInvolved: true } }, historySystem: { record() {} } };
+    ui.warLog = log;
+    const payload = '<img src=x onerror=alert(1)>\n次行';
+    ui.addWarDetailLog(payload);
+    ui.log(payload, false);
+    assert.strictEqual(log.children.length, 2);
+    assert.strictEqual(log.children[0].children[0].text, '<img src=x onerror=alert(1)>');
+    assert.strictEqual(log.children[0].children[1].tag, 'br');
+    const body = mockNode('div');
+    ui.resultBody = body;
+    ui.resultModal = {};
+    ui.hideAIGuardTemporarily = () => {};
+    ui.prepareCoveredViewForOpen = () => {};
+    ui.completeVisualHandoff = () => {};
+    ui._closePendingDialogHandoffNow = () => {};
+    ui.pauseBackgroundUpdates = () => {};
+    ui.showResultModal(payload);
+    assert.strictEqual(body.children[0].text, '<img src=x onerror=alert(1)>');
+    assert.strictEqual(body.children[1].tag, 'br');
+});
+
+test('r476 会話・攻城戦の主要なDOM出力は安全表示窓口を使用する', () => {
+    const source = read('js/ui.js');
+    assert.ok(source.includes('this._renderPlainMessage(msgEl, dialog.msg);'));
+    assert.ok(source.includes('this._renderPlainMessage(entry, msgText, true);'));
+    assert.ok(!source.includes('msgEl.innerHTML = dialog.msg'));
+    assert.ok(!source.includes('textContainer.innerHTML = `<span>${armyName}'));
+});
+
+// r477: 表示幅圧縮によるHTML混入と戦場名の直接埋込みを回帰検証する。
+test('r477 表示圧縮は短い名前も長い名前もHTMLを解釈させない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/stat_presenter.js');
+    loadScript(ctx, 'js/ui.js');
+    const uiProto = vm.runInContext('UIManager.prototype', ctx);
+    const marker = '<img src=x onerror=alert(1)>&"\'';
+    const short = uiProto._getCompressedTextHtml('A<&', 10);
+    const long = uiProto._getCompressedTextHtml(marker, 3);
+    assert.strictEqual(short, 'A&lt;&amp;');
+    assert.ok(long.includes('class="compressed-list-text ui-compressed-text"'));
+    assert.ok(long.includes('&lt;img src=x onerror=alert(1)&gt;&amp;&quot;&#39;'));
+    assert.ok(!long.includes('<img'));
+    assert.strictEqual(ctx.StatPresenter.safeFaceIconPath('../bad.svg" onerror="alert(1)'), 'data/images/faceicons/unknown_face.webp');
+    assert.strictEqual(ctx.StatPresenter.safeFaceIconPath('oda_nobunaga.webp'), 'data/images/faceicons/oda_nobunaga.webp');
+});
+
+test('r477 野戦部隊の軍勢名と部隊情報の表示では保存名をHTML化しない', () => {
+    const elements = new Map();
+    const getEl = id => {
+        if (!elements.has(id)) {
+            const el = fakeElement(id);
+            el.style.setProperty = () => {};
+            elements.set(id, el);
+        }
+        return elements.get(id);
+    };
+    const ctx = createContext({ document: { getElementById: getEl } });
+    loadScript(ctx, 'js/stat_presenter.js');
+    loadScript(ctx, 'js/ui.js');
+    loadScript(ctx, 'js/field_war.js');
+    const UI = vm.runInContext('UIManager.prototype', ctx);
+    const field = vm.runInContext('FieldWarManager.prototype', ctx);
+    const clanName = '敵家<img src=x onerror=alert(1)>';
+    const leaderName = '<svg onload=alert(1)>太郎';
+    const actor = { id: 77, clan: 1, name: leaderName, fullName: leaderName, aptAshigaru: 'A' };
+    const game = {
+        playerClanId: 1,
+        getClan: () => ({ name: clanName }),
+        getBusho: () => actor,
+        ui: { _getCompressedTextHtml: UI._getCompressedTextHtml }
+    };
+    const unit = { id: 9, bushoId: 77, name: leaderName, isGeneral: true, isAttacker: true, groupId: 'atk_main', stats: { ldr: 70, str: 60, int: 50 }, soldiers: 500, troopType: 'ashigaru' };
+    field.updateStatus.call({ game, isInfoMode: true, units: [unit], groupStats: {}, activeAtkTab: 'main', activeDefTab: 'main', warState: { attacker: { ownerClan: 1 }, defender: { ownerClan: 2 } }, _updateFieldWarHeader() {} });
+    const armyHtml = getEl('fw-atk-status').innerHTML;
+    assert.ok(armyHtml.includes('&lt;img'));
+    assert.ok(armyHtml.includes('&lt;svg'));
+    assert.ok(!armyHtml.includes('<img'));
+    assert.ok(!armyHtml.includes('<svg'));
+    field.showUnitInfo.call({ game, groupStats: {} }, unit);
+    const unitHtml = getEl('fw-unit-info').innerHTML;
+    assert.ok(unitHtml.includes('&lt;img'));
+    assert.ok(unitHtml.includes('&lt;svg'));
+    assert.ok(!unitHtml.includes('<img'));
+    assert.ok(!unitHtml.includes('<svg'));
+});
+
+test('r477 拠点情報・攻城戦の可変名称と顔画像も表示境界で保護する', () => {
+    const ui = read('js/ui.js');
+    assert.ok(ui.includes('StatPresenter.escapePlainText(provinceName)'));
+    assert.ok(ui.includes('StatPresenter.escapePlainText(castle.name)'));
+    assert.ok(ui.includes('StatPresenter.safeFaceIconPath(castellan.faceIcon)'));
+    assert.ok(ui.includes('StatPresenter.escapePlainText(s.defender.name)'));
+    assert.ok(ui.includes('StatPresenter.safeFaceIconPath(busho && busho.faceIcon)'));
+    assert.ok(ui.includes('StatPresenter.safeFaceIconPath(leader && leader.faceIcon)'));
 });
 
 Promise.all(pendingTests).then(() => {

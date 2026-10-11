@@ -4,6 +4,21 @@
  * ゲーム計算からHTML生成を分離する。
  */
 class StatPresenter {
+    // HTMLテンプレートへ表示専用の文字列を差し込む時の共通境界。
+    // 圧縮表示など装飾タグと組み合わせる場合も、文字列部分だけを先にエスケープする。
+    static escapePlainText(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[char]);
+    }
+
+    // 顔画像は同梱画像のファイル名のみ認め、外部セーブによる属性・パス混入を防ぐ。
+    static safeFaceIconPath(value) {
+        const name = typeof value === 'string' ? value : '';
+        const safeName = /^[A-Za-z0-9_-]+\.(?:webp|png|jpe?g)$/.test(name) ? name : 'unknown_face.webp';
+        return `data/images/faceicons/${safeName}`;
+    }
+
     static getGradeParts(val) {
         const value = Number(val || 0);
         if (value >= 110) return { base: 'S', sub: '+', cls: 'rank-s' };

@@ -458,12 +458,14 @@ class UIManager {
 
     _getCompressedTextHtml(text, threshold, isStrong = false) {
         if (!text) return "";
-        if (text.length < threshold) return text;
+        const value = String(text);
+        const escaped = StatPresenter.escapePlainText(value);
+        if (value.length < threshold) return escaped;
         const step = isStrong ? 0.15 : 0.1;
         const minScale = isStrong ? 0.55 : 0.65;
-        let scale = 1.0 - (text.length - (threshold - 1)) * step;
+        let scale = 1.0 - (value.length - (threshold - 1)) * step;
         if (scale < minScale) scale = minScale;
-        return `<span class="compressed-list-text ui-compressed-text" style="--text-scale:${scale}; --text-unscale:${1 / scale};">${text}</span>`;
+        return `<span class="compressed-list-text ui-compressed-text" style="--text-scale:${scale}; --text-unscale:${1 / scale};">${escaped}</span>`;
     }
 
     // ==========================================
@@ -1077,6 +1079,36 @@ class UIManager {
         }, Math.max(0, graceMs));
     }
 
+    // 外部セーブ由来の名称を含む会話・結果・戦闘文はHTMLではなく文字列として表示する。
+    // 既存の改行表現（\n / <br>）だけをDOMのbr要素へ変換し、攻城戦の重要文だけは
+    // 正式な強調ラッパーを明示的に再構築する。任意のタグ・属性は決して解析しない。
+    _renderPlainMessage(target, value, allowCriticalWrapper = false) {
+        if (!target) return;
+        let text = String(value ?? '');
+        let critical = false;
+        if (allowCriticalWrapper) {
+            const match = /^<span class="war-critical-message">([\s\S]*)<\/span>$/.exec(text);
+            if (match) {
+                text = match[1];
+                critical = true;
+            }
+        }
+        const parts = text.split(/(\r\n|\n|<br\s*\/?>)/gi);
+        const nodes = [];
+        parts.forEach((part, index) => {
+            if (index % 2 === 1) nodes.push(document.createElement('br'));
+            else if (part) nodes.push(document.createTextNode(part));
+        });
+        if (critical) {
+            const strong = document.createElement('span');
+            strong.className = 'war-critical-message';
+            strong.replaceChildren(...nodes);
+            target.replaceChildren(strong);
+        } else {
+            target.replaceChildren(...nodes);
+        }
+    }
+
     showDialogAsync(msg, isConfirm = false, autoCloseTime = 0, customOpts = null) {
         // ★追加：確認ダイアログ（はい/いいえ等）や、複数の選択肢があるかをチェックします
         const hasChoices = isConfirm || (customOpts && customOpts.choices && customOpts.choices.length > 0);
@@ -1238,7 +1270,7 @@ class UIManager {
 
         // ★Round 11：次の画像が準備できた同じ処理単位の中で、文章と顔をまとめて更新します。
         // これにより「次の台詞＋前の顔」や、顔だけ空になるフレームを作りません。
-        msgEl.innerHTML = dialog.msg.replace(/\n/g, '<br>');
+        this._renderPlainMessage(msgEl, dialog.msg);
         setFaceAndName(leftFaceEl, leftNameEl, leftFace, leftName, preparedFaces.leftImg);
         setFaceAndName(rightFaceEl, rightNameEl, rightFace, rightName, preparedFaces.rightImg);
         
@@ -2079,7 +2111,7 @@ class UIManager {
         
         if(this.game.warManager && this.game.warManager.state.active && this.game.warManager.state.isPlayerInvolved && this.warLog) {
              const div = document.createElement('div');
-             div.innerHTML = msg;
+             this._renderPlainMessage(div, msg);
              this.warLog.appendChild(div);
              this.warLog.scrollTop = this.warLog.scrollHeight;
         }
@@ -2154,7 +2186,7 @@ class UIManager {
         this.hideAIGuardTemporarily(); 
         
         if (this.resultBody) {
-            this.resultBody.innerHTML = msg.replace(/\n/g, '<br>');
+            this._renderPlainMessage(this.resultBody, msg);
             // ここがリストを一番上に戻す魔法です！
             this.resultBody.scrollTop = 0;
         }
@@ -2450,7 +2482,7 @@ class UIManager {
         
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
-            faceHtml = `<img class="sp-castellan-face" src="data/images/faceicons/${castellan.faceIcon}">`;
+            faceHtml = `<img class="sp-castellan-face" src="${StatPresenter.safeFaceIconPath(castellan.faceIcon)}">`;
         }
 
         // 拠点の在城者は Castle.samuraiIds が正本。全武将を走査せず、同じ拠点の数十人だけを1回見ます。
@@ -2502,7 +2534,7 @@ class UIManager {
 
         if (isPc) {
             content = `
-                <div class="sp-info-header">${clanHtml}<span class="sp-province">${provinceName}</span><span class="sp-castle">${castle.name}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${compressedCastellanName}</span></div>
+                <div class="sp-info-header">${clanHtml}<span class="sp-province">${StatPresenter.escapePlainText(provinceName)}</span><span class="sp-castle">${StatPresenter.escapePlainText(castle.name)}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${compressedCastellanName}</span></div>
                 <div class="sp-info-body">
                     <div class="sp-face-wrapper">${faceHtml}</div>
                     <div class="sp-params-grid">
@@ -2531,7 +2563,7 @@ class UIManager {
             `;
         } else {
             content = `
-                <div class="sp-info-header">${clanHtml}<span class="sp-province">${provinceName}</span><span class="sp-castle">${castle.name}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${compressedCastellanName}</span></div>
+                <div class="sp-info-header">${clanHtml}<span class="sp-province">${StatPresenter.escapePlainText(provinceName)}</span><span class="sp-castle">${StatPresenter.escapePlainText(castle.name)}</span><span class="sp-lord-label">城主</span><span class="sp-lord-name">${compressedCastellanName}</span></div>
                 <div class="sp-info-body">
                     <div class="sp-face-column">
                         <div class="sp-face-wrapper">${faceHtml}</div>
@@ -3269,7 +3301,7 @@ class UIManager {
     addWarDetailLog(msg) {
         if(this.game.warManager && this.game.warManager.state.active && this.game.warManager.state.isPlayerInvolved && this.warLog) {
              const div = document.createElement('div');
-             div.innerHTML = msg;
+             this._renderPlainMessage(div, msg);
              this.warLog.appendChild(div);
              this.warLog.scrollTop = this.warLog.scrollHeight;
         }
@@ -3345,7 +3377,7 @@ class UIManager {
             if (msgText) {
                 const entry = document.createElement('div');
                 entry.className = `war-action-message-entry${isCritical ? ' is-critical' : ''}`;
-                entry.innerHTML = msgText;
+                this._renderPlainMessage(entry, msgText, true);
                 textContainer.appendChild(entry);
                 if (!isCritical) trimOldMessages();
             }
@@ -3773,9 +3805,7 @@ class UIManager {
         const updateFace = (id, busho) => {
             const el = document.getElementById(id);
             if (!el) return;
-            const nextSrc = (busho && busho.faceIcon)
-                ? `data/images/faceicons/${busho.faceIcon}`
-                : 'data/images/faceicons/unknown_face.webp';
+            const nextSrc = StatPresenter.safeFaceIconPath(busho && busho.faceIcon);
             if (el.getAttribute('src') !== nextSrc) {
                 setSrcEl(el, nextSrc);
                 el.onerror = () => { setSrcEl(el, 'data/images/faceicons/unknown_face.webp'); };
@@ -3839,15 +3869,15 @@ class UIManager {
 
                     titleNameEl.classList.add('war-title-three-lines');
                     setHtmlEl(titleNameEl, `
-                        <span class="war-title-segment war-title-fixed-line">${provinceName}</span>
-                        <span class="war-title-segment war-title-fixed-line">${factionName}</span>
+                        <span class="war-title-segment war-title-fixed-line">${StatPresenter.escapePlainText(provinceName)}</span>
+                        <span class="war-title-segment war-title-fixed-line">${StatPresenter.escapePlainText(factionName)}</span>
                         <span class="war-title-segment war-title-fixed-line">鎮圧戦</span>
                     `);
                 } else {
-                    setHtmlEl(titleNameEl, `<span class="war-title-segment">${s.defender.name}</span> <span class="war-title-segment">鎮圧戦</span>`);
+                    setHtmlEl(titleNameEl, `<span class="war-title-segment">${StatPresenter.escapePlainText(s.defender.name)}</span> <span class="war-title-segment">鎮圧戦</span>`);
                 }
             } else {
-                setHtmlEl(titleNameEl, `<span class="war-title-segment">${s.defender.name}</span> <span class="war-title-segment">攻防戦</span>`);
+                setHtmlEl(titleNameEl, `<span class="war-title-segment">${StatPresenter.escapePlainText(s.defender.name)}</span> <span class="war-title-segment">攻防戦</span>`);
             }
         }
         
@@ -4006,9 +4036,7 @@ class UIManager {
                 // ★修正：魔法を使って武将名を縮小します！
                 const leaderNameHtml = leader ? getCompressedBushoNameHtml(leader, isMobile) + "軍" : "不明";
                 
-                const leaderFaceSrc = (leader && leader.faceIcon)
-                    ? `data/images/faceicons/${leader.faceIcon}`
-                    : 'data/images/faceicons/unknown_face.webp';
+                const leaderFaceSrc = StatPresenter.safeFaceIconPath(leader && leader.faceIcon);
                 if (faceImg && faceImg.getAttribute('src') !== leaderFaceSrc) {
                     setSrcEl(faceImg, leaderFaceSrc);
                     faceImg.onerror = () => { setSrcEl(faceImg, 'data/images/faceicons/unknown_face.webp'); };
@@ -4414,7 +4442,9 @@ class UIManager {
         
         const textContainer = document.createElement('div');
         textContainer.className = 'war-action-message-text';
-        textContainer.innerHTML = `<span>${armyName}が作戦を思案中...</span>`;
+        const thinkingText = document.createElement('span');
+        thinkingText.textContent = `${armyName}が作戦を思案中...`;
+        textContainer.appendChild(thinkingText);
         
         msgContainer.onclick = (e) => {
             e.stopPropagation();

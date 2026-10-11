@@ -1222,7 +1222,7 @@ class FieldWarManager {
                  if (k) clanNameText = k.getName(this.game);
             }
 
-            return `<strong>${clanNameText} ${leader.name} 軍</strong>`;
+            return `<strong>${StatPresenter.escapePlainText(clanNameText)} ${StatPresenter.escapePlainText(leader.name)} 軍</strong>`;
         };
 
         let atkDisplayName = getDisplayName(true, this.activeAtkTab);
@@ -1382,7 +1382,7 @@ class FieldWarManager {
             if (this.game.ui && typeof this.game.ui._getCompressedTextHtml === 'function') {
                 return this.game.ui._getCompressedTextHtml(value, threshold, isStrong);
             }
-            return value;
+            return StatPresenter.escapePlainText(value);
         };
         const aptitudeItemHtml = (label, rank) => `
             <span class="fw-unit-aptitude-item"><span class="fw-unit-aptitude-label">${label}</span>${rank ? StatPresenter.toAptitudeHTML(rank) : '<span class="fw-unit-aptitude-empty">-</span>'}</span>`;

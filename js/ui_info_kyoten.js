@@ -68,7 +68,7 @@ Object.assign(UIInfoManager.prototype, {
 
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
-            faceHtml = `<img src="data/images/faceicons/${castellan.faceIcon}" class="info-detail-face castle-detail-face" data-hide-on-error="true">`;
+            faceHtml = `<img src="${this._safeFaceIconPath(castellan.faceIcon)}" class="info-detail-face castle-detail-face" data-hide-on-error="true">`;
         } else {
             faceHtml = `<div class="info-detail-face castle-detail-face info-detail-face-empty"></div>`;
         }
@@ -117,18 +117,18 @@ Object.assign(UIInfoManager.prototype, {
                             <!-- 国名＆拠点名 -->
                             <div class="info-detail-title-row">
                                 <div class="info-detail-title-block">
-                                    <span class="info-detail-yomi">${provinceYomi}</span>
-                                    <span class="info-detail-name">${provinceName}</span>
+                                    <span class="info-detail-yomi">${this._escapePlainText(provinceYomi)}</span>
+                                    <span class="info-detail-name">${this._escapePlainText(provinceName)}</span>
                                 </div>
                                 <div class="info-detail-title-block">
-                                    <span class="info-detail-yomi">${yomiStr}</span>
-                                    <span class="info-detail-name">${castle.name}</span>
+                                    <span class="info-detail-yomi">${this._escapePlainText(yomiStr)}</span>
+                                    <span class="info-detail-name">${this._escapePlainText(castle.name)}</span>
                                 </div>
                             </div>
                             <!-- 城主＆直轄/国主 -->
                             <div class="info-detail-subinfo">
-                                <div class="info-detail-owner-line">城主 <span class="info-detail-owner-value">${castellanName}</span></div>
-                                <div class="info-detail-secondary">${legionInfoStr}</div>
+                                <div class="info-detail-owner-line">城主 <span class="info-detail-owner-value">${this._escapePlainText(castellanName)}</span></div>
+                                <div class="info-detail-secondary">${this._escapePlainText(legionInfoStr)}</div>
                             </div>
                         </div>
                     </div>
@@ -226,7 +226,7 @@ Object.assign(UIInfoManager.prototype, {
                     e.stopPropagation();
                     this.openBushoSelector('view_only', null, { 
                         customBushos: targetBushos,
-                        customInfoHtml: `<div>${castle.name} 滞在武将</div>`,
+                        customInfoHtml: `<div>${this._escapePlainText(castle.name)} 滞在武将</div>`,
                         rankOrderProfile: 'castle_detail'
                     });
                 };
