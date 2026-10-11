@@ -1178,7 +1178,7 @@ class IndependenceSystem {
                     for (const cClan of candidateClans) {
                         const cList = this.game.getClanCastles(cClan.id);
                         if (cList.length > 0) {
-                            targetCastles = cList; // 城が見つかったら、それをターゲットにします
+                            targetCastles = cList.slice(); // 共有の勢力別拠点索引は並べ替えず、逃亡先探索のローカル配列だけソートします
                             break; 
                         }
                     }

@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r472');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r473');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -16297,6 +16297,49 @@ test('r471 月末独立候補は先行する勢力変動で失効した場合に
         assert.deepStrictEqual(checked, situation === 'unchanged' ? [1, 2] : [1],
             `${situation}: 失効した候補は除外し、有効な候補は従来どおり審査する`);
     }
+});
+
+
+// r473: 謀反成功時の旧主家臣の逃亡先選択は、共有される勢力別拠点索引を
+// 距離順に直接ソートしてはならない。他機能の拠点走査順へ副作用を伝播させない。
+test('r473 謀反の逃亡先探索は共有する勢力別拠点索引の順序を変えない', async () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        WarParams: { Independence: {} }
+    });
+    loadScript(ctx, 'js/independence_system.js');
+    const Independence = vm.runInContext('IndependenceSystem', ctx);
+    const far = { id: 201, ownerClan: 2, x: 100, y: 100 };
+    const near = { id: 202, ownerClan: 2, x: 1, y: 1 };
+    // GameManager.getClanCastles() はこの配列を索引として保持・再利用する。
+    const sharedAllyCastles = [far, near];
+    const rebelCastle = { id: 101, ownerClan: 1, x: 0, y: 0 };
+    const originalOrder = sharedAllyCastles.map(c => c.id);
+    const rebel = { id: 12, name: '謀反人', clan: 1, status: 'active', factionId: 0,
+        personality: 'aggressive', ambition: 80, duty: 40 };
+    const oldDaimyo = { id: 11, name: '旧大名', clan: 1, status: 'active', factionId: 0,
+        originalEndYear: 9999, deathFlag: false };
+    const oldClan = { id: 1, diplomacyValue: { 2: { status: '友好', sentiment: 90 } } };
+    const stopBeforeRelocation = new Error('STOP_AFTER_ESCAPE_SELECTION');
+    let selectedCastleId = 0;
+    const game = {
+        year: 1560, playerClanId: 1,
+        ui: { log() {}, async showDialogAsync() {} },
+        getClan: id => id === 1 ? oldClan : null,
+        getClanBushos: id => id === 1 ? [rebel, oldDaimyo] : [],
+        getClanCastles: id => id === 2 ? sharedAllyCastles : id === 1 ? [rebelCastle] : [],
+        affiliationSystem: {
+            becomeRonin() {},
+            moveCastle(busho, castleId) { selectedCastleId = castleId; throw stopBeforeRelocation; }
+        }
+    };
+    const system = new Independence(game);
+    system.executeSecretFieldWar = async () => ({ result: 'rebel_win', deadAttacker: 0, deadDefender: 0 });
+    await assert.rejects(() => system.planCoupDetatOrRebellion(rebelCastle, rebel, oldDaimyo, 'coup'),
+        error => error === stopBeforeRelocation, '逃亡先決定後の移動処理まで進む');
+    assert.strictEqual(selectedCastleId, near.id, '友好勢力の最寄り拠点を選ぶ既存仕様は維持する');
+    assert.deepStrictEqual(sharedAllyCastles.map(c => c.id), originalOrder,
+        '近い拠点を探すために共有索引自体を並べ替えない');
 });
 
 Promise.all(pendingTests).then(() => {
