@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r465');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r466');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -15935,6 +15935,49 @@ test('r465 通常落城・撤退落城は戦闘開始時の旧城主情報を所
     const effort = read('js/war_effort.js');
     assert.match(effort, /defenderCastellanIdAtBattleStart:\s*Number\(defCastle\.castellanId\s*\|\|\s*0\)/);
     assert.strictEqual((effort.match(/changeOwner\(s\.defender, s\.attacker\.ownerClan, false, newLegionId, s\.defenderCastellanIdAtBattleStart\)/g) || []).length, 2);
+});
+
+
+// r466: UIが選択時に除外していても、実行時の正本でも大名への通常調略を拒否する。
+// 予約したAI目標や二段選択の途中で対象の身分が変わった場合、家督と勢力の不整合を作らない。
+test('r466 通常調略の実行条件は大名を対象から除外し、通常家臣は維持する', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: b => b.status === 'active' } });
+    loadScript(ctx, 'js/strategy_system.js');
+    const System = vm.runInContext('StrategySystem', ctx);
+    const sys = new System({});
+    const member = { id: 7, clan: 2, status: 'active', belongKunishuId: 0, isDaimyo: false };
+    const leader = { ...member, isDaimyo: true };
+    assert.strictEqual(sys.isRegularClanStrategyTarget(member, 2), true);
+    assert.strictEqual(sys.isRegularClanStrategyTarget(leader, 2), false, '現役大名は通常調略の対象外');
+});
+
+test('r466 引抜実行直前に対象が大名なら資金も勢力も変更しない', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: b => b.status === 'active' } });
+    loadScript(ctx, 'js/strategy_system.js');
+    const System = vm.runInContext('StrategySystem', ctx);
+    const player = { id: 11, name: '担当武将', clan: 1, status: 'active' };
+    const leader = { id: 22, name: '敵大名', clan: 2, castleId: 20, isDaimyo: true,
+        isCastellan: true, belongKunishuId: 0, status: 'active' };
+    const castle = { gold: 1000 };
+    const notices = [];
+    const game = {
+        getBusho: id => id === 11 ? player : leader,
+        getCurrentTurnCastle: () => castle,
+        ui: { showDialog: text => notices.push(text) }
+    };
+    const sys = new System(game);
+    let attempts = 0;
+    sys.calcHeadhunt = () => { attempts++; return true; };
+    sys.handleCovertAction = () => ({ message: '' });
+    sys.applyHeadhuntEffect = () => [];
+    sys.recordStrategyHistory = () => {};
+    game.getCastle = () => ({ name: '目標拠点' });
+    game.commandSystem = { finishCommand() {} };
+    sys.executeHeadhunt(11, 22, 100);
+    assert.strictEqual(castle.gold, 1000, '失効した対象に対して金を消費しない');
+    assert.strictEqual(attempts, 0, '計略判定より先に大名への工作を拒否する');
+    assert.strictEqual(leader.clan, 2, '大名の所属は変わらない');
+    assert.ok(notices.length > 0, '既存の対象外メッセージを表示する');
 });
 
 

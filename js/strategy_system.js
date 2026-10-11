@@ -12,6 +12,9 @@ class StrategySystem {
     // 諸勢力所属者は同じ城にいても大名家臣ではないため、通常調略の対象にしない。
     isRegularClanStrategyTarget(busho, expectedClanId = null) {
         if (!busho || !window.BushoStatusRules || !window.BushoStatusRules.isActive(busho)) return false;
+        // UIの候補一覧と同じく、現役大名は通常調略（引抜・暗殺・離間）の対象外。
+        // 二段選択やAI作戦の作成後に対象の身分が変わっても、実行側で再確認する。
+        if (busho.isDaimyo) return false;
         if (Number(busho.belongKunishuId || 0) > 0) return false;
         const clanId = Number(busho.clan || 0);
         if (clanId <= 0) return false;
