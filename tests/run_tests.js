@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r477');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r478');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -14792,6 +14792,7 @@ test('r446 所領分配の選択画面は現在地ではなく居城を除外す
         getDaimyoHomeCastle: () => castles[0], getClanCastles: () => castles,
         getBusho: () => null, getProvince: () => null };
     const ui = new UI(); ui.game = game;
+    ui._escapePlainText = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;');
     let rows;
     ui._renderListModal = params => { rows = params.items; };
     ui._renderAllotFief(1);
@@ -16652,6 +16653,130 @@ test('r477 拠点情報・攻城戦の可変名称と顔画像も表示境界で
     assert.ok(ui.includes('StatPresenter.escapePlainText(s.defender.name)'));
     assert.ok(ui.includes('StatPresenter.safeFaceIconPath(busho && busho.faceIcon)'));
     assert.ok(ui.includes('StatPresenter.safeFaceIconPath(leader && leader.faceIcon)'));
+});
+
+// r478: 共通一覧と姫詳細・部隊分割は、外部セーブ由来の名称をHTMLと解釈しない。
+test('r478 姫詳細の名前・所属・親族名・顔画像を無害化する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ui_info.js');
+    const UI = vm.runInContext('UIInfoManager', ctx);
+    const view = Object.create(UI.prototype);
+    const bad = '<svg onload="window.__owned=1">';
+    const princess = { id: 8, name: '姫' + bad, yomi: bad, birthYear: 1540, currentClanId: 1,
+        realFatherId: 2, husbandId: 3, familyIds: [], faceIcon: 'face.webp" onerror="window.__owned=1' };
+    const people = { 1: { name: '主君' + bad, familyIds: [] }, 2: { name: '父' + bad }, 3: { name: '夫' + bad } };
+    view.game = { year: 1560, getPrincess: () => princess, getClan: () => ({ name: '所属' + bad, leaderId: 1 }), getBusho: id => people[id] };
+    const container = { style: {}, scrollTop: 0, innerHTML: '' };
+    view._openInfoShell = () => ({ listContainer: container });
+    view._bindImageFallbacks = () => {};
+    view._renderPrincessDetail(8);
+    assert.ok(container.innerHTML.includes('&lt;svg onload=&quot;window.__owned=1&quot;&gt;'));
+    assert.ok(!container.innerHTML.includes('<svg onload='));
+    assert.ok(container.innerHTML.includes('src="data/images/faceicons/unknown_face.webp"'));
+    assert.ok(!container.innerHTML.includes('onerror="window.__owned=1'));
+    assert.ok(container.innerHTML.includes('姫&lt;svg'));
+});
+
+test('r478 外交関係・派閥の一覧は名称と保存済み関係表記を無害化する', () => {
+    const ctx = createContext({ document: { body: { classList: { contains: () => true } } } });
+    loadScript(ctx, 'js/ui_info.js');
+    const UI = vm.runInContext('UIInfoManager', ctx);
+    const view = Object.create(UI.prototype);
+    const bad = '<img src=x onerror="window.__owned=1">';
+    view.game = {
+        clans: [{ id: 1, name: '自家' }, { id: 2, name: '他家' + bad }],
+        getClanCastles: () => [1],
+        getRelation: () => ({ sentiment: 75, status: '同盟' + bad }),
+        getClan: () => ({ id: 1, name: '自家' }),
+        getClanBushos: () => [{ id: 9, isDaimyo: true, factionId: 2, isFactionLeader: true,
+            factionName: '派閥' + bad, name: '主' + bad, factionSeikaku: '性格' + bad,
+            factionHoshin: '方針' + bad }]
+    };
+    ctx.BushoStatusRules = { isActive: () => true };
+    view._getCommonSortMark = () => '';
+    view._createBarHtml = () => '<span class="bar"></span>';
+    view._saveStableSortResult = () => {};
+    view._withChoiceSound = fn => fn;
+    let rendered;
+    view._renderListModal = config => { rendered = config; };
+    view._renderDiplomacyList(1, '自家', 'daimyo', null);
+    assert.ok(rendered.items[0].cells[0].includes('&lt;img'));
+    assert.ok(rendered.items[0].cells[2].includes('&lt;img'));
+    assert.ok(!rendered.items[0].cells.join('').includes('<img '));
+    view._renderFactionList(1, true);
+    assert.ok(rendered.items[0].cells[0].includes('&lt;img'));
+    assert.ok(rendered.items[0].cells[1].includes('&lt;img'));
+    assert.ok(!rendered.items[0].cells.join('').includes('<img '));
+});
+
+test('r478 諸勢力選択の可変名称・説明はHTML化せず、装飾要素は維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ui_info.js');
+    const UI = vm.runInContext('UIInfoManager', ctx);
+    const view = Object.create(UI.prototype);
+    const bad = '<svg onload="window.__owned=1">';
+    view.game = { playerClanId: 1, getRelation: () => ({ sentiment: 40, status: '普通' }) };
+    let rendered;
+    view._renderListModal = config => { rendered = config; };
+    view.updateCommonConfirmBtn = () => {};
+    view._renderForceSelector([{ id: 2, name: '勢力' + bad, leaderName: '頭領' + bad, soldiers: 500 }],
+        () => {}, null, '候補' + bad);
+    assert.ok(rendered.contextHtml.includes('&lt;svg'));
+    assert.ok(rendered.items[0].cells[0].includes('&lt;svg'));
+    assert.ok(rendered.items[0].cells[1].includes('&lt;svg'));
+    assert.ok(!rendered.items[0].cells.join('').includes('<svg '));
+    assert.ok(rendered.items[0].cells[3].includes('<span')); // 友好度の装飾表示は従来どおり維持
+});
+
+test('r478 部隊分割・所領分配の一覧でも保存文字列をHTMLとして解釈しない', () => {
+    const slider = read('js/ui_slider.js');
+    const info = read('js/ui_info_kyoten.js');
+    const core = read('js/ui_info.js');
+    assert.ok(slider.includes('StatPresenter.escapePlainText(b.name)'));
+    assert.ok(!slider.includes('<span class="slider-row-label">${b.name}</span>'));
+    assert.ok(info.includes('this._escapePlainText(c.name)'));
+    assert.ok(info.includes('this._escapePlainText(castellanName)'));
+    assert.ok(info.includes('this._escapePlainText(provinceName)'));
+    assert.ok(core.includes('this._escapePlainText(text)'));
+});
+
+test('r478 諸勢力詳細の名称・理念・所在地をHTMLとして解釈しない', () => {
+    const elements = new Map();
+    const ctx = createContext({ document: { getElementById: id => {
+        if (!elements.has(id)) elements.set(id, { onclick: null });
+        return elements.get(id);
+    } } });
+    loadScript(ctx, 'js/ui_info.js');
+    const UI = vm.runInContext('UIInfoManager', ctx);
+    const view = Object.create(UI.prototype);
+    const bad = '<img src=x onerror="window.__owned=1">';
+    const leader = { id: 7, name: '頭領' + bad, faceIcon: 'leader.webp' };
+    const kunishu = { id: 5, leaderId: 7, castleId: 8, ideology: '理念' + bad,
+        soldiers: 300, training: 60, morale: 60, horses: 0, guns: 0, defense: 5,
+        getName: () => '国衆' + bad, getYomi: () => 'よみ' + bad };
+    view.game = { provinces: [{}], getBusho: () => leader, getCastle: () => ({ name: '拠点' + bad, provinceId: 2 }),
+        getProvince: () => ({ province: '国' + bad, provinceYomi: bad }),
+        kunishuSystem: { getKunishu: () => kunishu, getKunishuMembers: () => [leader] } };
+    const container = { style: {}, innerHTML: '', scrollTop: 0 };
+    view._openInfoShell = () => ({ listContainer: container });
+    view._bindImageFallbacks = () => {};
+    view._renderKunishuDetail(5);
+    assert.ok(container.innerHTML.includes('国衆&lt;img'));
+    assert.ok(container.innerHTML.includes('理念&lt;img'));
+    assert.ok(container.innerHTML.includes('拠点&lt;img'));
+    assert.ok(!container.innerHTML.includes('<img src=x'));
+    assert.ok(container.innerHTML.includes('src="data/images/faceicons/leader.webp"'));
+});
+
+test('r478 拠点三タブ一覧と勢力一覧の名前圧縮で安全表示を維持する', () => {
+    const kyoten = read('js/ui_info_kyoten.js');
+    const info = read('js/ui_info.js');
+    assert.ok(kyoten.includes('${this._escapePlainText(c.name)}'));
+    assert.ok(!kyoten.includes('<span class="col-castle-name col-name-left">${c.name}</span>'));
+    assert.ok(kyoten.includes('${this._escapePlainText(text)}'));
+    assert.ok(info.includes('${this._escapePlainText(d.leaderName)}'));
+    assert.ok(info.includes('${this._escapePlainText(d.friendStatus)}'));
+    assert.ok(info.includes('${this._escapePlainText(text)}'));
 });
 
 Promise.all(pendingTests).then(() => {

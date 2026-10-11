@@ -899,9 +899,9 @@ class UIInfoManager {
                 let scale = 1.0 - (text.length - (threshold - 1)) * 0.05;
                 // ★修正：これ以上小さくならない下限も少し緩めました（0.55 → 0.75）
                 if (scale < 0.75) scale = 0.75;
-                return `<span class="compressed-list-text" style="--text-scale:${scale}; --text-unscale:${1/scale};">${text}</span>`;
+                return `<span class="compressed-list-text" style="--text-scale:${scale}; --text-unscale:${1/scale};">${this._escapePlainText(text)}</span>`;
             }
-            return text;
+            return this._escapePlainText(text);
         };
 
         let items = [];
@@ -921,11 +921,11 @@ class UIInfoManager {
                 
                 cells = [
                     `<span class="col-daimyo-name">${compressedDaimyoName}</span>`,
-                    `<span class="col-leader-name">${d.leaderName}</span>`,
+                    `<span class="col-leader-name">${this._escapePlainText(d.leaderName)}</span>`,
                     `<span class="col-castle-count">${d.castlesCount}</span>`,
                     `<span class="col-prestige">${powerBarHtml}</span>`,
                     `<span class="col-friend">${friendBarHtml}</span>`,
-                    `<span class="col-relation ${statusClass}">${d.friendStatus}</span>`,
+                    `<span class="col-relation ${statusClass}">${this._escapePlainText(d.friendStatus)}</span>`,
                     `<span class="col-marriage">${d.isMarriage ? "◯" : ""}</span>`,
                     `<span class="col-empty pc-only"></span>`
                 ];
@@ -1093,7 +1093,7 @@ class UIInfoManager {
         const makeEmptyRow = () => `<div class="info-detail-stat-box is-placeholder"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
         const clanYomi = this._escapePlainText(clan.yomi || "");
-        const ideologyHtml = `<div class="daimyo-detail-ideology info-detail-ideology ${ideologyClass}">${ideology}</div>`;
+        const ideologyHtml = `<div class="daimyo-detail-ideology info-detail-ideology ${ideologyClass}">${this._escapePlainText(ideology)}</div>`;
 
         if (listContainer) {
             listContainer.className = 'list-container hide-native-scroll';
@@ -1212,7 +1212,7 @@ class UIInfoManager {
                 e.stopPropagation();
                 this.openBushoSelector('view_only', null, { 
                     customBushos: this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b)),
-                    customInfoHtml: `<div>${clan.name} 所属武将</div>`
+                    customInfoHtml: `<div>${this._escapePlainText(clan.name)} 所属武将</div>`
                 });
             };
 
@@ -1342,9 +1342,9 @@ class UIInfoManager {
             items.push({
                 onClick: null, 
                 cells: [
-                    `<span class="col-daimyo-name list-text-strong">${r.name}</span>`,
+                    `<span class="col-daimyo-name list-text-strong">${this._escapePlainText(r.name)}</span>`,
                     friendBarHtml,
-                    `<span class="col-relation ${statusClass}">${r.status}</span>`,
+                    `<span class="col-relation ${statusClass}">${this._escapePlainText(r.status)}</span>`,
                     `<span class="col-period">${periodStr}</span>`,
                     `<span class="col-marriage">${r.isMarriage ? "◯" : ""}</span>`,
                     ""
@@ -1506,11 +1506,11 @@ class UIInfoManager {
             items.push({
                 onClick: this._withChoiceSound(() => this.showFactionBushoList(clan.id, fId, factionNameStr)),
                 cells: [
-                    `<strong class="col-faction-name ${nameClass}">${factionNameStr}</strong>`,
-                    `<span class="col-leader-name">${leaderFullName}</span>`,
+                    `<strong class="col-faction-name ${nameClass}">${this._escapePlainText(factionNameStr)}</strong>`,
+                    `<span class="col-leader-name">${this._escapePlainText(leaderFullName)}</span>`,
                     `<span class="col-busho-count">${count}</span>`,
-                    `<span class="col-seikaku ${seikakuClass}">${seikaku}</span>`,
-                    `<span class="col-hoshin ${hoshinClass}">${hoshin}</span>`,
+                    `<span class="col-seikaku ${seikakuClass}">${this._escapePlainText(seikaku)}</span>`,
+                    `<span class="col-hoshin ${hoshinClass}">${this._escapePlainText(hoshin)}</span>`,
                     ""
                 ]
             });
@@ -1555,7 +1555,7 @@ class UIInfoManager {
 
         this.openBushoSelector('view_only', null, { 
             customBushos: targetBushos,
-            customInfoHtml: `<div>${clan.name} ${factionName} 所属武将</div>`,
+            customInfoHtml: `<div>${this._escapePlainText(clan.name)} ${this._escapePlainText(factionName)} 所属武将</div>`,
             isFactionView: true
         });
     }
@@ -2376,12 +2376,12 @@ class UIInfoManager {
             return {
                 onClick: isSelectMode ? (e) => this.handleCommonSelect(p.id, e.currentTarget, false) : this._withChoiceSound(() => this.showPrincessDetail(p.id)),
                 cells: [
-                    `<strong class="col-princess-name">${p.name}</strong>`,
-                    `<span class="col-clan">${clanName}</span>`,
+                    `<strong class="col-princess-name">${this._escapePlainText(p.name)}</strong>`,
+                    `<span class="col-clan">${this._escapePlainText(clanName)}</span>`,
                     `<span class="col-age">${age}</span>`,
                     `<span class="col-family">${familyMark}</span>`,
-                    `<span class="col-father">${father ? father.name : "不明"}</span>`,
-                    `<span class="col-husband">${husband ? husband.name : "なし"}</span>`,
+                    `<span class="col-father">${this._escapePlainText(father ? father.name : "不明")}</span>`,
+                    `<span class="col-husband">${this._escapePlainText(husband ? husband.name : "なし")}</span>`,
                     `<span class="pc-only"></span>` 
                 ],
                 itemClass: isSelectMode && isSelected ? "selected" : ""
@@ -2477,7 +2477,7 @@ class UIInfoManager {
             items.push({
                 onClick: this._withChoiceSound(() => this.showDelegateSettingModal(c.id)),
                 cells: [
-                    `<span class="col-castle-name col-name-left list-text-strong">${c.name}</span>`,
+                    `<span class="col-castle-name col-name-left list-text-strong">${this._escapePlainText(c.name)}</span>`,
                     attackDisplay,
                     moveDisplay,
                     `<span class="${statusClass} list-text-strong">${statusText}</span>`
@@ -2786,7 +2786,7 @@ class UIInfoManager {
         if (ideology === '宗教') ideologyClass = "ideology-hoshu"; 
         else if (ideology === '傭兵') ideologyClass = "ideology-kakushin";
 
-        const ideologyHtml = `<div class="daimyo-detail-ideology info-detail-ideology ${ideologyClass}">${ideology}</div>`;
+        const ideologyHtml = `<div class="daimyo-detail-ideology info-detail-ideology ${ideologyClass}">${this._escapePlainText(ideology)}</div>`;
 
         let faceSrc = this._safeFaceIconPath(leader && leader.faceIcon);
 
@@ -2811,12 +2811,12 @@ class UIInfoManager {
                             <!-- 国名＆諸勢力名 -->
                             <div class="info-detail-title-row">
                                 <div class="info-detail-title-block">
-                                    <span class="info-detail-yomi">${provinceYomi}</span>
-                                    <span class="info-detail-name">${provinceName}</span>
+                                    <span class="info-detail-yomi">${this._escapePlainText(provinceYomi)}</span>
+                                    <span class="info-detail-name">${this._escapePlainText(provinceName)}</span>
                                 </div>
                                 <div class="info-detail-title-block">
-                                    <span class="info-detail-yomi">${kunishuYomi}</span>
-                                    <span class="info-detail-name">${kunishuName}</span>
+                                    <span class="info-detail-yomi">${this._escapePlainText(kunishuYomi)}</span>
+                                    <span class="info-detail-name">${this._escapePlainText(kunishuName)}</span>
                                 </div>
                             </div>
                             <!-- 頭領＆イデオロギー -->
@@ -2832,7 +2832,7 @@ class UIInfoManager {
                         <!-- 左列：武将・所在・空箱 -->
                         <div class="info-detail-group">
                             ${makeRow('武将', bushosCount)}
-                            ${makeRow('所在', baseCastleName)}
+                            ${makeRow('所在', this._escapePlainText(baseCastleName))}
                             ${makeEmptyRow()}
                         </div>
                         
@@ -2872,7 +2872,7 @@ class UIInfoManager {
                 e.stopPropagation();
                 this.openBushoSelector('view_only', null, { 
                     customBushos: this.game.kunishuSystem.getKunishuMembers(kunishuId),
-                    customInfoHtml: `<div>${kunishuName} 所属武将</div>`
+                    customInfoHtml: `<div>${this._escapePlainText(kunishuName)} 所属武将</div>`
                 });
             };
 
@@ -2902,7 +2902,7 @@ class UIInfoManager {
 
     // ★引数に isSelectMode と onConfirm を追加して両対応にしました
     _renderKunishuList(kunishus, castle, isSelectMode = false, onBack = null, onConfirm = null, scrollPos = 0) {
-        let contextHtml = `<div>${castle ? castle.name + 'に存在する諸勢力です' : '全国の諸勢力一覧です'}</div>`;
+        let contextHtml = `<div>${this._escapePlainText(castle ? castle.name + 'に存在する諸勢力です' : '全国の諸勢力一覧です')}</div>`;
         if (isSelectMode) {
             contextHtml = "<div>対象とする諸勢力をお選びください</div>";
         }
@@ -3005,10 +3005,10 @@ class UIInfoManager {
             items.push({
                 onClick: onClickStr,
                 cells: [
-                    `<strong class="col-kunishu-name">${kunishuName}</strong>`,
-                    `<span class="col-leader-name">${leaderName}</span>`,
-                    `<span class="col-castle-name">${castleName}</span>`,
-                    `<span class="col-province">${provinceName}</span>`,
+                    `<strong class="col-kunishu-name">${this._escapePlainText(kunishuName)}</strong>`,
+                    `<span class="col-leader-name">${this._escapePlainText(leaderName)}</span>`,
+                    `<span class="col-castle-name">${this._escapePlainText(castleName)}</span>`,
+                    `<span class="col-province">${this._escapePlainText(provinceName)}</span>`,
                     `<span class="col-soldiers">${kunishu.soldiers}</span>`,
                     `<span class="col-friend">${friendBarHtml}</span>`,
                     `<span class="col-relation ${relClass} list-text-strong">${relStatus}</span>`,
@@ -3129,7 +3129,7 @@ class UIInfoManager {
     }
 
     _renderForceSelector(forces, onSelect, onCancel, message = "対象の勢力を選択してください", scrollPos = 0) {
-        let contextHtml = `<div>${message}</div>`;
+        let contextHtml = `<div>${this._escapePlainText(message)}</div>`;
         this.currentForces = forces;
         this.selectedForceIndex = null;
 
@@ -3163,8 +3163,8 @@ class UIInfoManager {
             items.push({
                 onClick: (e) => this.handleCommonSelect(index, e.currentTarget, false),
                 cells: [
-                    `<strong class="col-kunishu-name">${force.name}</strong>`,
-                    `<span class="col-leader-name">${force.leaderName}</span>`,
+                    `<strong class="col-kunishu-name">${this._escapePlainText(force.name)}</strong>`,
+                    `<span class="col-leader-name">${this._escapePlainText(force.leaderName)}</span>`,
                     `<span>${force.soldiers}</span>`,
                     `<span>${friendBarHtml}</span>`,
                     `<span class="${statusClass} list-text-strong">${relStatus}</span>`
@@ -3214,7 +3214,7 @@ class UIInfoManager {
         if (!shell) return;
         const { listContainer } = shell;
 
-        let faceHtml = princess.faceIcon ? `<img src="data/images/faceicons/${princess.faceIcon}" class="daimyo-detail-face" data-face-fallback="data/images/faceicons/unknown_princess_face.webp">` : `<img src="data/images/faceicons/unknown_princess_face.webp" class="daimyo-detail-face">`;
+        let faceHtml = princess.faceIcon ? `<img src="${this._safeFaceIconPath(princess.faceIcon)}" class="daimyo-detail-face" data-face-fallback="data/images/faceicons/unknown_princess_face.webp">` : `<img src="data/images/faceicons/unknown_princess_face.webp" class="daimyo-detail-face">`;
 
         let affiliationName = "無所属";
         let isFamily = false;
@@ -3285,13 +3285,13 @@ class UIInfoManager {
             <div class="busho-detail-info-column">
                 <div class="busho-detail-group">
                     ${makeRow('所在', '&nbsp;')}
-                    ${makeRow('主君', lordName)}
+                    ${makeRow('主君', this._escapePlainText(lordName))}
                 </div>
                 <div class="busho-detail-group">
                     ${makeRow('年齢', ageStr)}
                     ${makeRow('一門', isFamily ? "◯" : "&nbsp;")}
-                    ${makeRow('父親', fatherName)}
-                    ${makeRow('配偶者', husbandName)}
+                    ${makeRow('父親', this._escapePlainText(fatherName))}
+                    ${makeRow('配偶者', this._escapePlainText(husbandName))}
                 </div>
             </div>
         `;
@@ -3310,12 +3310,12 @@ class UIInfoManager {
                 <div class="daimyo-detail-container busho-detail-container princess-detail-container">
                     <div class="daimyo-detail-header busho-detail-header-pc pc-only">
                         <div class="busho-detail-heading-stack">
-                            <span class="busho-detail-yomi pc-only-yomi">${displayYomi}</span>
+                            <span class="busho-detail-yomi pc-only-yomi">${this._escapePlainText(displayYomi)}</span>
                             <div class="busho-detail-name-row pc-name-row">
-                                <div class="daimyo-detail-name busho-detail-name-pc">${displayName}</div>
+                                <div class="daimyo-detail-name busho-detail-name-pc">${this._escapePlainText(displayName)}</div>
                             </div>
                             <div class="busho-detail-meta pc-meta">
-                                <span>${affiliationName}</span>
+                                <span>${this._escapePlainText(affiliationName)}</span>
                             </div>
                         </div>
                     </div>
@@ -3323,12 +3323,12 @@ class UIInfoManager {
                         <div class="daimyo-detail-left">
                             ${faceHtml}
                             <div class="daimyo-detail-header busho-detail-header-sp sp-only">
-                                <span class="busho-detail-yomi sp-yomi">${displayYomi}</span>
+                                <span class="busho-detail-yomi sp-yomi">${this._escapePlainText(displayYomi)}</span>
                                 <div class="busho-detail-name-row sp-name-row">
-                                    <div class="daimyo-detail-name busho-detail-name-sp">${displayName}</div>
+                                    <div class="daimyo-detail-name busho-detail-name-sp">${this._escapePlainText(displayName)}</div>
                                 </div>
                                 <div class="busho-detail-meta sp-meta">
-                                    <span>${affiliationName}</span>
+                                    <span>${this._escapePlainText(affiliationName)}</span>
                                 </div>
                             </div>
                         </div>

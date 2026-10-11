@@ -906,7 +906,7 @@ class UISliderManager {
             div.innerHTML = `
                 <div class="divide-row-header">
                     ${isPcDivide ? '' : `<div class="troop-type-selector is-mobile-cycle" id="troop-type-group-${b.id}">${mobileCycleButtonHtml}</div>`}
-                    <span class="slider-row-label">${b.name}</span>
+                    <span class="slider-row-label">${StatPresenter.escapePlainText(b.name)}</span>
                     ${isPcDivide ? '' : `<div class="troop-aptitude-summary" title="現在兵科の適性${isSeaBattleForDivide ? ' / 操船適性' : ''}">${aptitudeSummaryHtml(b, myType, isSeaBattleForDivide)}</div>`}
                 </div>
                 ${isPcDivide ? pcCardInfoHtml : ''}

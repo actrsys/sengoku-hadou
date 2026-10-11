@@ -462,9 +462,9 @@ Object.assign(UIInfoManager.prototype, {
                 let scale = 1.0 - (text.length - (threshold - 1)) * 0.05;
                 // ★修正：これ以上小さくならない下限も少し緩めました（0.55 → 0.75）
                 if (scale < 0.75) scale = 0.75;
-                return `<span class="compressed-list-text" style="--text-scale:${scale}; --text-unscale:${1/scale};">${text}</span>`;
+                return `<span class="compressed-list-text" style="--text-scale:${scale}; --text-unscale:${1/scale};">${this._escapePlainText(text)}</span>`;
             }
-            return text;
+            return this._escapePlainText(text);
         };
 
         let items = [];
@@ -495,10 +495,10 @@ Object.assign(UIInfoManager.prototype, {
             let cells = [];
             if (this.currentKyotenTab === 'status') {
                 cells = [
-                    `<span class="col-castle-name col-name-left">${c.name}</span>`,
+                    `<span class="col-castle-name col-name-left">${this._escapePlainText(c.name)}</span>`,
                     `<span class="col-clan">${compressedClanName}</span>`,
-                    `<span class="col-castellan">${castellanName}</span>`,
-                    `<span class="col-province">${provinceName}</span>`,
+                    `<span class="col-castellan">${this._escapePlainText(castellanName)}</span>`,
+                    `<span class="col-province">${this._escapePlainText(provinceName)}</span>`,
                     `<span class="col-busho-count">${bushosCount}</span>`,
                     `<span class="col-gold">${c.gold}</span>`,
                     `<span class="col-rice">${c.rice}</span>`,
@@ -511,7 +511,7 @@ Object.assign(UIInfoManager.prototype, {
                     legionStr = numberNames[c.legionId] || `第${c.legionId}席`;
                 }
                 cells = [
-                    `<span class="col-castle-name col-name-left">${c.name}</span>`,
+                    `<span class="col-castle-name col-name-left">${this._escapePlainText(c.name)}</span>`,
                     `<span class="col-legion">${legionStr}</span>`,
                     `<span class="col-soldiers">${c.soldiers}</span>`,
                     `<span class="col-defense">${c.defense}</span>`,
@@ -521,7 +521,7 @@ Object.assign(UIInfoManager.prototype, {
                 ];
             } else if (this.currentKyotenTab === 'economy') {
                 cells = [
-                    `<span class="col-castle-name col-name-left">${c.name}</span>`,
+                    `<span class="col-castle-name col-name-left">${this._escapePlainText(c.name)}</span>`,
                     `<span class="col-population">${c.population}</span>`,
                     `<span class="col-gold-income">${goldIncome}</span>`,
                     `<span class="col-gold-consume">${consumeGold}</span>`,
@@ -756,9 +756,9 @@ Object.assign(UIInfoManager.prototype, {
                 },
                 cells: [
                     `<span class="col-act">${inputHtml}<span class="status-mark allot-fief-status ${isChecked ? 'is-selected-status' : ''}">${displayLegionStr}</span></span>`,
-                    `<span class="col-castle-name">${c.name}</span>`,
-                    `<span class="col-castellan">${castellanName}</span>`,
-                    `<span class="col-province">${provinceName}</span>`,
+                    `<span class="col-castle-name">${this._escapePlainText(c.name)}</span>`,
+                    `<span class="col-castellan">${this._escapePlainText(castellanName)}</span>`,
+                    `<span class="col-province">${this._escapePlainText(provinceName)}</span>`,
                     `<span class="col-soldiers">${c.soldiers}</span>`,
                     `<span class="col-defense">${c.defense}</span>`,
                     `<span class="col-empty pc-only"></span>`
@@ -769,7 +769,7 @@ Object.assign(UIInfoManager.prototype, {
 
         this._renderListModal({
             title: `${legionName}の所領分配`,
-            contextHtml: `<div>${legionName}の所属とする拠点にチェックを入れてください</div>`,
+            contextHtml: `<div>${this._escapePlainText(legionName)}の所属とする拠点にチェックを入れてください</div>`,
             headers: ["所属", "拠点名", "城主", "国", "兵数", "防御", `<span class="col-empty pc-only"></span>`],
             headerClass: "delegate-list-header",
             itemClass: "delegate-list-item",
