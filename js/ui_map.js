@@ -1546,6 +1546,9 @@ Object.assign(UIManager.prototype, {
         const clanData = this.game.getClan(castle.ownerClan);
         const castellanName = castellan ? castellan.name : '-';
         const clanName = clanData ? clanData.name : '中立';
+        // 拠点ツールチップはHTMLの装飾を保持し、セーブ由来の名称だけを表示直前に安全化する。
+        // _castleContentSignature は生の名称を使い続け、変更時の差分更新を維持する。
+        const escapeName = value => StatPresenter.escapePlainText(value);
         const kunishus = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishusInCastle(castle.id) : [];
         let kunishuHtml = '';
         const kunishuSignature = [];
@@ -1561,8 +1564,8 @@ Object.assign(UIManager.prototype, {
                     <div class="kunishu-icon-wrap">
                         <img src="data/images/map/various_forces.webp" class="kunishu-icon-img">
                         <div class="hover-info kunishu-hover-info">
-                            <div class="info-line">${kName}</div>
-                            <div class="info-line">${kLeaderName}</div>
+                            <div class="info-line">${escapeName(kName)}</div>
+                            <div class="info-line">${escapeName(kLeaderName)}</div>
                         </div>
                     </div>
                 `;
@@ -1589,9 +1592,9 @@ Object.assign(UIManager.prototype, {
         ]);
         const html = `
             <div class="hover-info">
-                <div class="info-line name">${castle.name}</div>
-                <div class="info-line">${clanName}</div>
-                <div class="info-line">${castellanName}</div>
+                <div class="info-line name">${escapeName(castle.name)}</div>
+                <div class="info-line">${escapeName(clanName)}</div>
+                <div class="info-line">${escapeName(castellanName)}</div>
             </div>
             ${kunishuHtml}
             ${legionMarkerHtml}

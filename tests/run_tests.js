@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r478');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r479');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -16777,6 +16777,50 @@ test('r478 拠点三タブ一覧と勢力一覧の名前圧縮で安全表示を
     assert.ok(info.includes('${this._escapePlainText(d.leaderName)}'));
     assert.ok(info.includes('${this._escapePlainText(d.friendStatus)}'));
     assert.ok(info.includes('${this._escapePlainText(text)}'));
+});
+
+
+
+test('r479 地図拠点ツールチップはセーブ由来の拠点・大名家・城主名をHTMLとして解釈しない', () => {
+    const ctx = createContext({ UIManager: function UIManager() {} });
+    loadScript(ctx, 'js/stat_presenter.js');
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = Object.create(ctx.UIManager.prototype);
+    const hostile = '<img src=x onerror="window.__owned=1">';
+    const castle = { id: 1, name: '城' + hostile, ownerClan: 2, castellanId: 3, legionId: 1 };
+    ui.game = {
+        getBusho: () => ({ name: '城主' + hostile }),
+        getClan: () => ({ name: '勢力' + hostile }),
+        kunishuSystem: { getKunishusInCastle: () => [] }
+    };
+    const actual = ui._buildCastleCardContent(castle, false);
+    assert.ok(actual.html.includes('城&lt;img'));
+    assert.ok(actual.html.includes('勢力&lt;img'));
+    assert.ok(actual.html.includes('城主&lt;img'));
+    assert.ok(!actual.html.includes('<img src=x'));
+    assert.ok(actual.html.includes('class="legion-marker-base legion-color-1 hidden"'));
+    assert.strictEqual(JSON.parse(actual.signature)[0], castle.name, '描画用signatureは生データの変化を引き続き追跡する');
+});
+
+test('r479 地図の諸勢力アイコンの頭領・名称も文字列化し、装飾アイコンは保持する', () => {
+    const ctx = createContext({ UIManager: function UIManager() {} });
+    loadScript(ctx, 'js/stat_presenter.js');
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = Object.create(ctx.UIManager.prototype);
+    const hostile = '"<svg onload="window.__owned=1">&';
+    const kunishu = { id: 9, leaderId: 10, getName: () => '諸勢力' + hostile };
+    ui.game = {
+        getBusho: id => id === 10 ? { name: '頭領' + hostile } : null,
+        getClan: () => null,
+        kunishuSystem: { getKunishusInCastle: () => [kunishu] }
+    };
+    const actual = ui._buildCastleCardContent({ id: 1, name: '城', ownerClan: 0, castellanId: 0, legionId: 0 }, false);
+    assert.ok(actual.html.includes('諸勢力&quot;&lt;svg'));
+    assert.ok(actual.html.includes('頭領&quot;&lt;svg'));
+    assert.ok(actual.html.includes('&amp;'));
+    assert.ok(!actual.html.includes('<svg onload'));
+    assert.ok(actual.html.includes('class="kunishu-icon-img"'), '地図の諸勢力アイコンは残す');
+    assert.strictEqual(JSON.parse(actual.signature)[6][0][2], '諸勢力' + hostile);
 });
 
 Promise.all(pendingTests).then(() => {
