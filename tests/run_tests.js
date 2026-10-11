@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r460');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r461');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -15654,27 +15654,27 @@ test('r458 援軍帰還時の兵数上限で士気・訓練度が逸脱しない
     const returning = {morale: 100, training: 100};
 
     const almostFull = {soldiers: 99000, morale: 100, training: 100};
-    const accepted = manager.mergeReturnedReinforcementReadiness(almostFull, returning, 5000);
+    const accepted = manager.mergeReturningArmyReadiness(almostFull, returning, 5000);
     assert.strictEqual(accepted, 999, '上限までに入る兵数のみ受け入れる');
     assert.strictEqual(almostFull.soldiers, 99999);
     assert.strictEqual(almostFull.morale, 100, '士気が100を超えてはならない');
     assert.strictEqual(almostFull.training, 100, '訓練度が100を超えてはならない');
 
     const room = {soldiers: 1000, morale: 40, training: 30};
-    assert.strictEqual(manager.mergeReturnedReinforcementReadiness(room, {morale: 80, training: 70}, 1000), 1000);
+    assert.strictEqual(manager.mergeReturningArmyReadiness(room, {morale: 80, training: 70}, 1000), 1000);
     assert.deepStrictEqual([room.soldiers, room.morale, room.training], [2000, 60, 50],
         '上限未満の場合の従来の加重平均は変えない');
 
     const limited = {soldiers: 90000, morale: 20, training: 30};
-    assert.strictEqual(manager.mergeReturnedReinforcementReadiness(limited, {morale: 80, training: 90}, 40000), 9999);
+    assert.strictEqual(manager.mergeReturningArmyReadiness(limited, {morale: 80, training: 90}, 40000), 9999);
     assert.deepStrictEqual([limited.soldiers, limited.morale, limited.training], [99999, 25, 35],
         '一部しか受け入れられない場合にも旧兵・受入兵だけを加重する');
 
     const full = {soldiers: 99999, morale: 35, training: 45};
-    assert.strictEqual(manager.mergeReturnedReinforcementReadiness(full, returning, 500), 0);
+    assert.strictEqual(manager.mergeReturningArmyReadiness(full, returning, 500), 0);
     assert.deepStrictEqual([full.soldiers, full.morale, full.training], [99999, 35, 45],
         '満員の場合は士気・訓練度も変化させない');
-    assert.ok(read('js/war_effort.js').includes('this.mergeReturnedReinforcementReadiness(helperCastle, reinf, finalReturnSoldiers)'),
+    assert.ok(read('js/war_effort.js').includes('this.mergeReturningArmyReadiness(helperCastle, reinf, finalReturnSoldiers)'),
         '本番の援軍帰還処理から検査済みの計算を使う');
 });
 
@@ -15763,6 +15763,35 @@ test('r460 攻城戦の反撃で兵・軍馬・鉄砲の損耗が一致する', 
     const src = read('js/war.js');
     assert.ok(src.includes('this.applyWarArmyCasualties(activeArmyObj, actualCounterDmg)'),
         '本番の反撃経路でも共通処理を必ず使用する');
+});
+
+
+// r461: 攻撃本隊・諸勢力の帰還も、受入兵数の上限で士気・訓練度を計算する。
+test('r461 敗戦本隊の帰還は収容できた兵数だけで士気・訓練度を統合する', () => {
+    const ctx = createContext({WarManager: class WarManager {}});
+    loadScript(ctx, 'js/war_effort.js');
+    const manager = new ctx.WarManager();
+    assert.strictEqual(typeof manager.mergeReturningArmyReadiness, 'function');
+    const source = {soldiers: 90000, morale: 20, training: 30};
+    const army = {morale: 80, training: 90};
+    const received = manager.mergeReturningArmyReadiness(source, army, 40000);
+    assert.strictEqual(received, 9999);
+    assert.deepStrictEqual([source.soldiers, source.morale, source.training], [99999, 25, 35],
+        '受入できない帰還兵を士気・訓練度の平均に含めない');
+    const full = {soldiers: 99999, morale: 40, training: 50};
+    assert.strictEqual(manager.mergeReturningArmyReadiness(full, army, 5000), 0);
+    assert.deepStrictEqual([full.soldiers, full.morale, full.training], [99999, 40, 50]);
+    const normal = {soldiers: 1000, morale: 20, training: 30};
+    assert.strictEqual(manager.mergeReturningArmyReadiness(normal, army, 1000), 1000);
+    assert.deepStrictEqual([normal.soldiers, normal.morale, normal.training], [2000, 50, 60],
+        '通常の受入可能時は従来の加重平均');
+    const effort = read('js/war_effort.js');
+    assert.ok(effort.includes('this.mergeReturningArmyReadiness(srcC, s.attacker, totalAtkSurvivors)'),
+        '敗戦後の攻撃本隊にも共通の帰還計算を適用する');
+    assert.ok(effort.includes('this.mergeReturningArmyReadiness(kunishu, s.attacker, totalAtkSurvivors)'),
+        '諸勢力の本隊にも同じ帰還計算を適用する');
+    assert.ok(effort.includes('this.mergeReturningArmyReadiness(helperCastle, reinf, finalReturnSoldiers)'),
+        '援軍の既存帰還処理を同一の計算に保つ');
 });
 
 Promise.all(pendingTests).then(() => {

@@ -30,10 +30,10 @@ Object.assign(WarManager.prototype, {
         return { survivingSoldiers, fieldLoss, siegeLoss, totalLoss: fieldLoss + siegeLoss };
     },
 
-    // 援軍帰還で拠点が兵数上限に達する場合、士気・訓練度には実際に
-    // 受け入れた兵だけを反映する。受け入れられない兵まで加重すると
-    // 士気・訓練度が100を超え、次の戦闘へ不正な値を持ち越してしまう。
-    mergeReturnedReinforcementReadiness(helperCastle, reinf, returningSoldiers) {
+    // 帰還元へ兵を戻す時は、本隊・援軍を問わず「実際に受け入れた人数」
+    // だけを士気・訓練度の加重平均へ反映する。兵数上限を超えた分は
+    // 帰還兵として収容されないため、練度・士気にも影響させない。
+    mergeReturningArmyReadiness(helperCastle, reinf, returningSoldiers) {
         const oldSoldiers = Math.max(0, Number(helperCastle.soldiers) || 0);
         const acceptedSoldiers = Math.min(
             Math.max(0, 99999 - oldSoldiers),
@@ -1775,7 +1775,7 @@ Object.assign(WarManager.prototype, {
                         // 援軍部隊が持っている残りの兵糧をそのまま持ち帰ります
                         let returnRice = reinf.rice || 0;
                         
-                        this.mergeReturnedReinforcementReadiness(helperCastle, reinf, finalReturnSoldiers);
+                        this.mergeReturningArmyReadiness(helperCastle, reinf, finalReturnSoldiers);
                         helperCastle.rice = Math.min(99999, helperCastle.rice + returnRice);
                         helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + returnHorses);
                         helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + returnGuns);
@@ -2154,13 +2154,7 @@ Object.assign(WarManager.prototype, {
                 if (s.attacker.isKunishu) {
                     const kunishu = this.game.kunishuSystem.getKunishu(s.attacker.kunishuId);
                     if (kunishu && !kunishu.isDestroyed) {
-                        const originalSoldiers = kunishu.soldiers;
-                        const newTotalSoldiers = originalSoldiers + totalAtkSurvivors;
-                        if (newTotalSoldiers > 0) {
-                            kunishu.training = Math.floor(((kunishu.training || 0) * originalSoldiers + (s.attacker.training || 0) * totalAtkSurvivors) / newTotalSoldiers);
-                            kunishu.morale = Math.floor(((kunishu.morale || 0) * originalSoldiers + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
-                        }
-                        kunishu.soldiers = Math.min(99999, newTotalSoldiers);
+                        this.mergeReturningArmyReadiness(kunishu, s.attacker, totalAtkSurvivors);
                         kunishu.horses = Math.min(99999, (kunishu.horses || 0) + attackerSurvivedHorses);
                         kunishu.guns = Math.min(99999, (kunishu.guns || 0) + attackerSurvivedGuns);
                     }
@@ -2168,15 +2162,9 @@ Object.assign(WarManager.prototype, {
                     const srcC = this.game.getCastle(s.sourceCastle.id);
     
                     // ★追加：帰ってきた兵士と、お留守番していた兵士の士気と訓練をまぜまぜします！
-                    const originalSoldiers = srcC.soldiers;
-                    const newTotalSoldiers = originalSoldiers + totalAtkSurvivors;
-                    if (newTotalSoldiers > 0) {
-                        srcC.training = Math.floor(((srcC.training || 0) * originalSoldiers + (s.attacker.training || 0) * totalAtkSurvivors) / newTotalSoldiers);
-                        srcC.morale = Math.floor(((srcC.morale || 0) * originalSoldiers + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
-                    }
-    
-                    // ★追加：負けて帰ってきた遠征軍の兵士、軍馬、鉄砲の合流にストッパー！
-                    srcC.soldiers = Math.min(99999, newTotalSoldiers);
+                    this.mergeReturningArmyReadiness(srcC, s.attacker, totalAtkSurvivors);
+
+                    // 帰還兵の士気・訓練度と兵数は共通窓口で収容数を確定済み。
                     srcC.horses = Math.min(99999, (srcC.horses || 0) + attackerSurvivedHorses);
                     srcC.guns = Math.min(99999, (srcC.guns || 0) + attackerSurvivedGuns);
                 }
