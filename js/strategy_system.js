@@ -711,11 +711,12 @@ class StrategySystem {
             const oldClanId = target.clan;
             const newClanId = doer.clan;
             
-            if (oldClanId !== 0 && oldClanId !== newClanId) {
-                target.achievementTotal = Math.floor((target.achievementTotal || 0) / 2);
-            }
-            
             if (target.isCastellan && oldCastle) {
+                // 城主の移籍は transferClanRaw を使うため、ここで一度だけ功績を半減する。
+                // 通常家臣は joinClan 側が半減を担当するので、先に減らさない。
+                if (oldClanId !== 0 && oldClanId !== newClanId) {
+                    target.achievementTotal = Math.floor((target.achievementTotal || 0) / 2);
+                }
                 // 部下の追随判定には寝返り前の派閥IDを使うが、本人の旧派閥・承認欲求は新家へ持ち越さない。
                 const targetOriginalFactionId = Number(target.factionId) || 0;
                 this.game.castleManager.changeOwner(oldCastle, newClanId);

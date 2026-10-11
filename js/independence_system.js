@@ -809,8 +809,10 @@ class IndependenceSystem {
         if (!targetFactionId || targetFactionId === 0) return; 
         
         const potential = this.game.getClanBushos(oldClanId).filter(b => window.BushoStatusRules.isActive(b) && !b.isCastellan && b.factionId === targetFactionId && !b.isDaimyo && !b.isCommander && !b.isFactionLeader);
-        const mainCastle = this.game.castles.find(c => c.castellanId === newDaimyo.id);
-        if (!mainCastle) return;
+        // 神輿に担がれた派閥主が元は城主でない場合、移動・所属変更後でも
+        // 城主欄の再選出はこの処理より後になる。合流先は大名本人の現所在を正本とする。
+        const mainCastle = this.game.getCastle(newDaimyo.castleId);
+        if (!mainCastle || Number(mainCastle.ownerClan) !== Number(newClanId)) return;
 
         potential.forEach(busho => {
             // ★修正：記憶しておいた元の派閥IDを渡します

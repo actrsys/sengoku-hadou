@@ -1,0 +1,24 @@
+戦国覇道 r469 — 大名家滅亡時の功績二重減少監査
+
+基準版: r468
+対象: LifeSystem.checkClanExtinction() / AffiliationSystem.becomeRonin()
+方針: 滅亡時の従来規則（功績半減1回）を維持し、二重実行だけを除去。状態遷移・戦闘・AI・データの仕様変更はしない。
+
+発見した不整合
+- 後継者不在・全城喪失の滅亡処理において、LifeSystem が通常家臣の功績を先に半減してから AffiliationSystem.becomeRonin() へ移していた。
+- becomeRonin() は旧所属大名家を離れる通常武将の功績を半減する正規処理であるため、通常家臣の功績は101→50→25となっていた。生存スキルによる残党化・合流でも同様の二重減少が起き得る。
+- r467 の引抜功績二重減少・r468 の残党合流修正と同じ責務境界の欠落である。
+
+再現・改修
+- 実際の LifeSystem.checkClanExtinction() と AffiliationSystem.becomeRonin() を通す新規回帰テストを追加。
+- 最後の城喪失、後継者不在の2経路を検証し、r468では通常家臣の功績101→25で新規テスト失敗（既存722件成功、新規1件失敗）。
+- LifeSystem 側の事前半減のみを撤去。功績減少は AffiliationSystem の所属変更窓口に一元化した。
+- 修正後は功績101→50、所属0、浪人状態、旧大名家滅亡を両経路で確認。723件成功、失敗0件。
+
+変更ファイル
+追加: docs/audits/r469_滅亡時功績二重半減監査記録.txt
+更新: ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/life_system.js、tests/run_tests.js
+削除: なし
+
+非変更
+シナリオデータ、管理用Excel・実行用BIN、調整値、戦闘ロジック、AI、CSS、画像・音声、セーブ形式。

@@ -1787,9 +1787,8 @@ class LifeSystem {
 
             // もし残っている武将がいたら、全員「浪人」にします
             this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b)).forEach(b => {
-                if ((b.belongKunishuId || 0) === 0) {
-                    b.achievementTotal = Math.floor((b.achievementTotal || 0) / 2);
-                }
+                // 功績半減は AffiliationSystem.becomeRonin() が一度だけ担当する。
+                // ここで先に半減すると、通常浪人化と残党合流のどちらも二重減少する。
                 this.game.affiliationSystem.becomeRonin(b);
             });
 

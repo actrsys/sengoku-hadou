@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r466');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r470');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -15980,6 +15980,218 @@ test('r466 引抜実行直前に対象が大名なら資金も勢力も変更し
     assert.ok(notices.length > 0, '既存の対象外メッセージを表示する');
 });
 
+
+// r467: 引抜で通常家臣が移籍する場合、功績半減は joinClan の責務。
+// StrategySystem で先に半減すると、城主と異なり通常家臣だけ 1/4 になる。
+test('r467 引抜後の功績は通常家臣・城主とも別家移籍につき一度だけ半減する', () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin' } },
+        LifeStatusRules: { isPresent: b => b.status !== 'dead' && b.status !== 'unborn' },
+        BushoStatusRules: { isActive: b => b.status === 'active' }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/strategy_system.js');
+    const Affiliation = vm.runInContext('AffiliationSystem', ctx);
+    const Strategy = vm.runInContext('StrategySystem', ctx);
+    const sourceCastle = { id: 20, name: '旧城', ownerClan: 2 };
+    const destination = { id: 10, name: '新城', ownerClan: 1 };
+    const doer = { id: 1, name: '実行者', clan: 1, achievementTotal: 0, intelligence: 70 };
+    const makeTarget = isCastellan => ({
+        id: 2, name: '対象', clan: 2, castleId: 20, status: 'active',
+        isCastellan, achievementTotal: 101, factionId: 0,
+        strength: 30, intelligence: 40, leadership: 50, charm: 60, diplomacy: 70
+    });
+    const game = {
+        legions: [],
+        getCastle: id => id === 20 ? sourceCastle : id === 10 ? destination : null,
+        getClanDaimyo: () => ({ affinity: 50 }),
+        getCastleBushos: () => [],
+        updateCastleLord() {},
+        factionSystem: { updateRecognition() {}, updateFactions() {} },
+        castleManager: { changeOwner() {} },
+        independenceSystem: { resolveSubordinates: () => [] }
+    };
+    const affiliation = new Affiliation(game);
+    game.affiliationSystem = affiliation;
+    // 移動・派閥・忠誠の副作用を固定し、実際の joinClan と transferClanRaw を通す。
+    affiliation.leaveCastle = () => {};
+    affiliation.enterCastle = (b, id) => { b.castleId = id; };
+    affiliation.syncSpousesForClanChange = () => {};
+    affiliation.updateLoyaltyForNewLord = () => {};
+    affiliation.updateUI = () => {};
+    const strategy = new Strategy(game);
+    const ordinary = makeTarget(false);
+    strategy.applyHeadhuntEffect(doer, ordinary, destination, true);
+    assert.strictEqual(ordinary.clan, 1);
+    assert.strictEqual(ordinary.achievementTotal, 50, '通常家臣の功績は101→50で止める');
+    const castellan = makeTarget(true);
+    strategy.applyHeadhuntEffect(doer, castellan, destination, true);
+    assert.strictEqual(castellan.clan, 1);
+    assert.strictEqual(castellan.achievementTotal, 50, '城主の功績も101→50とする');
+});
+
+
+
+// r468: 滅亡後にすでに存在する残党諸勢力へ合流する場合も、
+// 通常の浪人化・残党の新規結成と同じく功績半減と旧家の派閥更新を一度行う。
+test('r468 滅亡家臣の既存残党合流でも功績半減・旧派閥更新・画面反映を行う', () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', DEAD: 'dead' } },
+        LifeStatusRules: { isPresent: b => b.status !== 'dead' && b.status !== 'unborn' },
+        SkillManager: { getExtinctionSurvivalInfo: () => null }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const Affiliation = vm.runInContext('AffiliationSystem', ctx);
+    const oldCastle = { id: 11, samuraiIds: [1, 2], castellanId: 0 };
+    const hideout = { id: 22, samuraiIds: [], castellanId: 0 };
+    const updates = [];
+    const game = {
+        playerClanId: 9, legions: [], bushos: [],
+        getCastle: id => id === 11 ? oldCastle : id === 22 ? hideout : null,
+        getClanCastles: () => [],
+        kunishuSystem: { kunishus: [{ id: 501, _survivalClanId: 2, castleId: 22, isDestroyed: false }] },
+        factionSystem: { updateFactions: id => updates.push(id) }
+    };
+    const affiliation = new Affiliation(game);
+    game.affiliationSystem = affiliation;
+    affiliation.updateCastleLord = () => {};
+    let repaint = 0;
+    affiliation.updateUI = () => { repaint++; };
+    const member = {
+        id: 1, name: '旧家臣', clan: 2, castleId: 11, status: 'active',
+        achievementTotal: 101, factionId: 7, isFactionLeader: true,
+        belongKunishuId: 0, wifeIds: [], isGunshi: false
+    };
+    affiliation.becomeRonin(member);
+    assert.strictEqual(member.achievementTotal, 50, '残党結成経路と同じく旧家を離れる功績半減を一度行う');
+    assert.strictEqual(member.clan, 0);
+    assert.strictEqual(member.status, 'active');
+    assert.strictEqual(member.belongKunishuId, 501);
+    assert.strictEqual(member.factionId, 0);
+    assert.deepStrictEqual(updates, [2], '旧家の派閥は直接合流時にも再編する');
+    assert.strictEqual(repaint, 1, '通常浪人化と同様に画面更新を行う');
+    assert.deepStrictEqual(oldCastle.samuraiIds, [2]);
+    assert.deepStrictEqual(hideout.samuraiIds, [1]);
+
+    // 先に浪人化して功績半減済みの武将は、あとから残党へ編入しても再び減らさない。
+    const previousRonin = {
+        id: 2, name: '先行浪人', clan: 0, castleId: 11, status: 'ronin',
+        achievementTotal: 50, factionId: 0, belongKunishuId: 0, wifeIds: [], isGunshi: false
+    };
+    affiliation._joinSurvivalKunishu(previousRonin, game.kunishuSystem.kunishus[0]);
+    assert.strictEqual(previousRonin.achievementTotal, 50, '浪人化済みの功績を二重に半減させない');
+    assert.strictEqual(previousRonin.belongKunishuId, 501);
+    assert.strictEqual(previousRonin.status, 'active');
+});
+
+// r469: 滅亡処理は浪人化窓口へ委譲するため、功績を事前に半減してはいけない。
+// 最後の城を失う場合と、後継者不在で城が残る場合を実際の両システムで検証する。
+test('r469 大名家滅亡による浪人化は功績を一度だけ半減する', async () => {
+    const ctx = createContext({ SkillManager: { getExtinctionSurvivalInfo: () => null } });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/life_system.js');
+    const Affiliation = vm.runInContext('AffiliationSystem', ctx);
+    const Life = vm.runInContext('LifeSystem', ctx);
+
+    for (const reason of ['no_castle', 'no_heir']) {
+        const sourceCastle = { id: 11, name: '旧居城', ownerClan: reason === 'no_heir' ? 2 : 3,
+            samuraiIds: [7], castellanId: 0, adjacentCastleIds: [] };
+        const member = { id: 7, name: '旧家臣', clan: 2, status: 'active',
+            castleId: 11, achievementTotal: 101, belongKunishuId: 0, wifeIds: [],
+            nemesisIds: [], nemesisList: [], isCastellan: false, isCommander: false, isDaimyo: false };
+        const clan = { id: 2, name: '旧家', leaderId: 99, princessIds: [] };
+        const game = {
+            playerClanId: 1, bushos: [member], legions: [], princesses: [],
+            getClan: id => id === 2 ? clan : null,
+            getBusho: id => id === 7 ? member : null,
+            getClanCastles: id => id === 2 && sourceCastle.ownerClan === 2 ? [sourceCastle] : [],
+            getClanBushos: id => game.bushos.filter(b => b.clan === id),
+            getCastle: id => id === 11 ? sourceCastle : null,
+            getCastleBushos: id => game.bushos.filter(b => b.castleId === id),
+            getClanDaimyo: () => null,
+            factionSystem: { updateFactions() {} },
+            castleManager: { changeOwner(c, clanId) { c.ownerClan = clanId; } },
+            ui: { log() {}, renderMap() {}, async showDialogAsync() {} }
+        };
+        game.affiliationSystem = new Affiliation(game);
+        game.lifeSystem = new Life(game);
+        game.updateCastleLord = c => game.affiliationSystem.updateCastleLord(c);
+        await game.lifeSystem.checkClanExtinction(2, reason);
+        assert.strictEqual(member.achievementTotal, 50,
+            `${reason}: 功績101の滅亡家臣は一度だけ半減して50になる`);
+        assert.strictEqual(member.clan, 0, `${reason}: 家臣は旧家を離れる`);
+        assert.strictEqual(member.status, 'ronin', `${reason}: 家臣は浪人化する`);
+        assert.strictEqual(clan.isDestroyed, true, `${reason}: 旧家は滅亡する`);
+    }
+});
+
+
+// r470: 神輿となる派閥主が元々城主ではない場合、独立後に本拠地へ移動しても
+// 城主欄が更新される前に遠方の同派閥武将の合流先探索が走る。
+// 城主IDではなく、新大名が実際に所在する新勢力の拠点を正本とする。
+test('r470 非城主の派閥主を擁立した独立でも遠方派閥武将が新大名の所在拠点へ合流する', () => {
+    const fixedMath = Object.create(Math);
+    fixedMath.random = () => 0;
+    const ctx = createContext({
+        Math: fixedMath,
+        PersonnelRules: { calcAffinityDiff: () => 0 },
+        BushoStatusRules: { isActive: b => b.status === 'active' }
+    });
+    loadScript(ctx, 'js/independence_system.js');
+    const Independence = vm.runInContext('IndependenceSystem', ctx);
+    const rebelCastle = { id: 10, ownerClan: 3, castellanId: 19, samuraiIds: [19, 20] };
+    const oldCastle = { id: 11, ownerClan: 2, castellanId: 25, samuraiIds: [22, 25] };
+    const rebelLeader = {
+        id: 20, name: '新大名', clan: 3, castleId: 10,
+        factionId: 0, ambition: 80, duty: 50, loyalty: 100,
+        affinity: 30, leadership: 70, strength: 70, politics: 70,
+        diplomacy: 70, intelligence: 70, isDaimyo: true
+    };
+    const oldDaimyo = {
+        id: 21, affinity: 90, factionId: 1, leadership: 50, strength: 50,
+        politics: 50, diplomacy: 50, intelligence: 50
+    };
+    const distant = {
+        id: 22, name: '遠方派閥武将', clan: 2, castleId: 11, status: 'active',
+        factionId: 5, isFactionLeader: false, isCastellan: false, isDaimyo: false,
+        isCommander: false, affinity: 30, ambition: 80, duty: 40, loyalty: 15,
+        leadership: 50, strength: 50, politics: 50, diplomacy: 50, intelligence: 50,
+        achievementTotal: 101
+    };
+    const members = [rebelLeader, distant];
+    const game = {
+        castles: [rebelCastle, oldCastle], bushos: members,
+        ui: { log() {} },
+        getCastle: id => [rebelCastle, oldCastle].find(c => c.id === id) || null,
+        getClanBushos: id => members.filter(b => b.clan === id),
+        getBusho: id => members.find(b => b.id === id),
+        updateCastleLord() {},
+        affiliationSystem: {
+            transferClanRaw(b, clanId) { b.clan = clanId; },
+            setCastleIdRaw(b, castleId) { b.castleId = castleId; }
+        }
+    };
+    const sys = new Independence(game);
+    sys.calcNewLoyalty = () => 95;
+    sys.resolveDistantFactionMembers(rebelLeader, 2, 3, oldDaimyo, 5);
+    assert.strictEqual(distant.clan, 3, '遠方の旧派閥武将が新勢力へ所属変更される');
+    assert.strictEqual(distant.castleId, 10, '新大名が所在する拠点へ合流する');
+    assert.ok(!oldCastle.samuraiIds.includes(22), '旧拠点の武将名簿から除外される');
+    assert.ok(rebelCastle.samuraiIds.includes(22), '新拠点の武将名簿に反映される');
+    assert.strictEqual(distant.achievementTotal, 50, '別家移籍の功績半減は従来どおり一度だけ');
+
+    // 従来どおり城主欄が先に揃っている場合でも同じ結果になる。
+    rebelCastle.castellanId = 20;
+    distant.clan = 2;
+    distant.castleId = 11;
+    distant.achievementTotal = 101;
+    oldCastle.samuraiIds = [22, 25];
+    rebelCastle.samuraiIds = [19, 20];
+    sys.resolveDistantFactionMembers(rebelLeader, 2, 3, oldDaimyo, 5);
+    assert.strictEqual(distant.castleId, 10, '城主確定済みの既存経路も維持する');
+    assert.strictEqual(distant.achievementTotal, 50);
+});
 
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);

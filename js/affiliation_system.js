@@ -197,6 +197,9 @@ class AffiliationSystem {
                 const survivalKunishu = this.game.kunishuSystem.kunishus.find(k => k._survivalClanId === oldClanId && !k.isDestroyed);
                 if (survivalKunishu) {
                     this._joinSurvivalKunishu(busho, survivalKunishu);
+                    // 新規結成・通常の浪人化と同じく、旧家側の派閥と表示も更新する。
+                    if (this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
+                    this.updateUI();
                     return; // 浪人にはならずに終了
                 }
             }
@@ -400,6 +403,11 @@ class AffiliationSystem {
     // ★追加：旧家臣が生存スキルの諸勢力に合流する処理
     _joinSurvivalKunishu(busho, kunishu) {
         const oldClanId = Number(busho.clan) || 0;
+        // 旧家から直接合流した場合のみ一度だけ半減。すでに浪人化済みの家臣は
+        // becomeRonin() で半減済みなので、ここで二重に減らさない。
+        if (oldClanId !== 0) {
+            busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
+        }
         this.resetFactionData(busho);
         this.setClanIdRaw(busho, 0);
         
