@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r470');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r472');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7310,6 +7310,74 @@ test('方針については能力上位2分野だけを既存ゲーム状態か�
     assert.strictEqual(messages.length, 2, '上位2能力だけに言及する');
     assert.ok(messages.join(' ').includes('吉田城'), '統率が高ければ実際の攻撃目標へ言及する');
     assert.ok(messages.join(' ').includes('清洲城') && messages.join(' ').includes('城壁'), '内政が高ければ共通内政評価へ言及する');
+});
+
+test('面談外交助言は友好度100の親善計画を再推薦せず有効な周辺候補へ切り替える', () => {
+    const ctx = createContext({
+        DiplomacyRules: { isHostile: status => status === '敵対' }
+    });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager; this.InterviewSystem = InterviewSystem;', ctx);
+
+    const relations = {
+        2: { status: '同盟', sentiment: 100 },
+        3: { status: '友好', sentiment: 65 }
+    };
+    const clans = {
+        1: { id: 1, name: '我が家', currentDiplomacyTarget: { targetId: 2, action: 'goodwill', gold: 500 } },
+        2: { id: 2, name: '上限の家' },
+        3: { id: 3, name: '交渉余地のある家' }
+    };
+    const castles = {
+        1: { id: 1, ownerClan: 1, adjacentCastleIds: [2, 3] },
+        2: { id: 2, ownerClan: 2 },
+        3: { id: 3, ownerClan: 3 }
+    };
+    const game = {
+        playerClanId: 1,
+        getClan: id => clans[id] || null,
+        getClanCastles: id => Number(id) === 1 ? [castles[1]] : [],
+        getCastle: id => castles[id] || null,
+        getRelation: (_from, to) => relations[to] || null,
+        aiEngine: { getClanPrestige: id => id === 2 ? 1000 : 500 }
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    dm.getRelation = (_from, to) => relations[to] || null;
+    dm.evaluateStrategicValue = () => ({ priorityBonus: 0, isStrategicPartner: false });
+    game.diplomacyManager = dm;
+    const system = new ctx.InterviewSystem(game);
+    const speaker = { clan: 1 };
+    const full = { level: 'full' };
+
+    assert.strictEqual(system._getDiplomacyPolicyTarget(speaker).targetId, 3,
+        '友好度100になった親善計画は使わず、現在有効な別候補を提示する');
+    assert.ok(system._getDiplomacyPolicyText(speaker, full).includes('交渉余地のある家'));
+    assert.strictEqual(clans[1].currentDiplomacyTarget.action, 'goodwill',
+        '面談でAIの月次外交計画を勝手に変更しない');
+
+    clans[1].currentDiplomacyTarget = null;
+    assert.strictEqual(system._getDiplomacyPolicyTarget(speaker).targetId, 3,
+        '月次目標がない時も、優先度の高い友好度100の相手を一般的な関係改善対象として選ばない');
+
+    clans[1].currentDiplomacyTarget = { targetId: 2, action: 'goodwill', gold: 500 };
+    relations[2].sentiment = 99;
+    assert.strictEqual(system._getDiplomacyPolicyTarget(speaker).targetId, 2,
+        '友好度99なら既存の親善計画を引き続き助言に使う');
+    assert.ok(system._getDiplomacyPolicyText(speaker, full).includes('関係を深めておく'));
+
+    relations[2].sentiment = 100;
+    clans[1].currentDiplomacyTarget = { targetId: 2, action: 'alliance', gold: 0 };
+    assert.strictEqual(system._getDiplomacyPolicyTarget(speaker).targetId, 2,
+        '友好度100でも親善以外の既存の外交目標は消さない');
+    assert.ok(system._getDiplomacyPolicyText(speaker, full).includes('同盟を視野に入れる'));
+
+    clans[1].currentDiplomacyTarget = null;
+    castles[1].adjacentCastleIds = [2];
+    assert.strictEqual(system._getDiplomacyPolicyTarget(speaker), null,
+        '周囲が友好度上限の相手だけなら空の助言候補にする');
+    assert.ok(system._getDiplomacyPolicyText(speaker, full).includes('周囲の出方を見ても'));
 });
 
 test('軍師の調略助言は智謀が他主要能力より1.2倍以上突出した時だけ候補にする', () => {
@@ -16191,6 +16259,44 @@ test('r470 非城主の派閥主を擁立した独立でも遠方派閥武将が
     sys.resolveDistantFactionMembers(rebelLeader, 2, 3, oldDaimyo, 5);
     assert.strictEqual(distant.castleId, 10, '城主確定済みの既存経路も維持する');
     assert.strictEqual(distant.achievementTotal, 50);
+});
+
+// r471: 月末独立判定は候補を最初に列挙するため、先行する独立・寝返りで
+// 後続拠点の所有者・城主・残存拠点数が変わった場合は、旧候補を再利用してはならない。
+test('r471 月末独立候補は先行する勢力変動で失効した場合に再判定しない', async () => {
+    const ctx = createContext({
+        WarParams: { Independence: { ThresholdBase: 50, ThresholdDutyDiv: 10, ThresholdAmbitionDiv: 10 } }
+    });
+    loadScript(ctx, 'js/independence_system.js');
+    const Independence = vm.runInContext('IndependenceSystem', ctx);
+    for (const situation of ['owner_changed', 'castellan_changed', 'last_castle', 'unchanged']) {
+        const castles = [
+            { id: 1, ownerClan: 1, castellanId: 11 },
+            { id: 2, ownerClan: 1, castellanId: 12 }
+        ];
+        const bushos = new Map([11, 12, 13].map(id => [id, {
+            id, clan: 1, status: 'active', loyalty: 1, duty: 50, ambition: 50, factionId: 0
+        }]));
+        const checked = [];
+        const game = {
+            castles,
+            getBusho: id => bushos.get(id),
+            getClanDaimyo: () => ({ factionId: 0 }),
+            getClanCastles: clanId => castles.filter(c => c.ownerClan === clanId)
+        };
+        const system = new Independence(game);
+        system.calculateAndExecute = async castle => {
+            checked.push(castle.id);
+            if (castle.id === 1) {
+                if (situation === 'owner_changed') castles[1].ownerClan = 2;
+                if (situation === 'castellan_changed') castles[1].castellanId = 13;
+                if (situation === 'last_castle') castles[0].ownerClan = 2;
+            }
+        };
+        await system.checkIndependence();
+        assert.deepStrictEqual(checked, situation === 'unchanged' ? [1, 2] : [1],
+            `${situation}: 失効した候補は除外し、有効な候補は従来どおり審査する`);
+    }
 });
 
 Promise.all(pendingTests).then(() => {

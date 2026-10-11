@@ -40,17 +40,23 @@ class IndependenceSystem {
             const clanCastles = this.game.getClanCastles(c.ownerClan);
             if (clanCastles.length <= 1) return false;
             return true;
-        });
+        }).map(c => ({ castle: c, ownerClan: c.ownerClan, castellanId: c.castellanId }));
 
         const I = window.WarParams.Independence;
         const thresholdBase = I.ThresholdBase;
         const dutyDiv = I.ThresholdDutyDiv;
         const ambDiv = I.ThresholdAmbitionDiv;
 
-        for (const castle of potentialRebels) {
+        for (const candidate of potentialRebels) {
             if (!isCurrentFlow()) return;
-            const castellan = this.game.getBusho(castle.castellanId);
-            const daimyo = this.game.getClanDaimyo(castle.ownerClan);
+            const { castle, ownerClan, castellanId } = candidate;
+            // 前の拠点の独立・寝返りで、月末開始時の候補が別勢力や別城主へ
+            // 変わることがある。古い候補で同月中に二度目の独立判定をしない。
+            if (Number(castle.ownerClan) !== Number(ownerClan)
+                || Number(castle.castellanId) !== Number(castellanId)
+                || this.game.getClanCastles(ownerClan).length <= 1) continue;
+            const castellan = this.game.getBusho(castellanId);
+            const daimyo = this.game.getClanDaimyo(ownerClan);
             if (!castellan || !daimyo) continue;
             if (daimyo.factionId !== 0 && castellan.factionId === daimyo.factionId) continue; 
 

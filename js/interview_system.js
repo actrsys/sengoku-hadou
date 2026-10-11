@@ -611,14 +611,31 @@ class InterviewSystem {
         if (!this.game || !busho) return null;
         const clanId = Number(busho.clan);
         const clan = this.game.getClan ? this.game.getClan(clanId) : null;
+        const diplomacyManager = this.game.diplomacyManager;
+        const getRelation = targetId => this.game.getRelation
+            ? this.game.getRelation(clanId, targetId)
+            : (diplomacyManager && typeof diplomacyManager.getRelation === 'function'
+                ? diplomacyManager.getRelation(clanId, targetId) : null);
+
         if (clan && clan.currentDiplomacyTarget && Number(clan.currentDiplomacyTarget.targetId) > 0) {
-            return { ...clan.currentDiplomacyTarget, targetId: Number(clan.currentDiplomacyTarget.targetId), planned: true };
+            const plan = clan.currentDiplomacyTarget;
+            const rel = plan.action === 'goodwill' ? getRelation(Number(plan.targetId)) : null;
+            // 月初の親善計画後に友好度が100へ達した場合は、面談で無意味な親善を勧めない。
+            // AIの計画自体は変更せず、同盟・和睦等の別目的は関係値100でも維持する。
+            if (!(rel && Number(rel.sentiment) >= 100)) {
+                return { ...plan, targetId: Number(plan.targetId), planned: true };
+            }
         }
 
-        const neighbors = this._getNeighborClanIds(clanId);
-        if (neighbors.length === 0 || !this.game.diplomacyManager || typeof this.game.diplomacyManager.getDiplomacyPriorityList !== 'function') return null;
+        // 月次計画のない時の一般的な関係改善助言も、既に友好度が上限の相手は除く。
+        // AIの外交優先度式や確率を再実装せず、残った候補を既存の優先度で比較する。
+        const neighbors = this._getNeighborClanIds(clanId).filter(id => {
+            const rel = getRelation(id);
+            return !rel || !(Number(rel.sentiment) >= 100);
+        });
+        if (neighbors.length === 0 || !diplomacyManager || typeof diplomacyManager.getDiplomacyPriorityList !== 'function') return null;
         const hostile = neighbors.filter(id => {
-            const rel = this.game.getRelation ? this.game.getRelation(clanId, id) : this.game.diplomacyManager.getRelation(clanId, id);
+            const rel = getRelation(id);
             return rel && typeof DiplomacyRules !== 'undefined' && DiplomacyRules.isHostile(rel.status);
         });
         let mainThreatId = 0;
@@ -626,7 +643,7 @@ class InterviewSystem {
             hostile.sort((a, b) => this.game.aiEngine.getClanPrestige(b) - this.game.aiEngine.getClanPrestige(a));
             mainThreatId = hostile[0];
         }
-        const list = this.game.diplomacyManager.getDiplomacyPriorityList(clanId, neighbors, mainThreatId);
+        const list = diplomacyManager.getDiplomacyPriorityList(clanId, neighbors, mainThreatId);
         return list && list[0] ? { targetId: Number(list[0].clanId), planned: false } : null;
     }
 
