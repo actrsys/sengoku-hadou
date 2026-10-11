@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r453');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r454');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -15462,6 +15462,60 @@ test('r453 輸送量が不正または保有超過なら元・先拠点の物資
     command.executeTransport([7],2,{gold:10,rice:20,soldiers:30,horses:4,guns:2});
     assert.deepStrictEqual([source.gold,source.rice,source.soldiers,source.horses,source.guns],[190,180,70,6,8]);
     assert.deepStrictEqual([target.gold,target.rice,target.soldiers,target.horses,target.guns],[10,20,30,4,2]);
+});
+
+
+// r454: 自動・手動の援軍で物資を在庫以上に発生させない。
+test('r454 自動援軍は兵糧不足でも存在しない兵糧を作らない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/troop_allocation.js');
+    loadScript(ctx, 'js/reinforcement_service.js');
+    const busho = {id: 7, clan: 1, status: 'active', strength: 80};
+    const game = {getCastleBushos: () => [busho]};
+    const Service = vm.runInContext('ReinforcementService', ctx);
+    const service = new Service(game);
+    for (const mode of ['self', 'clan']) {
+        const castle = {id: 1, ownerClan: 1, soldiers: 2000, rice: 100, horses: 10, guns: 5, morale: 50, training: 40};
+        const reinforcement = mode === 'self'
+            ? service.createAutoSelfReinforcement(castle)
+            : service.createAutoClanReinforcement(castle, {sentiment: 100}, {duty: 100});
+        assert.ok(reinforcement.soldiers > 100, '正常な援軍兵数は変えない');
+        assert.strictEqual(reinforcement.rice + castle.rice, 100, '援軍と拠点の兵糧合計は保存される');
+        assert.strictEqual(reinforcement.rice, 100, '保有する兵糧だけを持ち出す');
+        assert.strictEqual(reinforcement.horses + castle.horses, 10);
+        assert.strictEqual(reinforcement.guns + castle.guns, 5);
+        service.restoreCastleReinforcement(reinforcement);
+        assert.strictEqual(castle.rice, 100, '援軍中止時も元の兵糧に戻る');
+    }
+});
+
+test('r454 手動援軍も変更後の在庫を超える物資を持ち出さない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/troop_allocation.js');
+    loadScript(ctx, 'js/reinforcement_service.js');
+    const Service = vm.runInContext('ReinforcementService', ctx);
+    const service = new Service({});
+    const castle = {id: 1, soldiers: 1000, rice: 60, horses: 3, guns: 2, morale: 50, training: 40};
+    const reinforcement = service.createManualCastleReinforcement(castle, [{id:7}],
+        {soldiers: 200, rice: 200, horses: 9, guns: 8});
+    assert.deepStrictEqual([reinforcement.rice, reinforcement.horses, reinforcement.guns], [60,3,2]);
+    assert.deepStrictEqual([castle.rice, castle.horses, castle.guns], [0,0,0]);
+    service.restoreCastleReinforcement(reinforcement);
+    assert.deepStrictEqual([castle.rice, castle.horses, castle.guns], [60,3,2]);
+});
+
+
+test('r454 配布物の監査記録は専用フォルダへ集約し直下へ置かない', () => {
+    const stray = fs.readdirSync(ROOT).filter(name =>
+        /^r\d+_.*(?:監査|記録).*\.txt$/.test(name) || /^audit_output.*\.txt$/i.test(name)
+    );
+    assert.deepStrictEqual(stray, [], '監査記録がプロジェクト直下へ逆戻りしない');
+    assert.ok(fs.existsSync(path.join(ROOT, 'docs/audits/README.md')));
+    assert.ok(fs.existsSync(path.join(ROOT, 'docs/audits/r454_援軍資源と配布構成監査記録.txt')));
 });
 
 Promise.all(pendingTests).then(() => {

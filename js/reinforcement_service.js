@@ -43,10 +43,16 @@ class ReinforcementService {
     }
 
     _consumeCastleResources(helperCastle, data) {
+        // 援軍の物資は城の実在庫からのみ持ち出す。自動編成で兵糧が不足しても、
+        // 戦場側へ必要量だけを生成せず、実際に引き出せた数量を援軍データに記録する。
+        // 手動選択後に在庫が変わった場合も同じ窓口で守る。
         helperCastle.soldiers = Math.max(0, helperCastle.soldiers - data.soldiers);
-        helperCastle.rice = Math.max(0, helperCastle.rice - data.rice);
-        helperCastle.horses = Math.max(0, (helperCastle.horses || 0) - data.horses);
-        helperCastle.guns = Math.max(0, (helperCastle.guns || 0) - data.guns);
+        for (const key of ['rice', 'horses', 'guns']) {
+            const stock = Math.max(0, Number(helperCastle[key]) || 0);
+            const carried = Math.min(stock, Math.max(0, Number(data[key]) || 0));
+            data[key] = carried;
+            helperCastle[key] = stock - carried;
+        }
     }
 
     _buildData(helperCastle, soldierCount, { requireMinimumEquipmentStock = false, flags = {} } = {}) {

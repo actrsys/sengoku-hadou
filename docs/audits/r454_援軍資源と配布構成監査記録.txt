@@ -1,0 +1,26 @@
+戦国覇道 r454 継続監査記録（r453を基準）
+
+【監査方針】
+通常プレイで再現可能な資源の異常増減、援軍処理、前回の数量入力修正、配布ZIP構成を優先。仕様の優劣に関わる再設計は行わない。
+
+【確認した問題】
+1. AIの自動援軍が城の保有兵糧以上の兵糧を持ち出す。例：城の兵糧100、援軍1,000人のとき、援軍に兵糧1,000を持たせて城は0となり兵糧900が無から増加する。
+2. 手動援軍の選択から実消費までの間に在庫が減少した場合など、直接サービスへ渡された物資が実在庫を上回っても、援軍データは過大な物資を保持できた。正常なUIでは選択時に在庫制約があるが、最終的な所有権はReinforcementServiceが担う。
+
+【修正内容】
+ReinforcementService._consumeCastleResources() で実在庫を上限に兵糧・軍馬・鉄砲の持ち出し量を定め、その実数を援軍データへ反映。すでに兵数はTroopAllocationServiceで制限されるため、出撃兵数と兵科配分は変更しない。援軍の撤回時は実際に消費した資源だけを返却する。諸勢力が出す援軍は別仕様かつ在庫管理対象でないため変更しない。
+
+【再現・検証】
+r453で新規テスト2件が失敗（自動援軍1,000/城100、手動援軍在庫超過）。r454で成功。通常回帰706件成功（新規3件）、表示16グループ成功、シミュレーション4件成功。共通・1560・1570の原本数式残存検査とExcel/BIN全フィールド照合はいずれも成功。
+
+【配布構成】
+r440〜r453の監査・改修記録14件はファイル内容を変更せず docs/audits/ へ移動。0バイトの audit_output_r399.txt は docs/audits/archive/ に移動。r454記録とREADMEも同じフォルダへ追加。過去ZIP内に混入していたPython自動生成の __pycache__/*.pyc 2件を配布対象から除外。インデックスHTML、設計ガイド、テスト実行BAT、管理用Excel・BINの位置は変更しない。
+
+【変更しないもの】
+戦闘勝敗、援軍要請条件、AI援軍兵数、外交、月次、城データ、シナリオ・共通Excel/BIN、地図・画像・CSS。値の改変や数式の再計算は行わない。
+
+【差分一覧】
+追加：docs/audits/README.md、docs/audits/r454_援軍資源と配布構成監査記録.txt
+更新：ARCHITECTURE.md、js/config.js、js/reinforcement_service.js、tests/run_tests.js
+移動：r440〜r453監査記録14件 → docs/audits/、audit_output_r399.txt → docs/audits/archive/
+削除：tools/simulation/__pycache__/player_focus_sim.cpython-313.pyc、tools/simulation/__pycache__/test_player_focus_sim.cpython-313.pyc（いずれも自動生成キャッシュ）
