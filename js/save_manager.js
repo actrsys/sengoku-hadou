@@ -118,8 +118,10 @@ class SaveManager {
             const originalClanId = Number(princess.originalClanId || 0);
             const currentClanId = Number(princess.currentClanId || 0);
             const husbandId = Number(princess.husbandId || 0);
-            if (originalClanId !== 0 && !clanIds.has(originalClanId)) fail(`princesses[${index}].originalClanId の参照先がありません`);
-            if (currentClanId !== 0 && !clanIds.has(currentClanId)) fail(`princesses[${index}].currentClanId の参照先がありません`);
+            // 生家・嫁ぎ先は既に滅亡した大名家のIDも履歴として保持する。
+            // data.clans はシナリオ時点で有効な勢力だけなので、所属先の現存を必須にしない。
+            if (!Number.isInteger(originalClanId) || originalClanId < 0) fail(`princesses[${index}].originalClanId が不正です`);
+            if (!Number.isInteger(currentClanId) || currentClanId < 0) fail(`princesses[${index}].currentClanId が不正です`);
             if (husbandId !== 0 && !bushoIds.has(husbandId)) fail(`princesses[${index}].husbandId の参照先がありません`);
         });
         const bushoById = new Map(data.bushos.map(b => [Number(b.id), b]));
@@ -177,7 +179,13 @@ class SaveManager {
 
         data.bushos.forEach((busho, index) => {
             const clanId = Number(busho.clan || 0);
-            if (clanId !== 0 && !clanIds.has(clanId)) fail(`bushos[${index}].clan の参照先がありません`);
+            // 死亡・未登場武将の旧所属は、滅亡勢力であっても史料上の履歴として残す。
+            // 活動中の武将だけ、現在有効な大名家を参照することを必須とする。
+            const isHistorical = window.LifeStatusRules && window.LifeStatusRules.isUnavailable(busho);
+            if (!Number.isInteger(clanId) || clanId < 0
+                || (clanId !== 0 && !clanIds.has(clanId) && !isHistorical)) {
+                fail(`bushos[${index}].clan の参照先がありません`);
+            }
             const castleId = Number(busho.castleId || 0);
             if (castleId !== 0 && !castleIds.has(castleId)) fail(`bushos[${index}].castleId の参照先がありません`);
         });
@@ -660,6 +668,7 @@ class SaveManager {
         try {
             const data = await this._createSaveDataObj(); // ★待つように変更
             if (!data) return; // 保存準備中に別シナリオへ遷移した場合は書き込まない。
+            this._validateSaveDataStructure(data);
             const encryptedData = this._encryptData(data); // ★暗号化します
             const blob = new Blob([encryptedData], {type: 'application/octet-stream'}); // ★バイナリデータとして保存します
             const url = URL.createObjectURL(blob); 
@@ -668,6 +677,9 @@ class SaveManager {
             a.download = `sengoku_save_${data.year}_${data.month}.sav`; // ★拡張子を.savに変更します
             a.click(); 
             URL.revokeObjectURL(url); 
+        } catch (e) {
+            console.error('ファイルセーブに失敗しました:', e);
+            if (this.game.ui) this.game.ui.showDialog('ファイルセーブに失敗しました。エラー原因: ' + e.message, false);
         } finally {
             this.hideSaveGuard(); // ★追加：保存が終わったらバリアを解除します
         }
@@ -726,8 +738,18 @@ class SaveManager {
         try {
             const data = await this._createSaveDataObj(); // ★待つように変更
             if (!data) return; // 保存準備中に別シナリオへ遷移した場合は書き込まない。
+            // 保存済みデータの正本検査と同じ条件で検証してから上書きする。
+            // 読めない新データで既存の正常なスロットを置き換える事故を防止。
+            this._validateSaveDataStructure(data);
             const encryptedData = this._encryptData(data); // ★暗号化します
-            await saveToDB("sengoku_save_slot" + slotNo, encryptedData);
+            const storageKey = "sengoku_save_slot" + slotNo;
+            await saveToDB(storageKey, encryptedData);
+            // IndexedDBの完了通知だけで「ロード可能」とは報告しない。
+            // 実際に再読込でき、保存時刻を含む現行スキーマが復元できたことを確認する。
+            const writtenData = this.decodeStoredData(await loadFromDB(storageKey));
+            if (!this.isLoadableSaveData(writtenData) || Number(writtenData.saveTimestamp) !== Number(data.saveTimestamp)) {
+                throw new Error('保存直後の読み戻し検証に失敗しました。');
+            }
             this.game.hasSaveData = true; // ★追加：セーブしたので「データあり」の印をつけます
             
             // ★追加：もしメニューが開いていたら、ロードボタンを押せるように画面を更新します
@@ -816,6 +838,7 @@ class SaveManager {
             // SaveManagerは現在仕様として、手動のUint8Arrayと低メモリ用オートセーブのオブジェクトを両方扱います。
             const data = await this._createSaveDataObj({ includeThumbnail: false });
             if (!data) return;
+            this._validateSaveDataStructure(data);
             await saveToDB("sengoku_autosave_slot" + autoSaveIndex, data);
             // オートセーブもロード可能データなので、システムメニューのロード可否へ即時反映します。
             this.game.hasSaveData = true;

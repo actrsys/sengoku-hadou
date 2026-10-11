@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r446');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r447');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6834,8 +6834,10 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, historyEntries: ['旧文字列履歴'] }), /historyEntries/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, aiOperations: { operations: {} } }), /aiOperations/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, scenarioFolder: 'missing' }), /未登録のシナリオ/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, originalClanId: 999, isDiplomaticMarriageActive: true }] }), /originalClanId/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, currentClanId: 999, isDiplomaticMarriageActive: true }] }), /currentClanId/);
+    assert.strictEqual(manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, originalClanId: 999, isDiplomaticMarriageActive: true }] }), true, '姫の生家は現存しない歴史的勢力IDを許容する');
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, originalClanId: -1, isDiplomaticMarriageActive: true }] }), /originalClanId/);
+    assert.strictEqual(manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, currentClanId: 999, isDiplomaticMarriageActive: true }] }), true, '姫の過去の嫁ぎ先は滅亡勢力でも保持する');
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, currentClanId: -2, isDiplomaticMarriageActive: true }] }), /currentClanId/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, husbandId: 999, isDiplomaticMarriageActive: true }] }), /husbandId/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 999, legionNo: 1, commanderId: 0, establishedTurnId: 0 }] }), /legions\[0\]\.clanId/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 1, legionNo: 1, commanderId: 999, establishedTurnId: 0 }] }), /commanderId/);
@@ -14837,6 +14839,155 @@ test('r446 戦闘開始の大名居城陥落判定は恒久本拠地を参照す
     assert.match(src, /const defHomeCastle = this\.game\.getDaimyoHomeCastle\(defClan\)/);
     assert.match(src, /const isDaimyoCastle = Boolean\(defHomeCastle && Number\(defHomeCastle\.id\) === Number\(defCastle\.id\)\)/);
     assert.doesNotMatch(src, /const isDaimyoCastle\s*=\s*\(defDaimyo.*castleId/);
+});
+
+// r447: 1570年は滅亡勢力所属の死亡/未登場武将と、既に滅亡した生家・嫁ぎ先を記録する姫がいる。
+// 現行の実データから生成した保存を無効と誤判定しないことを、両シナリオで検証する。
+test('r447 1560・1570年の実シナリオから作った保存はどちらも有効として読める', async () => {
+    const ctx = createContext({ TextEncoder, TextDecoder, Uint8Array,
+        LifeStatusRules: { isUnavailable: p => p.status === 'dead' || p.status === 'unborn' },
+        FamilyLinker: { rebuildAllFamilyIds() {} },
+        PortraitRules: { getLatestYearFace() { return null; } }
+    });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/models.js');
+    loadScript(ctx, 'js/data_manager.js');
+    loadScript(ctx, 'js/save_manager.js');
+    const common = getRuntimeData().common;
+    const Manager = vm.runInContext('DataManager', ctx);
+    const classes = Object.fromEntries(['Clan','Castle','Busho','Princess','Legion','Kunishu','Province']
+        .map(key => [key, vm.runInContext(key, ctx)]));
+    const scenarioList = getRuntimeData().index.scenarios;
+    ctx.__defs = scenarioList;
+    vm.runInContext('SCENARIOS.splice(0, SCENARIOS.length, ...__defs)', ctx);
+    for (const folder of ['1560_okehazama', '1570_anegawa']) {
+        const scenario = getRuntimeData(folder).scenario;
+        ctx.MainParams.StartYear = Number(scenario.scenario.startYear);
+        const rows = (master, state, options) => Manager.mergeMasterAndState(master, state, folder, options);
+        const clans = Manager.applyDiplomacyToClanRows(rows(common.clansMaster, scenario.clansState, {enabledOnly:true}), scenario.diplomacy)
+            .map(data => new classes.Clan(data));
+        const castles = rows(common.castlesMaster, scenario.castlesState, {enabledOnly:true}).map(data => new classes.Castle(data));
+        const bushos = rows(common.warriorsMaster, scenario.warriorsState, {requireAllMaster:true}).map(data => new classes.Busho(data));
+        const princesses = rows(common.princessMaster, scenario.princessState, {requireAllMaster:true}).map(data => new classes.Princess(data));
+        const legions = scenario.legions.map(data => new classes.Legion(data));
+        const kunishus = scenario.kunishus.map(data => new classes.Kunishu(data));
+        const provinces = common.provinces.map(data => new classes.Province(data));
+        Manager.joinData(clans, castles, bushos, princesses, legions);
+        const game = {
+            year: ctx.MainParams.StartYear, month: Number(scenario.scenario.startMonth),
+            gameStartYear: ctx.MainParams.StartYear, gameStartMonth: Number(scenario.scenario.startMonth),
+            scenarioFolder: folder, castles, bushos, princesses, clans, provinces, legions,
+            kunishuSystem: { kunishus }, mapWidth: 3140, mapHeight: 2440,
+            playerClanId: clans[0].id, turnQueue: castles.slice(0, 1), currentIndex: 0, flags: {},
+            aiOperationManager: { save() { return {operations:{},draftBases:{},grandObjectives:{},historyOwnedCastles:{}}; } },
+            historySystem: { serialize() { return []; } }
+        };
+        const saver = new ctx.SaveManager(game);
+        const data = await saver._createSaveDataObj({ includeThumbnail: false });
+        assert.strictEqual(saver.isLoadableSaveData(data), true, `${folder} は保存直後に無効表示されない`);
+        const storedPayload = saver._encryptData(data);
+        assert.strictEqual(saver.isLoadableSaveData(saver.decodeStoredData(storedPayload)), true,
+            `${folder} は暗号化・復号後にもスロット一覧からロード可能と判定される`);
+        const lostWarriors = data.bushos.filter(b => b.clan > 0 && !clans.some(c => c.id === b.clan));
+        if (folder === '1570_anegawa') {
+            assert.strictEqual(lostWarriors.length, 106, '1570年の歴史的所属情報を削除せず保持する');
+            assert.ok(lostWarriors.every(b => b.status === 'dead' || b.status === 'unborn'));
+        }
+        const tampered = { ...data, bushos: data.bushos.map((b, i) => i === 0 ? { ...b, clan: 999999, status: 'active' } : b) };
+        assert.strictEqual(saver.isLoadableSaveData(tampered), false, '活動中の武将が不存在勢力に属す破損は拒否する');
+    }
+});
+
+// 成功表示の前にロード可否検査を通し、壊れた新規保存で既存スロットを上書きしない。
+test('r447 不正な保存は上書き前に拒否し、正常な保存はスロット一覧へ復帰する', async () => {
+    const stored = new Map();
+    const ctx = createContext({ TextEncoder, TextDecoder, Uint8Array,
+        document: { getElementById() { return null; }, createElement() { return {classList:{remove(){},add(){}},appendChild(){}}; }, body:{appendChild(){}} }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__stored = stored;
+    vm.runInContext(`saveToDB = async (key, data) => { __stored.set(key, data); };
+        loadFromDB = async key => __stored.get(key) || null;`, ctx);
+    const messages = [];
+    const game = { hasSaveData: false, ui: { showDialog(message) { messages.push(message); }, renderCommandMenu() {} } };
+    const saver = new ctx.SaveManager(game);
+    const valid = {
+        saveSchemaVersion: 2, saveTimestamp: 1770000000000, saveTime: '2026/10/11 09:00',
+        year: 1570, month: 6, gameStartYear: 1570, gameStartMonth: 6,
+        scenarioFolder: '1570_anegawa', scenarioName: '1570年 姉川', scenarioNo: 'シナリオ2',
+        castles: [{id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [10]}],
+        bushos: [{id: 10, clan: 1, castleId: 1, nemesisList: []}],
+        clans: [{id: 1, leaderId: 10}], princesses: [], provinces: [{id: 1}], legions: [], kunishus: [],
+        turnQueueIds: [1], currentIndex: 0, playerClanId: 1, mapWidth: 100, mapHeight: 100,
+        aiOperations: {operations:{},draftBases:{},grandObjectives:{},historyOwnedCastles:{}}, flags: {}, historyEntries: []
+    };
+    saver.showSaveGuard = () => {};
+    saver.hideSaveGuard = () => {};
+    saver._createSaveDataObj = async () => valid;
+    await saver.saveGameToLocal(1);
+    assert.ok(messages.at(-1).includes('完了'), JSON.stringify(messages));
+    assert.strictEqual((await saver.readSaveSlots('sengoku_save_slot', 1))[0].hasData, true);
+    const original = stored.get('sengoku_save_slot1');
+    saver._createSaveDataObj = async () => ({...valid, castles:[{id: 1, ownerClan: 1, castellanId: 10, samuraiIds:[999]}]});
+    await saver.saveGameToLocal(1);
+    assert.ok(messages.at(-1).includes('失敗'));
+    assert.strictEqual(stored.get('sengoku_save_slot1'), original, '検証失敗時は既存の保存バイト列を保護する');
+    assert.strictEqual((await saver.readSaveSlots('sengoku_save_slot', 1))[0].hasData, true);
+});
+
+
+// 自動保存でも現行形式に不適合なスナップショットは書込み前に中止する。
+test('r447 無効なオートセーブは旧スロットと巡回インデックスを上書きしない', async () => {
+    const saved = new Map([['sengoku_autosave_slot1', 'original_valid_bytes']]);
+    const settings = new Map([['autoSaveIndex', '1']]);
+    const ctx = createContext({
+        console: { ...console, error() {} },
+        localStorage: { getItem: k => settings.get(k), setItem: (k, v) => settings.set(k, v) },
+        document: { getElementById() { return null; }, createElement() { return {classList:{remove(){},add(){}},appendChild(){}}; }, body:{appendChild(){}} }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__saved = saved;
+    vm.runInContext('saveToDB = async (key, data) => { __saved.set(key, data); };', ctx);
+    const game = { _autoSaveInProgress: false, hasSaveData: false };
+    const saver = new ctx.SaveManager(game);
+    saver.showSaveGuard = () => {};
+    saver.hideSaveGuard = () => {};
+    saver._createSaveDataObj = async () => ({saveSchemaVersion: 2, castles: [], bushos: []});
+    await saver.executeAutoSave();
+    assert.strictEqual(saved.get('sengoku_autosave_slot1'), 'original_valid_bytes');
+    assert.strictEqual(settings.get('autoSaveIndex'), '1', '失敗時は次のスロットへ進まない');
+    assert.strictEqual(game._autoSaveInProgress, false);
+});
+
+test('r447 DB書込成功だけでは完了表示せず読み戻しを検証する', async () => {
+    const messages = [];
+    const ctx = createContext({TextEncoder,TextDecoder,Uint8Array, console: { ...console, error() {} },
+        document: { getElementById() { return null; }, createElement() { return {classList:{remove(){},add(){}},appendChild(){}}; }, body:{appendChild(){}} }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__store = new Map();
+    vm.runInContext(`saveToDB = async (key, value) => { __store.set(key, value); };
+        loadFromDB = async () => null;`, ctx);
+    const game = { hasSaveData: false, ui: { showDialog(m) { messages.push(m); } } };
+    const saver = new ctx.SaveManager(game);
+    saver.showSaveGuard = () => {};
+    saver.hideSaveGuard = () => {};
+    saver._createSaveDataObj = async () => ({
+        saveSchemaVersion:2,saveTimestamp:1770000000000,saveTime:'2026/10/11 09:00',
+        year:1560,month:4,gameStartYear:1560,gameStartMonth:4,scenarioFolder:'1560_okehazama',
+        scenarioName:'1560年 桶狭間',scenarioNo:'シナリオ1',
+        castles:[{id:1,ownerClan:1,castellanId:10,samuraiIds:[10]}],
+        bushos:[{id:10,clan:1,castleId:1,nemesisList:[]}],clans:[{id:1,leaderId:10}],
+        princesses:[],provinces:[{id:1}],legions:[],kunishus:[],turnQueueIds:[1],currentIndex:0,
+        playerClanId:1,mapWidth:100,mapHeight:100,
+        aiOperations:{operations:{},draftBases:{},grandObjectives:{},historyOwnedCastles:{}},flags:{},historyEntries:[]
+    });
+    await saver.saveGameToLocal(1);
+    assert.ok(ctx.__store.has('sengoku_save_slot1'), 'DBの書込み自体は成功している');
+    assert.ok(messages.some(m => m.includes('失敗')), '読戻し失敗時は成功扱いしない');
+    assert.ok(!messages.some(m => m.includes('完了')));
+    assert.strictEqual(game.hasSaveData, false, '読み戻せない保存でロードボタンを有効化しない');
 });
 
 Promise.all(pendingTests).then(() => {
