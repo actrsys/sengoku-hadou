@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r484');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r485');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -17150,6 +17150,81 @@ test('r484 出陣・援軍等の資源残数は不正タグをテキストとし
     for (const [id, val] of Object.entries(values)) {
         assert.strictEqual(cells.get(id).textContent, val, `${id}の元の文字列はテキストノードへ入る`);
     }
+});
+
+
+test('r485 武将一覧の姓名・勢力・所在・派閥をHTMLとして解釈しない', () => {
+    const hostile = '<img src=x onerror=alert(1)>';
+    const clan = { id: 1, name: '大名家' + hostile, leaderId: 100 };
+    const castle = { id: 2, name: '城' + hostile, investigatedUntil: 0 };
+    const busho = {
+        id: 100, familyName: '姓' + hostile, givenName: '名' + hostile,
+        name: '姓名' + hostile, clan: 1, castleId: 2, factionName: '派閥' + hostile,
+        isActionDone: false, isDaimyo: false, isAutoLeader: false, birthYear: 1530,
+        getSalary() { return 120; }
+    };
+    const ctx = createContext({
+        document: { body: { classList: new FakeClassList(['is-pc']) }, getElementById() { return null; } },
+        BushoStatusRules: { isRonin() { return false; } },
+        StatPresenter: {
+            getDisplayStatHTML() { return 'A'; },
+            getBushoRankName() { return '家臣'; },
+            toAptitudeHTML() { return 'B'; }
+        }
+    });
+    loadScript(ctx, 'js/ui_info.js');
+    loadScript(ctx, 'js/ui_info_busho.js');
+    const info = Object.create(vm.runInContext('UIInfoManager', ctx).prototype);
+    info.ui = { currentCastle: castle, selectorList: null };
+    info.game = {
+        playerClanId: 1, year: 1570,
+        getBusho(id) { return id === 100 ? busho : null; },
+        getClan(id) { return id === 1 ? clan : null; },
+        getCastle(id) { return id === 2 ? castle : null; },
+        getClanGunshi() { return null; }, getClanDaimyo() { return busho; },
+        getCurrentTurnId() { return 10; },
+        kunishuSystem: { getKunishu() { return null; } }
+    };
+    info.bushoCurrentScope = 'clan';
+    info.bushoCurrentSortKey = null;
+    info.bushoIsSortAsc = true;
+    info.commonSelectedIds = [];
+    info._acquireCommonModalAIGuardHide = () => {};
+    info._getCachedListItems = (key, cacheKey, produce) => produce();
+    info._renderListModal = config => { info.__lastRows = config.items; };
+    info._updateBushoSelectorUI = () => {};
+    info._withChoiceSound = fn => fn;
+
+    const extra = { customBushos: [busho], customIsMulti: false };
+    const check = tab => {
+        info.bushoCurrentTab = tab;
+        info._renderBushoSelector('all_busho_list', 0, extra, null);
+        const html = info.__lastRows[0].cells.join('');
+        assert.ok(!html.includes(hostile), `${tab}: HTMLタグを生のまま挿入しない`);
+        assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'), `${tab}: 元の文字列を文字実体参照として保持`);
+        assert.ok(html.includes('col-name'), `${tab}: 一覧の列構造を保持`);
+        return html;
+    };
+    const statusHtml = check('status');
+    assert.ok(statusHtml.includes('派閥&lt;img'), '派閥名の表示を保護');
+    assert.ok(statusHtml.includes('城&lt;img'), '在城拠点の表示を保護');
+    assert.ok(statusHtml.includes('大名家&lt;img'), '勢力名の表示を保護');
+    const statsHtml = check('stats');
+    assert.ok(statsHtml.includes('busho-compressed-text'), '姓名の文字圧縮を維持');
+    check('aptitude');
+
+    // 仮想スクロール経路も同じ行生成関数を通ることを確認する。
+    info.bushoSavedData = null;
+    info.bushoSavedBushos = null;
+    info.bushoSavedSortedBushos = null;
+    info.bushoCurrentTab = 'status';
+    const many = Array.from({ length: 151 }, (_, index) => ({ ...busho, id: 1000 + index }));
+    info._renderListModal = config => { info.__lastList = config; };
+    info._renderBushoSelector('all_busho_list', 0, { customBushos: many }, null);
+    assert.strictEqual(typeof info.__lastList.getItem, 'function', '151名以上は仮想リストへ切り替わる');
+    const virtualRow = info.__lastList.getItem(150).cells.join('');
+    assert.ok(!virtualRow.includes(hostile), '仮想一覧も姓名と所属名をHTMLとして挿入しない');
+    assert.ok(virtualRow.includes('派閥&lt;img'), '仮想一覧も派閥名を保護する');
 });
 
 Promise.all(pendingTests).then(() => {

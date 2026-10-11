@@ -1714,3 +1714,8 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 
 - `UISliderManager.openQuantitySelector()` の複数スライダー上部にある資源残数は、HTMLの装飾枠だけを固定テンプレートとして生成し、拠点データ由来の金・兵糧・兵士・軍馬・鉄砲を `textContent` で設定する。外部セーブで数値が改変されていてもHTMLとして解釈しない。以後の資源残数再計算も既存の `updateStock()` を維持する。
 - `docs/audits/r484_数量指定資源残数表示HTML境界監査記録.txt` を参照。兵数上限・資源計算・画面構造・CSS・セーブ形式・管理Excel/BINは変更しない。
+
+## r485 武将一覧の文字列表示境界
+
+- `UIInfoManager._renderBushoSelector()` の姓名圧縮表示、基本タブの身分名、状態タブの勢力名・所在拠点名・派閥名は、共通の `_escapePlainText()` を通してから一覧の `cells` HTMLへ組み込む。
+- 圧縮spanや行装飾・タブ・仮想スクロールの構造を維持する。詳細: `docs/audits/r485_武将一覧表示文字列境界監査記録.txt`。

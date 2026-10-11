@@ -1220,9 +1220,9 @@ Object.assign(UIInfoManager.prototype, {
                     let scale = 1.0 - (text.length - (threshold - 1)) * 0.1;
                     if (scale < 0.55) scale = 0.55;
                     // ★修正：letter-spacingによって削られた右側の空間を「padding-right: 1px;」で補って食い込みを防ぎます
-                    return `<span class="busho-compressed-text" style="--name-font-size:${scale}em; --name-scale-y:${1/scale};">${text}</span>`;
+                    return `<span class="busho-compressed-text" style="--name-font-size:${scale}em; --name-scale-y:${1/scale};">${this._escapePlainText(text)}</span>`;
                 }
-                return text;
+                return this._escapePlainText(text);
             };
 
             let compressedNameHtml = "";
@@ -1250,7 +1250,7 @@ Object.assign(UIInfoManager.prototype, {
                 cells = [
                     !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
                     `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${compressedNameHtml}</span>`,
-                    `<span class="col-rank">${StatPresenter.getBushoRankName(b, this.game)}</span>`,
+                    `<span class="col-rank">${this._escapePlainText(StatPresenter.getBushoRankName(b, this.game))}</span>`,
                     `<span class="col-stat">${getStat('leadership')}</span>`,
                     `<span class="col-stat">${getStat('strength')}</span>`,
                     `<span class="col-stat">${getStat('politics')}</span>`,
@@ -1302,12 +1302,12 @@ Object.assign(UIInfoManager.prototype, {
                 cells = [
                     !hideActionCol ? `<span class="col-act">${inputHtml}${b.isActionDone?'済':'未'}</span>` : null,
                     `<span class="col-name">${hideActionCol && !isViewMode ? inputHtml : ''}${compressedNameHtml}</span>`,
-                    `<span class="col-faction">${forceName}</span>`,
-                    `<span class="col-castle">${bCastleName}</span>`,
+                    `<span class="col-faction">${this._escapePlainText(forceName)}</span>`,
+                    `<span class="col-castle">${this._escapePlainText(bCastleName)}</span>`,
                     `<span class="col-age">${age}</span>`,
                     `<span class="col-family">${familyMark}</span>`,
                     `<span class="col-salary">${salary}</span>`,
-                    `<span class="col-faction-leader">${factionNameStr}</span>`
+                    `<span class="col-faction-leader">${this._escapePlainText(factionNameStr)}</span>`
                 ].filter(Boolean);
             }
             
