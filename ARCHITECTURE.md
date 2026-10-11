@@ -1708,3 +1708,9 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `UIInfoManager._renderForceSelector()` の共通一覧 `cells` は装飾HTMLを保持するため、可変項目の `force.soldiers` と外交関係 `rel.status` / `relStatus` を `UIInfoManager._escapePlainText()` で出力直前にエスケープする。
 - `DiplomacyManager.findAvailableReinforcements()` が返す兵数は拠点データ、外交状態は復元可能な外交データ由来。正規データが数値・既定の状態名であっても、外部セーブで変更された内容をHTMLとして信頼しない。
 - 勢力名・武将名の既存保護、友好度の棒グラフ、選択・援軍依頼のルール、CSS、セーブ形式、管理用Excel/BINは変更しない。詳細は `docs/audits/r483_援軍勢力選択表示境界監査記録.txt`。
+
+
+## r484 数量指定画面の資源残数HTML入力境界
+
+- `UISliderManager.openQuantitySelector()` の複数スライダー上部にある資源残数は、HTMLの装飾枠だけを固定テンプレートとして生成し、拠点データ由来の金・兵糧・兵士・軍馬・鉄砲を `textContent` で設定する。外部セーブで数値が改変されていてもHTMLとして解釈しない。以後の資源残数再計算も既存の `updateStock()` を維持する。
+- `docs/audits/r484_数量指定資源残数表示HTML境界監査記録.txt` を参照。兵数上限・資源計算・画面構造・CSS・セーブ形式・管理Excel/BINは変更しない。

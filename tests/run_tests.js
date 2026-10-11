@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r483');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r484');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -17106,6 +17106,50 @@ test('r483 援軍勢力選択は保存された関係名と兵数もHTMLとし�
         () => {}, null);
     assert.ok(rendered.items[0].cells[2].includes('1500'), '通常の兵数表示は変わらない');
     assert.ok(rendered.items[0].cells[4].includes('同盟</span>'), '通常の外交表示は変わらない');
+});
+
+
+// r484: 複数スライダーの資源残数はセーブ復元値をHTML構造へ埋め込まない。
+test('r484 出陣・援軍等の資源残数は不正タグをテキストとして保持する', () => {
+    const marker = new Error('資源残数DOMの生成で停止');
+    const injected = '<img src=x onerror="window.__owned=1">';
+    const values = {
+        gold: '800' + injected,
+        rice: '300' + injected,
+        soldiers: '500' + injected,
+        horses: '20' + injected,
+        guns: '10' + injected
+    };
+    const cells = new Map();
+    let stockDiv = null;
+    const createNode = () => ({
+        className: '', innerHTML: '',
+        querySelector(selector) {
+            const id = selector.replace(/^#multi-stock-/, '');
+            if (!cells.has(id)) cells.set(id, { textContent: '' });
+            return cells.get(id);
+        }
+    });
+    const container = {
+        innerHTML: '',
+        appendChild(node) { stockDiv = node; throw marker; }
+    };
+    const ctx = createContext({ document: { createElement: createNode } });
+    loadScript(ctx, 'js/ui_slider.js');
+    const Slider = vm.runInContext('UISliderManager', ctx);
+    const ui = {
+        quantityModal: fakeElement('quantity-modal'), quantityContainer: container,
+        currentCastle: { ownerClan: 1, castellanId: 2, ...values },
+        hideAIGuardTemporarily() {}, prepareCoveredViewForOpen() {}
+    };
+    const game = { getClanDaimyo() { return {}; }, getBusho() { return {}; } };
+    const slider = new Slider(ui, game);
+    assert.throws(() => slider.openQuantitySelector('war_supplies', []), err => err === marker);
+    assert.ok(stockDiv, '資源残数欄が構築される');
+    assert.ok(!stockDiv.innerHTML.includes(injected), '保存値がHTML要素として挿入されない');
+    for (const [id, val] of Object.entries(values)) {
+        assert.strictEqual(cells.get(id).textContent, val, `${id}の元の文字列はテキストノードへ入る`);
+    }
 });
 
 Promise.all(pendingTests).then(() => {

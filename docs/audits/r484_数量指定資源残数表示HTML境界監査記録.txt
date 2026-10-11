@@ -1,0 +1,18 @@
+r484 数量指定モーダルの資源残数表示入力境界監査記録
+
+【対象】
+- js/ui_slider.js の UISliderManager.openQuantitySelector()、複数スライダー（出陣、迎撃、援軍、輸送）に共通する上部資源残数欄。
+
+【再現と原因】
+- sourceCastleForMulti の gold/rice/soldiers/horses/guns をテンプレートHTMLへ直接挿入していた。
+- 改変された外部セーブで資源値が文字列へ置換されると、資源残数欄のDOMへHTMLタグが混入する。
+- r483をベースに実際のopenQuantitySelector('war_supplies', ...)を呼び、資源欄DOM作成時点を検査するテストを追加。旧実装ではタグ混入で失敗した。
+
+【修正】
+- 固定のラベルとspan構造だけをinnerHTMLで組み、保存データ由来の値は各span.textContentへ設定する。
+- 更新時のupdateStock()も既存のtextContent方式を維持する。資源の計算式、範囲、操作、レイアウト、CSSには触れない。
+
+【検証】
+- 旧版での再現テスト失敗後、修正実装で同テストを含む基本回帰テスト758件成功。
+- 金、兵糧、兵士、軍馬、鉄砲の各欄について、細工された文字列がinnerHTMLへ直接入らずtextContentへ保持されることを検証。
+- 正規データの表示構造を維持し、管理用Excel・BIN・シナリオ値・セーブ形式・ゲームルールは変更しない。

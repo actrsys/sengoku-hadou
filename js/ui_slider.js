@@ -434,19 +434,30 @@ class UISliderManager {
         if (isMultiSliderMode) {
             const stockDiv = document.createElement('div');
             stockDiv.className = 'slider-stock-info'; // ★CSSに任せる名札
+            // 枠の構造だけをHTMLで生成し、セーブ復元値はテキストとして設定する。
+            // 不正な外部セーブ由来の値がタグ・属性として解釈されることを防ぐ。
             stockDiv.innerHTML = `
                 <div class="stock-grid">
-                    <div class="stock-item"><span class="stock-label">金</span><span id="multi-stock-gold">${sourceCastleForMulti.gold}</span></div>
-                    <div class="stock-item"><span class="stock-label">兵糧</span><span id="multi-stock-rice">${sourceCastleForMulti.rice}</span></div>
-                    <div class="stock-item"><span class="stock-label">兵士</span><span id="multi-stock-soldiers">${sourceCastleForMulti.soldiers}</span></div>
-                    <div class="stock-item"><span class="stock-label">軍馬</span><span id="multi-stock-horses">${sourceCastleForMulti.horses || 0}</span></div>
-                    <div class="stock-item"><span class="stock-label">鉄砲</span><span id="multi-stock-guns">${sourceCastleForMulti.guns || 0}</span></div>
+                    <div class="stock-item"><span class="stock-label">金</span><span id="multi-stock-gold"></span></div>
+                    <div class="stock-item"><span class="stock-label">兵糧</span><span id="multi-stock-rice"></span></div>
+                    <div class="stock-item"><span class="stock-label">兵士</span><span id="multi-stock-soldiers"></span></div>
+                    <div class="stock-item"><span class="stock-label">軍馬</span><span id="multi-stock-horses"></span></div>
+                    <div class="stock-item"><span class="stock-label">鉄砲</span><span id="multi-stock-guns"></span></div>
                 </div>
             `;
-            this.ui.quantityContainer.appendChild(stockDiv);
+            const initialStocks = {
+                gold: sourceCastleForMulti.gold,
+                rice: sourceCastleForMulti.rice,
+                soldiers: sourceCastleForMulti.soldiers,
+                horses: sourceCastleForMulti.horses || 0,
+                guns: sourceCastleForMulti.guns || 0
+            };
             ['gold', 'rice', 'soldiers', 'horses', 'guns'].forEach(id => {
-                stockEls[id] = stockDiv.querySelector(`#multi-stock-${id}`);
+                const el = stockDiv.querySelector(`#multi-stock-${id}`);
+                if (el) el.textContent = initialStocks[id] ?? 0;
+                stockEls[id] = el;
             });
+            this.ui.quantityContainer.appendChild(stockDiv);
         }
         
         if (type === 'draft') {
