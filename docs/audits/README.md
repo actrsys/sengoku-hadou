@@ -75,3 +75,5 @@
 - `InterviewView._renderConversationMessage()` は会話の句点・改行を `DialogueTextRules` に従って整形した後、自由なHTMLではなく `textContent` として描画する。会話テキスト内の任意タグ・インラインイベントは解釈しない。
 - 面談一覧と面談下部の顔画像は `StatPresenter.safeFaceIconPath()` で同梱の画像ファイル名を検証する。画像未設定・不正値は従来どおり不明画像へフォールバックする。人物名は既存の DOM `textContent` を維持する。
 - ゲームルール・面談判定・会話の文面生成・ダイアログ配置・セーブスキーマ・管理用Excel・BINは変更しない。詳細は `docs/audits/r480_面談会話顔画像セキュリティ監査記録.txt`。
+
+- [r481 武将詳細の所在・主君・派閥・技能表示HTML境界監査記録](r481_武将詳細技能状態表示HTML境界監査記録.txt)

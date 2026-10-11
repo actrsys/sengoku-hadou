@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r480');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r481');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -16901,6 +16901,104 @@ test('r480 面談の武将選択一覧も安全な顔画像パスを使用する
     assert.strictEqual(grid.children[0].children[0].src, 'data/images/faceicons/unknown_face.webp');
     assert.strictEqual(grid.children[1].children[0].src, 'data/images/faceicons/portrait.webp');
     assert.strictEqual(grid.children[0].children[1].children[0].textContent, '安全表示');
+});
+
+// 武将詳細は、セーブから復元した技能・所在・主君・派閥文字列を描画する。
+// 表示HTMLの装飾を保持しながら、データ値がタグや属性へ昇格しないことを直接検証する。
+function createR481BushoDetailHarness(tab, skillValue = '猛将') {
+    const ctx = createContext({
+        document: { body: { classList: { contains: () => true } } },
+        BushoStatusRules: { isRonin: () => false },
+        StatPresenter: {
+            getBushoRankName: () => '城主',
+            getDisplayStatHTML: () => 'A',
+            getPerceivedStatValue: () => 75,
+            toAptitudeHTML: () => 'A'
+        },
+        SkillManager: {
+            getSkillList: busho => busho.skill.split('|'),
+            getSkillDescription: name => `説明：${name}<svg onload=alert(2)>`
+        }
+    });
+    loadScript(ctx, 'js/ui_info.js');
+    loadScript(ctx, 'js/ui_info_busho.js');
+    const Manager = vm.runInContext('UIInfoManager', ctx);
+    const ui = Object.create(Manager.prototype);
+    const hostile = '<img src=x onerror=alert(1)>';
+    const descText = { innerHTML: '' };
+    const aptArea = { style: {} };
+    const descArea = { style: {} };
+    const detailContainer = { addEventListener() {} };
+    const skillBox = {
+        dataset: { skillName: skillValue },
+        addEventListener(event, handler) { if (event === 'click') this.click = handler; }
+    };
+    const listContainer = {
+        className: '', style: {}, scrollTop: 0, innerHTML: '',
+        querySelector(selector) {
+            return ({
+                '#busho-aptitude-area': aptArea,
+                '#busho-skill-desc-area': descArea,
+                '#busho-skill-desc-text': descText,
+                '.daimyo-detail-container': detailContainer
+            })[selector] || null;
+        },
+        querySelectorAll(selector) { return selector === '.skill-box-clickable' ? [skillBox] : []; }
+    };
+    ui._openInfoShell = () => ({ listContainer, tabsEl: null });
+    ui._releaseBushoSelectorTransientStateForDetail = () => {};
+    ui.bushoDetailCurrentTab = tab;
+    ui.game = {
+        playerClanId: 2, year: 1560,
+        getClan: () => ({ name: '大名家', leaderId: 42 }),
+        getBusho: () => ({ name: '主君' + hostile }),
+        getCastle: () => ({ name: '拠点' + hostile, legionId: 0 }),
+        getClanGunshi: () => null, getClanDaimyo: () => null
+    };
+    const busho = {
+        id: 1, name: '武将', clan: 2, castleId: 10,
+        isDaimyo: false, birthYear: 1520,
+        factionName: '派閥' + hostile, isFactionLeader: true,
+        skill: skillValue, getSalary: () => 120
+    };
+    return { ui, busho, listContainer, skillBox, descText, hostile, aptArea, descArea };
+}
+
+test('r481 武将詳細の基本タブは所在・主君・派閥名をHTMLとして解釈しない', () => {
+    const h = createR481BushoDetailHarness('status');
+    h.ui._renderBushoDetail(h.busho);
+    const html = h.listContainer.innerHTML;
+    assert.ok(html.includes('拠点&lt;img src=x onerror=alert(1)&gt;'), '拠点名を文字列化');
+    assert.ok(html.includes('主君&lt;img src=x onerror=alert(1)&gt;'), '主君名を文字列化');
+    assert.ok(html.includes('派閥&lt;img src=x onerror=alert(1)&gt; 筆頭'), '派閥名を文字列化');
+    assert.ok(!html.includes('<img src=x onerror='), '名前からHTML要素を作らない');
+    assert.ok(html.includes('120'), '従来の俸禄と状態レイアウトを保持する');
+});
+
+test('r481 武将詳細の技能名は本文とdata属性の両方を保護し、説明文も安全に表示する', () => {
+    const skill = '\"><svg onload=alert(1)>';
+    const h = createR481BushoDetailHarness('aptitude', skill);
+    h.ui._renderBushoDetail(h.busho);
+    const html = h.listContainer.innerHTML;
+    assert.ok(html.includes('data-skill-name="&quot;&gt;&lt;svg onload=alert(1)&gt;"'), '属性の引用符とタグを無害化する');
+    assert.ok(html.includes('&quot;&gt;&lt;svg onload=alert(1)&gt;</span>'), '表示名も無害化する');
+    assert.ok(!html.includes('<svg onload='), '技能名が実要素にならない');
+    assert.strictEqual(typeof h.skillBox.click, 'function', '既存の技能説明クリックを維持する');
+    h.skillBox.click({ stopPropagation() {} });
+    assert.ok(h.descText.innerHTML.includes('&lt;svg onload=alert(1)&gt;'), '説明ヘッダーを文字列化');
+    assert.ok(h.descText.innerHTML.includes('&lt;svg onload=alert(2)&gt;'), '技能説明本文を文字列化');
+    assert.ok(!h.descText.innerHTML.includes('<svg onload='), 'クリック後も実要素にしない');
+    assert.strictEqual(h.aptArea.style.display, 'none');
+    assert.strictEqual(h.descArea.style.display, 'flex');
+});
+
+test('r481 正規技能名と空欄のHTML表示を従来どおり保持する', () => {
+    const h = createR481BushoDetailHarness('aptitude', '猛将');
+    h.ui._renderBushoDetail(h.busho);
+    const html = h.listContainer.innerHTML;
+    assert.ok(html.includes('data-skill-name="猛将"'));
+    assert.ok(html.includes('<span class="daimyo-detail-value">猛将</span>'));
+    assert.ok(html.includes('<span class="daimyo-detail-value">&nbsp;</span>'), '未設定の技能は空欄のまま');
 });
 
 Promise.all(pendingTests).then(() => {

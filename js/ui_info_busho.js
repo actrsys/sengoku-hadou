@@ -320,14 +320,14 @@ Object.assign(UIInfoManager.prototype, {
             const infoHtml = `
                 <div class="busho-detail-info-column">
                     <div class="busho-detail-group">
-                        ${makeRow('所在', castleName)}
-                        ${makeRow('主君', lordName)}
+                        ${makeRow('所在', this._escapePlainText(castleName))}
+                        ${makeRow('主君', this._escapePlainText(lordName))}
                     </div>
                     <div class="busho-detail-group">
                         ${makeRow('年齢', ageStr !== "" ? ageStr : "&nbsp;")}
                         ${makeRow('俸禄', salary !== "" ? salary : "&nbsp;")}
                         ${makeRow('一門', isFamily ? "◯" : "&nbsp;")}
-                        ${makeRow('派閥', factionNameStr !== "" ? factionNameStr : "&nbsp;")}
+                        ${makeRow('派閥', factionNameStr !== "" ? this._escapePlainText(factionNameStr) : "&nbsp;")}
                     </div>
                 </div>
             `;
@@ -384,14 +384,14 @@ Object.assign(UIInfoManager.prototype, {
                 for (let j = 0; j < 2; j++) {
                     let index = i + j;
                     if (index < 3) {
-                        let skillName = skills[index] || "&nbsp;";
+                        const skillName = skills[index] ? this._escapePlainText(skills[index]) : "&nbsp;";
 
                         // ★ここから追加：技能がある箱だけクリックできるようにクラスや情報を付けます
                         let clickClass = "";
                         let dataAttr = "";
                         if (skills[index]) {
                             clickClass = "skill-box-clickable";
-                            dataAttr = `data-skill-name="${skills[index]}"`;
+                            dataAttr = `data-skill-name="${this._escapePlainText(skills[index])}"`;
                         }
                         
                         rowInnerHtml += `<div class="daimyo-detail-stat-box ${clickClass}" ${dataAttr}><span class="daimyo-detail-label">技能${index + 1}</span><span class="daimyo-detail-value">${skillName}</span></div>`;
@@ -538,8 +538,8 @@ Object.assign(UIInfoManager.prototype, {
                                 
                                 // 説明文をセットして、瞬時に表示を切り替えます
                                 descText.innerHTML = `
-                                    <div class="busho-skill-desc-title">【${skillName}】</div>
-                                    <div class="busho-skill-desc-body">${desc}</div>
+                                    <div class="busho-skill-desc-title">【${this._escapePlainText(skillName)}】</div>
+                                    <div class="busho-skill-desc-body">${this._escapePlainText(desc)}</div>
                                 `;
                                 aptArea.style.display = 'none';
                                 descArea.style.display = 'flex';

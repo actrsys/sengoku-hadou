@@ -1694,3 +1694,10 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `InterviewView` の会話本文は `DialogueTextRules` による組版規則を適用したうえで `textContent` として出力し、HTMLとして解釈しない。本文に含まれる人物名などの外部セーブ由来文字列を信頼しない。既存の会話文の句点・改行処理は変更しない。
 - 面談の一覧・下部会話の顔画像は共通 `StatPresenter.safeFaceIconPath()` を利用し、同梱顔画像ファイル名以外は `unknown_face.webp` へフォールバックする。人物名は DOM の `textContent` を維持する。
 - 詳細: `docs/audits/r480_面談会話顔画像セキュリティ監査記録.txt`。
+
+
+## r481 武将詳細の状態・技能表示境界
+
+- `UIInfoManager._renderBushoDetail()` の基本タブに表示する所在・主君・派閥の名称は、データ値を直接HTMLへ連結せず `_escapePlainText()` を使用する。列伝タブの高さ合わせに使う参照HTMLにも同じ安全化済みの要素を渡す。
+- 技能名は `SkillManager.getSkillList()` が返す元の技能名を維持し、UI出力時にテキストおよび `data-skill-name` 属性の両方をエスケープする。技能説明を開く場合も見出し・本文のデータ値を安全化し、説明のクリック操作と意匠HTMLは維持する。未設定技能の空欄 `&nbsp;` はエスケープ対象のデータ文字列として扱わない。
+- 改修は表示境界に限定し、技能判定、能力値、セーブスキーマ、管理用Excel/BINには触れない。旧版失敗の再現テストを追加。詳細: `docs/audits/r481_武将詳細技能状態表示HTML境界監査記録.txt`。
