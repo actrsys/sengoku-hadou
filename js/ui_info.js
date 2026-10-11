@@ -3165,9 +3165,9 @@ class UIInfoManager {
                 cells: [
                     `<strong class="col-kunishu-name">${this._escapePlainText(force.name)}</strong>`,
                     `<span class="col-leader-name">${this._escapePlainText(force.leaderName)}</span>`,
-                    `<span>${force.soldiers}</span>`,
+                    `<span>${this._escapePlainText(force.soldiers)}</span>`,
                     `<span>${friendBarHtml}</span>`,
-                    `<span class="${statusClass} list-text-strong">${relStatus}</span>`
+                    `<span class="${statusClass} list-text-strong">${this._escapePlainText(relStatus)}</span>`
                 ],
                 itemClass: isSelected ? "selected" : ""
             });

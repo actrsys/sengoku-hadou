@@ -53,6 +53,7 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `js/turn_manager.js` — 月初・各拠点ターン・月末の進行順を管理。月次の具体的な計算式は持たず、FactionSystem / EconomyRules / DomesticRules / PersonnelRules / AIStaffing 等へ委譲する。
 - `js/data_manager.js` — `data/scenarios/index.bin` のシナリオ定義、`data/common.bin` の共通マスター、`data/scenarios/<folder>/scenario.bin` の年代別stateを読み込み、IDで結合して既存モデルへ渡す。実行時はCSVを読まない。共通マスターはシナリオ切替でも再利用できるようキャッシュし、年代別stateだけを切り替える。城色画像は各城の種点座標だけを帯状解析し、国境画像は国IDマップへ変換する。その後、各国のピクセルを国内の最寄り城へ割り当てて領土用の城IDマップを構築する。巨大RGBAや全画面BFSキューは常駐保持せず、地図UI・イベントは同一TypedArrayを共有する。タイトル復帰・シナリオ切替時は `releaseMapResources()` を正規窓口として旧国/城IDマップの参照を切り、新しい地図生成時のピークメモリへ重ねない。
 - シナリオ登録の正本は `data/scenarios/index.bin` とし、`SCENARIOS` は起動時にそこから展開する実行時配列に限定する。削除済み・開発用シナリオをコードへ登録だけ残して選択可能にしない。シナリオ選択UIには実データと分離した選択不可のダミースロットを置いて複数件時の密度を確認できるようにし、`tests/visual/guide.html` の確認用モックも同じ考え方で維持する。4件以下は一列の見た目を保ち、5件以上では同じカード意匠のままPC・スマホとも2列へ切り替えて、少数時の間延びと件数増加時の縦スクロールをどちらも抑える。ダミーを `SCENARIOS` や保存対象のシナリオとして扱わない。
+- **シナリオ定義の入力境界:** `DataManager.loadScenarioDefinitions()` は `tools/data_converter.html` の `scenario_info.folder` と同じ `[A-Za-z0-9_-]+` を実行時にも検証する。不正な `index.bin` は部分登録せず拒否し、`loadAll()` のURLを構築する前にも登録済みの安全なfolderか確認する。シナリオ選択の名称・説明は `UIManager.showScenarioSelection()` の表示境界で `textContent` として描画し、選択・ダミースロット・改行表示の従来構造は保つ。
 
 ### 管理用Excelと実行用BIN
 
@@ -1701,3 +1702,9 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `UIInfoManager._renderBushoDetail()` の基本タブに表示する所在・主君・派閥の名称は、データ値を直接HTMLへ連結せず `_escapePlainText()` を使用する。列伝タブの高さ合わせに使う参照HTMLにも同じ安全化済みの要素を渡す。
 - 技能名は `SkillManager.getSkillList()` が返す元の技能名を維持し、UI出力時にテキストおよび `data-skill-name` 属性の両方をエスケープする。技能説明を開く場合も見出し・本文のデータ値を安全化し、説明のクリック操作と意匠HTMLは維持する。未設定技能の空欄 `&nbsp;` はエスケープ対象のデータ文字列として扱わない。
 - 改修は表示境界に限定し、技能判定、能力値、セーブスキーマ、管理用Excel/BINには触れない。旧版失敗の再現テストを追加。詳細: `docs/audits/r481_武将詳細技能状態表示HTML境界監査記録.txt`。
+
+## r483 セキュリティ監査：援軍勢力選択の外交状態・兵数表示
+
+- `UIInfoManager._renderForceSelector()` の共通一覧 `cells` は装飾HTMLを保持するため、可変項目の `force.soldiers` と外交関係 `rel.status` / `relStatus` を `UIInfoManager._escapePlainText()` で出力直前にエスケープする。
+- `DiplomacyManager.findAvailableReinforcements()` が返す兵数は拠点データ、外交状態は復元可能な外交データ由来。正規データが数値・既定の状態名であっても、外部セーブで変更された内容をHTMLとして信頼しない。
+- 勢力名・武将名の既存保護、友好度の棒グラフ、選択・援軍依頼のルール、CSS、セーブ形式、管理用Excel/BINは変更しない。詳細は `docs/audits/r483_援軍勢力選択表示境界監査記録.txt`。

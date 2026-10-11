@@ -1,0 +1,25 @@
+r482 シナリオ定義・シナリオ選択表示の入力境界監査記録
+
+【監査対象】
+- js/ui.js の showScenarioSelection：data/scenarios/index.bin 由来の name / desc を使用する画面。
+- js/data_manager.js の loadScenarioDefinitions / loadAll：登録フォルダの検証とシナリオBIN URL構築。
+- tools/data_converter.html の scenario_info.folder 許可規則との一貫性。
+
+【確認した問題】
+1. シナリオ名・説明を未加工で innerHTML に埋め込んでいた。index.bin に不正なマークアップが混入した場合、選択画面でDOMとして解釈され得た。
+2. BIN変換ツールはfolderを英数字・アンダースコア・ハイフンへ制限していた一方、実行時のindex.bin読み込みは任意のfolder文字列を登録できた。URLパスへ流れる入力に対する二重チェックが不足していた。
+
+【修正】
+- 名前は strong 要素の textContent、説明は scenario-desc-text 要素の textContent へ挿入する。初回選択・切替時とも同じ処理を共用。
+- データ管理層に isValidScenarioFolder() を追加し、変換ツールと同じ命名規則で index.bin の全登録を検査する。不正行は全体の読込を拒否して既存の登録を破壊しない。
+- loadAll() の登録確認時にもfolder形式を確認してからURLを組み立てる。
+- UIレイアウト、改行CSS、選択確認、8つのダミースロット、PC/スマホの表示方針は変更しない。
+
+【再現と検証】
+- 旧版では新設した2件のテストが失敗。未処理HTMLと不正folder受理を確認。
+- 修正後は計756件の回帰テストを通過。不正タグ、正常な選択・切替、許可folder、親階層・区切り文字・null行の拒否を含む。
+- Excel/BIN/シナリオ内容やセーブスキーマ、AI・戦闘ルールは不変更。
+
+【補足】
+- このリスクは主に改変された配布データ等を読み込む場合に生じる。外部から誰でもindex.binを書き換えられると断定するものではない。
+- 他の動的HTML生成箇所について、包括的な安全性まで保証したものではない。

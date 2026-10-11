@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r481');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r483');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -16999,6 +16999,113 @@ test('r481 正規技能名と空欄のHTML表示を従来どおり保持する',
     assert.ok(html.includes('data-skill-name="猛将"'));
     assert.ok(html.includes('<span class="daimyo-detail-value">猛将</span>'));
     assert.ok(html.includes('<span class="daimyo-detail-value">&nbsp;</span>'), '未設定の技能は空欄のまま');
+});
+
+// r482: シナリオ一覧はindex.bin由来の表示文字列をHTMLとして解釈しない。
+test('r482 シナリオ選択の名前・説明は不正なタグをDOM化せず文字列として保持する', () => {
+    function node() {
+        const el = {
+            children: [], style: {}, textContent: '',
+            classList: { add() {}, remove() {}, toggle() {} },
+            appendChild(child) { this.children.push(child); return child; },
+            querySelector() { return null; },
+            setAttribute() {}
+        };
+        let html = '';
+        Object.defineProperty(el, 'innerHTML', {
+            get() { return html; },
+            set(value) { html = value; this.children = []; }
+        });
+        return el;
+    }
+    const descBox = node();
+    const scenarioList = node();
+    const screen = node();
+    const confirm = node();
+    const ctx = createContext({
+        document: {
+            getElementById(id) { return ({ 'scenario-desc-box': descBox, 'scenario-confirm-btn': confirm })[id] || null; },
+            createElement: node
+        },
+        GameConfig: { Main: { ScenarioSelection: { PlaceholderSlots: 1 } } }
+    });
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const ui = Object.create(UI.prototype);
+    ui.forceResetModals = () => {};
+    ui.scenarioScreen = screen;
+    ui.scenarioList = scenarioList;
+    const evilName = '永禄 <img src=x onerror=alert(1)>';
+    const evilDesc = '桶狭間 <svg onload=alert(2)> & 現代';
+    const scenarios = [
+        { folder: '1560_okehazama', name: evilName, desc: evilDesc },
+        { folder: '1570_anegawa', name: '姉川', desc: '元亀元年' }
+    ];
+    let selected = null;
+    ui.showScenarioSelection(scenarios, folder => { selected = folder; });
+    assert.strictEqual(scenarioList.children[0].children[0].textContent, evilName, 'シナリオ名は文字列として追加される');
+    assert.strictEqual(descBox.children[0].textContent, evilDesc, '初期選択の説明は文字列として追加される');
+    assert.ok(!scenarioList.children[0].innerHTML.includes('<img'), '名称のHTML直接挿入をしない');
+    assert.ok(!descBox.innerHTML.includes('<svg'), '説明のHTML直接挿入をしない');
+    scenarioList.children[1].onclick();
+    assert.strictEqual(descBox.children[0].textContent, '元亀元年', '選択切替時もテキスト更新');
+    confirm.onclick();
+    assert.strictEqual(selected, '1570_anegawa', '既存のシナリオ確定動作を維持');
+    assert.strictEqual(scenarioList.children.length, 3, '確認用ダミースロット数を維持');
+});
+
+// r482: converterのfolder命名規則は、実行時の読み込み境界でも保証する。
+test('r482 不正なシナリオfolderをindex読込時に拒否し、正規folderは受理する', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/data_manager.js');
+    const Manager = vm.runInContext('DataManager', ctx);
+    const makeBundle = folder => ({
+        format: 'sengoku-scenario-index-v1', schemaVersion: 1,
+        scenarios: [{ folder, name: '試験', desc: '試験説明' }]
+    });
+    Manager.fetchCompressedJson = async () => makeBundle('../escape');
+    await assert.rejects(() => Manager.loadScenarioDefinitions(true), /folder|フォルダ|不正/, '親ディレクトリ参照は拒否');
+    Manager.fetchCompressedJson = async () => makeBundle('1560_okehazama');
+    const valid = await Manager.loadScenarioDefinitions(true);
+    assert.strictEqual(valid.length, 1);
+    assert.strictEqual(valid[0].folder, '1560_okehazama');
+    Manager.fetchCompressedJson = async () => makeBundle('a/b');
+    await assert.rejects(() => Manager.loadScenarioDefinitions(true), /folder|フォルダ|不正/, '区切り文字も拒否');
+    Manager.fetchCompressedJson = async () => ({
+        format: 'sengoku-scenario-index-v1', schemaVersion: 1, scenarios: [null]
+    });
+    await assert.rejects(() => Manager.loadScenarioDefinitions(true), /folder|フォルダ|不正/, 'null行も拒否');
+    assert.strictEqual(Manager.getScenarioDefinition('1560_okehazama').folder, '1560_okehazama', '不正な再読込で旧登録を破壊しない');
+});
+
+
+// r483: 援軍の勢力選択で、名称だけでなく外交状態と兵数も復元データ由来となる。
+test('r483 援軍勢力選択は保存された関係名と兵数もHTMLとして解釈しない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ui_info.js');
+    const UI = vm.runInContext('UIInfoManager', ctx);
+    const view = Object.create(UI.prototype);
+    const malicious = '<img src=x onerror="window.__owned=1">';
+    view.game = {
+        playerClanId: 1,
+        getRelation: () => ({ sentiment: 80, status: '同盟' + malicious })
+    };
+    let rendered;
+    view._renderListModal = config => { rendered = config; };
+    view.updateCommonConfirmBtn = () => {};
+    view._renderForceSelector([{ id: 2, name: '同盟家', leaderName: '城主', soldiers: '1000' + malicious }],
+        () => {}, null, '対象の勢力を選択してください');
+    const cells = rendered.items[0].cells;
+    assert.ok(cells[2].includes('1000&lt;img'), '兵数も安全な表示文字列である');
+    assert.ok(cells[4].includes('同盟&lt;img'), '外交状態を安全な表示文字列に変換する');
+    assert.ok(!cells.join('').includes('<img '), '悪意あるタグをDOMとして渡さない');
+    assert.ok(cells[3].includes('<span'), '友好度の既存装飾は保持する');
+
+    view.game.getRelation = () => ({ sentiment: 100, status: '同盟' });
+    view._renderForceSelector([{ id: 2, name: '同盟家', leaderName: '城主', soldiers: 1500 }],
+        () => {}, null);
+    assert.ok(rendered.items[0].cells[2].includes('1500'), '通常の兵数表示は変わらない');
+    assert.ok(rendered.items[0].cells[4].includes('同盟</span>'), '通常の外交表示は変わらない');
 });
 
 Promise.all(pendingTests).then(() => {

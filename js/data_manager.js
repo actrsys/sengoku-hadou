@@ -36,6 +36,12 @@ class DataManager {
     static commonDataCache = null;
     static commonDataPromise = null;
 
+    // BIN変換ツールのscenario_info.folderと同じ命名規則を実行時にも保証する。
+    // folderはURLパスに使う識別子であり、相対パス・絶対パスを受け付けない。
+    static isValidScenarioFolder(folder) {
+        return typeof folder === 'string' && /^[A-Za-z0-9_-]+$/.test(folder);
+    }
+
     static async loadScenarioDefinitions(force = false) {
         if (!force && this.scenarioDefinitionsLoaded && SCENARIOS.length > 0) return SCENARIOS;
         if (!force && this.scenarioDefinitionsPromise) return this.scenarioDefinitionsPromise;
@@ -44,6 +50,11 @@ class DataManager {
             this.assertDataBundle(bundle, 'sengoku-scenario-index-v1');
             const definitions = Array.isArray(bundle.scenarios) ? bundle.scenarios : [];
             if (definitions.length === 0) throw new Error('シナリオ一覧が空です');
+            // 登録を破壊する前に全行を検査し、不正なindex.binは取り込まない。
+            const invalidFolderIndex = definitions.findIndex(item => !item || !this.isValidScenarioFolder(String(item.folder || '').trim()));
+            if (invalidFolderIndex >= 0) {
+                throw new Error(`シナリオfolderが不正です: ${String(definitions[invalidFolderIndex]?.folder ?? '')}`);
+            }
             SCENARIOS.splice(0, SCENARIOS.length, ...definitions.map(item => ({
                 folder: String(item.folder || '').trim(),
                 name: String(item.name || '').trim(),
@@ -153,7 +164,9 @@ class DataManager {
             await this.loadScenarioDefinitions();
             if (!isCurrent()) return null;
             const selectedScenario = this.getScenarioDefinition(folderName);
-            if (!selectedScenario) throw new Error(`未登録のシナリオです: ${folderName}`);
+            if (!this.isValidScenarioFolder(folderName) || !selectedScenario) {
+                throw new Error(`未登録または不正なシナリオfolderです: ${folderName}`);
+            }
             const path = `./data/scenarios/${folderName}/scenario.bin`;
             const [common, scenarioBundle] = await Promise.all([this.loadCommonData(), this.fetchCompressedJson(path)]);
             if (!isCurrent()) return null;

@@ -2321,12 +2321,24 @@ class UIManager {
             if (scenarioContent) scenarioContent.classList.toggle('scenario-layout-many', useMultiColumnLayout);
             
             let selectedScenario = null; // 今選ばれているシナリオを覚えておく箱です
+            // index.bin由来の説明はHTMLでなくテキストとして表示し、既存の装飾classを維持する。
+            const showDescription = description => {
+                if (!descBox) return;
+                descBox.innerHTML = '';
+                const descEl = document.createElement('div');
+                descEl.className = 'scenario-desc-text';
+                descEl.textContent = String(description ?? '');
+                descBox.appendChild(descEl);
+                descBox.style.display = 'flex';
+            };
 
             scenarios.forEach((s, index) => {
                 const div = document.createElement('div'); 
                 div.className = 'clan-btn';
                 // 名前だけを真ん中に表示するようにします
-                div.innerHTML = `<strong>${s.name}</strong>`;
+                const nameEl = document.createElement('strong');
+                nameEl.textContent = String(s.name ?? '');
+                div.appendChild(nameEl);
                 
                 div.onclick = () => { 
                     if (selectedScenario !== s) {
@@ -2338,10 +2350,7 @@ class UIManager {
                         selectedScenario = s;
 
                         // 下の説明用の窓に文章を出して、見えるようにします
-                        if (descBox) {
-                            descBox.innerHTML = `<div class="scenario-desc-text">${s.desc}</div>`;
-                            descBox.style.display = 'flex';
-                        }
+                        showDescription(s.desc);
                     }
                 };
                 this.scenarioList.appendChild(div);
@@ -2350,10 +2359,7 @@ class UIManager {
                 if (index === 0) {
                     div.classList.add('selected');
                     selectedScenario = s;
-                    if (descBox) {
-                        descBox.innerHTML = `<div class="scenario-desc-text">${s.desc}</div>`;
-                        descBox.style.display = 'flex';
-                    }
+                    showDescription(s.desc);
                 }
             });
 
