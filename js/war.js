@@ -423,6 +423,10 @@ class WarManager {
 
     startSiegeWarPhase() {
         const s = this.state; const W = window.WarParams.War;
+        // 攻城戦開始時の援軍兵数を一度だけ記録する。攻城中の被害は
+        // distributeDamage等で既に各援軍の兵数へ反映されるため、帰還時に
+        // 全軍の生存率をもう一度掛けてはならない。
+        this.recordSiegeReinforcementStartingSoldiers(s);
         
         if (!s.isKunishuSubjugation) {
             const dropLoyalty = Math.floor(s.defender.peoplesLoyalty * 0.2);
@@ -532,7 +536,9 @@ class WarManager {
                     } else {
                         let took = army.soldiers;
                         applyDamageToArmy(army, role, took);
-                        unassignedDmg -= sliceToApply; 
+                        // 部隊が損害の割当量を受け切れない場合、実際に減った兵数だけ
+                        // 未配分量から引く。余剰は残存部隊へ引き継ぐ。
+                        unassignedDmg -= took;
                         newlyDead = true;
                     }
                 });

@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r454');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r459');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -15516,6 +15516,221 @@ test('r454 配布物の監査記録は専用フォルダへ集約し直下へ置
     assert.deepStrictEqual(stray, [], '監査記録がプロジェクト直下へ逆戻りしない');
     assert.ok(fs.existsSync(path.join(ROOT, 'docs/audits/README.md')));
     assert.ok(fs.existsSync(path.join(ROOT, 'docs/audits/r454_援軍資源と配布構成監査記録.txt')));
+});
+
+
+// r455: 守備側野戦の主軍・自軍援軍・同盟援軍は別々の拠点から出撃する。
+test('r455 守備側迎撃で援軍兵を本城から二重に差し引かない', () => {
+    const ctx = createContext({WarManager: class WarManager {}});
+    loadScript(ctx, 'js/war_effort.js');
+    const war = new ctx.WarManager();
+    war.state = {
+        defSelfReinforcement: {bushos: [{id: 20}], soldiers: 800},
+        defReinforcement: {bushos: [{id: 30}], soldiers: 500}
+    };
+    const assignments = [
+        {busho: {id: 10}, soldiers: 1200},
+        {busho: {id: 20}, soldiers: 800},
+        {busho: {id: 30}, soldiers: 500}
+    ];
+    const fortressBefore = 5000;
+    const deployedFromFortress = war.getFieldDefenderMainSoldiers(assignments);
+    assert.strictEqual(deployedFromFortress, 1200);
+    assert.strictEqual(fortressBefore - deployedFromFortress + 1200, fortressBefore,
+        '無損害なら自軍援軍・同盟援軍の参戦で本城兵を失わない');
+    assert.strictEqual(war.getFieldDefenderMainSoldiers([{busho:{id:10},soldiers:1200}]), 1200);
+    war.state = {defSelfReinforcement: null, defReinforcement: null};
+    assert.strictEqual(war.getFieldDefenderMainSoldiers(assignments), 2500,
+        '援軍がない編成は従来どおり全兵を本城から出撃させる');
+    const source = read('js/war_effort.js');
+    assert.ok(source.includes('const fieldMainDefSoldiers = this.getFieldDefenderMainSoldiers(defAssignments);'));
+    assert.ok(source.includes('defCastle.soldiers = Math.max(0, defCastle.soldiers - fieldMainDefSoldiers);'));
+    assert.ok(source.includes('this.state.defender.fieldSoldiers = fieldMainDefSoldiers;'));
+});
+
+
+
+// r456: 攻城戦ではdistributeDamageが各援軍の兵数をすでに減算している。
+// 帰還時に全軍の生存率を二重適用せず、各援軍の実損害だけを回復対象にする。
+test('r456 攻城戦の援軍帰還で戦死者を二重計上しない', () => {
+    const ctx = createContext({WarParams: {War: {}}});
+    loadScript(ctx, 'js/war.js');
+    loadScript(ctx, 'js/war_effort.js');
+    const War = vm.runInContext('WarManager', ctx);
+    const manager = new War({});
+    const state = {
+        attacker: { soldiers: 1000, horses: 0, guns: 0 },
+        defender: { soldiers: 1000 },
+        reinforcement: { soldiers: 500, fieldLoss: 0, bushos: [{ id: 3 }] },
+        selfReinforcement: null, defReinforcement: null, defSelfReinforcement: null,
+        deadSoldiers: { attacker: 0, defender: 0 }
+    };
+    manager.state = state;
+    manager.recordSiegeReinforcementStartingSoldiers(state);
+    const damage = manager.distributeDamage(false, 300);
+    assert.strictEqual(damage.total, 300);
+    assert.strictEqual(state.reinforcement.soldiers, 350,
+        '攻城戦の攻撃による援軍150人の損害は戦闘中に確定済み');
+    const result = manager.getReinforcementReturnCounts(state.reinforcement, 'reinforcement', state);
+    assert.strictEqual(result.survivingSoldiers, 350,
+        'すでに減った兵数へ全軍の生存率を再適用しない');
+    assert.strictEqual(result.siegeLoss, 150);
+    assert.strictEqual(result.totalLoss, 150);
+    // 相手方と別援軍の損害を、無傷の援軍へ割り振らない。
+    const unaffected = { soldiers: 500, fieldLoss: 0 };
+    const secondState = { attacker: { soldiers: 1000 }, reinforcement: { soldiers: 500 }, selfReinforcement: unaffected };
+    manager.recordSiegeReinforcementStartingSoldiers(secondState);
+    secondState.reinforcement.soldiers = 350;
+    assert.strictEqual(manager.getReinforcementReturnCounts(unaffected, 'selfReinforcement', secondState).totalLoss, 0);
+    // 守備側も同じ計算で、野戦の損害と攻城戦の損害を分離する。
+    const defenseState = { defReinforcement: {soldiers: 800, fieldLoss: 200} };
+    manager.recordSiegeReinforcementStartingSoldiers(defenseState);
+    defenseState.defReinforcement.soldiers = 700;
+    const defenseCounts = manager.getReinforcementReturnCounts(defenseState.defReinforcement, 'defReinforcement', defenseState);
+    assert.strictEqual(defenseCounts.survivingSoldiers, 700);
+    assert.strictEqual(defenseCounts.fieldLoss, 200);
+    assert.strictEqual(defenseCounts.siegeLoss, 100);
+    assert.strictEqual(defenseCounts.totalLoss, 300);
+    manager.recordSiegeReinforcementStartingSoldiers(defenseState);
+    assert.strictEqual(manager.getReinforcementReturnCounts(defenseState.defReinforcement, 'defReinforcement', defenseState).siegeLoss, 100,
+        '攻城戦中に開始時の兵数を上書きしない');
+    // 野戦のみで攻城戦へ入らなかった場合、野戦損害だけを回復対象にする。
+    const fieldOnly = manager.getReinforcementReturnCounts({ soldiers: 400, fieldLoss: 100 }, 'reinforcement', {});
+    assert.strictEqual(fieldOnly.survivingSoldiers, 400);
+    assert.strictEqual(fieldOnly.totalLoss, 100);
+    assert.ok(read('js/war.js').includes('this.recordSiegeReinforcementStartingSoldiers(s);'));
+    assert.ok(read('js/war_effort.js').includes('this.getReinforcementReturnCounts(reinf, reinforcementKey, s)'));
+});
+
+
+// r457: 攻城戦で士気崩壊・全滅・撤退となった援軍も、その時点までの
+// 攻城損害を負傷兵回復対象にする。野戦だけで撤退した場合の既存計算は維持。
+test('r457 攻城戦途中離脱援軍の損害・回復対象を失わない', () => {
+    const ctx = createContext({WarParams: {War: {}}});
+    loadScript(ctx, 'js/war.js');
+    loadScript(ctx, 'js/war_effort.js');
+    const War = vm.runInContext('WarManager', ctx);
+    const manager = new War({});
+    const cases = [
+        ['reinforcement', true], ['selfReinforcement', true],
+        ['defReinforcement', false], ['defSelfReinforcement', false]
+    ];
+    for (const [key, isAttackerData] of cases) {
+        const army = {soldiers: 500, fieldLoss: 80, bushos:[{id:1}]};
+        const state = { [key]: army, retreatedReinforcements: [] };
+        manager.state = state;
+        manager.recordSiegeReinforcementStartingSoldiers(state);
+        // 攻城戦で兵150を失って撤退、野戦では既に80人が減少済み。
+        army.soldiers = 350;
+        manager.retreatReinforcementForce(key);
+        assert.strictEqual(state[key], null, `${key}: 撤退後は戦闘に残さない`);
+        assert.strictEqual(state.retreatedReinforcements.length, 1);
+        const record = state.retreatedReinforcements[0];
+        assert.strictEqual(record.isAttackerData, isAttackerData);
+        assert.strictEqual(record.reinforcementKey, key, `${key}: 攻城開始時の記録へ再照合できる`);
+        const counts = manager.getReinforcementReturnCounts(record.data, record.reinforcementKey, state);
+        assert.strictEqual(counts.survivingSoldiers, 350);
+        assert.strictEqual(counts.siegeLoss, 150, `${key}: 途中撤退の攻城損害を算入`);
+        assert.strictEqual(counts.totalLoss, 230, `${key}: 野戦80と攻城150を合算`);
+        assert.strictEqual(350 + Math.floor(counts.totalLoss * 0.3), 419,
+            `${key}: 同じ撤退回復率を使うと419人（野戦80だけなら374人）`);
+    }
+    // 野戦後、攻城へ入らず撤退する場合の損害集計は従来のまま。
+    manager.state = {reinforcement: {soldiers: 400, fieldLoss: 100, bushos: [{id:2}]}};
+    manager.retreatReinforcementForce('reinforcement');
+    const ret = manager.state.retreatedReinforcements[0];
+    assert.strictEqual(manager.getReinforcementReturnCounts(ret.data, ret.reinforcementKey, manager.state).totalLoss, 100);
+    // 攻城戦開始時記録と途中離脱した援軍の経路が共通の正本へ接続されている。
+    assert.ok(read('js/war_effort.js').includes('this.getReinforcementReturnCounts(reinf, ret.reinforcementKey, s)'));
+});
+
+
+// r458: 援軍出発後に城側が徴兵して上限へ近づいたケース。
+// 実際には受け入れられない帰還兵を士気・訓練度の加重に含めない。
+test('r458 援軍帰還時の兵数上限で士気・訓練度が逸脱しない', () => {
+    const ctx = createContext({WarManager: class WarManager {}});
+    loadScript(ctx, 'js/war_effort.js');
+    const manager = new ctx.WarManager();
+    const returning = {morale: 100, training: 100};
+
+    const almostFull = {soldiers: 99000, morale: 100, training: 100};
+    const accepted = manager.mergeReturnedReinforcementReadiness(almostFull, returning, 5000);
+    assert.strictEqual(accepted, 999, '上限までに入る兵数のみ受け入れる');
+    assert.strictEqual(almostFull.soldiers, 99999);
+    assert.strictEqual(almostFull.morale, 100, '士気が100を超えてはならない');
+    assert.strictEqual(almostFull.training, 100, '訓練度が100を超えてはならない');
+
+    const room = {soldiers: 1000, morale: 40, training: 30};
+    assert.strictEqual(manager.mergeReturnedReinforcementReadiness(room, {morale: 80, training: 70}, 1000), 1000);
+    assert.deepStrictEqual([room.soldiers, room.morale, room.training], [2000, 60, 50],
+        '上限未満の場合の従来の加重平均は変えない');
+
+    const limited = {soldiers: 90000, morale: 20, training: 30};
+    assert.strictEqual(manager.mergeReturnedReinforcementReadiness(limited, {morale: 80, training: 90}, 40000), 9999);
+    assert.deepStrictEqual([limited.soldiers, limited.morale, limited.training], [99999, 25, 35],
+        '一部しか受け入れられない場合にも旧兵・受入兵だけを加重する');
+
+    const full = {soldiers: 99999, morale: 35, training: 45};
+    assert.strictEqual(manager.mergeReturnedReinforcementReadiness(full, returning, 500), 0);
+    assert.deepStrictEqual([full.soldiers, full.morale, full.training], [99999, 35, 45],
+        '満員の場合は士気・訓練度も変化させない');
+    assert.ok(read('js/war_effort.js').includes('this.mergeReturnedReinforcementReadiness(helperCastle, reinf, finalReturnSoldiers)'),
+        '本番の援軍帰還処理から検査済みの計算を使う');
+});
+
+// r459: 攻城戦の損害均等配分で、小部隊が二段階目に全滅しても
+// 残余ダメージを生存部隊へ正しく引き継ぐ。
+test('r459 攻城戦の損害再配分で余剰ダメージが消失しない', () => {
+    const ctx = createContext({WarParams: {War: {}}});
+    loadScript(ctx, 'js/war.js');
+    const War = vm.runInContext('WarManager', ctx);
+    const manager = new War({});
+    const run = (defender, main, self, ally, damage) => {
+        const s = {
+            attacker: {soldiers: main, horses: main, guns: 0},
+            defender: {soldiers: defender, horses: defender, guns: 0},
+            selfReinforcement: {soldiers: self, horses: self, guns: 0},
+            reinforcement: {soldiers: ally, horses: ally, guns: 0},
+            defSelfReinforcement: {soldiers: self, horses: self, guns: 0},
+            defReinforcement: {soldiers: ally, horses: ally, guns: 0},
+            deadSoldiers: {attacker: 0, defender: 0}
+        };
+        manager.state = s;
+        return s;
+    };
+    const atk = run(100, 1, 12, 100, 30);
+    const atkResult = manager.distributeDamage(false, 30);
+    assert.strictEqual(atkResult.total, 30, '損害30は全30を計上する');
+    assert.strictEqual(atk.deadSoldiers.attacker, 30);
+    assert.strictEqual(atk.attacker.soldiers + atk.selfReinforcement.soldiers + atk.reinforcement.soldiers, 83,
+        '初期113人から30人だけ減る');
+    assert.strictEqual(atk.reinforcement.soldiers, 83, '再配分の不足分は残る援軍へ移る');
+    assert.strictEqual(Object.values(atkResult.details).reduce((a,b) => a + b,0), 30);
+    const def = run(1, 100, 12, 100, 30);
+    const defResult = manager.distributeDamage(true, 30);
+    assert.strictEqual(defResult.total, 30, '守備側でも不足分を正しく配分する');
+    assert.strictEqual(def.deadSoldiers.defender, 30);
+    assert.strictEqual(def.defender.soldiers + def.defSelfReinforcement.soldiers + def.defReinforcement.soldiers, 83);
+    const allDestroyed = run(1, 1, 2, 3, 500);
+    const allResult = manager.distributeDamage(false, 500);
+    assert.strictEqual(allResult.total, 6, '兵数以上に戦死者を発生させない');
+
+    // 兵力差・再配分の段階によらず、実損害は指示損害と残存兵数の小さい方。
+    for (const main of [0, 1, 2, 7, 29, 100]) {
+        for (const self of [0, 1, 2, 7, 29, 100]) {
+            for (const ally of [0, 1, 2, 7, 29, 100]) {
+                for (const damage of [0, 1, 2, 9, 30, 100, 250]) {
+                    const state = run(0, main, self, ally, damage);
+                    const result = manager.distributeDamage(false, damage);
+                    const expected = Math.min(main + self + ally, damage);
+                    const remaining = state.attacker.soldiers + state.selfReinforcement.soldiers + state.reinforcement.soldiers;
+                    assert.strictEqual(result.total, expected, `攻城兵 ${main}/${self}/${ally}、損害${damage}`);
+                    assert.strictEqual(remaining, main + self + ally - expected);
+                    assert.strictEqual(state.deadSoldiers.attacker, expected);
+                }
+            }
+        }
+    }
 });
 
 Promise.all(pendingTests).then(() => {

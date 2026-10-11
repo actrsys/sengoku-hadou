@@ -7,6 +7,69 @@
 // Object.assign を使って、WarManager に魔法をくっつけます！
 Object.assign(WarManager.prototype, {
 
+    // 各援軍の攻城開始時兵数を保存する。野戦を経由した場合は野戦後の実数が基準。
+    recordSiegeReinforcementStartingSoldiers(state = this.state) {
+        if (!state || state._siegeReinforcementStartSoldiers) return;
+        const initial = {};
+        for (const key of ['reinforcement', 'selfReinforcement', 'defReinforcement', 'defSelfReinforcement']) {
+            if (state[key]) initial[key] = Math.max(0, Number(state[key].soldiers) || 0);
+        }
+        state._siegeReinforcementStartSoldiers = initial;
+    },
+
+    // 帰還処理では現在の実兵数をそのまま生存者とする。
+    // 攻城損害は開始時との差、野戦損害はFieldWar側のfieldLossを正本とする。
+    getReinforcementReturnCounts(reinf, reinforcementKey, state = this.state) {
+        const survivingSoldiers = Math.max(0, Number(reinf && reinf.soldiers) || 0);
+        const fieldLoss = Math.max(0, Number(reinf && reinf.fieldLoss) || 0);
+        const initial = state && state._siegeReinforcementStartSoldiers;
+        const initialSiegeSoldiers = initial ? initial[reinforcementKey] : undefined;
+        const siegeLoss = Number.isFinite(initialSiegeSoldiers)
+            ? Math.max(0, initialSiegeSoldiers - survivingSoldiers)
+            : 0;
+        return { survivingSoldiers, fieldLoss, siegeLoss, totalLoss: fieldLoss + siegeLoss };
+    },
+
+    // 援軍帰還で拠点が兵数上限に達する場合、士気・訓練度には実際に
+    // 受け入れた兵だけを反映する。受け入れられない兵まで加重すると
+    // 士気・訓練度が100を超え、次の戦闘へ不正な値を持ち越してしまう。
+    mergeReturnedReinforcementReadiness(helperCastle, reinf, returningSoldiers) {
+        const oldSoldiers = Math.max(0, Number(helperCastle.soldiers) || 0);
+        const acceptedSoldiers = Math.min(
+            Math.max(0, 99999 - oldSoldiers),
+            Math.max(0, Number(returningSoldiers) || 0)
+        );
+        const newSoldiers = oldSoldiers + acceptedSoldiers;
+        if (newSoldiers > 0 && acceptedSoldiers > 0) {
+            helperCastle.training = Math.floor(
+                ((helperCastle.training ?? 50) * oldSoldiers +
+                 (reinf.training ?? 50) * acceptedSoldiers) / newSoldiers
+            );
+            helperCastle.morale = Math.floor(
+                ((helperCastle.morale ?? 50) * oldSoldiers +
+                 (reinf.morale ?? 50) * acceptedSoldiers) / newSoldiers
+            );
+        }
+        helperCastle.soldiers = newSoldiers;
+        return acceptedSoldiers;
+    },
+
+    // 守備側野戦へ出る本城兵だけを数える。自城以外の援軍は出発元で既に
+    // 兵数を減算済みなので、ここで本城から再び差し引かない。
+    // FieldWarManager も各部隊の武将IDで主軍・援軍を分離して帰還させる。
+    getFieldDefenderMainSoldiers(defAssignments) {
+        const reinforcementBushoIds = new Set();
+        for (const reinf of [this.state && this.state.defSelfReinforcement, this.state && this.state.defReinforcement]) {
+            if (reinf && Array.isArray(reinf.bushos)) {
+                reinf.bushos.forEach(busho => reinforcementBushoIds.add(busho.id));
+            }
+        }
+        return (Array.isArray(defAssignments) ? defAssignments : []).reduce((total, assignment) => {
+            if (!assignment || !assignment.busho || reinforcementBushoIds.has(assignment.busho.id)) return total;
+            return total + Math.max(0, Number(assignment.soldiers) || 0);
+        }, 0);
+    },
+
     // ★追加：通知やアニメーションを表示するかどうかを判定する一元管理の魔法
     canShowNotify(isPlayerFactionInvolved, isPlayerInvolved = false) {
         // プレイヤー自身が操作・関与している戦闘なら、絶対に表示します！
@@ -1301,13 +1364,13 @@ Object.assign(WarManager.prototype, {
                     if (choice === 'field') {
                         this.state.atkAssignments = atkAssignments; this.state.defAssignments = defAssignments; 
                         
-                        let fieldTotalDefSoldiers = 0; if(defAssignments) defAssignments.forEach(a => fieldTotalDefSoldiers += a.soldiers);
-                        defCastle.soldiers = Math.max(0, defCastle.soldiers - fieldTotalDefSoldiers);
+                        const fieldMainDefSoldiers = this.getFieldDefenderMainSoldiers(defAssignments);
+                        defCastle.soldiers = Math.max(0, defCastle.soldiers - fieldMainDefSoldiers);
                         defCastle.rice = Math.max(0, defCastle.rice - (defRice || 0));
                         defCastle.horses = Math.max(0, (defCastle.horses || 0) - interceptHorses);
                         defCastle.guns = Math.max(0, (defCastle.guns || 0) - interceptGuns);
                         
-                        this.state.defender.fieldSoldiers = fieldTotalDefSoldiers;
+                        this.state.defender.fieldSoldiers = fieldMainDefSoldiers;
                         this.state.defFieldRice = defRice || 0; 
                         this.state.defender.fieldHorses = interceptHorses;
                         this.state.defender.fieldGuns = interceptGuns;
@@ -1389,6 +1452,7 @@ Object.assign(WarManager.prototype, {
         // その時の兵士数などの「今の状態」をそのままリストにメモします
         s.retreatedReinforcements.push({
             data: reinf,
+            reinforcementKey: reinfKey, // 攻城開始時の援軍別兵数と照合するためのキー
             isAttackerData: (reinfKey === 'reinforcement' || reinfKey === 'selfReinforcement')
         });
         
@@ -1640,39 +1704,8 @@ Object.assign(WarManager.prototype, {
             
             // ★ここから「生存率の計算」と「援軍の帰還処理」を丸ごと新しくします！
             
-            // 1. 攻城戦の本当の死者を出す（全体の死者から、野戦の死者を引きます）
-            let siegeDeadAtk = s.deadSoldiers.attacker;
-            let siegeDeadDef = s.deadSoldiers.defender;
-            
-            if (s.fieldDeadSoldiers) {
-                siegeDeadAtk = Math.max(0, s.deadSoldiers.attacker - s.fieldDeadSoldiers.attacker);
-                siegeDeadDef = Math.max(0, s.deadSoldiers.defender - s.fieldDeadSoldiers.defender);
-            }
-
-            // 2. 攻城戦の開始時の全兵力を計算する（メイン部隊と援軍をすべて足します）
-            const currentAtkMain = Math.max(0, s.attacker.soldiers);
-            const currentAtkAlly = s.reinforcement ? Math.max(0, s.reinforcement.soldiers) : 0;
-            const currentAtkSelfAlly = s.selfReinforcement ? Math.max(0, s.selfReinforcement.soldiers) : 0;
-            const totalCurrentAtk = currentAtkMain + currentAtkAlly + currentAtkSelfAlly;
-            
-            let atkSurviveRate = 1.0;
-            let siegeStartAtk = totalCurrentAtk;
-            if (siegeDeadAtk > 0) {
-                siegeStartAtk = totalCurrentAtk + siegeDeadAtk;
-                atkSurviveRate = Math.max(0, totalCurrentAtk) / Math.max(1, siegeStartAtk);
-            }
-
-            const currentDefMain = Math.max(0, s.defender.soldiers);
-            const currentDefAlly = s.defReinforcement ? Math.max(0, s.defReinforcement.soldiers) : 0;
-            const currentDefSelfAlly = s.defSelfReinforcement ? Math.max(0, s.defSelfReinforcement.soldiers) : 0;
-            const totalCurrentDef = currentDefMain + currentDefAlly + currentDefSelfAlly;
-
-            let defSurviveRate = 1.0;
-            let siegeStartDef = totalCurrentDef;
-            if (siegeDeadDef > 0) {
-                siegeStartDef = totalCurrentDef + siegeDeadDef;
-                defSurviveRate = Math.max(0, totalCurrentDef) / Math.max(1, siegeStartDef);
-            }
+            // 攻城損害は各援軍の兵数へ既に反映済み。
+            // 全軍から再計算した生存率を掛けると、実際に受けた損害を二度引く。
 
             // ★変更：リアルタイムで減らした最新の馬と鉄砲の数をそのまま使うようにし、
             // 今まで使っていた「逆算して二重に減らしてしまう魔法」を撤去しました！
@@ -1696,21 +1729,11 @@ Object.assign(WarManager.prototype, {
             };
 
             // 4. 援軍部隊を元の城に帰還させるお帰り魔法
-            const returnReinforcement = (reinf, isAttackerData) => {
+            const returnReinforcement = (reinf, isAttackerData, reinforcementKey) => {
                 if (!reinf) return;
-                
-                // 野戦で減った数（メモ用紙から読み取ります）
-                const fieldLoss = reinf.fieldLoss || 0;
-                
-                // 新しく計算した生存率を使います！
-                let surviveRate = isAttackerData ? atkSurviveRate : defSurviveRate;
-                
-                // 攻城戦を生き残った数
-                const surviveSoldiers = Math.floor(reinf.soldiers * surviveRate);
-                // 攻城戦で減った数
-                const siegeLoss = reinf.soldiers - surviveSoldiers;
-                // トータルの負傷兵
-                const totalLoss = fieldLoss + siegeLoss;
+
+                const { survivingSoldiers: surviveSoldiers, totalLoss } =
+                    this.getReinforcementReturnCounts(reinf, reinforcementKey, s);
                 
                 // メイン部隊が吸い込まないようにメモしておきます
                 if (isAttackerData) atkReinfTotalLoss += totalLoss;
@@ -1752,17 +1775,10 @@ Object.assign(WarManager.prototype, {
                         // 援軍部隊が持っている残りの兵糧をそのまま持ち帰ります
                         let returnRice = reinf.rice || 0;
                         
-                        const oldSoldiers = helperCastle.soldiers;
-                        helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + finalReturnSoldiers);
+                        this.mergeReturnedReinforcementReadiness(helperCastle, reinf, finalReturnSoldiers);
                         helperCastle.rice = Math.min(99999, helperCastle.rice + returnRice);
                         helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + returnHorses);
                         helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + returnGuns);
-                        
-                        // ★追加：帰ってきた兵士たちの士気と訓練度を、お城の兵士たちと混ぜ合わせます！
-                        if (helperCastle.soldiers > 0 && finalReturnSoldiers > 0) {
-                            helperCastle.training = Math.floor(((helperCastle.training ?? 50) * oldSoldiers + (reinf.training ?? 50) * finalReturnSoldiers) / helperCastle.soldiers);
-                            helperCastle.morale = Math.floor(((helperCastle.morale ?? 50) * oldSoldiers + (reinf.morale ?? 50) * finalReturnSoldiers) / helperCastle.soldiers);
-                        }
                         
                         reinf.bushos.forEach(b => {
                             this.game.affiliationSystem.setCastleIdRaw(b, helperCastle.id); 
@@ -1789,10 +1805,10 @@ Object.assign(WarManager.prototype, {
                 }
             };
 
-            returnReinforcement(s.selfReinforcement, true);
-            returnReinforcement(s.reinforcement, true);
-            returnReinforcement(s.defSelfReinforcement, false);
-            returnReinforcement(s.defReinforcement, false);
+            returnReinforcement(s.selfReinforcement, true, 'selfReinforcement');
+            returnReinforcement(s.reinforcement, true, 'reinforcement');
+            returnReinforcement(s.defSelfReinforcement, false, 'defSelfReinforcement');
+            returnReinforcement(s.defReinforcement, false, 'defReinforcement');
             
             // 5. 途中で撤退した援軍たちを、無事にお城へ帰してあげる魔法
             if (s.retreatedReinforcements) {
@@ -1800,18 +1816,19 @@ Object.assign(WarManager.prototype, {
                     const reinf = ret.data;
                     const isAttackerData = ret.isAttackerData;
                     
-                    // 野戦で減った数（メモ用紙）から、回復する負傷兵を計算します！
-                    const fieldLoss = reinf.fieldLoss || 0;
-                    
-                    // ★追加: 個別に撤退しているので、ここは確実に撤退時の回復率計算を使います！
-                    let recRate = getGroupRecoveryRate(reinf.bushos, true);
-                    
-                    const recovered = Math.floor(fieldLoss * recRate);
-                    const finalReturnSoldiers = reinf.soldiers + recovered;
-                    
-                    // 吸い込み防止のメモ用紙にも、この負傷兵を記録しておきます
-                    if (isAttackerData) atkReinfTotalLoss += fieldLoss;
-                    else defReinfTotalLoss += fieldLoss;
+                    // 攻城中に退いた援軍も、通常帰還と同じ損害正本を使う。
+                    // 野戦だけで退いた場合は攻城開始記録がなく、従来の fieldLoss のみとなる。
+                    const { survivingSoldiers, totalLoss } =
+                        this.getReinforcementReturnCounts(reinf, ret.reinforcementKey, s);
+
+                    // 個別撤退した部隊には従来の撤退回復率を適用する。
+                    const recRate = getGroupRecoveryRate(reinf.bushos, true);
+                    const recovered = Math.floor(totalLoss * recRate);
+                    const finalReturnSoldiers = survivingSoldiers + recovered;
+
+                    // 野戦損害と攻城損害の両方を全軍側の集計へ反映する。
+                    if (isAttackerData) atkReinfTotalLoss += totalLoss;
+                    else defReinfTotalLoss += totalLoss;
                     
                     if (reinf.isKunishuForce) {
                         const kunishu = this.game.kunishuSystem.getKunishu(reinf.kunishuId);
