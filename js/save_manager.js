@@ -736,13 +736,21 @@ class SaveManager {
     async saveGameToLocal(slotNo = 1) { 
         this.showSaveGuard(); // ★追加：保存中のバリアを張ります
         try {
+            const storageKey = "sengoku_save_slot" + slotNo;
+            // 一覧表示後に保存領域の読込が失敗し始めた場合は、
+            // 読めない既存スロットを上書きしない。新しい大容量スナップショットの
+            // 生成前に確認し、低メモリ端末で旧・新データを同時保持しない。
+            try {
+                await loadFromDB(storageKey);
+            } catch (error) {
+                throw new Error('保存先スロットの読込に失敗したため、既存データを保護して保存を中止しました。');
+            }
             const data = await this._createSaveDataObj(); // ★待つように変更
             if (!data) return; // 保存準備中に別シナリオへ遷移した場合は書き込まない。
             // 保存済みデータの正本検査と同じ条件で検証してから上書きする。
             // 読めない新データで既存の正常なスロットを置き換える事故を防止。
             this._validateSaveDataStructure(data);
             const encryptedData = this._encryptData(data); // ★暗号化します
-            const storageKey = "sengoku_save_slot" + slotNo;
             await saveToDB(storageKey, encryptedData);
             // IndexedDBの完了通知だけで「ロード可能」とは報告しない。
             // 実際に再読込でき、保存時刻を含む現行スキーマが復元できたことを確認する。
@@ -783,6 +791,12 @@ class SaveManager {
         } catch (e) {
             if (!requestFlow.isLatest()) return;
             console.error("ロードエラー:", e);
+            // DBアクセス失敗と実際の空スロットは別。ロードを中断して再試行を案内する。
+            if (this.game.ui) {
+                this.game.ui.hideLoadingScreen();
+                this.game.ui.showDialog(`スロット${slotNo}の読込に失敗しました。保存領域を確認して再試行してください。`, false);
+            }
+            return;
         }
         if (!requestFlow.isLatest()) return;
 
@@ -919,19 +933,26 @@ class SaveManager {
             Array.from({ length: count }, (_, index) => {
                 const slotNo = index + 1;
                 return loadFromDB(prefix + slotNo)
-                    .then(rawData => ({ slotNo, rawData }))
-                    .catch(() => ({ slotNo, rawData: null }));
+                    .then(rawData => ({ slotNo, rawData, readError: false }))
+                    // DBへのアクセス失敗を「空スロット」と見なすと、読めない既存データを
+                    // 空き扱いして上書きできてしまう。復号・形式不一致とは区別する。
+                    .catch(() => ({ slotNo, rawData: null, readError: true }));
             })
         );
 
-        return rows.map(({ slotNo, rawData }) => {
-            const data = this.decodeStoredData(rawData);
-            const hasData = this.isLoadableSaveData(data);
+        return rows.map(({ slotNo, rawData, readError }) => {
+            const data = readError ? null : this.decodeStoredData(rawData);
+            const hasData = !readError && this.isLoadableSaveData(data);
+            // 現行形式でロード不可でも、DB内に実際のレコードが存在するなら空欄とは表示しない。
+            // 開発中は旧スキーマへの互換処理を持たないが、意図的な上書きは可能にする。
+            const invalidData = !readError && rawData != null && !hasData;
             return {
                 originalSlotNo: slotNo,
                 data,
                 saveTimestamp: hasData ? this.getSaveTimestamp(data) : 0,
-                hasData
+                hasData,
+                readError,
+                invalidData
             };
         });
     }

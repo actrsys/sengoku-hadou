@@ -1192,9 +1192,17 @@ class AIStaffing {
     /** 四半期の全国AI人事。TurnManagerは実行時期だけを決める。 */
     async processQuarterlyStaffing(month, playerClanId) {
         if (![1, 4, 7, 10].includes(month)) return;
+        // 4勢力ごとの描画待ち中に別シナリオへ移った場合の旧人事継続を防ぐ。
+        const turnManager = this.game && this.game.turnManager;
+        const generation = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration() : null;
+        const isCurrentFlow = () => generation === null || !turnManager
+            || typeof turnManager.isTurnFlowGenerationLatest !== 'function'
+            || turnManager.isTurnFlowGenerationLatest(generation);
         let staffingProcessed = 0;
 
         for (const clan of this.game.clans) {
+            if (!isCurrentFlow()) return;
             if (clan.id === 0 || clan.isDestroyed || clan.id === playerClanId) continue;
 
             // 四半期だけの全国処理なので、実機停止時にどの勢力の人事で止まったかを1勢力1回だけ記録します。
@@ -1229,6 +1237,7 @@ class AIStaffing {
             staffingProcessed++;
             if (staffingProcessed % 4 === 0) {
                 await new Promise(resolve => setTimeout(resolve, 0));
+                if (!isCurrentFlow()) return;
             }
         }
     }

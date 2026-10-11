@@ -8,6 +8,16 @@ class IndependenceSystem {
         this.game = game;
     }
 
+    // 独立・寝返り・謀反では会話／戦闘演出をまたぐため、旧ゲームの
+    // 非同期処理がタイトル復帰・ロード後の画面や勢力を操作しないようにする。
+    _captureIndependenceFlow() {
+        const turnManager = this.game && this.game.turnManager;
+        if (!turnManager || typeof turnManager.captureTurnFlowGeneration !== 'function'
+            || typeof turnManager.isTurnFlowGenerationLatest !== 'function') return () => true;
+        const generation = turnManager.captureTurnFlowGeneration();
+        return () => turnManager.isTurnFlowGenerationLatest(generation);
+    }
+
     _logIndependence(text, clanIds) {
         this.game.ui.log(text, {
             clanIds,
@@ -20,6 +30,7 @@ class IndependenceSystem {
      * 月末に呼び出されるメイン処理
      */
     async checkIndependence() {
+        const isCurrentFlow = this._captureIndependenceFlow();
         const potentialRebels = this.game.castles.filter(c => {
             if (c.ownerClan === 0) return false; 
             if (!c.castellanId) return false; 
@@ -37,6 +48,7 @@ class IndependenceSystem {
         const ambDiv = I.ThresholdAmbitionDiv;
 
         for (const castle of potentialRebels) {
+            if (!isCurrentFlow()) return;
             const castellan = this.game.getBusho(castle.castellanId);
             const daimyo = this.game.getClanDaimyo(castle.ownerClan);
             if (!castellan || !daimyo) continue;
@@ -45,6 +57,7 @@ class IndependenceSystem {
             const threshold = thresholdBase + ((50 - castellan.duty) / dutyDiv) + ((castellan.ambition - 50) / ambDiv);
             if (castellan.loyalty <= threshold) {
                 await this.calculateAndExecute(castle, castellan, daimyo, threshold);
+                if (!isCurrentFlow()) return;
             }
         }
     }
@@ -93,6 +106,7 @@ class IndependenceSystem {
     }
     
     async executeRebellion(castle, castellan, oldDaimyo, intention = 'indep', forceTargetClanId = null) {
+        const isCurrentFlow = this._captureIndependenceFlow();
         const oldClanId = castle.ownerClan;
         
         // ★追加：誰が裏切ったか後で確認するために、今の「主家」の武将たちをメモしておきます！
@@ -255,6 +269,7 @@ class IndependenceSystem {
             if (targetClanId === this.game.playerClanId && !forceTargetClanId) {
                 // プレイヤー勢力なら面会イベントを呼び出します
                 const isAccepted = await this.askPlayerForDefection(rebellionLeader, oldClanId);
+                if (!isCurrentFlow()) return;
                 // もし面会で「断る」を選んだら、寝返りは諦めて独立ルートに変更します
                 if (!isAccepted) {
                     targetClanId = null;
@@ -475,10 +490,12 @@ class IndependenceSystem {
 
         // まずは最初のメッセージを出します
         await this.game.ui.showDialogAsync(msg, false, 0);
+        if (!isCurrentFlow()) return;
 
         // もし改名があった場合は、ここで続けて改名のダイアログを出します
         if (nameChangeMsg !== "") {
             await this.game.ui.showDialogAsync(nameChangeMsg, false, 0);
+            if (!isCurrentFlow()) return;
         }
 
         // 画面を勝手に触られないようにバリアを張ります
@@ -500,7 +517,13 @@ class IndependenceSystem {
             this.game.writeSystemDiagnostic('independence:blink_start');
         }
         const independenceBlinkCompleted = await this.game.ui.playBattleBlink(changedCastleIds, oldColor, newColorRgb, 1000);
-        if (independenceBlinkCompleted === false) return;
+        if (!isCurrentFlow()) return;
+        if (independenceBlinkCompleted === false) {
+            // 演出のみの中断なら独立処理の一時遮断を確実に解除する。
+            this.game.isSuspendingColorUpdate = false;
+            if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+            return;
+        }
         if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
             this.game.writeSystemDiagnostic('independence:blink_done');
         }
@@ -515,6 +538,7 @@ class IndependenceSystem {
         // 発光演出を完全に片付けてから地図更新を1回だけ行います。
         // 点滅CanvasのGPU解放にも1イベントループ分の隙間を与えます。
         await new Promise(resolve => setTimeout(resolve, 0));
+        if (!isCurrentFlow()) return;
 
         if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
             this.game.writeSystemDiagnostic('independence:capture_start');
@@ -525,7 +549,7 @@ class IndependenceSystem {
         // エフェクトが消えた時には既に新勢力色が見える状態になります。
         let colorUpdatedDuringCapture = false;
         const applyNewClanColor = () => {
-            if (colorUpdatedDuringCapture) return;
+            if (!isCurrentFlow() || colorUpdatedDuringCapture) return;
             colorUpdatedDuringCapture = true;
             if (this.game.ui && typeof this.game.ui.updateClanColors === 'function') {
                 if (typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('independence:color_update:start');
@@ -536,7 +560,11 @@ class IndependenceSystem {
 
         if (typeof this.game.ui.playCaptureEffect === 'function') {
             const independenceCaptureCompleted = await this.game.ui.playCaptureEffect(changedCastleIds, applyNewClanColor);
-            if (independenceCaptureCompleted === false) return;
+            if (!isCurrentFlow()) return;
+            if (independenceCaptureCompleted === false) {
+                if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+                return;
+            }
         } else {
             applyNewClanColor();
         }
@@ -552,6 +580,7 @@ class IndependenceSystem {
             if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
             else setTimeout(resolve, 0);
         });
+        if (!isCurrentFlow()) return;
 
         // AI/月末処理中はフルrenderMap()を安全地点へまとめます。
         // 特にスマホ観戦は制圧演出直後に全城DOMを再生成するとGPU/DOMメモリの山ができるため、
@@ -602,6 +631,7 @@ class IndependenceSystem {
                 this.game.writeSystemDiagnostic('independence:result_dialog_start');
             }
             await this.game.ui.showDialogAsync(extraMsg, false, 0);
+            if (!isCurrentFlow()) return;
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic('independence:result_dialog_done');
             }
@@ -659,6 +689,7 @@ class IndependenceSystem {
                     // 最初にメニューを呼び出します
                     showSelectMenu();
                 });
+                if (!isCurrentFlow()) return;
 
                 // ★追加：メニューの選択が終わったあとに、ナレーションを表示します！
                 if (chosenClanId === oldClanId) {
@@ -879,6 +910,7 @@ class IndependenceSystem {
     // =========================================================================
 
     async planCoupDetatOrRebellion(castle, castellan, oldDaimyo, forceAction = null) {
+        const isCurrentFlow = this._captureIndependenceFlow();
         // 1. まずは反乱のリーダー（神輿）を探します。
         let rebellionLeader = castellan;
         const oldClanId = castle.ownerClan;
@@ -1033,6 +1065,7 @@ class IndependenceSystem {
         if (action === 'coup') {
             this._logIndependence(`${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました。`, [oldClanId]);
             await this.game.ui.showDialogAsync(`${rebellionLeader.name}が主君である${oldDaimyo.name}に対し、謀反を起こしました！`);
+            if (!isCurrentFlow()) return;
 
             // ★ここから追加：謀反の時もカメラを移動してチカチカさせます！
             // ただし、プレイヤー大名家の場合は野戦画面になるのでチカチカさせません！
@@ -1060,12 +1093,15 @@ class IndependenceSystem {
 
                 // 反乱軍の城をすべて同時に点滅させます！
                 const rebellionBlinkCompleted = await this.game.ui.playBattleBlink(rebelCastleIds, oldColor, rebelColor, 1000);
+                // 遷移後は旧謀反から新画面の入力ガードを解除しない。
+                if (!isCurrentFlow()) return;
                 if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                 if (rebellionBlinkCompleted === false) return;
             }
 
             // 裏で野戦を行います！
             const warResult = await this.executeSecretFieldWar(daimyoMembers, rebelMembers, oldDaimyo, rebellionLeader);
+            if (!isCurrentFlow()) return;
             const result = warResult.result;
 
             // ★追加：ここで野戦での総被害数を計算し、全拠点から割合で減らします！
@@ -1102,6 +1138,7 @@ class IndependenceSystem {
                     this._logIndependence(`反乱軍が勝利し、${oldDaimyo.name}は討死しました。`, [oldClanId]);
                     // 大名死亡処理（life_systemにお任せします）
                     await this.game.lifeSystem.executeDeath(oldDaimyo);
+                    if (!isCurrentFlow()) return;
                 } else {
                     this._logIndependence(`反乱軍が勝利し、${oldDaimyo.name}は追放されました。`, [oldClanId]);
                     // 追放の場合は後で他の家臣と一緒に浪人として逃亡させます
@@ -1292,17 +1329,20 @@ class IndependenceSystem {
                     resultMsg = `${oldDaimyoNameStr}は追放されました！\n${leaderNameStr}が新たな大名となります！`;
                 }
                 await this.game.ui.showDialogAsync(resultMsg);
+                if (!isCurrentFlow()) return;
 
                 // ★変更：改名があった場合は、文章を分けてダイアログを出します
                 if (info && info.isNameChanged) {
                     const nameChangeMsg = `大名となるにあたり、${info.oldNameStr}は「${info.newNameStr}」と名を改めました。`;
                     this._logIndependence(nameChangeMsg, [oldClanId]); // ログにも記録しておきます
                     await this.game.ui.showDialogAsync(nameChangeMsg);
+                    if (!isCurrentFlow()) return;
                 }
 
             } else if (result === 'daimyo_win') {
                 // 【主家軍の勝利】
                 await this.game.ui.showDialogAsync(`${oldDaimyo.name}が勝利をおさめ、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+                if (!isCurrentFlow()) return;
                 this._logIndependence(`${oldDaimyo.name}が勝利をおさめ、首魁の${rebellionLeader.name}は自領に逃亡しました。`, [oldClanId]);
 
                 // ★追加：後で元に戻せるように、元の功績を覚えておくためのメモ帳を用意します
@@ -1333,6 +1373,7 @@ class IndependenceSystem {
             } else {
                 // 【引き分け】
                 await this.game.ui.showDialogAsync(`決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`);
+                if (!isCurrentFlow()) return;
                 this._logIndependence(`決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`, [oldClanId]);
 
                 // 全員を強制的に追従させるため、一時的に派閥IDを反乱リーダーと同じにします

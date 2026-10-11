@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r447');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r452');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4813,7 +4813,8 @@ test('SaveManager がスロット読込・保存時刻抽出の公開窓口を�
     assert.ok(source.includes('getSaveTimestamp(data)'));
     assert.ok(source.includes('loadFromDB(prefix + slotNo)'));
     assert.ok(source.includes('isLoadableSaveData(data)'));
-    assert.ok(source.includes('const hasData = this.isLoadableSaveData(data);'));
+    assert.ok(source.includes('const hasData = !readError && this.isLoadableSaveData(data);'));
+    assert.ok(source.includes('readError'), 'DB読込例外を空きと区別する');
     assert.ok(source.includes("async hasAnyLoadableSaveData(prefixes = ['sengoku_save_slot', 'sengoku_autosave_slot'])"));
     assert.ok(source.includes('async refreshLoadAvailability(options = {})'));
 });
@@ -12597,9 +12598,10 @@ test('地図戦闘演出はシナリオ切替でrAFと固定Canvasを中断し�
     assert.ok(war.includes('if (!isCurrentWar() || openingBlinkCompleted === false) return;'));
     assert.ok(war.includes('if (resultBlinkCompleted === false) return;'));
     assert.ok((war.match(/if \(captureCompleted === false\) return;/g) || []).length >= 3);
-    assert.ok(indep.includes('if (independenceBlinkCompleted === false) return;'));
-    assert.ok(indep.includes('if (independenceCaptureCompleted === false) return;'));
+    assert.ok(indep.includes('if (independenceBlinkCompleted === false) {'), '取消時に後続演出を開始しない');
+    assert.ok(indep.includes('if (independenceCaptureCompleted === false) {'), '取消時に後続演出を開始しない');
     assert.ok(indep.includes('if (rebellionBlinkCompleted === false) return;'));
+    assert.ok(indep.includes('if (!isCurrentFlow()) return;\n                if (typeof this.game.ui.hideMapGuard'), '旧謀反が新画面のガードを解除しない'); 
 });
 
 test('地図ズームrAFはresetMapViewState後の新しい地図へ旧座標を書き戻さない', () => {
@@ -14988,6 +14990,385 @@ test('r447 DB書込成功だけでは完了表示せず読み戻しを検証す�
     assert.ok(messages.some(m => m.includes('失敗')), '読戻し失敗時は成功扱いしない');
     assert.ok(!messages.some(m => m.includes('完了')));
     assert.strictEqual(game.hasSaveData, false, '読み戻せない保存でロードボタンを有効化しない');
+});
+
+// r448: IndexedDBの読込失敗は本当の空スロットとは異なり、上書きを許可してはならない。
+test('r448 DB読込例外は空きスロットと区別する', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    vm.runInContext(`loadFromDB = async key => {
+        if (key.endsWith('1')) throw new Error('temporary IndexedDB read failure');
+        return undefined;
+    };`, ctx);
+    const saver = new ctx.SaveManager({});
+    const rows = await saver.readSaveSlots('sengoku_save_slot', 2);
+    assert.strictEqual(rows[0].hasData, false);
+    assert.strictEqual(rows[0].readError, true, '読込例外は保存内容の不存在とは異なる');
+    assert.strictEqual(rows[1].hasData, false);
+    assert.strictEqual(rows[1].readError, false, '正常に空だったスロットは上書き可能');
+});
+
+test('r448 保存画面は読込失敗スロットを上書き不能にする', async () => {
+    const elements = new Map();
+    const makeElement = id => ({
+        id, classList: new FakeClassList(), children: [], innerHTML: '',
+        appendChild(child) { this.children.push(child); },
+        set innerText(value) { this._text = value; }
+    });
+    for (const id of ['saveload-modal', 'saveload-title', 'saveload-list',
+        'saveload-tabs', 'saveload-tab-manual', 'saveload-tab-auto']) elements.set(id, makeElement(id));
+    const document = {
+        body: { classList: new FakeClassList(['is-pc']) },
+        getElementById: id => elements.get(id) || null,
+        createElement: () => makeElement('new')
+    };
+    const ctx = createContext({ document,
+        setTimeout: cb => { cb(); return 1; },
+        requestAnimationFrame: cb => { cb(); return 1; }
+    });
+    loadScript(ctx, 'js/save_load_view.js');
+    const view = new ctx.SaveLoadView({ updateCustomScrollbars() {} }, {
+        phase: 'game', saveManager: { readSaveSlots: async prefix =>
+            Array.from({ length: 5 }, (_, index) => ({
+                originalSlotNo: index + 1, hasData: false, saveTimestamp: 0,
+                data: null, readError: prefix === 'sengoku_save_slot' && index === 0
+            })) }
+    });
+    view.open('save');
+    await new Promise(resolve => setImmediate(resolve));
+    const list = elements.get('saveload-list');
+    const rendered = list.children.slice(-5); // テストDOMは innerHTML='' でchildrenを消さないため最新5枠を見る
+    const first = rendered[0], second = rendered[1];
+    assert.strictEqual(first.disabled, true, '読込不能なら上書きを禁止する');
+    assert.ok(first.innerHTML.includes('読込エラー'), '読込失敗の理由が空スロットと区別できる');
+    assert.strictEqual(second.disabled, false, '正常な空スロットは利用可能');
+});
+
+
+// r449: 既存レコードがあるのに現行形式で読めない場合は「空欄」と説明してはならない。
+test('r449 読取成功だが非対応の保存は空スロットと区別する', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    vm.runInContext(`loadFromDB = async key => key.endsWith('1')
+        ? {saveSchemaVersion: 1, scenarioName:'old save'} : undefined;`, ctx);
+    const saver = new ctx.SaveManager({});
+    const rows = await saver.readSaveSlots('sengoku_save_slot', 2);
+    assert.strictEqual(rows[0].hasData, false);
+    assert.strictEqual(rows[0].readError, false);
+    assert.strictEqual(rows[0].invalidData, true, '実際にはレコードがある');
+    assert.strictEqual(rows[1].invalidData, false, 'データが存在しない空き枠とは区別する');
+});
+
+// r449: データ存在を明示しつつ、旧スキーマの保存も利用者の明示確認で上書き可能にする。
+test('r449 非対応スロットの上書き前に喪失警告を表示する', async () => {
+    const elements = new Map();
+    const makeElement = id => ({ id, classList: new FakeClassList(), children: [], innerHTML:'',
+        appendChild(child){ this.children.push(child); }, set innerText(value){ this._text = value; } });
+    for (const id of ['saveload-modal','saveload-title','saveload-list','saveload-tabs','saveload-tab-manual','saveload-tab-auto']) {
+        elements.set(id, makeElement(id));
+    }
+    const ctx = createContext({ document: {
+        body:{classList:new FakeClassList(['is-pc'])},
+        getElementById:id => elements.get(id)||null,
+        createElement: () => makeElement('new')
+    }, setTimeout: cb => { cb(); return 1; }, requestAnimationFrame: cb => { cb(); return 1; } });
+    loadScript(ctx, 'js/save_load_view.js');
+    let confirmation = null;
+    const view = new ctx.SaveLoadView({ showDialog(message){confirmation=message;}, updateCustomScrollbars(){} }, {
+        phase:'game',saveManager:{ readSaveSlots: async prefix => Array.from({length:5},(_,index)=>({
+            originalSlotNo:index+1, hasData:false, saveTimestamp:0, data:null, readError:false,
+            invalidData: prefix === 'sengoku_save_slot' && index===0
+        })) }
+    });
+    view.open('save');
+    await new Promise(resolve => setImmediate(resolve));
+    const buttons = elements.get('saveload-list').children.slice(-5);
+    assert.ok(buttons[0].innerHTML.includes('読込不可'), '旧形式をNO DATAと呼ばない');
+    assert.strictEqual(buttons[0].disabled,false,'旧形式は明示確認した上で上書き可能');
+    buttons[0].onclick();
+    assert.ok(confirmation.includes('元の保存内容は失われます'), '上書きの取り返しのつかなさを明示する');
+    assert.ok(buttons[1].innerHTML.includes('NO DATA'),'未使用枠は従来表示');
+});
+
+// r449: 一覧表示後にDBが不調になった場合、保存確定処理が旧内容を削除してはならない。
+test('r449 保存確定直前のIndexedDB読込障害では旧データを上書きしない', async () => {
+    const ctx = createContext({Uint8Array,console:{...console,error(){}}, document:{getElementById(){return null;}}});
+    loadScript(ctx,'js/save_manager.js');
+    let writes=0;
+    vm.runInContext(`saveToDB = async () => { __writes(); };
+        loadFromDB = async () => { throw new Error('IndexedDB temporarily unavailable'); };`,ctx);
+    ctx.__writes = () => {writes++;};
+    const messages=[];
+    const saver=new ctx.SaveManager({ui:{showDialog:m=>messages.push(m)}});
+    saver.showSaveGuard=()=>{}; saver.hideSaveGuard=()=>{};
+    saver._createSaveDataObj=async()=>({saveTimestamp:1770000000000});
+    saver._validateSaveDataStructure=()=>true;
+    saver._encryptData=()=>new Uint8Array([1,2]);
+    await saver.saveGameToLocal(1);
+    assert.strictEqual(writes,0,'直前確認に失敗した場合、書込み要求自体を発行しない');
+    assert.ok(messages.some(m=>m.includes('失敗')));
+});
+
+test('r449 直接ロードでIndexedDB読込失敗時にデータなしと誤報しない', async () => {
+    const ctx=createContext({console:{...console,error(){}},document:{getElementById(){return null;}}});
+    loadScript(ctx,'js/save_manager.js');
+    vm.runInContext(`loadFromDB = async()=>{throw new Error('IndexedDB unavailable')}`,ctx);
+    const messages=[];
+    const saver=new ctx.SaveManager({
+        turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationLatest:n=>n===1},
+        ui:{showLoadingScreen(){},hideLoadingScreen(){},showDialog:m=>messages.push(m)}
+    });
+    await saver.loadGameFromLocal(1);
+    assert.ok(messages.some(m=>m.includes('読込') && m.includes('失敗')),'読込失敗を案内する');
+    assert.ok(!messages.some(m=>m.includes('データがありません')),'空欄とは誤認させない');
+});
+
+// r450: 月末の独立判定が旧シナリオの会話待ちから復帰しても次の拠点を処理しない。
+test('r450 独立の非同期待機中にシナリオが切り替われば後続拠点を処理しない', async () => {
+    const ctx = createContext({ WarParams: { Independence: {ThresholdBase:50,ThresholdDutyDiv:10,ThresholdAmbitionDiv:10}} });
+    loadScript(ctx,'js/independence_system.js');
+    const castles = [1,2].map(id=>({id,ownerClan:1,castellanId:id+10}));
+    const members = new Map([11,12].map(id=>[id,{id,loyalty:1,duty:50,ambition:50,factionId:0}]));
+    let generation=1, resolveFirst;
+    const started=[];
+    const game = {
+        castles,turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:g=>g===generation},
+        getBusho:id=>members.get(id),getClanDaimyo:()=>({factionId:0}),getClanCastles:()=>castles
+    };
+    const system=new (vm.runInContext('IndependenceSystem',ctx))(game);
+    system.calculateAndExecute=castle=>{
+        started.push(castle.id);
+        return new Promise(resolve=>{resolveFirst=resolve;});
+    };
+    const pending=system.checkIndependence();
+    assert.deepStrictEqual(started,[1]);
+    generation=2;
+    resolveFirst();
+    await pending;
+    assert.deepStrictEqual(started,[1],'旧ゲームの月末処理は次の拠点へ進まない');
+});
+
+// r450: 独立処理は既に一部の勢力状態を更新していても、会話完了後に旧画面へ戻らない。
+test('r450 独立会話の待機中にタイトルへ戻ると旧勢力の地図演出を開始しない', async () => {
+    const ctx=createContext({WarParams:{Independence:{}},PersonnelRules:{calcAffinityDiff:()=>0},setTimeout:cb=>{cb();return 1;}});
+    loadScript(ctx,'js/independence_system.js');
+    let generation=1,finishDialog,guardCalls=0,blinkCalls=0;
+    const castle={id:5,name:'試験城',ownerClan:1,castellanId:11,samuraiIds:[11]};
+    const oldClan={id:1,name:'旧家'},newClan={id:2,name:'新家'};
+    const rebel={id:11,clan:1,castleId:5,factionId:0,isFactionLeader:false,isCastellan:true,
+        belongKunishuId:0,achievementTotal:0,fullName:'試験武将',name:'試験武将',lastApproachedClanId:0};
+    const oldDaimyo={id:12,clan:1,name:'旧大名',nemesisList:[],nemesisIds:[]};
+    const game={ castles:[castle],clans:[oldClan,newClan],playerClanId:99,
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:g=>g===generation},
+        getClanBushos:()=>[rebel],getClan:id=>id===1?oldClan:newClan,getClanDaimyo:()=>oldDaimyo,
+        getBusho:id=>id===11?rebel:oldDaimyo, updateCastleLord(){},
+        affiliationSystem:{transferClanRaw(b,id){b.clan=id;}},
+        castleManager:{changeOwner(c,id){c.ownerClan=id;}},
+        ui:{log(){},showDialogAsync(){return new Promise(resolve=>finishDialog=resolve);},
+            showMapGuard(){guardCalls++;},playBattleBlink(){blinkCalls++;return Promise.resolve(true);}},
+        updateClanPrestige(){}
+    };
+    const system=new (vm.runInContext('IndependenceSystem',ctx))(game);
+    system.calcNewLoyalty=()=>95;
+    system.resolveSubordinates=()=>[];
+    system.resolveFactionWideRebellion=()=>{};
+    system.resolveDistantFactionMembers=()=>{};
+    const pending=system.executeRebellion(castle,rebel,oldDaimyo,'defect',2);
+    assert.strictEqual(game.isSuspendingColorUpdate,true,'独立開始時は旧勢力色更新を停止する');
+    assert.strictEqual(typeof finishDialog,'function');
+    generation=2;
+    finishDialog();
+    await pending;
+    assert.strictEqual(guardCalls,0,'失効した旧処理は新しい画面に入力ガードを張らない');
+    assert.strictEqual(blinkCalls,0,'失効した旧処理は新しい地図へ演出しない');
+});
+
+test('r450 シナリオ遷移は独立・謀反の勢力色停止を同期的に解除する', () => {
+    const ctx=createContext({clearTimeout() {}});
+    loadScript(ctx,'js/turn_manager.js');
+    const game={isSuspendingColorUpdate:true};
+    const manager=new ctx.TurnManager(game);
+    manager.abortForScenarioTransition();
+    assert.strictEqual(game.isSuspendingColorUpdate,false,'前ゲームの色更新停止を新ゲームへ残さない');
+});
+
+
+// r451: シナリオを切り替えた後に、旧月末の諸勢力処理を次へ進めない。
+test('r451 諸勢力の頭領交代ダイアログ待機中に遷移すると旧月末処理は停止する', async () => {
+    const ctx=createContext();
+    loadScript(ctx,'js/kunishu_system.js');
+    const KunishuSystem=vm.runInContext('KunishuSystem',ctx);
+    let generation=1, resume, checked=[], actionCount=0;
+    const kunishus=[{id:1,soldiers:100,maxSoldiers:100,defense:100,maxDefense:100,
+        horses:0,maxHorses:0,guns:0,maxGuns:0,training:50,defaultTraining:50,morale:50,defaultMorale:50},
+        {id:2,soldiers:100,maxSoldiers:100,defense:100,maxDefense:100,
+        horses:0,maxHorses:0,guns:0,maxGuns:0,training:50,defaultTraining:50,morale:50,defaultMorale:50}];
+    const game={turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation}};
+    const sys=new KunishuSystem(game);
+    sys.getAliveKunishus=()=>kunishus;
+    sys.checkDestroyed=k=>{checked.push(k.id);return k.id===1 ? new Promise(resolve=>{resume=resolve;}) : Promise.resolve();};
+    sys.applyIkkoNetworkRelationLink=()=>{actionCount++;};
+    const pending=sys.processEndMonth();
+    assert.deepStrictEqual(checked,[1]);
+    generation=2;
+    resume();
+    await pending;
+    assert.deepStrictEqual(checked,[1],'旧処理が2件目の諸勢力へ進んではならない');
+    assert.strictEqual(actionCount,0,'旧ゲームの関係更新をしてはならない');
+});
+
+// 1つ目の諸勢力のアクション待機後、次の諸勢力へ処理を進めない。
+test('r451 諸勢力の献上待機中にシナリオ切替した場合は次の行動を処理しない', async () => {
+    const ctx=createContext({Math:Object.assign(Object.create(Math),{random:()=>0})});
+    loadScript(ctx,'js/kunishu_system.js');
+    const KunishuSystem=vm.runInContext('KunishuSystem',ctx);
+    let generation=1, resume, acted=[];
+    const castle={id:1,ownerClan:1,castellanId:10};
+    const kunishus=[1,2].map(id=>({id,ideology:'商人',castleId:1,daimyoRelations:{1:{sentiment:90}},
+        soldiers:100,maxSoldiers:100,defense:100,maxDefense:100,
+        horses:0,maxHorses:0,guns:0,maxGuns:0,training:50,defaultTraining:50,morale:50,defaultMorale:50}));
+    const game={turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation},
+        getClanDaimyo:()=>({castleId:1}),getCastle:()=>castle,getBusho:()=>null};
+    const sys=new KunishuSystem(game);
+    sys.getAliveKunishus=()=>kunishus;
+    sys.checkDestroyed=async()=>{};
+    sys.applyIkkoNetworkRelationLink=()=>{};
+    sys.executeActionToLord=k=>{acted.push(k.id);return k.id===1 ? new Promise(resolve=>resume=resolve) : Promise.resolve();};
+    const pending=sys.processEndMonth();
+    for (let i=0;i<8 && acted.length===0;i++) await Promise.resolve();
+    assert.deepStrictEqual(acted,[1]);
+    generation=2;
+    resume();
+    await pending;
+    assert.deepStrictEqual(acted,[1],'旧月末の2件目の献上を実行してはならない');
+});
+
+
+// r451: 下野会話から戻った旧シナリオが次の武将や派閥を更新しない。
+test('r451 下野ダイアログ中のシナリオ切替後は旧月初の派閥再編を行わない', async () => {
+    const ctx=createContext({WarParams:{Faction:{RoninLoyaltyThreshold:50,RoninChanceBase:1,RoninChanceMultiplier:1}},
+        BushoStatusRules:{isActive:()=>true}});
+    loadScript(ctx,'js/faction_system.js');
+    const FactionSystem=vm.runInContext('FactionSystem',ctx);
+    let generation=1, resume, fled=[], rebuilt=0;
+    const bushos=[1,2].map(id=>({id,clan:1,loyalty:0,isDaimyo:false,isCastellan:false}));
+    const game={bushos,getClanDaimyo:()=>null,
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation}};
+    const sys=new FactionSystem(game);
+    sys.executeRonin=b=>{fled.push(b.id);return b.id===1 ? new Promise(resolve=>resume=resolve):Promise.resolve();};
+    sys.updateFactions=()=>rebuilt++;
+    const pending=sys.processStartMonth();
+    assert.deepStrictEqual(fled,[1]);
+    generation=2;
+    resume();
+    await pending;
+    assert.deepStrictEqual(fled,[1]);
+    assert.strictEqual(rebuilt,0,'旧シナリオの派閥再編を実行してはならない');
+});
+
+// r451: 四半期人事の端末負荷分散待ち後に、遷移したシナリオのAI配置を変更しない。
+test('r451 四半期軍団人事の分割待ち中にタイトル復帰したら後続勢力を処理しない', async () => {
+    let releaseYield;
+    const ctx=createContext({setTimeout:cb=>{releaseYield=cb;return 1;}});
+    loadScript(ctx,'js/ai_staffing.js');
+    const Staffing=vm.runInContext('AIStaffing',ctx);
+    let generation=1;
+    const visited=[];
+    const clans=[1,2,3,4,5].map(id=>({id,isDestroyed:false}));
+    const sys=new Staffing();
+    sys.game={clans,getBusho:()=>null,writeSystemDiagnostic:msg=>visited.push(msg),
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation}};
+    sys.checkLegionDisband=()=>false;
+    sys.createNewLegionIfNeeded=()=>false;
+    const pending=sys.processQuarterlyStaffing(1,99);
+    assert.ok(visited.some(s=>s.includes('clan_4')));
+    generation=2;
+    releaseYield();
+    await pending;
+    assert.ok(!visited.some(s=>s.includes('clan_5')),'旧ゲームで5番目の勢力に着手してはならない');
+});
+
+
+// r452: 1月の分割能力計算を旧シナリオのまま再開しない。
+test('r452 年始の分割能力再計算中にシナリオ切替すると新しい姫データを変更しない', async () => {
+    const ctx = createContext({GameConstants:{BushoStatus:{UNBORN:'unborn'}},LifeStatusRules:{isUnborn:()=>false}});
+    loadScript(ctx,'js/life_system.js');
+    const LifeSystem=vm.runInContext('LifeSystem',ctx);
+    let generation=1, resume;
+    const oldBushos=Array.from({length:129},(_,id)=>({id,birthYear:1500,isNotBorn:false}));
+    const freshPrincess={birthYear:1600,isNotBorn:false,status:'active'};
+    const game={month:1,year:1560,bushos:oldBushos,princesses:[],
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation}};
+    const sys=new LifeSystem(game);
+    sys.recalculateBushoAgeStats=b=>{b.recalculated=true;};
+    sys.checkBirth=async()=>{};sys.checkNameChange=async()=>{};sys.checkFaceChange=()=>{};sys.checkRandomPrincessAppearance=async()=>{};
+    let yieldCount=0;sys._yieldToBrowserForLife=()=>++yieldCount===1?new Promise(resolve=>resume=resolve):Promise.resolve();
+    const pending=sys.processStartMonth();
+    assert.ok(oldBushos[127].recalculated);
+    assert.ok(!oldBushos[128].recalculated);
+    generation=2;game.year=1570;game.princesses=[freshPrincess];
+    resume();await pending;
+    assert.strictEqual(freshPrincess.status,'active','旧年始処理が新シナリオの姫を未登場にしない');
+    assert.ok(!oldBushos[128].recalculated,'中断後は旧配列の残りも計算しない');
+});
+
+// r452: 改名ダイアログ待ちから新シナリオの人物を改名しない。
+test('r452 1月の改名案内中にタイトルへ戻ると後続の改名処理を中止する', async () => {
+    const ctx=createContext({setTimeout,BushoStatusRules:{isActive:()=>true,isRonin:()=>false}});
+    loadScript(ctx,'js/life_system.js');
+    const LifeSystem=vm.runInContext('LifeSystem',ctx);
+    let generation=1,resume,changed=[],dialogCount=0;
+    const bushos=[1,2].map(id=>({id,clan:1,isDaimyo:false,name:'元の名前',nameChange:'1560:新名:しんめい',
+        applyNameChangeData(){changed.push(id);this.name='新しい名前';}}));
+    const game={year:1560,playerClanId:1,bushos,turnManager:{captureTurnFlowGeneration:()=>generation,
+        isTurnFlowGenerationLatest:n=>n===generation},getClan:()=>({name:'某家'}),ui:{log(){},showDialogAsync:()=>++dialogCount===1?new Promise(resolve=>resume=resolve):Promise.resolve()}};
+    const sys=new LifeSystem(game);
+    // 50ms待ちをテスト用に解放できるようにし、現実の遅延を増やさない。
+    const pending=sys.checkNameChange();
+    await new Promise(resolve=>setTimeout(resolve,65));
+    assert.deepStrictEqual(changed,[1]);
+    generation=2;resume();await pending;
+    assert.deepStrictEqual(changed,[1],'旧ゲームの残りの武将を改名しない');
+});
+
+// r452: 寿命判定中のイベントが画面遷移を跨いだ場合、旧死亡処理を続行しない。
+test('r452 死亡イベント待機中のシナリオ切替後は旧武将を処断しない', async () => {
+    const ctx=createContext({LifeStatusRules:{isDead:b=>b.status==='dead',isUnborn:()=>false},
+        Math:Object.assign(Object.create(Math),{random:()=>0})});
+    loadScript(ctx,'js/life_system.js');
+    const LifeSystem=vm.runInContext('LifeSystem',ctx);
+    let generation=1,resume,eventCount=0;const executed=[];
+    const bushos=[1,2].map(id=>({id,clan:1,status:'active',endYear:1490,deathFlag:false}));
+    const game={year:1560,month:5,gameStartYear:1550,gameStartMonth:1,bushos,princesses:[],playerClanId:9,
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation},
+        eventManager:{processEvents:()=>++eventCount===1?new Promise(resolve=>resume=resolve):Promise.resolve()},ui:{log(){},showDialogAsync:async()=>{}}};
+    const sys=new LifeSystem(game);
+    sys.executeDeath=async b=>{executed.push(b.id);};
+    const pending=sys.checkDeath();
+    assert.deepStrictEqual(executed,[]);
+    generation=2;resume();await pending;
+    assert.deepStrictEqual(executed,[],'失効した死亡イベントの後で旧武将を死亡させない');
+});
+
+// r452: 年始の姫生成案内中にシナリオ切替すると、次勢力の姫を生成しない。
+test('r452 姫誕生案内から旧シナリオの次勢力へ処理が流れない', async () => {
+    const ctx=createContext({FamilyLinker:{rebuildAllFamilyIds(){}},
+        Math:Object.assign(Object.create(Math),{random:()=>0})});
+    loadScript(ctx,'js/life_system.js');
+    const LifeSystem=vm.runInContext('LifeSystem',ctx);
+    let generation=1,resume;const created=[];
+    const game={year:1560,playerClanId:1,clans:[1,2].map(id=>({id,leaderId:id})),
+        bushos:[],princesses:[],turnManager:{captureTurnFlowGeneration:()=>generation,
+            isTurnFlowGenerationLatest:n=>n===generation},
+        getBusho:id=>({id,name:'当主'}),ui:{log(){},showDialogAsync:()=>new Promise(resolve=>resume=resolve)}};
+    const sys=new LifeSystem(game);
+    sys._buildPrincessAppearanceContext=()=>({unmarriedCountByClan:new Map(),fatherCandidatesByClan:new Map()});
+    sys._getPrincessFamilyFatherCandidates=()=>[];
+    sys.createRandomPrincess=clan=>{created.push(clan);return {realFatherId:clan,name:'姫'};};
+    const pending=sys.checkRandomPrincessAppearance();
+    assert.deepStrictEqual(created,[1]);
+    generation=2;resume();await pending;
+    assert.deepStrictEqual(created,[1],'画面遷移後に他勢力の姫を生成してはならない');
 });
 
 Promise.all(pendingTests).then(() => {

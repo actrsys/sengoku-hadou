@@ -159,12 +159,30 @@ class LifeSystem {
         return true;
     }
 
+    // TurnManagerを世代の唯一の正本とし、寿命処理側は読取・比較だけを行います。
+    _captureLifeFlowGeneration() {
+        const tm = this.game && this.game.turnManager;
+        return tm && typeof tm.captureTurnFlowGeneration === 'function'
+            ? tm.captureTurnFlowGeneration() : null;
+    }
+
+    _isLifeFlowCurrent(generation) {
+        const tm = this.game && this.game.turnManager;
+        return generation === null || generation === undefined || !tm
+            || typeof tm.isTurnFlowGenerationLatest !== 'function'
+            || tm.isTurnFlowGenerationLatest(generation);
+    }
+
     // 毎月の初め（1月）に「新しく登場する武将がいないか」をチェックします
     async processStartMonth() {
+        const generation = this._captureLifeFlowGeneration();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        if (!isCurrentFlow()) return;
         if (this.game.month === 1) {
             // 4000人超を一気に再計算すると古いWebViewのwatchdog/メモリ回収が追いつかないため、
             // 月初だけは小分けにしてブラウザへ制御を返します。
             await this.updateAllBushosAgeCooperatively();
+            if (!isCurrentFlow()) return;
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:age_done');
             
             // ★ここから追加：姫の年齢（出生前かどうか）も毎年1月にチェックします！
@@ -179,16 +197,21 @@ class LifeSystem {
             }
 
             await this.checkBirth();
+            if (!isCurrentFlow()) return;
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:birth_done');
             await this._yieldToBrowserForLife();
+            if (!isCurrentFlow()) return;
             await this.checkNameChange();
+            if (!isCurrentFlow()) return;
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:name_done');
             this.checkFaceChange();
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:face_done');
             await this._yieldToBrowserForLife();
+            if (!isCurrentFlow()) return;
 
             // ★追加：毎年1月に、ランダムで新しい姫が登場するかチェックします！
             await this.checkRandomPrincessAppearance();
+            if (!isCurrentFlow()) return;
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:princess_done');
 
             // ★高速化：派閥再編は、この直後に GameManager → factionSystem.processStartMonth() から
@@ -234,11 +257,15 @@ class LifeSystem {
     }
 
     async updateAllBushosAgeCooperatively() {
+        const generation = this._captureLifeFlowGeneration();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        if (!isCurrentFlow()) return false;
         const currentYear = this.game.year;
         const bushos = this.game.bushos || [];
         const isPC = typeof document !== 'undefined' && document.body && document.body.classList.contains('is-pc');
         const chunkSize = isPC ? 768 : 128;
         for (let start = 0; start < bushos.length; start += chunkSize) {
+            if (!isCurrentFlow()) return false;
             const end = Math.min(bushos.length, start + chunkSize);
             for (let i = start; i < end; i++) {
                 const b = bushos[i];
@@ -250,8 +277,12 @@ class LifeSystem {
                 }
                 this.recalculateBushoAgeStats(b, currentYear);
             }
-            if (end < bushos.length) await this._yieldToBrowserForLife();
+            if (end < bushos.length) {
+                await this._yieldToBrowserForLife();
+                if (!isCurrentFlow()) return false;
+            }
         }
+        return true;
     }
 
     // ★ 全員の年齢から能力値を計算し直します。
@@ -328,11 +359,15 @@ class LifeSystem {
     
     // ★ 改名のチェック（毎年1月に行います）
     async checkNameChange() {
+        const generation = this._captureLifeFlowGeneration();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        if (!isCurrentFlow()) return;
         const currentYear = this.game.year;
         let isDaimyoChanged = false; // ★追加：大名家が改名したかどうかをメモする旗
 
         // 武将全員をチェックします（まだ登場していない人や亡くなった人も、内部的に名前は変えておきます）
         for (const b of this.game.bushos) {
+            if (!isCurrentFlow()) return;
             if (!b.nameChange) continue;
 
             // 「/」で区切られている複数の改名予定を一つずつ確認します
@@ -388,16 +423,19 @@ class LifeSystem {
                                 // ★ここから追加：名前が変わって画面がパニック（フリーズ）になるのを防ぐため、
                                 // メッセージを出す前に一瞬だけ息継ぎ（お休み）をさせます！
                                 await new Promise(resolve => setTimeout(resolve, 50));
+                                if (!isCurrentFlow()) return;
 
                                 // ★すべての裏処理が終わってから、メッセージを出して待ちます！
                                 this.game.ui.log(msg, { clanIds: Number(b.clan) > 0 ? [Number(b.clan)] : [], category: 'family', inferCurrentTurn: false });
                                 if (b.clan === this.game.playerClanId || b.isDaimyo) {
-                                    await this.game.ui.showDialogAsync(msg); 
+                                    await this.game.ui.showDialogAsync(msg);
+                                    if (!isCurrentFlow()) return;
                                 }
                                 
                                 if (clanMsg !== "") {
                                     this.game.ui.log(clanMsg, { clanIds: Number(b.clan) > 0 ? [Number(b.clan)] : [], category: 'family', inferCurrentTurn: false });
                                     await this.game.ui.showDialogAsync(clanMsg);
+                                    if (!isCurrentFlow()) return;
                                 }
                                 // ==========================================
                             }
@@ -408,6 +446,7 @@ class LifeSystem {
         }
 
         // ★追加：すべての武将のチェックが終わった後、大名が改名していたら1回だけ情報を最新にします！
+        if (!isCurrentFlow()) return;
         if (isDaimyoChanged) {
             // 同名被りの回避を行い、家名を確定させます
             if (this.game.updateClanDisplayNames) {
@@ -451,6 +490,9 @@ class LifeSystem {
 
     // ★ 登場のチェック（毎年1月に行います）
     async checkBirth() {
+        const generation = this._captureLifeFlowGeneration();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        if (!isCurrentFlow()) return;
         const currentYear = this.game.year;
         
         // まだ登場していない（statusが'unborn'）武将の中で、登場年を迎えた人を探します
@@ -458,6 +500,7 @@ class LifeSystem {
         
         // ★変更：メッセージをためる箱（配列）は使わず、一つずつ順番に出すために「for...of」という魔法の繰り返しを使います！
         for (const b of unbornBushos) {
+            if (!isCurrentFlow()) return;
             // ★変更：大名家に所属しておらず、諸勢力でもない場合は「浪人」になります
             if (b.clan === 0 && (b.belongKunishuId || 0) === 0) {
                 // 登場前:浪人 の場合
@@ -495,6 +538,7 @@ class LifeSystem {
                         
                         this.game.ui.log(`【頭領交代】${msg}`);
                         await this.game.ui.showDialogAsync(msg, false, 0);
+                        if (!isCurrentFlow()) return;
                     }
                 } else {
                     // ★ 諸勢力が壊滅している場合：一門を頼るか浪人になる
@@ -538,6 +582,7 @@ class LifeSystem {
                             const msg = `${nameStr}が元服し、当家に加わりました！`;
                             this.game.ui.log(msg, { history: false });
                             await this.game.ui.showDialogAsync(msg, false, 0);
+                            if (!isCurrentFlow()) return;
                         }
                     } else {
                         // 一門がいない場合：浪人として登場
@@ -620,6 +665,7 @@ class LifeSystem {
                         // ★変更：リストに溜め込まず、ここで直接画面に出して「OK」を押すまで待ちます！
                         this.game.ui.log(msg, { history: false });
                         await this.game.ui.showDialogAsync(msg, false, 0);
+                        if (!isCurrentFlow()) return;
                     }
                 } else {
                     // 万が一城が見つからなかった時の安全策
@@ -629,6 +675,7 @@ class LifeSystem {
                 }
             }
 
+            if (!isCurrentFlow()) return;
             this._recordBushoAppearance(b);
         }
 
@@ -637,6 +684,7 @@ class LifeSystem {
 
         // ★変更：ここも「for...of」の魔法の繰り返しに変えて、一つずつ待ちます！
         for (const p of unbornPrincesses) {
+            if (!isCurrentFlow()) return;
             let targetClanId = 0;
             let fatherNameStr = ""; // ★お父さんの名前を書いておくメモ帳です
 
@@ -702,6 +750,7 @@ class LifeSystem {
                     // ★変更：リストに溜め込まず、ここで直接画面に出して「OK」を押すまで待ちます！
                     this.game.ui.log(msg, { clanIds: [targetClanId], category: 'family', inferCurrentTurn: false });
                     await this.game.ui.showDialogAsync(msg, false, 0);
+                    if (!isCurrentFlow()) return;
                 }
             }
         }
@@ -710,6 +759,9 @@ class LifeSystem {
 
     // ★ 寿命のチェック（毎月行います）
     async checkDeath() {
+        const generation = this._captureLifeFlowGeneration();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        if (!isCurrentFlow()) return;
         const startY = this.game.gameStartYear || window.MainParams.StartYear;
         const startM = this.game.gameStartMonth || window.MainParams.StartMonth;
         const elapsedTurns = ((this.game.year - startY) * 12) + (this.game.month - startM);
@@ -732,6 +784,7 @@ class LifeSystem {
         });
 
         for (const b of targetBushos) {
+            if (!isCurrentFlow()) return;
             // 【変更点②】没年の「1年前」をスタート地点として、そこから何年過ぎたかを計算します
             const actualEndYear = b.endYear;
             const yearsPassed = currentYear - (actualEndYear - 1);
@@ -748,6 +801,7 @@ class LifeSystem {
                 let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false, deferFactionUpdate: true };
                 if (this.game.eventManager) {
                     await this.game.eventManager.processEvents('busho_death', context);
+                    if (!isCurrentFlow()) return;
                 }
 
                 await this.executeDeath(b, context); // ★修正：イベントの結果（context）を渡します
@@ -759,6 +813,7 @@ class LifeSystem {
                     this.game.ui.log(`${name}が死亡しました……`, { history: false });
                     // ★一人ずつ順番にダイアログを出して、押すまで待ちます！
                     await this.game.ui.showDialogAsync(`${name}が死亡しました……`, false, 0);
+                    if (!isCurrentFlow()) return;
                 }
             }
         }
@@ -768,6 +823,7 @@ class LifeSystem {
         const flagTargetBushos = this.game.bushos.filter(b => !window.LifeStatusRules.isDead(b) && b.deathFlag === true);
         
         for (const b of flagTargetBushos) {
+            if (!isCurrentFlow()) return;
             // ★追加：討死武将が本来の寿命を過ぎているかチェックして、確率を変えます
             let deathProb = 0.20; // 基本は20%の確率です
             if (b.isKilledInBattle && currentYear >= b.originalEndYear) {
@@ -788,6 +844,7 @@ class LifeSystem {
                 let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false, deferFactionUpdate: true };
                 if (this.game.eventManager) {
                     await this.game.eventManager.processEvents('busho_death', context);
+                    if (!isCurrentFlow()) return;
                 }
 
                 await this.executeDeath(b, context); // ★修正：イベントの結果（context）を渡します
@@ -798,6 +855,7 @@ class LifeSystem {
                     const name = b.fullName;
                     this.game.ui.log(`戦傷が元となり${name}が死亡しました……`, { history: false });
                     await this.game.ui.showDialogAsync(`戦傷が元となり${name}が死亡しました……`, false, 0);
+                    if (!isCurrentFlow()) return;
                 }
             }
         }
@@ -809,9 +867,11 @@ class LifeSystem {
             }
             // 大きな月でもブラウザへ制御を返す機会を作ります。
             await new Promise(resolve => setTimeout(resolve, 0));
+            if (!isCurrentFlow()) return;
         }
 
         // ★追加：全ての死亡判定が終わったので、全員のdeathFlagを綺麗にお掃除（false）します！
+        if (!isCurrentFlow()) return;
         this.game.bushos.forEach(b => {
             b.deathFlag = false;
         });
@@ -822,6 +882,7 @@ class LifeSystem {
         );
 
         for (const p of targetPrincesses) {
+            if (!isCurrentFlow()) return;
             const yearsPassed = currentYear - (p.endYear - 1);
             const deathProb = 0.02 + (yearsPassed * 0.02);
 
@@ -846,6 +907,7 @@ class LifeSystem {
                                     const breakMsg = `${p.name}の死により、${otherClan.name}との婚姻関係は解消されました。`;
                                     this.game.ui.log(breakMsg, { clanIds: [clanA, clanB], category: 'family', inferCurrentTurn: false });
                                     await this.game.ui.showDialogAsync(breakMsg, false, 0);
+                                    if (!isCurrentFlow()) return;
                                 }
                             }
                         }
@@ -856,6 +918,7 @@ class LifeSystem {
                 if (p.currentClanId === this.game.playerClanId && !wasUnborn) {
                     this.game.ui.log(`${p.name}が死亡しました……`, { clanIds: Number(p.currentClanId) > 0 ? [Number(p.currentClanId)] : [], category: 'death', inferCurrentTurn: false });
                     await this.game.ui.showDialogAsync(`${p.name}が死亡しました……`, false, 0);
+                    if (!isCurrentFlow()) return;
                 }
             }
         }
@@ -2032,6 +2095,9 @@ class LifeSystem {
 
     // ③ 毎年1月にランダムで新しい姫を登場させる機能です
     async checkRandomPrincessAppearance() {
+        const generation = this._captureLifeFlowGeneration();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        if (!isCurrentFlow()) return;
         const currentYear = this.game.year;
         let familyRebuildNeeded = false;
         // この年初処理中に武将の所属・活動状態は変えないため、父親候補は冒頭の1回集計を共用できます。
@@ -2039,6 +2105,7 @@ class LifeSystem {
         const princessContext = this._buildPrincessAppearanceContext();
 
         for (const clan of this.game.clans) {
+            if (!isCurrentFlow()) return;
             if (clan.id === 0) continue;
 
             // 今その家にいる未婚の姫を数えます（旧 `currentClanId === clan.id` の厳密一致）。
@@ -2067,7 +2134,8 @@ class LifeSystem {
                         const msg = `${fatherName}の息女、${newPrincess.name}が誕生しました！`;
                         
                         this.game.ui.log(msg, { clanIds: [clan.id], category: 'family', inferCurrentTurn: false });
-                        await this.game.ui.showDialogAsync(msg, false, 0); 
+                        await this.game.ui.showDialogAsync(msg, false, 0);
+                        if (!isCurrentFlow()) return;
                     }
                 }
             }
@@ -2094,6 +2162,7 @@ class LifeSystem {
                             
                             this.game.ui.log(msg, { clanIds: [clan.id], category: 'family', inferCurrentTurn: false });
                             await this.game.ui.showDialogAsync(msg, false, 0);
+                            if (!isCurrentFlow()) return;
                         }
                     }
                 }
@@ -2101,6 +2170,7 @@ class LifeSystem {
         }
         // ★安定化：1月に複数家で姫が誕生しても、4000人規模の全国一門再構築は1回だけ。
         // 一門索引自体は全武将・全姫を対象にするため、他勢力・浪人・未所属との血縁も維持されます。
+        if (!isCurrentFlow()) return;
         if (familyRebuildNeeded) {
             FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
         }

@@ -115,7 +115,9 @@ class SaveLoadView {
                     originalSlotNo: slot.originalSlotNo,
                     data: slot.data,
                     time,
-                    hasData: slot.hasData
+                    hasData: slot.hasData,
+                    readError: !!slot.readError,
+                    invalidData: !!slot.invalidData
                 };
             });
             
@@ -217,14 +219,30 @@ class SaveLoadView {
                             </div>
                         </div>
                     `;
+                } else if (slotInfo.readError) {
+                    // IndexedDBの一時的な読込失敗を空きスロット扱いしない。
+                    // 既存データの有無が不明なので、セーブ時も上書きを禁止する。
+                    btn.className = 'saveload-slot-btn empty-slot is-load-disabled';
+                    btn.disabled = true;
+                    btn.innerHTML = `
+                        <div class="saveload-slot-number">${slotNumberText}</div>
+                        <div class="saveload-slot-image"><div class="saveload-map-placeholder">読込エラー</div></div>
+                        <div class="saveload-slot-content empty">
+                            <div class="saveload-slot-time">----/--/-- --:--</div>
+                            <div class="saveload-slot-empty-text">読込エラー</div>
+                        </div>
+                    `;
                 } else {
+                    // レコードが存在しても現行形式でロードできない場合は空きと偽らない。
+                    // 旧セーブ互換は維持しないため、上書きは警告付きで引き続き可能にする。
+                    const emptyLabel = slotInfo.invalidData ? '読込不可' : 'NO DATA';
                     btn.className = 'saveload-slot-btn empty-slot';
                     btn.innerHTML = `
                         <div class="saveload-slot-number">${slotNumberText}</div>
-                        <div class="saveload-slot-image"><div class="saveload-map-placeholder">NO DATA</div></div>
+                        <div class="saveload-slot-image"><div class="saveload-map-placeholder">${emptyLabel}</div></div>
                         <div class="saveload-slot-content empty">
                             <div class="saveload-slot-time">----/--/-- --:--</div>
-                            <div class="saveload-slot-empty-text">NO DATA</div>
+                            <div class="saveload-slot-empty-text">${emptyLabel}</div>
                         </div>
                     `;
                     
@@ -246,7 +264,10 @@ class SaveLoadView {
                     
                     if (mode === 'save') {
                         // 確認を取り消した時はスロット一覧をそのまま残し、別スロットを選び直せるようにします。
-                        this.ui.showDialog(`${displayTitle}に現在の状態をセーブ（上書き）しますか？`, true, () => {
+                        const saveMessage = slotInfo.invalidData
+                            ? `${displayTitle}には現在の形式で読み込めないデータが存在します。上書きすると元の保存内容は失われます。現在の状態をセーブしますか？`
+                            : `${displayTitle}に現在の状態をセーブ（上書き）しますか？`;
+                        this.ui.showDialog(saveMessage, true, () => {
                             closeSlotList();
                             this.game.saveGameToLocal(i);
                         }, null, {

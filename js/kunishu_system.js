@@ -399,11 +399,23 @@ class KunishuSystem {
         return Math.max(0, Math.min(50, baseAffinity)); // 結果を0〜50の間に閉じ込めます
     }
 
+    // 月末処理がロード・タイトル復帰・シナリオ切替をまたがないよう、
+    // 既存TurnManagerの世代を読取専用で利用する。世代の管理責務は増やさない。
+    _captureKunishuFlow() {
+        const manager = this.game && this.game.turnManager;
+        if (!manager || typeof manager.captureTurnFlowGeneration !== 'function'
+            || typeof manager.isTurnFlowGenerationLatest !== 'function') return () => true;
+        const generation = manager.captureTurnFlowGeneration();
+        return () => manager.isTurnFlowGenerationLatest(generation);
+    }
+
     // 月末処理
-    async processEndMonth() { // ★追加：async を付けます
+    async processEndMonth() {
+        const isCurrentFlow = this._captureKunishuFlow();
         const activeKunishus = this.getAliveKunishus();
         
         for (const kunishu of activeKunishus) {
+            if (!isCurrentFlow()) return;
             // 1. 兵力と防御力の自動回復 (最大値の２．５％)
             if (kunishu.soldiers < kunishu.maxSoldiers) {
                 kunishu.soldiers = Math.min(kunishu.maxSoldiers, kunishu.soldiers + Math.floor(kunishu.maxSoldiers * 0.025));
@@ -438,6 +450,7 @@ class KunishuSystem {
 
             // 組織の壊滅チェック（★変更：awaitを付けてダイアログを待ちます）
             await this.checkDestroyed(kunishu);
+            if (!isCurrentFlow()) return;
 
             // ★変更：スキルマネージャーに旗揚げ（大名復帰）できるスキルを持っていないか聞きに行きます
             if (!kunishu.isDestroyed && typeof SkillManager !== 'undefined') {
@@ -447,11 +460,13 @@ class KunishuSystem {
                 
                 if (riseInfo && riseInfo.canRise) {
                     await this.executeIndependentRise(kunishu, leader, myCastle, riseInfo.skillName);
+                    if (!isCurrentFlow()) return;
                     continue; // 旗揚げしたので、これ以降の諸勢力アクションはスキップ
                 }
             }
         }
 
+        if (!isCurrentFlow()) return;
         // 壊滅していないものを再度取得
         const survivingKunishus = this.getAliveKunishus();
 
@@ -465,6 +480,7 @@ class KunishuSystem {
         // 2. 城の所有者（大名）に対するアクション
         // ★変更：forEach をやめて、順番待ちができる for...of に変えます
         for (const kunishu of survivingKunishus) {
+            if (!isCurrentFlow()) return;
             const myCastle = this.game.getCastle(kunishu.castleId);
             
             // ★ここをごっそり変更：商人勢力の場合は、拠点支配にかかわらずアクションの判定をします！
@@ -483,6 +499,7 @@ class KunishuSystem {
                             // お城が見つかって、毎月10%の確率に当たったらアクション！
                             if (targetCastle && Math.random() < 0.10) {
                                 await this.executeActionToLord(kunishu, targetCastle);
+                                if (!isCurrentFlow()) return;
                             }
                         }
                     }
@@ -493,6 +510,7 @@ class KunishuSystem {
                     // 毎月末、最大10%の確率で発動
                     if (Math.random() < 0.10) {
                         await this.executeActionToLord(kunishu, myCastle);
+                        if (!isCurrentFlow()) return;
                     }
                 }
             }
@@ -730,6 +748,7 @@ class KunishuSystem {
 
     // 壊滅と継承のチェック（★変更：async を付けます）
     async checkDestroyed(kunishu) {
+        const isCurrentFlow = this._captureKunishuFlow();
         if (kunishu.isDestroyed) return;
 
         const members = this.getKunishuMembers(kunishu.id);
@@ -849,6 +868,7 @@ class KunishuSystem {
                 const mainMsg = `${kunishuName}の${leaderName}が死亡しました。`;
                 this.game.ui.log(`【頭領交代】${mainMsg}`);
                 await this.game.ui.showDialogAsync(mainMsg, false, 0);
+                if (!isCurrentFlow()) return;
                 
                 // 2枚目：急遽元服のメッセージ
                 await this.game.ui.showDialogAsync(extraMsg, false, 0);
@@ -863,6 +883,7 @@ class KunishuSystem {
 
     // ★追加：スキルによる大名勢力としての旗揚げ（一元化処理）
     async executeIndependentRise(kunishu, leader, castle, skillName) {
+        const isCurrentFlow = this._captureKunishuFlow();
         let newClanId = Math.max(...this.game.clans.map(c => c.id)) + 1;
         const indepSys = this.game.independenceSystem;
         const newColor = indepSys ? indepSys.generateDistinctColor(castle) : "#ff0000";
@@ -914,11 +935,13 @@ class KunishuSystem {
         const msg = `${kunishu.getName(this.game)}の${leaderNameStr}が${castle.name}を乗っ取り、大名として再び旗揚げしました！`;
         this.game.ui.log(msg);
         await this.game.ui.showDialogAsync(msg);
+        if (!isCurrentFlow()) return;
 
         if (info && info.isNameChanged) {
             const nameChangeMsg = `大名となるにあたり、${info.oldNameStr}は「${info.newNameStr}」と名を改めました。`;
             this.game.ui.log(nameChangeMsg);
             await this.game.ui.showDialogAsync(nameChangeMsg);
+            if (!isCurrentFlow()) return;
         }
 
         if (this.game.ui && typeof this.game.ui.updateClanColors === 'function') {

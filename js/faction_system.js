@@ -124,7 +124,14 @@ class FactionSystem {
     /**
      * 月初処理: 下野判定と派閥形成
      */
-    async processStartMonth() { // ★ async を追加します！
+    async processStartMonth() {
+        // 出奔会話待機中にロードされた場合、旧ゲームの下野・派閥再編を継続しない。
+        const turnManager = this.game && this.game.turnManager;
+        const generation = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration() : null;
+        const isCurrentFlow = () => generation === null || !turnManager
+            || typeof turnManager.isTurnFlowGenerationLatest !== 'function'
+            || turnManager.isTurnFlowGenerationLatest(generation);
         const F = window.WarParams.Faction;
         const roninThreshold = F.RoninLoyaltyThreshold;
         const roninChanceBase = F.RoninChanceBase;
@@ -142,6 +149,7 @@ class FactionSystem {
 
         // ★修正：forEach をやめて、順番待ちができる for...of に変えます！
         for (const b of roninCandidates) {
+            if (!isCurrentFlow()) return;
             // ★基本の計算結果に、先ほど一番上で作った倍率（roninMultiplier）を掛け算します
             let chance = (roninChanceBase - (b.loyalty * 0.01)) * roninMultiplier;
             
@@ -158,10 +166,12 @@ class FactionSystem {
             // ★書き足しここまで！
 
             if (Math.random() < chance) {
-                await this.executeRonin(b); // ★ await を追加します！
+                await this.executeRonin(b);
+                if (!isCurrentFlow()) return;
             }
         }
 
+        if (!isCurrentFlow()) return;
         // 2. 派閥形成・更新
         if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
             this.game.writeSystemDiagnostic('month_start:faction:rebuild_start');

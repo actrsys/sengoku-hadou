@@ -19,6 +19,9 @@ class TurnManager {
 
     abortForScenarioTransition() {
         this._turnFlowGeneration = Number(this._turnFlowGeneration || 0) + 1;
+        // 独立・謀反の途中で切替が始まった場合、旧演出の勢力色遮断を
+        // 新シナリオへ持ち越さない。演出の入力ガードはUI側のresetが所有する。
+        if (this.game) this.game.isSuspendingColorUpdate = false;
         this._cancelAllActionsDonePromptTimer();
         if (this._turnContinuationTimers && this._turnContinuationTimers.size > 0) {
             this._turnContinuationTimers.forEach(timerId => clearTimeout(timerId));
