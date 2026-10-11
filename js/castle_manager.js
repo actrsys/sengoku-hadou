@@ -24,9 +24,13 @@ class CastleManager {
     }
 
     // 城の持ち主を変更する魔法です。isEventがtrueの時は、イベントによる平和的な変更として扱います。
-    changeOwner(castle, newOwnerId, isEvent = false, newLegionId = 0) {
+    changeOwner(castle, newOwnerId, isEvent = false, newLegionId = 0, previousCastellanId = undefined) {
         const oldOwnerId = Number(castle.ownerClan);
         const oldLegionId = Number(castle.legionId || 0);
+        // 合戦では捕縛・撤退により、所有者変更前に旧城主が名簿から外れる。
+        // 戦争開始時に控えた城主IDが渡された場合はそれを旧軍団長の判定正本にする。
+        const oldCastellanId = previousCastellanId === undefined
+            ? Number(castle.castellanId || 0) : Number(previousCastellanId || 0);
 
         this.setOwnerIdRaw(castle, newOwnerId);
         castle.legionId = Number(newLegionId); // 攻撃側の軍団IDになる
@@ -84,8 +88,8 @@ class CastleManager {
                 if (remaining.length === 0) {
                     // ★修正：oldLegionIdは軍団No(1~8)なので、正確な軍団データを探し出して固有IDを渡すように直します！
                     this.disbandLegion(targetLegion.id);
-                } else if (Number(castle.castellanId) === Number(targetLegion.commanderId)) {
-                    // 城が残っていても、国主の居城が奪われた場合は軍団を解散する
+                } else if (oldCastellanId > 0 && oldCastellanId === Number(targetLegion.commanderId)) {
+                    // 城が残っていても、旧国主の居城が奪われた場合は軍団を解散する
                     this.disbandLegion(targetLegion.id);
                 }
             }

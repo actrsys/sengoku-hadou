@@ -1,0 +1,31 @@
+戦国覇道 r465 — 国主の居城陥落・軍団解散の状態整合監査
+
+基準版: r464
+対象: 通常の攻城戦／防衛軍撤退／国主の捕縛・退避／拠点所有者変更／軍団管理
+方針: 通常プレイで成立する不具合のみ修正し、評価式・戦闘バランス・任命条件は変更しない。
+
+発見事項
+- CastleManager.changeOwner() は国主居城の陥落を、所有者変更時点の castle.castellanId と Legion.commanderId の一致で判断していた。
+- 通常落城では processCaptures() が先に国主を捕虜にするか他城へ逃がす。この時、AffiliationSystem.leaveCastle() が旧居城の castle.castellanId を0にする。
+- 防衛軍の撤退戦では executeRetreatLogic() が旧居城の castellanId を0にしてから endWar() の所有者変更に進む。
+- 旧軍団の拠点がほかに残る場合、CastleManager は旧国主居城の陥落を検知できず、軍団長IDが旧国主のまま残存軍団が維持されていた。
+
+修正
+- startWar() の戦争状態に defenderCastellanIdAtBattleStart を保持。
+- 通常落城と撤退による落城の CastleManager.changeOwner() 呼び出しへ旧城主IDを渡す。
+- CastleManager.changeOwner() の省略可能な第5引数 previousCastellanId が渡された場合だけ、旧軍団長の居城陥落判定でこれを使う。引数がない外交・イベント等の既存動作は維持する。
+- disbandLegion() の正規窓口で関連軍団のみ解除し、別軍団は触らない。
+
+再現・検証
+- r464に新規テストを追加した結果、旧居城 castle.castellanId=0 での changeOwner() 後に Legion.commanderId が残る失敗を確認。
+- r465修正後、同テストで commanderId=0、残存城の直轄化、委任解除、旧国主の isCommander解除を確認。別軍団は不変。
+- 通常落城・撤退落城の2経路から戦争開始時の旧城主IDを渡す配線検査も追加。
+- 既存回帰テスト・表示・シミュレーション・管理用Excel/BIN検査は実行結果を完成報告に記載。
+
+変更ファイル
+更新: ARCHITECTURE.md, docs/audits/README.md, js/config.js, js/castle_manager.js, js/war_effort.js, tests/run_tests.js
+追加: docs/audits/r465_国主居城落城軍団解散整合監査記録.txt
+削除: なし
+
+非変更
+軍団新設閾値・国主任命条件・城主選定・他軍団の領有・士気・兵数・兵糧・装備・外交・AI評価・UI・セーブ形式・共通／1560／1570の管理用Excelと実行BIN・画像。

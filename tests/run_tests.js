@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r461');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r465');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -15793,6 +15793,150 @@ test('r461 敗戦本隊の帰還は収容できた兵数だけで士気・訓練
     assert.ok(effort.includes('this.mergeReturningArmyReadiness(helperCastle, reinf, finalReturnSoldiers)'),
         '援軍の既存帰還処理を同一の計算に保つ');
 });
+
+
+// r462: 鎮圧戦の帰還も本隊の共通収容処理を通す。
+test('r462 諸勢力鎮圧本隊の帰還時に兵数と士気・訓練度を揃える', () => {
+    const ctx = createContext({WarManager: class WarManager {}});
+    loadScript(ctx, 'js/war_effort.js');
+    const war = new ctx.WarManager();
+    const src = {soldiers: 90000, morale: 20, training: 30};
+    const returning = {soldiers: 40000, morale: 80, training: 90};
+    assert.strictEqual(war.mergeReturningArmyReadiness(src, returning, returning.soldiers), 9999);
+    assert.deepStrictEqual([src.soldiers, src.morale, src.training], [99999, 25, 35]);
+    const full = {soldiers: 99999, morale: 20, training: 30};
+    assert.strictEqual(war.mergeReturningArmyReadiness(full, returning, returning.soldiers), 0);
+    assert.deepStrictEqual([full.soldiers, full.morale, full.training], [99999, 20, 30]);
+    const healthy = {soldiers: 1000, morale: 20, training: 30};
+    assert.strictEqual(war.mergeReturningArmyReadiness(healthy, returning, 1000), 1000);
+    assert.deepStrictEqual([healthy.soldiers, healthy.morale, healthy.training], [2000, 50, 60]);
+    const body = read('js/war_effort.js');
+    const subjugationBlock = body.slice(body.indexOf('if (s.isKunishuSubjugation) {'), body.indexOf('if (s.attacker.isKunishu) {', body.indexOf('if (s.isKunishuSubjugation) {')));
+    assert.ok(subjugationBlock.includes('this.mergeReturningArmyReadiness(srcC, s.attacker, s.attacker.soldiers)'),
+        '鎮圧戦の通常帰還経路が共通収容処理を実際に呼ぶ');
+    assert.ok(!subjugationBlock.includes('srcC.soldiers = Math.min(99999, srcC.soldiers + s.attacker.soldiers)'),
+        '兵数だけの従来の二重管理を残さない');
+});
+
+// r463: 本隊の拠点撤退は、出陣元への帰還と同じ収容人数・練度統合を行う。
+test('r463 拠点撤退時の生存兵と負傷兵は実際の収容数だけ士気・訓練度へ反映する', () => {
+    const ctx = createContext({
+        WarManager: class WarManager {},
+        WarParams: {War: {RetreatResourceLossFactor: 0.2}},
+        WarSystem: {calcRetreatScore: () => 0},
+        BushoStatusRules: {isRonin: () => false},
+        LifeStatusRules: {isPresent: () => true}
+    });
+    loadScript(ctx, 'js/war_effort.js');
+    const buildScenario = (targetSoldiers) => {
+        const source = {
+            id: 4, name: '撤退元', ownerClan: 1, soldiers: 40000, morale: 80, training: 90,
+            gold: 100, rice: 100, horses: 100, guns: 100, samuraiIds: [], castellanId: 0
+        };
+        const target = {
+            id: 5, name: '撤退先', ownerClan: 1, soldiers: targetSoldiers, morale: 20,
+            training: 30, gold: 100, rice: 100, horses: 100, guns: 100, samuraiIds: []
+        };
+        const manager = new ctx.WarManager();
+        let ended = false;
+        manager.game = {
+            getCastle: id => id === 5 ? target : source,
+            getCastleBushos: () => [],
+            updateCastleLord: () => {},
+            ui: {log: () => {}}
+        };
+        manager.state = {attacker: {soldiers: 1000}, defender: source, isPlayerInvolved: false};
+        manager.getEscapeCandidates = () => [target];
+        manager.endWar = (won, retreat, captured, targetId) => {
+            ended = won === true && retreat === true && targetId === 5;
+        };
+        manager.executeRetreatLogic(source);
+        assert.ok(ended, '実際の拠点撤退経路を終了まで実行する');
+        assert.strictEqual(source.soldiers, 0, '旧拠点から守備兵を移動させる');
+        return target;
+    };
+    const partial = buildScenario(90000);
+    assert.deepStrictEqual([partial.soldiers, partial.morale, partial.training], [99999, 25, 35],
+        '収容可能な9999人だけで平均を取る');
+    const full = buildScenario(99999);
+    assert.deepStrictEqual([full.soldiers, full.morale, full.training], [99999, 20, 30],
+        '満員の拠点には能力値を変更しない');
+    const normal = buildScenario(1000);
+    assert.deepStrictEqual([normal.soldiers, normal.morale, normal.training], [41000, 78, 88],
+        '全員を収容できる場合は加重平均する');
+    const effort = read('js/war_effort.js');
+    assert.ok(effort.includes('this.mergeReturningArmyReadiness(targetC, s.defender, s.defender.soldiers + recovered)'),
+        '戦後の撤退側の負傷兵も人数と練度を共通窓口で統合する');
+});
+
+
+// r464: 落城直後に敵守備兵を吸収する場合も、実際に収容できた人数のみを加重対象にする。
+test('r464 落城後の占領軍と吸収兵は上限内の実兵数で士気・訓練度を計算する', () => {
+    const ctx = createContext({WarManager: class WarManager {}});
+    loadScript(ctx, 'js/war_effort.js');
+    const manager = new ctx.WarManager();
+    const attacker = {morale: 20, training: 30};
+    const captured = {soldiers: 90000, morale: 100, training: 90};
+    const absorbed = manager.mergeCapturedCastleReadiness(captured, attacker, 40000, 90000);
+    assert.strictEqual(absorbed, 59999, '攻撃本隊を優先し残りの空きだけ旧守備兵を吸収する');
+    assert.deepStrictEqual([captured.soldiers, captured.morale, captured.training], [99999, 67, 65],
+        '兵数上限で切り捨てた旧守備兵を士気・訓練度へ算入しない');
+
+    const normal = {soldiers: 2000, morale: 80, training: 70};
+    assert.strictEqual(manager.mergeCapturedCastleReadiness(normal, attacker, 1000, 2000), 2000);
+    assert.deepStrictEqual([normal.soldiers, normal.morale, normal.training], [3000, 60, 56],
+        '上限に達しない従来の能力統合計算はそのまま');
+
+    const almostFull = {soldiers: 99999, morale: 100, training: 100};
+    assert.strictEqual(manager.mergeCapturedCastleReadiness(almostFull, {morale: 100, training: 100}, 99999, 99999), 0);
+    assert.deepStrictEqual([almostFull.soldiers, almostFull.morale, almostFull.training], [99999, 100, 100]);
+
+    const effort = read('js/war_effort.js');
+    assert.ok(effort.includes('this.mergeCapturedCastleReadiness(s.defender, s.attacker, totalAtkSurvivors, totalAbsorbed)'),
+        '本番の拠点制圧結果でも検査対象の計算を実行する');
+});
+
+
+// r465: 落城前の捕縛・逃走で旧国主が城から外れても、国主居城の喪失を検知する。
+test('r465 国主の居城陥落では捕縛後も旧国主の軍団を解散し、無関係な軍団を維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/castle_manager.js');
+    const Manager = vm.runInContext('CastleManager', ctx);
+    const lord = { id: 10, isCommander: true };
+    const legion = { id: 102, clanId: 1, legionNo: 2, commanderId: 10,
+        status: 'move', objective: '攻撃', targetId: 100, route: [1, 2] };
+    const otherLegion = { id: 300, clanId: 1, legionNo: 3, commanderId: 20 };
+    const captured = { id: 1, name: '陥落城', ownerClan: 1, legionId: 2, castellanId: 0,
+        isDelegated: false, samuraiIds: [] }; // 捕縛処理が先行して旧城主IDが消える
+    const remaining = { id: 2, ownerClan: 1, legionId: 2, isDelegated: true };
+    const unrelated = { id: 3, ownerClan: 1, legionId: 3, isDelegated: true };
+    const clans = [{ id: 1 }, { id: 9 }];
+    const game = {
+        castleOwnershipVersion: 0, legions: [legion, otherLegion],
+        castles: [captured, remaining, unrelated], clans,
+        getClan: id => clans.find(c => c.id === id),
+        getBusho: id => id === 10 ? lord : null,
+        getClanBushos: () => [],
+        aiOperationManager: { operations: {}, clearLegionPlanning() {} },
+        kunishuSystem: { applyRelationDropOnCastleCapture() {} }
+    };
+    const manager = new Manager(game);
+    // 第5引数はこの合戦での旧城主。城のcastellanIdは捕縛時に消えていてもよい。
+    manager.changeOwner(captured, 9, false, 0, 10);
+    assert.strictEqual(legion.commanderId, 0, '捕縛された国主を軍団長に残さない');
+    assert.strictEqual(remaining.legionId, 0, '旧国主軍団の残存城を直轄へ戻す');
+    assert.strictEqual(remaining.isDelegated, false);
+    assert.strictEqual(lord.isCommander, false);
+    assert.strictEqual(unrelated.legionId, 3, '別軍団は触らない');
+    assert.strictEqual(otherLegion.commanderId, 20);
+});
+
+test('r465 通常落城・撤退落城は戦闘開始時の旧城主情報を所有変更に引き渡す', () => {
+    const effort = read('js/war_effort.js');
+    assert.match(effort, /defenderCastellanIdAtBattleStart:\s*Number\(defCastle\.castellanId\s*\|\|\s*0\)/);
+    assert.strictEqual((effort.match(/changeOwner\(s\.defender, s\.attacker\.ownerClan, false, newLegionId, s\.defenderCastellanIdAtBattleStart\)/g) || []).length, 2);
+});
+
 
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);

@@ -54,6 +54,34 @@ Object.assign(WarManager.prototype, {
         return acceptedSoldiers;
     },
 
+    // 拠点制圧では攻略本隊を先に収容し、残った枠にだけ守備側の残兵・負傷兵を吸収する。
+    // 兵数上限で受け入れられない兵まで士気・訓練度の加重平均へ混ぜない。
+    mergeCapturedCastleReadiness(capturedCastle, attackingArmy, attackerSoldiers, absorbedSoldiers) {
+        const acceptedAttacker = Math.min(99999, Math.max(0, Number(attackerSoldiers) || 0));
+        const acceptedDefender = Math.min(
+            99999 - acceptedAttacker,
+            Math.max(0, Number(absorbedSoldiers) || 0)
+        );
+        const acceptedTotal = acceptedAttacker + acceptedDefender;
+        if (acceptedTotal > 0) {
+            const attackerTraining = Number(attackingArmy.training) || 0;
+            const attackerMorale = Number(attackingArmy.morale) || 0;
+            const averageTraining = Math.floor(
+                ((Number(capturedCastle.training) || 0) * acceptedDefender +
+                 attackerTraining * acceptedAttacker) / acceptedTotal
+            );
+            const averageMorale = Math.floor(
+                ((Number(capturedCastle.morale) || 0) * acceptedDefender +
+                 attackerMorale * acceptedAttacker) / acceptedTotal
+            );
+            // 既存の制圧時規則（攻略軍の士気・訓練度を下回らない）は維持する。
+            capturedCastle.training = Math.max(attackerTraining, averageTraining);
+            capturedCastle.morale = Math.max(attackerMorale, averageMorale);
+        }
+        capturedCastle.soldiers = acceptedTotal;
+        return acceptedDefender;
+    },
+
     // 守備側野戦へ出る本城兵だけを数える。自城以外の援軍は出発元で既に
     // 兵数を減算済みなので、ここで本城から再び差し引かない。
     // FieldWarManager も各部隊の武将IDで主軍・援軍を分離して帰還させる。
@@ -890,6 +918,7 @@ Object.assign(WarManager.prototype, {
                 reinforcement: reinforcementData, selfReinforcement: selfReinforcementData,
                 isKunishuSubjugation: defCastle.isKunishu === true && !atkCastle.isKunishu, // 防衛側が諸勢力で、攻撃側が諸勢力(蜂起)でないなら鎮圧戦！
                 isDaimyoCastle: isDaimyoCastle, // ★大名の居城フラグを追加
+                defenderCastellanIdAtBattleStart: Number(defCastle.castellanId || 0), // 捕縛・撤退で旧城主が消えても軍団解散判定へ渡す
                 isSeaBattle: isSeaBattle, // ★海戦フラグを追加
                 isPlayerFactionInvolved: isPlayerFactionInvolved, // ★追加
                 battleFocusCastleId: Number(defCastle.id) || 0,
@@ -1479,7 +1508,9 @@ Object.assign(WarManager.prototype, {
                 // ★追加：逃げ込んだ先の城がパンクしないように上限をかけます
                 target.gold = Math.min(99999, target.gold + carryGold); 
                 target.rice = Math.min(99999, target.rice + carryRice); 
-                target.soldiers = Math.min(99999, target.soldiers + defCastle.soldiers);
+                // 生存兵は実際に収容できた人数だけで士気・訓練度へ反映する。
+                // 通常の帰還・援軍帰還と同じ窓口を使い、兵数だけの合流を残さない。
+                this.mergeReturningArmyReadiness(target, defCastle, defCastle.soldiers);
                 target.horses = Math.min(99999, (target.horses || 0) + carryHorses);
                 target.guns = Math.min(99999, (target.guns || 0) + carryGuns);
                 
@@ -1931,7 +1962,9 @@ Object.assign(WarManager.prototype, {
                 const srcC = this.game.getCastle(s.sourceCastle.id);
                 if (srcC) {
                     // ★追加：帰還した城が上限を超えないようにします
-                    srcC.soldiers = Math.min(99999, srcC.soldiers + s.attacker.soldiers); 
+                    // 鎮圧戦の帰還も通常の本隊帰還と同じ窓口で収容人数を確定する。
+                    // 兵数だけ戻して士気・訓練度を据え置く旧経路を解消する。
+                    this.mergeReturningArmyReadiness(srcC, s.attacker, s.attacker.soldiers);
                     srcC.rice = Math.min(99999, srcC.rice + s.attacker.rice);
                     srcC.horses = Math.min(99999, (srcC.horses || 0) + (s.attacker.horses || 0));
                     srcC.guns = Math.min(99999, (srcC.guns || 0) + (s.attacker.guns || 0));
@@ -2127,7 +2160,7 @@ Object.assign(WarManager.prototype, {
                     // ★追加: 守備側の撤退時なので、先ほど計算した defMainRecRate を使います！
                     const recovered = Math.floor(realDefDead * defMainRecRate);
                     // ★追加：撤退先での兵士合流にストッパー！
-                    targetC.soldiers = Math.min(99999, targetC.soldiers + s.defender.soldiers + recovered);
+                    this.mergeReturningArmyReadiness(targetC, s.defender, s.defender.soldiers + recovered);
                     if (s.isPlayerInvolved && recovered > 0) this.game.ui.log(`(撤退先にて負傷兵 ${recovered}名 が復帰)`, { history: false });
                 }
             } else if (!isRetreat && attackerWon) {
@@ -2135,21 +2168,11 @@ Object.assign(WarManager.prototype, {
                 const recovered = Math.floor(realDefDead * baseRecoveryRate); // 守備側は全滅（非撤退）なので基本の回復率を使います
                 const totalAbsorbed = survivors + recovered;
 
-                // ★追加：攻め込んだ元気な兵士と、城に残っていた兵士の士気と訓練をまぜまぜします！
-                const newTotalSoldiers = totalAtkSurvivors + totalAbsorbed;
-                if (newTotalSoldiers > 0) {
-                    let calcTraining = Math.floor(((s.defender.training || 0) * totalAbsorbed + (s.attacker.training || 0) * totalAtkSurvivors) / newTotalSoldiers);
-                    let calcMorale = Math.floor(((s.defender.morale || 0) * totalAbsorbed + (s.attacker.morale || 0) * totalAtkSurvivors) / newTotalSoldiers);
-                    
-                    s.defender.training = ((s.attacker.training || 0) > calcTraining) ? (s.attacker.training || 0) : calcTraining;
-                    s.defender.morale = ((s.attacker.morale || 0) > calcMorale) ? (s.attacker.morale || 0) : calcMorale;
-                }
-
-                // ★追加：城を奪った時の兵士や軍馬、鉄砲の合流にストッパー！
-                s.defender.soldiers = Math.min(99999, newTotalSoldiers);
+                // 攻略本隊を優先し、収容枠に入った守備側の兵だけ能力値に反映する。
+                const acceptedAbsorbed = this.mergeCapturedCastleReadiness(s.defender, s.attacker, totalAtkSurvivors, totalAbsorbed);
                 s.defender.horses = Math.min(99999, defenderSurvivedHorses + attackerSurvivedHorses);
                 s.defender.guns = Math.min(99999, defenderSurvivedGuns + attackerSurvivedGuns);
-                if (s.isPlayerInvolved && totalAbsorbed > 0) this.game.ui.log(`(敵残存兵・負傷兵 計${totalAbsorbed}名 を吸収)`, { history: false });
+                if (s.isPlayerInvolved && acceptedAbsorbed > 0) this.game.ui.log(`(敵残存兵・負傷兵 計${acceptedAbsorbed}名 を吸収)`, { history: false });
             } else if (!attackerWon) {
                 if (s.attacker.isKunishu) {
                     const kunishu = this.game.kunishuSystem.getKunishu(s.attacker.kunishuId);
@@ -2183,7 +2206,7 @@ Object.assign(WarManager.prototype, {
             if (isRetreat && attackerWon) {
                 // ★城の管理システムにお任せします！
                 const newLegionId = s.sourceCastle ? (s.sourceCastle.legionId || 0) : 0;
-                this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan, false, newLegionId);
+                this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan, false, newLegionId, s.defenderCastellanIdAtBattleStart);
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
@@ -2287,7 +2310,7 @@ Object.assign(WarManager.prototype, {
                 
                 // ★城の管理システムにお任せします！
                 const newLegionId = s.sourceCastle ? (s.sourceCastle.legionId || 0) : 0;
-                this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan, false, newLegionId);
+                this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan, false, newLegionId, s.defenderCastellanIdAtBattleStart);
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！
