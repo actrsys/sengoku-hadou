@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r479');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r480');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -16821,6 +16821,86 @@ test('r479 地図の諸勢力アイコンの頭領・名称も文字列化し、
     assert.ok(!actual.html.includes('<svg onload'));
     assert.ok(actual.html.includes('class="kunishu-icon-img"'), '地図の諸勢力アイコンは残す');
     assert.strictEqual(JSON.parse(actual.signature)[6][0][2], '諸勢力' + hostile);
+});
+
+test('r480 面談会話はセーブ由来のHTMLを解釈せず共通の会話整形だけを適用する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/dialogue_text_rules.js');
+    loadScript(ctx, 'js/interview_view.js');
+    const view = Object.create(ctx.InterviewView.prototype);
+    const calls = [];
+    const messageEl = {
+        classList: { toggle() {} },
+        set innerHTML(value) { calls.push(['html', value]); },
+        set textContent(value) { calls.push(['text', value]); }
+    };
+    Object.assign(view, {
+        dialogMessage: messageEl,
+        _setConversationVisible() {},
+        _renderConversationFace() {},
+        dialogShell: null,
+        body: null,
+        currentSpeaker: null
+    });
+    const payload = '「<img src=x onerror=alert(1)>\n承知しました。」';
+    view._renderConversationMessage(null, payload);
+    assert.deepStrictEqual(calls, [['text', '「<img src=x onerror=alert(1)>承知しました」']],
+        '面談メッセージはHTMLにせず元のタグも文字として残す');
+});
+
+test('r480 面談の顔画像は共通のファイル名制限を使用し正規画像を保持する', () => {
+    const ctx = createContext({
+        document: {
+            createElement(tag) {
+                const elem = { tag, children: [], appendChild(child) { this.children.push(child); } };
+                return elem;
+            }
+        }
+    });
+    loadScript(ctx, 'js/stat_presenter.js');
+    loadScript(ctx, 'js/interview_view.js');
+    const view = Object.create(ctx.InterviewView.prototype);
+    const face = { children: [], replaceChildren() { this.children = []; }, appendChild(child) { this.children.push(child); } };
+    const name = { classList: new FakeClassList(), textContent: '' };
+    view.dialogFace = face;
+    view.dialogName = name;
+    const hostile = '../evil.webp" onerror="alert(1)';
+    view._renderConversationFace({ name: '武将', faceIcon: hostile });
+    assert.strictEqual(face.children[0].children[0].src, 'data/images/faceicons/unknown_face.webp',
+        '危険なパス指定は共通の不明画像へフォールバック');
+    assert.strictEqual(name.textContent, '武将');
+    view._renderConversationFace({ name: '家臣', faceIcon: 'sample_001.webp' });
+    assert.strictEqual(face.children[0].children[0].src, 'data/images/faceicons/sample_001.webp',
+        '正規の顔画像は従来どおり表示');
+});
+
+test('r480 面談の武将選択一覧も安全な顔画像パスを使用する', () => {
+    const ctx = createContext({
+        document: {
+            createElement(tag) {
+                return {
+                    tag, children: [],
+                    setAttribute(key, value) { this[key] = value; },
+                    append(...children) { this.children.push(...children); },
+                    appendChild(child) { this.children.push(child); }
+                };
+            }
+        }
+    });
+    loadScript(ctx, 'js/stat_presenter.js');
+    loadScript(ctx, 'js/interview_view.js');
+    const view = Object.create(ctx.InterviewView.prototype);
+    const items = [{ name: '安全表示', faceIcon: '../../wrong.webp' }, { name: '通常', faceIcon: 'portrait.webp' }];
+    const grid = { children: [], replaceChildren() { this.children = []; }, appendChild(child) { this.children.push(child); } };
+    Object.assign(view, {
+        body: {}, _listGrid: grid, page: 0, pageSize: 10, pageItems: items,
+        _getVisibleListItems() { return items; }, _getListSecondaryText() { return '武将'; },
+        pager: null, pageLabel: null, prevBtn: null, nextBtn: null, _listCount: null, _listDirection: null
+    });
+    view._renderCurrentPage();
+    assert.strictEqual(grid.children[0].children[0].src, 'data/images/faceicons/unknown_face.webp');
+    assert.strictEqual(grid.children[1].children[0].src, 'data/images/faceicons/portrait.webp');
+    assert.strictEqual(grid.children[0].children[1].children[0].textContent, '安全表示');
 });
 
 Promise.all(pendingTests).then(() => {

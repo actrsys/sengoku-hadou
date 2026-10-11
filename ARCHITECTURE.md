@@ -1687,3 +1687,10 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `UIManager._buildCastleCardContent()` は地図の拠点カードに表示する装飾用HTMLの生成担当であり、セーブ復元可能な拠点名・勢力名・城主名・諸勢力名・頭領名は `StatPresenter.escapePlainText()` を通してから挿入する。データ本体の名称を変更しない。
 - 諸勢力アイコンや軍団標識の静的HTMLは変更せず、`_castleContentSignature` は引き続き生の名称から作成して差分更新の契機を保持する。地図カードの再構築頻度・座標・見た目・ゲームルールに影響させない。
 - 回帰テストでは不正なHTMLタグを含む名前がツールチップ内では文字列として表示され、アイコンと軍団標識が消えないことを検証する。詳細は `docs/audits/r479_地図ツールチップHTML境界監査記録.txt`。
+
+
+## r480 面談専用Viewの文字列入力境界
+
+- `InterviewView` の会話本文は `DialogueTextRules` による組版規則を適用したうえで `textContent` として出力し、HTMLとして解釈しない。本文に含まれる人物名などの外部セーブ由来文字列を信頼しない。既存の会話文の句点・改行処理は変更しない。
+- 面談の一覧・下部会話の顔画像は共通 `StatPresenter.safeFaceIconPath()` を利用し、同梱顔画像ファイル名以外は `unknown_face.webp` へフォールバックする。人物名は DOM の `textContent` を維持する。
+- 詳細: `docs/audits/r480_面談会話顔画像セキュリティ監査記録.txt`。

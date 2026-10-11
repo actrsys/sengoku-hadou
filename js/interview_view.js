@@ -450,7 +450,9 @@ class InterviewView {
 
             const img = document.createElement('img');
             img.className = 'interview-session-person-face';
-            img.src = `data/images/faceicons/${busho.faceIcon || 'unknown_face.webp'}`;
+            img.src = window.StatPresenter
+                ? StatPresenter.safeFaceIconPath(busho.faceIcon)
+                : 'data/images/faceicons/unknown_face.webp';
             img.alt = '';
             img.onerror = () => {
                 img.onerror = null;
@@ -546,7 +548,9 @@ class InterviewView {
         wrapper.className = 'sp-face-wrapper dialog-face-wrapper';
         const img = document.createElement('img');
         img.className = 'dialog-face-img';
-        img.src = `data/images/faceicons/${busho.faceIcon || 'unknown_face.webp'}`;
+        img.src = window.StatPresenter
+                ? StatPresenter.safeFaceIconPath(busho.faceIcon)
+                : 'data/images/faceicons/unknown_face.webp';
         img.alt = '';
         img.onerror = () => {
             img.onerror = null;
@@ -576,7 +580,7 @@ class InterviewView {
         this._renderConversationFace(busho || this.currentSpeaker, narration);
         if (this.dialogMessage) {
             this.dialogMessage.classList.toggle('interview-session-narration-message', narration);
-            this.dialogMessage.innerHTML = this._formatConversationMessage(message);
+            this.dialogMessage.textContent = this._formatConversationMessage(message);
         }
     }
 
