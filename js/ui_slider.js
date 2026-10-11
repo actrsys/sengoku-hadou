@@ -105,6 +105,18 @@ class UISliderManager {
             }
         };
 
+        // 編集可能な数値欄が空欄・不正な値のままなら、隠し値や直前の
+        // スライダー値が有効でも確定させない。輸送は表示側の numTgt を正本とする。
+        const hasInvalidEditableQuantity = () => Array.from(sliderRefs.values()).some(ref => {
+            const field = ref.numTgt || ref.num;
+            if (!field || field.type !== 'number') return false;
+            const raw = String(field.value).trim();
+            const value = Number(raw);
+            return raw === '' || !Number.isSafeInteger(value)
+                || (field.min !== '' && value < Number(field.min))
+                || (field.max !== '' && value > Number(field.max));
+        });
+
         const checkValidQuantity = () => {
             if (!this.ui.quantityConfirmBtn) return;
             let isValid = true;
@@ -128,6 +140,8 @@ class UISliderManager {
                     if (val <= 0) isValid = false;
                 }
             }
+
+            if (hasInvalidEditableQuantity()) isValid = false;
 
             if (isValid) {
                 this.ui.quantityConfirmBtn.disabled = false;
@@ -319,7 +333,10 @@ class UISliderManager {
 
                 const numTgtHandler = () => {
                     let v = parseInt(numTgt.value);
-                    if (isNaN(v)) return;
+                    if (isNaN(v)) {
+                        checkValidQuantity();
+                        return;
+                    }
                     if (v < targetCurrent) v = targetCurrent;
                     if (v > targetCurrent + actualMaxTransport) v = targetCurrent + actualMaxTransport;
                     const transAmount = v - targetCurrent;
@@ -394,7 +411,10 @@ class UISliderManager {
 
                 const numHandler = () => {
                     let v = parseInt(num.value);
-                    if (isNaN(v)) return;
+                    if (isNaN(v)) {
+                        checkValidQuantity();
+                        return;
+                    }
                     if (v < minVal) v = minVal;
                     if (v > max) v = max;
                     updateSliderUI(v);
@@ -564,6 +584,9 @@ class UISliderManager {
         };
 
         this.ui.quantityConfirmBtn.onclick = async () => {
+            // 無効入力が画面に残った状態で、古いボタン活性状態を使って確定しない。
+            checkValidQuantity();
+            if (this.ui.quantityConfirmBtn.disabled) return;
             // 親selectorを一時退避して開いた数量画面では、数量画面自身を最後のcoverとして使う。
             // 親を閉じると背景復帰（巨大地図Canvasの再合成）が始まるため、そのpaintが完了する前に
             // quantity-modalを消すと一瞬だけ白/黒の地図が露出する。背景を1paint復帰させてから閉じ、

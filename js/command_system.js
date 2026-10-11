@@ -1232,6 +1232,15 @@ class CommandSystem {
     }
    
    handleQuantitySelection(type, inputs, targetId, data, extraData = null) {
+        // 数値欄を編集中の空欄・小数・非数値はコマンドへ渡さない。
+        const malformed = Object.values(inputs || {}).some(input => {
+            const raw = input && input.num ? String(input.num.value ?? '').trim() : null;
+            return raw !== null && (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw)));
+        });
+        if (malformed) {
+            this.game.ui.showDialog('数量を確認してください。', false);
+            return;
+        }
         const castle = this.game.getCurrentTurnCastle();
         
         if (type === 'draft') {
@@ -1299,7 +1308,11 @@ class CommandSystem {
             const rVal = parseInt(inputs.rice.num.value);
             const hVal = inputs.horses ? parseInt(inputs.horses.num.value) : 0;
             const gVal = inputs.guns ? parseInt(inputs.guns.num.value) : 0;
-            if (sVal <= 0) { this.game.ui.showDialog("兵士0では出陣できません", false); return; }
+            if (![sVal, rVal, hVal, gVal].every(Number.isSafeInteger)
+                || sVal <= 0 || rVal < 0 || hVal < 0 || gVal < 0) {
+                this.game.ui.showDialog('出陣する兵数・物資の数量を確認してください。', false);
+                return;
+            }
             
             const proceedWar = () => {
                 this.game.warPreparationController.checkReinforcementAndStartWar(castle, targetId, data.map(id => this.game.getBusho(id)), sVal, rVal, hVal, gVal, extraData);
@@ -1658,6 +1671,16 @@ class CommandSystem {
 
     executeTransport(bushoIds, targetId, vals) {
         const c = this.game.getCurrentTurnCastle(); const t = this.game.getCastle(targetId);
+        // 数量入力から実行までに保有量が変わる場合もあるため、資源変更の直前に再検証する。
+        // NaN や保有数を超える輸送を通すと、金・兵糧が NaN になったり軍馬等が増殖する。
+        const resourceKeys = ['gold', 'rice', 'soldiers', 'horses', 'guns'];
+        if (!c || !t || !vals || resourceKeys.some(key =>
+            !Number.isSafeInteger(vals[key]) || vals[key] < 0
+            || vals[key] > (Number(c[key]) || 0)
+        ) || resourceKeys.every(key => vals[key] === 0)) {
+            this.game.ui.showDialog('輸送量を確認してください。保有物資を超える数量は輸送できません。', false);
+            return;
+        }
         
         // ★ここから追加：輸送先が上限を超えないか事前にチェックして、超えるならお断りします！
         if (t.gold + vals.gold > 99999) { this.game.ui.showDialog("輸送先の「金」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
@@ -1757,6 +1780,12 @@ class CommandSystem {
     }
     
     executeTrade(type, amount) {
+        // 数値欄を編集中に空欄で確定すると parseInt が NaN を返す。
+        // 比較演算では NaN が弾かれないので、費用計算の前に数量を検証する。
+        if (!Number.isSafeInteger(amount) || amount <= 0) {
+            this.game.ui.showDialog('取引数量を確認してください。', false);
+            return;
+        }
         const castle = this.game.getCurrentTurnCastle(); 
         const daimyo = this.game.getClanDaimyo(castle.ownerClan);
         const castellan = this.game.getBusho(castle.castellanId);
@@ -1804,7 +1833,12 @@ class CommandSystem {
         this.finishCommand(msg);
     }
 
-    executeDraft(bushoIds, soldiers) { 
+    executeDraft(bushoIds, soldiers) {
+        // UIの入力途中の空欄を、兵数・人口・金への NaN 書込みに変えない。
+        if (!Number.isSafeInteger(soldiers) || soldiers <= 0) {
+            this.game.ui.showDialog('徴兵数を確認してください。', false);
+            return;
+        }
         const castle = this.game.getCurrentTurnCastle(); 
         const busho = this.game.getBusho(bushoIds[0]); 
         

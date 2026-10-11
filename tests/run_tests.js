@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r452');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r453');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -15369,6 +15369,99 @@ test('r452 姫誕生案内から旧シナリオの次勢力へ処理が流れな
     assert.deepStrictEqual(created,[1]);
     generation=2;resume();await pending;
     assert.deepStrictEqual(created,[1],'画面遷移後に他勢力の姫を生成してはならない');
+});
+
+
+
+test('r453 数量確定入口は空欄や小数を各コマンドへ渡さない', () => {
+    const ctx=createContext();loadScript(ctx,'js/command_system.js');
+    const Command=vm.runInContext('CommandSystem',ctx);
+    let called=0;const dialogs=[];
+    const command=new Command({getCurrentTurnCastle:()=>({}),ui:{showDialog:t=>dialogs.push(t)}});
+    command.executeWithEvent=()=>called++;
+    command.showAdviceAndExecute=()=>called++;
+    for (const raw of ['', '1.5', 'abc', '-3', 'Infinity']) {
+        command.handleQuantitySelection('buy_rice',{amount:{num:{value:raw}}},null,[]);
+        command.handleQuantitySelection('draft',{soldiers:{num:{value:raw}}},null,[1]);
+    }
+    assert.strictEqual(called,0);assert.strictEqual(dialogs.length,10);
+    command.handleQuantitySelection('buy_rice',{amount:{num:{value:'10'}}},null,[]);
+    assert.strictEqual(called,1,'有効な数量は従来どおり実行される');
+});
+
+test('r453 数量画面は入力欄の不正値を確定前に検査する', () => {
+    const slider=read('js/ui_slider.js');
+    const confirm=slider.indexOf('this.ui.quantityConfirmBtn.onclick = async () => {');
+    const validate=slider.indexOf('checkValidQuantity();',confirm);
+    const close=slider.indexOf('cancelQuantityUIUpdate();',confirm);
+    assert.ok(confirm>=0 && validate>confirm && validate<close,'モーダルを閉じる前に数量再確認が必要');
+    assert.ok(slider.includes('ref.numTgt || ref.num'),'輸送の表示入力欄も検査対象にする');
+    assert.ok(slider.includes('hasInvalidEditableQuantity()'),'空欄時に確定ボタンを無効化する');
+});
+// r453: 普通の数値入力欄を編集中に空欄へした場合も、資源をNaNへ壊さない。
+test('r453 正常な数量の売買・徴兵は従来の資源計算を維持する', () => {
+    const ctx=createContext({
+        EconomyRules:{calcTradeCostAndRate:(_type,amount)=>({cost:amount*5})},
+        DomesticRules:{calcDraftCost:(_amount)=>50,applyDraftPenalty:(castle,n)=>{castle.population-=n;return 2;}}
+    });
+    loadScript(ctx,'js/command_system.js');
+    const Command=vm.runInContext('CommandSystem',ctx);
+    const castle={id:1,gold:500,rice:300,tradeLimit:500,soldiers:100,population:500,training:50,morale:50,peoplesLoyalty:50};
+    const busho={id:7,name:'仮武将',isActionDone:false,achievementTotal:0};
+    const game={provinces:[],getCurrentTurnCastle:()=>castle,getClanDaimyo:()=>({}),getBusho:()=>busho,
+        ui:{showDialog(){}},factionSystem:{updateRecognition(){}}};
+    const command=new Command(game);command.finishCommand=()=>{};
+    command.executeTrade('buy_rice',10);
+    assert.strictEqual(castle.gold,450);assert.strictEqual(castle.rice,310);
+    command.executeDraft([7],10);
+    assert.strictEqual(castle.gold,400);assert.strictEqual(castle.population,490);
+    assert.strictEqual(castle.soldiers,110);assert.strictEqual(busho.isActionDone,true);
+});
+
+test('r453 数量が空欄の売買は金・兵糧を破壊しない', () => {
+    const ctx=createContext({EconomyRules:{calcTradeCostAndRate:(_type, amount)=>({cost: amount * 5})}});
+    loadScript(ctx,'js/command_system.js');
+    const Command=vm.runInContext('CommandSystem',ctx);
+    const castle={id:1,ownerClan:1,castellanId:7,gold:500,rice:300,tradeLimit:500};
+    const dialogs=[];
+    const game={provinces:[],getCurrentTurnCastle:()=>castle,getClanDaimyo:()=>({}),getBusho:()=>({}),ui:{showDialog:t=>dialogs.push(t)}};
+    const command=new Command(game);command.finishCommand=()=>{};
+    command.executeTrade('buy_rice',NaN);
+    assert.strictEqual(castle.gold,500);assert.strictEqual(castle.rice,300);
+    command.executeTrade('sell_rice',NaN);
+    assert.strictEqual(castle.gold,500);assert.strictEqual(castle.rice,300);
+});
+
+test('r453 数量空欄の徴兵は人口・兵数・金を破壊しない', () => {
+    const ctx=createContext({DomesticRules:{calcDraftCost:()=>NaN,applyDraftPenalty:c=>{c.population-=10;return 10;}}});
+    loadScript(ctx,'js/command_system.js');
+    const Command=vm.runInContext('CommandSystem',ctx);
+    const castle={gold:500,rice:500,population:500,soldiers:100,training:50,morale:50,peoplesLoyalty:50};
+    const busho={id:7,name:'仮武将',isActionDone:false,achievementTotal:0};
+    const game={getCurrentTurnCastle:()=>castle,getBusho:()=>busho,ui:{showDialog(){}},factionSystem:{updateRecognition(){}}};
+    const command=new Command(game);command.finishCommand=()=>{};
+    command.executeDraft([7],NaN);
+    assert.deepStrictEqual([castle.gold,castle.population,castle.soldiers,castle.training,castle.morale],[500,500,100,50,50]);
+    assert.strictEqual(busho.isActionDone,false);
+});
+
+test('r453 輸送量が不正または保有超過なら元・先拠点の物資を変えない', () => {
+    const ctx=createContext();loadScript(ctx,'js/command_system.js');
+    const Command=vm.runInContext('CommandSystem',ctx);
+    const source={id:1,ownerClan:1,gold:200,rice:200,soldiers:100,horses:10,guns:10,training:50,morale:50};
+    const target={id:2,ownerClan:1,gold:0,rice:0,soldiers:0,horses:0,guns:0,training:0,morale:0};
+    const busho={id:7,name:'仮武将',isActionDone:false};
+    const game={getCurrentTurnCastle:()=>source,getCastle:id=>id===2?target:source,getBusho:()=>busho,ui:{showDialog(){}},
+        factionSystem:{handleMove(){}},affiliationSystem:{moveCastle(){}}};
+    const command=new Command(game);command.finishCommand=()=>{};
+    command.executeTransport([7],2,{gold:NaN,rice:0,soldiers:0,horses:0,guns:0});
+    command.executeTransport([7],2,{gold:0,rice:0,soldiers:0,horses:11,guns:0});
+    assert.strictEqual(source.gold,200);assert.strictEqual(target.gold,0);
+    assert.strictEqual(source.horses,10);assert.strictEqual(target.horses,0);
+    assert.strictEqual(busho.isActionDone,false);
+    command.executeTransport([7],2,{gold:10,rice:20,soldiers:30,horses:4,guns:2});
+    assert.deepStrictEqual([source.gold,source.rice,source.soldiers,source.horses,source.guns],[190,180,70,6,8]);
+    assert.deepStrictEqual([target.gold,target.rice,target.soldiers,target.horses,target.guns],[10,20,30,4,2]);
 });
 
 Promise.all(pendingTests).then(() => {
