@@ -1552,8 +1552,9 @@ class LifeSystem {
             successor.isCommander = false;
         }
 
-        // 3. 選ばれた後継者を、先代の大名がいたお城へお引越しさせます
-        const baseCastle = this.game.getCastle(oldDaimyo.castleId);
+        // 3. 家督継承先は先代の一時的な出陣先ではなく、記録された居城。
+        // 本拠が失陥していた場合は正本による直轄拠点の再選定に従う。
+        const baseCastle = this.game.getDaimyoHomeCastle(oldDaimyo.clan);
         if (baseCastle) {
             if (window.BushoStatusRules.isRonin(successor) || window.BushoStatusRules.isActive(successor)) {
                 this.game.affiliationSystem.leaveCastle(successor);

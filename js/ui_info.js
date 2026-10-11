@@ -2438,9 +2438,10 @@ class UIInfoManager {
     }
 
     _renderDelegateList(scrollPos = 0) {
-        const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
-        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
-        const myCastles = this.game.getClanCastles(this.game.playerClanId).filter(c => c.id !== daimyoCastleId);
+        // 大名が出陣中でも、家の居城を委任対象へ出さない。
+        const daimyoHome = this.game.getDaimyoHomeCastle(this.game.playerClanId);
+        const daimyoCastleId = daimyoHome ? Number(daimyoHome.id) : -1;
+        const myCastles = this.game.getClanCastles(this.game.playerClanId).filter(c => Number(c.id) !== daimyoCastleId);
 
         const isAllDelegated = myCastles.length > 0 && myCastles.every(c => c.isDelegated);
         let toggleBtnClass = isAllDelegated ? "btn-toggle-delegated" : "btn-toggle-direct";
@@ -2497,12 +2498,17 @@ class UIInfoManager {
     }
 
     showDelegateSettingModal(castleId) {
+        const home = this.game.getDaimyoHomeCastle(this.game.playerClanId);
+        if (home && Number(home.id) === Number(castleId)) return;
         this.pushModal('delegate_setting', [castleId]);
     }
 
     _renderDelegateSetting(castleId, scrollPos = 0) {
         const castle = this.game.getCastle(castleId);
         if (!castle) return;
+        // 開いた後に居城移転した場合も旧画面から委任させない。
+        const home = this.game.getDaimyoHomeCastle(this.game.playerClanId);
+        if (home && Number(home.id) === Number(castle.id)) return;
 
         const shell = this._openInfoShell(`${castle.name}の委任設定`);
         if (!shell) return;
@@ -2540,6 +2546,8 @@ class UIInfoManager {
                 updateView();
             };
             document.getElementById('btn-delegate-control').onclick = () => {
+                const latestHome = this.game.getDaimyoHomeCastle(this.game.playerClanId);
+                if (latestHome && Number(latestHome.id) === Number(castle.id)) return;
                 castle.isDelegated = true;
                 updateView();
             };

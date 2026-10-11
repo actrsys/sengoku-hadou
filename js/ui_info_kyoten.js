@@ -316,7 +316,7 @@ Object.assign(UIInfoManager.prototype, {
 
             // ★選択モード（国主任命）の時だけ、選んではいけないお城（大名の居城や、すでに国主がいる城）を隠します！
             if (isSelectMode && selectData) {
-                const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
+                const daimyoHome = this.game.getDaimyoHomeCastle(this.game.playerClanId);
                 // 旧条件は「自家所属かつisCommander」の所在地だけ。候補城ごとに全国武将をsomeせず、
                 // 同じ所属集合から1回だけ所在地Setを作ります（生死等の条件は旧処理にも無いため加えません）。
                 const commanderCastleIds = new Set();
@@ -327,7 +327,7 @@ Object.assign(UIInfoManager.prototype, {
                     }
                 });
                 this.kyotenCastles = this.kyotenCastles.filter(c => {
-                    if (daimyo && Number(c.id) === Number(daimyo.castleId)) return false;
+                    if (daimyoHome && Number(c.id) === Number(daimyoHome.id)) return false;
                     if (commanderCastleIds.has(Number(c.id))) return false;
                     return true;
                 });
@@ -644,8 +644,8 @@ Object.assign(UIInfoManager.prototype, {
     },
 
     _renderAllotFief(legionNo, scrollPos = 0) {
-        const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
-        const daimyoCastleId = daimyo ? Number(daimyo.castleId) : -1;
+        const daimyoHome = this.game.getDaimyoHomeCastle(this.game.playerClanId);
+        const daimyoCastleId = daimyoHome ? Number(daimyoHome.id) : -1;
         
         const commanderCastleIds = new Set();
         if (this.game.legions) {

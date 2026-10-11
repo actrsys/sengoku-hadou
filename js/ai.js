@@ -1723,8 +1723,10 @@ class AIEngine {
                     isMainBase = true; // 出撃・援軍拠点なら特定の城のシールを貼ります
                 }
             } else {
-                if (daimyo && daimyo.castleId === castle.id) {
-                    isMainBase = true; // 大名居城なら特定の城のシールを貼ります
+                // 大名が前線へ一時移動しても、兵装購入の本拠地優先は移さない。
+                const home = this.game.getDaimyoHomeCastle(castle.ownerClan);
+                if (home && Number(home.id) === Number(castle.id)) {
+                    isMainBase = true; // 本来の居城を補給拠点として評価
                 }
             }
             

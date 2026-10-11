@@ -211,7 +211,12 @@ class AIStaffing {
             // AIによる正式な居城移転だけ本拠地を更新する。出陣・占領の移動では変更しない。
             if (castellan.isDaimyo) {
                 const clan = this.game.getClan(clanId);
-                if (clan) clan.homeCastleId = Number(bestCastle.id);
+                if (clan) {
+                    clan.homeCastleId = Number(bestCastle.id);
+                    // 月内に既に算出済みの旧本拠地の配置評価を使い続けない。
+                    // 城の評価・目的は必要時に再計算し、点数式やAIの候補選定は変更しない。
+                    this.evaluationCache = {};
+                }
             }
             castellan.isActionDone = true;
             
@@ -737,9 +742,9 @@ class AIStaffing {
         const myCastles = this.game.getClanCastles(clanId);
         const roles = new Map();
 
-        // 大名のいるお城を探します
-        const daimyo = this.game.getClanDaimyo(clanId); // ★高速化：索引を使って一瞬で見つけます
-        const daimyoCastleId = daimyo ? daimyo.castleId : -1;
+        // 本拠地の守備評価は、大名が一時出陣しても変えない。
+        const daimyoHome = this.game.getDaimyoHomeCastle(clanId);
+        const daimyoCastleId = daimyoHome ? Number(daimyoHome.id) : -1;
 
         myCastles.forEach(castle => {
             // 隣接関係は MapGraphService を正本にする（CSV片側記載も双方向として扱う）。

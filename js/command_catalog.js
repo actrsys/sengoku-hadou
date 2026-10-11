@@ -494,8 +494,8 @@ const COMMAND_SPECS = {
         startMode: 'busho_select', sortKey: 'leadership',
         msg: "城主を任命します",
         canExecute: (game, castle) => {
-            const daimyo = game.getClanDaimyo(game.playerClanId);
-            if (daimyo && Number(daimyo.castleId) === Number(castle.id)) return false;
+            const daimyoHome = game.getDaimyoHomeCastle(game.playerClanId);
+            if (daimyoHome && Number(daimyoHome.id) === Number(castle.id)) return false;
             
             // ★追加：国主の居城の城主も、勝手に変えられないようにします
             const castellan = game.getBusho(castle.castellanId);

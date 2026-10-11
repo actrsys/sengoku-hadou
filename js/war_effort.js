@@ -598,9 +598,10 @@ Object.assign(WarManager.prototype, {
             const defProvData = this.game.getProvince(defCastle.provinceId);
             const defDaimyoName = this.getDisplayClanName(defClan, (defClanData && defClanData.name) ? defClanData.name : (defCastle.isKunishu ? defCastle.name : (defProvData ? defProvData.province : "中立")));
             
-            // ★追加：大名の居城かどうかを判定して記憶します
-            const defDaimyo = this.game.getClanDaimyo(defClan);
-            const isDaimyoCastle = (defDaimyo && defDaimyo.castleId === defCastle.id);
+            // 大名が出陣していても、総取り判定の対象は現在地ではなく本来の居城。
+            // 本拠の喪失時はGameManagerの正本が残存直轄拠点を再選定する。
+            const defHomeCastle = this.game.getDaimyoHomeCastle(defClan);
+            const isDaimyoCastle = Boolean(defHomeCastle && Number(defHomeCastle.id) === Number(defCastle.id));
 
             // ★追加：最短ルートが海路を通るか（海戦か）どうかを判定して記憶します
             const isSeaBattle = MapGraphService.isSeaRoute(this.game, atkCastle, defCastle, atkClan);

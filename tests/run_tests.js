@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r445');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r446');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -13008,7 +13008,7 @@ test('AI内政は同じ軍団所属城を行動ごとに再抽出せず同一コ
     const ai = read('js/ai.js');
     const fnStart = ai.indexOf('async execInternalAffairs');
     const fnEnd = ai.indexOf('\n    async ', fnStart + 10);
-    const block = ai.slice(fnStart, fnEnd > fnStart ? fnEnd : fnStart + 30000);
+    const block = ai.slice(fnStart, fnEnd > fnStart ? fnEnd : fnStart + 34000);
     assert.ok(block.includes('const legionCastlesForInternalAffairs = clanCastlesForEquipment.filter(c => c.legionId === castle.legionId);'));
     assert.ok(block.includes('const totalLegionKokudaka = legionCastlesForInternalAffairs.reduce((sum, c) => sum + c.kokudaka, 0);'));
     assert.ok(block.includes('const myTotalSoldiers = legionCastlesForInternalAffairs.reduce((sum, c) => sum + c.soldiers, 0);'));
@@ -14617,7 +14617,9 @@ test('r445 AIの正式な居城移転は本拠地記録も移し、戦時の単�
         affiliationSystem: { moveCastle(b, id) { b.castleId = id; } }
     };
     const staffing = new Staffing(game);
+    staffing.evaluationCache[2] = { castleRoles: new Map([[1, { isBase: true }]]) };
     assert.strictEqual(staffing.relocateDaimyo(castle1, leader), true);
+    assert.strictEqual(staffing.evaluationCache[2], undefined, '正式移転時は旧本拠地に基づく配置評価を破棄');
     assert.strictEqual(leader.castleId, 2);
     assert.strictEqual(clan.homeCastleId, 2, '正式な移転で本拠地を更新');
 });
@@ -14648,6 +14650,193 @@ test('r445 本拠地IDはClanのセーブ再構築後も保存され、家督交
     assert.strictEqual(clan.leaderId, 12);
     assert.strictEqual(clan.homeCastleId, 2, '家督交代の新本拠を記録する');
     assert.strictEqual(castles[1].legionId, 0, '当主の新居城を直轄とする従来仕様も維持');
+});
+
+// r446: 一時的な行軍先の違いで、所領分配と城主任命が本拠地を壊さない。
+test('r446 所領分配は実行側で本拠地を保護し、他の拠点は従来通り配分する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const castles = [
+        { id: 1, ownerClan: 4, legionId: 0, castellanId: 40 },
+        { id: 2, ownerClan: 4, legionId: 0, castellanId: 0 },
+        { id: 3, ownerClan: 4, legionId: 0, castellanId: 0 },
+        { id: 4, ownerClan: 5, legionId: 0, castellanId: 0 }
+    ];
+    const game = {
+        playerClanId: 4, getCastle: id => castles.find(c => c.id === Number(id)),
+        getClanCastles: id => castles.filter(c => c.ownerClan === id),
+        getDaimyoHomeCastle: () => castles[0],
+        getLegionByClanNo: () => ({ commanderId: 44 }),
+        getClan: () => ({ name: '試験家' })
+    };
+    const cmd = new Command(game);
+    cmd.finishCommand = () => {};
+    cmd.executeAllotFief(1, [1, 2, 4], castles);
+    assert.strictEqual(castles[0].legionId, 0, '本拠は選択されても直轄のまま');
+    assert.strictEqual(castles[1].legionId, 1, 'その他の直轄は従来通り分配');
+    assert.strictEqual(castles[2].legionId, 0, '非選択は変更しない');
+    assert.strictEqual(castles[3].legionId, 0, '他家は編集できない');
+});
+
+test('r446 国主任命は出陣中の本拠地を拒否し、通常拠点は任命できる', () => {
+    const ctx = createContext({ Legion: class Legion { constructor(data) { Object.assign(this, data); } } });
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const home = { id: 1, ownerClan: 4, legionId: 0, castellanId: 40 };
+    const normal = { id: 2, ownerClan: 4, legionId: 0, castellanId: 0 };
+    const commander = { id: 44, isCommander: false, isCastellan: false };
+    const game = {
+        playerClanId: 4, legions: [],
+        getCastle: id => [home, normal].find(c => c.id === Number(id)),
+        getBusho: id => id === 44 ? commander : null,
+        getLegionByClanNo: () => null, getDaimyoHomeCastle: () => home,
+        affiliationSystem: { moveCastle(b, id) { b.castleId = id; }, clearGunshiRole() {} },
+        getCurrentTurnId: () => 123, getClan: () => ({ name: '試験家' })
+    };
+    const cmd = new Command(game);
+    cmd.finishCommand = () => {};
+    cmd.executeAppointLegionLeader(44, 1, home.id);
+    assert.strictEqual(game.legions.length, 0, '本拠への任命を拒否');
+    assert.strictEqual(home.legionId, 0);
+    assert.strictEqual(commander.castleId, undefined, '任命前の武将移動も行わない');
+    cmd.executeAppointLegionLeader(44, 1, normal.id);
+    assert.strictEqual(normal.legionId, 1, '通常拠点の国主任命は有効');
+    assert.strictEqual(game.legions.length, 1);
+    assert.strictEqual(home.legionId, 0);
+});
+
+test('r446 所領分配の選択画面は現在地ではなく居城を除外する', () => {
+    const ctx = createContext({ document: { getElementById: () => null },
+        UIInfoManager: class UIInfoManager {} });
+    loadScript(ctx, 'js/ui_info_kyoten.js');
+    const UI = ctx.UIInfoManager;
+    const castles = [
+        { id: 1, ownerClan: 4, legionId: 0, name: '居城', soldiers: 0, defense: 0 },
+        { id: 2, ownerClan: 4, legionId: 1, name: '出陣先', soldiers: 0, defense: 0 },
+        { id: 3, ownerClan: 4, legionId: 0, name: 'その他', soldiers: 0, defense: 0 }
+    ];
+    const game = { playerClanId: 4, legions: [], provinces: [],
+        getDaimyoHomeCastle: () => castles[0], getClanCastles: () => castles,
+        getBusho: () => null, getProvince: () => null };
+    const ui = new UI(); ui.game = game;
+    let rows;
+    ui._renderListModal = params => { rows = params.items; };
+    ui._renderAllotFief(1);
+    assert.strictEqual(JSON.stringify(rows.map(x => x.cells[1].includes('出陣先') ? 2 : 3)), '[2,3]', '居城は選択できず前線は選択できる');
+});
+
+test('r446 出陣中の居城は委任一覧・個別委任の対象にならない', () => {
+    const ctx = createContext({ document: { getElementById: () => null },
+        UIInfoManager: class UIInfoManager {} });
+    loadScript(ctx, 'js/ui_info.js');
+    const UI = vm.runInContext('UIInfoManager', ctx);
+    const homes = [
+        { id: 1, name: '居城', ownerClan: 4, isDelegated: false },
+        { id: 2, name: '前線', ownerClan: 4, isDelegated: false }
+    ];
+    const ui = Object.create(UI.prototype);
+    ui.game = { playerClanId: 4, getDaimyoHomeCastle: () => homes[0],
+        getClanCastles: () => homes, getCastle: id => homes.find(c => c.id === id) };
+    ui._withChoiceSound = fn => fn;
+    let shown;
+    ui._renderListModal = data => { shown = data.items; };
+    ui._renderDelegateList();
+    assert.strictEqual(shown.length, 1);
+    assert.ok(shown[0].cells[0].includes('前線'));
+    let chosen = 0;
+    ui.pushModal = () => chosen++;
+    ui.showDelegateSettingModal(1);
+    assert.strictEqual(chosen, 0, '本拠を直接指定しても委任設定を開かない');
+    ui.showDelegateSettingModal(2);
+    assert.strictEqual(chosen, 1, '他の拠点は設定を開ける');
+});
+
+test('r446 AI配置の本拠地評価は出陣先ではなく居城を参照する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ai_staffing.js');
+    const Staffing = vm.runInContext('AIStaffing', ctx);
+    const castles = [1, 2].map(id => ({ id, ownerClan: 4, soldiers: 100, defense: 100,
+        kokudaka: 200, maxKokudaka: 300, commerce: 200, maxCommerce: 300 }));
+    const game = {
+        getClanCastles: () => castles,
+        getDaimyoHomeCastle: () => castles[0],
+        getRelation: () => null,
+        diplomacyManager: { isNonAggression: () => false },
+        mapGraph: { getAdjacentCastles: () => [] }
+    };
+    const data = new Staffing(game).evaluateCastles(4);
+    assert.strictEqual(data.get(1).isBase, true);
+    assert.strictEqual(data.get(2).isBase, false);
+});
+
+test('r446 家督相続は出陣先でなく本拠地へ後継者を移す', () => {
+    const ctx = createContext({ GameConstants: { BushoStatus: { ACTIVE: 'active' } },
+        BushoStatusRules: { isRonin: () => false, isActive: () => true } });
+    loadScript(ctx, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const home = { id: 1, castellanId: 10, samuraiIds: [] };
+    const forward = { id: 2, castellanId: 0, samuraiIds: [] };
+    const old = { id: 10, clan: 4, castleId: 2, isDaimyo: true, familyIds: [] };
+    const heir = { id: 11, clan: 4, castleId: 2, familyIds: [], isGunshi: false, isCommander: false };
+    let newLeaderId;
+    const game = {
+        getDaimyoHomeCastle: () => home,
+        getCastle: id => [home, forward].find(c => c.id === Number(id)),
+        getBusho: id => id === 10 ? old : id === 11 ? heir : null,
+        affiliationSystem: { leaveCastle() {}, setActivityStatusRaw() {}, transferClanRaw() {},
+            setCastleIdRaw(b, id) { b.castleId = id; }, updateCastleLord() {} },
+        changeLeader: (id, value) => { newLeaderId = value; }
+    };
+    const life = new Life(game);
+    life.applyDaimyoNameAndFaceChange = () => {};
+    life.applyDaimyoChangeEffects = () => {};
+    life.setupNewDaimyo(old, heir, [], false);
+    assert.strictEqual(newLeaderId, 11);
+    assert.strictEqual(heir.castleId, 1, '後継者は出陣中の先代の現在地へ行かない');
+    assert.strictEqual(home.castellanId, 11);
+    assert.strictEqual(forward.castellanId, 0);
+});
+
+test('r446 城主任命は現在地が離れていても本拠地の城主を置換しない', () => {
+    const ctx = createContext({
+        COMMAND_SPECS: { appoint: {} },
+        DomesticRules: { calcFactionBonusRate: () => 1 }
+    });
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const home = { id: 1, ownerClan: 4, castellanId: 40 };
+    const target = { id: 2, ownerClan: 4, castellanId: 0 };
+    const candidate = { id: 44, isCastellan: false, name: '家臣' };
+    const game = {
+        playerClanId: 4, getDaimyoHomeCastle: () => home,
+        getCurrentTurnCastle: () => home, getBusho: id => id === 44 ? candidate : null,
+        getClan: () => ({ name: '試験家' })
+    };
+    const cmd = new Command(game);
+    cmd.finishCommand = () => {};
+    cmd.executeCommand('appoint', [44], 0);
+    assert.strictEqual(home.castellanId, 40, '大名不在時にも居城城主は交代しない');
+    assert.strictEqual(candidate.isCastellan, false);
+    game.getCurrentTurnCastle = () => target;
+    cmd.executeCommand('appoint', [44], 0);
+    assert.strictEqual(target.castellanId, 44, '居城以外は従来の任命ができる');
+});
+
+test('r446 兵装調達の本拠地優先は出陣先を誤認しない', () => {
+    const src = fs.readFileSync(path.join(ROOT, 'js/ai.js'), 'utf8');
+    const at = src.indexOf('// 大名が前線へ一時移動しても、兵装購入の本拠地優先は移さない。');
+    assert.ok(at > 0);
+    const block = src.slice(at, at + 300);
+    assert.ok(block.includes('this.game.getDaimyoHomeCastle(castle.ownerClan)'));
+    assert.ok(block.includes('Number(home.id) === Number(castle.id)'));
+});
+
+test('r446 戦闘開始の大名居城陥落判定は恒久本拠地を参照する', () => {
+    const src = fs.readFileSync(path.join(ROOT, 'js/war_effort.js'), 'utf8');
+    assert.match(src, /const defHomeCastle = this\.game\.getDaimyoHomeCastle\(defClan\)/);
+    assert.match(src, /const isDaimyoCastle = Boolean\(defHomeCastle && Number\(defHomeCastle\.id\) === Number\(defCastle\.id\)\)/);
+    assert.doesNotMatch(src, /const isDaimyoCastle\s*=\s*\(defDaimyo.*castleId/);
 });
 
 Promise.all(pendingTests).then(() => {

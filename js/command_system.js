@@ -1360,7 +1360,11 @@ class CommandSystem {
         
         // 差し替え後
         if (type === 'appoint') {
+            // 画面側の選択制限を迂回しても、本拠地の城主を変更させない。
+            const home = this.game.getDaimyoHomeCastle(this.game.playerClanId);
+            if (home && Number(castle.id) === Number(home.id)) return;
             const bushos = this.game.getBusho(bushoIds[0]);
+            if (!bushos) return;
             if (type === 'appoint') { 
                 const old = this.game.getBusho(castle.castellanId); if(old) old.isCastellan = false; 
                 castle.castellanId = bushos.id; bushos.isCastellan = true; 
@@ -1707,7 +1711,10 @@ class CommandSystem {
     executeAppointLegionLeader(bushoId, legionNo, castleId) {
         const busho = this.game.getBusho(bushoId);
         const castle = this.game.getCastle(castleId);
-        if (!busho || !castle) return;
+        if (!busho || !castle || Number(castle.ownerClan) !== Number(this.game.playerClanId)) return;
+        // 在城地ではなく直轄本拠地を保護。確認モーダル中の移動や直接呼出しも防ぐ。
+        const home = this.game.getDaimyoHomeCastle(this.game.playerClanId);
+        if (home && Number(castle.id) === Number(home.id)) return;
 
         this.game.affiliationSystem.moveCastle(busho, castleId);
 
@@ -2148,11 +2155,15 @@ class CommandSystem {
         // 候補リストが空っぽで送られてきた場合の保険として、自分の全てのお城を対象にします。
         // ownerClan一致だけが旧条件なので、同値な勢力別所有城索引を使います。
         const targetCastles = candidateCastles || this.game.getClanCastles(this.game.playerClanId);
+        const home = this.game.getDaimyoHomeCastle(this.game.playerClanId);
+        const homeId = home ? Number(home.id) : 0;
         
         targetCastles.forEach(c => {
             // ★ここが一番重要です！画面用の「コピー」ではなく、ゲーム本体の「本物のお城データ」を直接引っ張り出して書き換えます
             const realCastle = this.game.getCastle(c.id || c);
-            if (!realCastle) return;
+            if (!realCastle || Number(realCastle.ownerClan) !== Number(this.game.playerClanId)) return;
+            // 選択済み一覧が古くても、直轄居城を軍団領へ移さない。
+            if (homeId && Number(realCastle.id) === homeId) return;
 
             const isCommanderCastle = legion && Number(realCastle.castellanId) === Number(legion.commanderId);
             const isSelected = numSelectedIds.has(Number(realCastle.id)) || isCommanderCastle;
