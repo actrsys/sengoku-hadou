@@ -555,6 +555,13 @@ class GameManager {
                 if (!isScenarioLoadLatest()) return;
             }
             if (this.ui) this.ui.updateLoadingProgress(96, '地図を描画しています');
+            // タイトルからの観戦のみ、最初の地図を見せる時点の縮小倍率を保証する。
+            // 開始時イベント等がロード幕の裏で一度renderMap()した場合に限り、
+            // 既存の地図Viewリセット窓口でその仮初期化を破棄する。通常開始・ロード・途中観戦は触らない。
+            if (startInWatchMode && this.ui && this.ui.hasInitializedMap
+                && typeof this.ui.resetMapViewState === 'function') {
+                this.ui.resetMapViewState({ initialZoomLevel: 0 });
+            }
             this.ui.renderMap();
             // カットイン表示を消しました！
 

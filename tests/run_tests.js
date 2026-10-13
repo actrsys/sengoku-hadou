@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r507');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r509');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6914,6 +6914,51 @@ test('地図初期化は前回座標を破棄しシナリオ既定地点を使�
     assert.ok(ui.includes("if (typeof this.resetMapViewState === 'function') this.resetMapViewState();"), 'タイトル復帰時もカメラ状態を破棄する');
 });
 
+test('r509 タイトル観戦は開始直前にも最小ズームを確定し、通常開始へ影響させない', () => {
+    const game = read('js/game.js');
+    const loadStart = game.indexOf('async loadScenario(folder, options = {})');
+    const scenarioBlock = game.slice(loadStart, game.indexOf('preloadFaceIcons() {', loadStart));
+    const lastRender = scenarioBlock.indexOf('this.ui.renderMap();');
+    const beforeLastRender = scenarioBlock.slice(Math.max(0, lastRender - 650), lastRender);
+    assert.ok(beforeLastRender.includes('if (startInWatchMode'), '最終地図描画直前の初期カメラ確定はタイトル観戦だけ');
+    assert.ok(beforeLastRender.includes('this.ui.resetMapViewState({ initialZoomLevel: 0 });'), '史実補正等の事前描画があっても最小ズームを再予約する');
+    assert.ok(game.includes('startWatchGame() {\n        this.startNewGame({ watchMode: true });'), 'トップ観戦だけ観戦フラグを渡す');
+    assert.ok(game.includes('this.ui.resetMapViewState({ initialZoomLevel: startInWatchMode ? 0 : 1 });'), '通常開始の標準ズームは維持');
+    const midwayWatch = game.slice(game.indexOf('startWatchMode() {'), game.indexOf('requestWatchReturn() {'));
+    assert.ok(!midwayWatch.includes('resetMapViewState('), '途中から観戦する経路は現在の地図倍率を維持する');
+});
+
+test('r509 最小ズーム・標準ズームはPC/スマホとも地図Viewでのみ適用する', () => {
+    for (const isPc of [true, false]) {
+        const wrapper = {clientWidth: isPc ? 1280 : 405, clientHeight: 720};
+        const scroll = {style: {}, clientWidth: wrapper.clientWidth, clientHeight: 720, scrollLeft: 88, scrollTop: 42};
+        const ctx = createContext({
+            UIManager: class UIManager {},
+            document: {
+                body: {classList: {contains: name => name === 'is-pc' ? isPc : false}},
+                getElementById: id => id === 'map-wrapper' ? wrapper : (id === 'map-scroll-container' ? scroll : null)
+            },
+            cancelAnimationFrame() {}
+        });
+        loadScript(ctx, 'js/ui_map.js');
+        const ui = new ctx.UIManager();
+        ui.game = {mapWidth: 3140, mapHeight: 2440};
+        ui.mapEl = {style: {}};
+        ui._setMapSpacerSize = () => {};
+        ui.resetMapViewState({initialZoomLevel: 0});
+        ui.fitMapToScreen();
+        assert.strictEqual(ui.zoomLevel, 0, '観戦は' + (isPc ? 'PC' : 'スマホ') + 'で最小倍率');
+        assert.strictEqual(ui.mapScale, ui.zoomStages[0]);
+        ui.hasInitializedMap = true;
+        ui.fitMapToScreen();
+        assert.strictEqual(ui.zoomLevel, 0, '通常の再描画で観戦開始倍率を変更しない');
+        ui.resetMapViewState();
+        ui.fitMapToScreen();
+        assert.strictEqual(ui.zoomLevel, 1, '新規通常開始・ロードは標準倍率へ戻る');
+        assert.strictEqual(ui.mapScale, ui.zoomStages[1]);
+    }
+});
+
 test('PC入れ子コマンドの選択中表示はhoverと明確に区別する', () => {
     const css = read('css/style.css');
     assert.ok(css.includes('body.is-pc .pc-cmd-col .cmd-btn.category.active'));
@@ -12673,13 +12718,97 @@ test('地図戦闘演出はシナリオ切替でrAFと固定Canvasを中断し�
     assert.ok(indep.includes('if (!isCurrentFlow()) return;\n                if (typeof this.game.ui.hideMapGuard'), '旧謀反が新画面のガードを解除しない'); 
 });
 
+test('r508 地図ズームの350ms入力間隔は共通timerで管理し画面世代リセット時に破棄する', () => {
+    const timers = new Map();
+    let timerSeq = 0;
+    const ctx = createContext({
+        UIManager: class UIManager {},
+        document: {getElementById() {return null;}},
+        setTimeout(fn) {const id = ++timerSeq; timers.set(id, fn); return id;},
+        clearTimeout(id) {timers.delete(id);},
+        cancelAnimationFrame() {}
+    });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui._endMapZoomDiagnostic = () => {};
+    ui._beginMapZoomCooldown();
+    assert.strictEqual(ui.isZooming, true);
+    assert.strictEqual(timers.size, 1);
+    const firstId = timerSeq;
+    ui._beginMapZoomCooldown();
+    assert.strictEqual(timers.has(firstId), false, '旧の解除予約は次のズーム開始時に破棄する');
+    assert.strictEqual(timers.size, 1);
+    ui.resetMapViewState();
+    assert.strictEqual(ui.isZooming, false);
+    assert.strictEqual(timers.size, 0, '前地図のタイマーを次地図まで残さない');
+    ui._beginMapZoomCooldown();
+    assert.strictEqual(ui.isZooming, true);
+    const latestId = timerSeq;
+    assert.strictEqual(timers.size, 1);
+    timers.get(latestId)();
+    assert.strictEqual(ui.isZooming, false);
+    assert.strictEqual(ui._mapZoomCooldownTimer, null);
+
+    const source = read('js/ui_map.js');
+    assert.strictEqual((source.match(/_beginMapZoomCooldown\(\);/g) || []).length, 3, 'PCホイールとスマホ両方向ピンチは同じ入口を使う');
+});
+
+test('r508 地図リセットはPCズームの入力ロックを即時解除し旧rAFが新ズームを妨げない', () => {
+    const scheduledFrames = [];
+    const scroll = {
+        style: {}, scrollLeft: 0, scrollTop: 0,
+        clientWidth: 1280, clientHeight: 720,
+        offsetWidth: 1280, offsetHeight: 720,
+        getBoundingClientRect: () => ({left: 0, top: 0, width: 1280, height: 720})
+    };
+    const ctx = createContext({
+        document: {
+            body: {classList: {contains: key => key === 'is-pc'}},
+            getElementById: key => key === 'map-scroll-container' ? scroll : null
+        },
+        UIManager: class UIManager {},
+        performance: {now: () => 0},
+        requestAnimationFrame: callback => {scheduledFrames.push(callback); return scheduledFrames.length;},
+        cancelAnimationFrame() {}
+    });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.mapEl = {style: {left: '0', top: '0'}};
+    ui.game = {mapWidth: 1280, mapHeight: 720};
+    ui.zoomStages = [1, 2, 3];
+    ui.zoomLevel = 0;
+    ui.mapScale = 1;
+    ui._setMapSpacerSize = () => {};
+    ui._beginMapZoomDiagnostic = () => {};
+    ui._endMapZoomDiagnostic = () => {};
+    ui.updateZoomButtons = () => {};
+    ui.changeMapZoom(1);
+    assert.strictEqual(ui.isAnimatingZoom, true);
+    assert.strictEqual(scheduledFrames.length, 1, '旧PCズームrAFを予約する');
+
+    ui.resetMapViewState();
+    assert.strictEqual(ui.isAnimatingZoom, false, '旧rAFを実行できない場合も地図リセットの時点で入力可能にする');
+    ui.mapScale = 1;
+    ui.zoomStages = [1, 2, 3];
+    ui.zoomLevel = 0;
+    ui.changeMapZoom(1);
+    assert.strictEqual(ui.isAnimatingZoom, true, '次の地図では旧rAFより先にズームできる');
+    assert.strictEqual(scheduledFrames.length, 2);
+
+    scheduledFrames[0](1000);
+    assert.strictEqual(ui.isAnimatingZoom, true, '失効した旧rAFは新しいズームの入力ロックを解除しない');
+    scheduledFrames[1](1000);
+    assert.strictEqual(ui.isAnimatingZoom, false, '新ズームの正常終了だけが入力ロックを解除する');
+    assert.strictEqual(ui.mapScale, 2);
+});
+
 test('地図ズームrAFはresetMapViewState後の新しい地図へ旧座標を書き戻さない', () => {
     const map = read('js/ui_map.js');
     const at = map.indexOf('changeMapZoom(direction, cx = null, cy = null)');
     const block = map.slice(at, map.indexOf('focusMapOnCastle(', at));
     assert.ok(block.includes('const mapViewResetToken = Number(this._mapViewResetToken || 0);'));
     assert.ok(block.includes('const isCurrentMapView = () => Number(this._mapViewResetToken || 0) === mapViewResetToken;'));
-    assert.ok(block.includes('if (!isCurrentMapView()) {\n                    this.isAnimatingZoom = false;'));
+    assert.ok(block.includes('if (!isCurrentMapView()) return;'), '失効rAFは後発ズームのフラグへ触れない');
     assert.ok(block.includes('if (!isCurrentMapView()) return;'), 'スマホ次フレーム補正も世代切替後は書き戻さない');
 });
 

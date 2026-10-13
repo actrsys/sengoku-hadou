@@ -1,0 +1,38 @@
+戦国覇道 r509：タイトル観戦の初期ズームとロード途中の仮初期化の干渉対策
+
+基準：r508完全版。ARCHITECTURE.mdの地図View正本・画面寿命・タイトル観戦と途中観戦の境界を確認。
+
+【確認と補強対象】
+r508ではタイトル「観戦する」→シナリオ選択→loadScenarioにstartInWatchModeが渡り、
+resetMapViewState({ initialZoomLevel: 0 })で最小ズームを予約済みである。
+一方、初期イベント・史実補正などロード幕の裏で先行renderMapが発生し、
+hasInitializedMapがtrueになった場合、最終表示では初期ズーム予約が消費済みとなる。
+開始時の可視地図は必ず観戦用縮小カメラから始めるため、この境界のみ補強した。
+
+【改修】
+loadScenario()の最終renderMap直前に、タイトル観戦かつロード途中で
+mapが先行初期化されていた場合のみ、地図ViewのresetMapViewState({initialZoomLevel:0})を再実行する。
+過去の初期スクロール予約は既存_mapViewResetTokenで失効させる。
+通常開始・ロード・ゲーム途中からの観戦では追加リセットを実行しない。
+ズーム段階の値、中心地点、ズームボタン、手動操作やシミュレーションルールは変えない。
+
+【回帰検査】
+- 既存のタイトル観戦入口と通常入口の分岐は維持。
+- 最終renderMap直前の観戦条件付きリセットがないr508で追加テストが失敗することを確認。
+- PC/スマホのUIManager.fitMapToScreen()を動作テストし、観戦0/通常1、
+  同じ地図での再fitは0のまま、通常リセット後は1へ戻ることを確認。
+- 通常回帰全件、PC/スマホのビジュアル回帰、構文検査、ZIP整合を確認する。
+
+【非変更】
+ゲーム進行ルール、AI、保存形式、HTML/CSS、マスターExcel・BIN、音声・画像。
+
+【変更ファイル】
+追加:
+- docs/audits/r509_タイトル観戦初期ズーム先行描画対策記録.txt
+更新:
+- ARCHITECTURE.md
+- docs/audits/README.md
+- js/config.js
+- js/game.js
+- tests/run_tests.js
+削除: なし

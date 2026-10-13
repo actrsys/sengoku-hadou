@@ -32,6 +32,17 @@ Object.assign(UIManager.prototype, {
         this.velocityY = 0;
     },
 
+    // PCホイール・スマホピンチ共通の入力間隔。解除予約を単一所有して、
+    // 画面の切替／前操作の遅延タイマーが後発操作のロックを外さないようにする。
+    _beginMapZoomCooldown() {
+        if (this._mapZoomCooldownTimer) clearTimeout(this._mapZoomCooldownTimer);
+        this.isZooming = true;
+        this._mapZoomCooldownTimer = setTimeout(() => {
+            this._mapZoomCooldownTimer = null;
+            this.isZooming = false;
+        }, 350);
+    },
+
     // タイトル復帰・新規開始・ロードで前のカメラ状態を持ち越さないための正本。
     // initialZoomLevel は 0=最小、1=標準、2=最大。通常は標準、タイトルからの観戦だけ0を指定する。
     resetMapViewState(options = {}) {
@@ -55,7 +66,14 @@ Object.assign(UIManager.prototype, {
         this._mapPresentationNeedsFullRecovery = false;
         this._mapFocusLockCount = 0;
         this._mapFocusPrevPointerEvents = '';
+        if (this._mapZoomCooldownTimer) {
+            clearTimeout(this._mapZoomCooldownTimer);
+            this._mapZoomCooldownTimer = null;
+        }
         this.isZooming = false;
+        // PCズームのrAFは画面非表示中に停止したままになることがある.
+        // 旧rAFの終了待ちにせず、地図世代を切るこの窓口で入力ロックも解除する。
+        this.isAnimatingZoom = false;
         this.currentCastle = null;
         this.hasInitializedMap = false;
         this.zoomLevel = undefined;
@@ -775,8 +793,7 @@ Object.assign(UIManager.prototype, {
                 e.preventDefault(); 
                 if (this.isZooming) return; 
                 
-                this.isZooming = true;
-                setTimeout(() => { this.isZooming = false; }, 350); 
+                this._beginMapZoomCooldown();
 
                 if (e.deltaY < 0) this.changeMapZoom(1, e.clientX, e.clientY);       
                 else if (e.deltaY > 0) this.changeMapZoom(-1, e.clientX, e.clientY); 
@@ -822,13 +839,11 @@ Object.assign(UIManager.prototype, {
             const pinchCenterY = (t0.clientY + t1.clientY) / 2;
 
             if (diff > 50) {
-                this.isZooming = true;
-                setTimeout(() => { this.isZooming = false; }, 350);
+                this._beginMapZoomCooldown();
                 this.changeMapZoom(1, pinchCenterX, pinchCenterY);
                 initialPinchDist = currentDist;
             } else if (diff < -50) {
-                this.isZooming = true;
-                setTimeout(() => { this.isZooming = false; }, 350);
+                this._beginMapZoomCooldown();
                 this.changeMapZoom(-1, pinchCenterX, pinchCenterY);
                 initialPinchDist = currentDist;
             }
@@ -1043,10 +1058,9 @@ Object.assign(UIManager.prototype, {
             const startTime = performance.now();
 
             const animate = (currentTime) => {
-                if (!isCurrentMapView()) {
-                    this.isAnimatingZoom = false;
-                    return;
-                }
+                // 旧rAFは新地図のズーム入力ロックを所有しない。
+                // 中断時の解放はresetMapViewStateに任せ、世代失効後は一切変更しない。
+                if (!isCurrentMapView()) return;
                 let progress = (currentTime - startTime) / duration;
                 if (progress < 0) progress = 0; 
                 if (progress > 1) progress = 1;

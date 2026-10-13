@@ -1,0 +1,32 @@
+戦国覇道 r508 通常・設計・画面寿命監査：地図ズーム入力ロックと旧操作timer
+
+正本：r507完全版ZIP。ARCHITECTURE.mdの最優先ルールとr490～r507の監査記録を照合。
+
+【再現した不具合】
+1. PCズームrAFが残る状態でタイトル復帰／新規開始／セーブ復元によりresetMapViewState()すると、旧ズームのisAnimatingZoomがtrueのままになる。非表示タブ・旧端末等で古いrAFの実行が遅れると、新しい地図のズーム入力が拒否される。
+2. 旧rAFが後で再開すると、世代不一致を検知しても新ズームが設定したisAnimatingZoomをfalseへ戻す。後発ズームの入力ロックを旧画面の描画予約が変更してしまう。
+3. PCホイールとスマホ両方向ピンチの350ms解除timerは個別の匿名setTimeoutで管理され、リセット後も残り、新画面で始まったズームのisZoomingを意図せずfalseへできる。
+
+【責務を変えない最小改修】
+- 地図リセットの正規窓口 resetMapViewState() で isAnimatingZoom を即時解除。既存_mapViewResetTokenによって古いrAFは完全にno-opとし、後発操作の状態へ触れない。
+- ホイール／ピンチ共通の _beginMapZoomCooldown() で一つの解除timerを所有し、次のズームで旧timerを破棄。resetMapViewState()でもtimerを解放する。
+- 固定の350ms操作間隔、ズーム倍率、ズーム演出、スクロール計算、PC/スマホ表示分岐は維持。独自の世代番号、追加イベント、UI以外のルール変更は行わない。
+
+【再現・検証】
+- r507へ先に動作テストを追加し、PCズーム中のreset後に入力ロックが残ることを再現（798 passed、1 failed）。修正後は正常。旧rAF実行時も新ズームが維持され、現行rAFの正常終了で解除されることを検査。
+- さらに共通解除timerのテストを追加。修正前は入口不存在で失敗（799 passed、1 failed）、修正後は全て成功。旧timer取消・リセット後解放・新timer正常解除と3入口共通化を検査。
+- 既存の地図世代・戦闘演出・ロード幕テスト、PC/スマホ表示テスト、マスターデータ整合を最終成果物で再確認する。
+
+【非変更】
+HTML/CSS、保存構造、マスターExcel/BIN、音声・画像、ゲームルール、AI、戦闘計算、外交、マップズーム倍率、操作間隔。
+
+【変更ファイル】
+追加:
+- docs/audits/r508_地図ズーム入力寿命監査記録.txt
+更新:
+- ARCHITECTURE.md
+- docs/audits/README.md
+- js/config.js
+- js/ui_map.js
+- tests/run_tests.js
+削除: なし
