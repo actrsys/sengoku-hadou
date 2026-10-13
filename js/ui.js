@@ -2232,7 +2232,8 @@ class UIManager {
             }
         } catch (e) {
             console.error('セーブデータ確認エラー:', e);
-            if (this.game) this.game.hasSaveData = false;
+            // 失効したタイトルの照合エラーで、後発画面が確定した保存可否を消さない。
+            if (isCurrent() && this.game) this.game.hasSaveData = false;
         }
 
         if (!isCurrent()) return false;

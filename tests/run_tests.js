@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r498');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r500');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -17881,6 +17881,138 @@ test('r497 タイトル復帰の完了可否は後発遷移で失効し、シナ
     bindHandler.call(screen);
     await button.onclick();
     assert.strictEqual(starts, 1, '正常復帰だけ次のシナリオ選択へ進む');
+});
+
+// r499: 失効したタイトルの保存確認がエラーになっても、後発遷移の保存可否を消さない。
+test('r499 失効したタイトルの保存確認エラーは後発画面のロード可否を変更しない', async () => {
+    const ctx = createContext({
+        document: {getElementById(id) {
+            return id === 'continue-btn' || id === 'load-btn'
+                ? {disabled: false, style: {opacity: '1', cursor: 'pointer'}} : null;
+        }}
+    });
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    let rejectOld;
+    let current = true;
+    const oldQuery = new Promise((_, reject) => { rejectOld = reject; });
+    const game = {hasSaveData: true, saveManager: {refreshLoadAvailability: () => oldQuery}};
+    const old = UI.prototype.checkSaveDataForTitle.call({game}, {isCurrent: () => current});
+    current = false; // タイトル確認中に新しいゲーム・ロードが画面の所有権を取得
+    rejectOld(new Error('古いIndexedDB照合の失敗'));
+    assert.strictEqual(await old, false, '古いタイトル側は結果を破棄する');
+    assert.strictEqual(game.hasSaveData, true, '失効したエラーで後発画面の保存可否を消さない');
+
+    game.saveManager.refreshLoadAvailability = async () => {throw new Error('最新画面の確認失敗');};
+    assert.strictEqual(await UI.prototype.checkSaveDataForTitle.call({game}, {isCurrent: () => true}), true);
+    assert.strictEqual(game.hasSaveData, false, '現行画面で失敗した場合だけロード不可へ更新');
+});
+
+
+// r500: 同一スロットの保存要求が重なっても、先発の旧スナップショットが最後に上書きされない。
+test('r500 同一スロットへの並行手動保存は要求順に書き込み、古い保存が巻き戻さない', async () => {
+    const saved = new Map();
+    const writes = [];
+    const ctx = createContext({
+        console: {...console, error() {}},
+        document: {getElementById() { return null; }, createElement() { return {}; }}
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__saved = saved;
+    ctx.__writes = writes;
+    vm.runInContext(`
+        loadFromDB = async key => __saved.get(key) || null;
+        saveToDB = async (key, data) => { __writes.push(data.saveTimestamp); __saved.set(key, data); };
+    `, ctx);
+    let resolveFirst;
+    let started = 0;
+    const saver = new ctx.SaveManager({
+        hasSaveData: false,
+        scenarioFolder: '1560_okehazama',
+        ui: {showDialog() {}, renderCommandMenu() {}}
+    });
+    saver.showSaveGuard = () => {};
+    saver.hideSaveGuard = () => {};
+    saver._createSaveDataObj = async () => {
+        started++;
+        return started === 1 ? new Promise(resolve => { resolveFirst = resolve; }) : {saveTimestamp: 2};
+    };
+    saver._validateSaveDataStructure = () => true;
+    saver._encryptData = data => data;
+    saver.isLoadableSaveData = () => true;
+    const first = saver.saveGameToLocal(1);
+    const second = saver.saveGameToLocal(1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(started, 1, '先発保存が完了する前に後発スナップショットを生成しない');
+    resolveFirst({saveTimestamp: 1});
+    await Promise.all([first, second]);
+    assert.deepStrictEqual(writes, [1, 2], 'スロット書込順序は保存要求順に固定する');
+    assert.strictEqual(saved.get('sengoku_save_slot1').saveTimestamp, 2,
+        '完了後には最新の保存要求が残る');
+});
+
+
+// r500: 先発失敗でスロットのキューが詰まらず、古い画面からの待機保存を後発へ持ち込まない。
+test('r500 保存失敗後も同スロットの後続要求は実行できる', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    const saver = new ctx.SaveManager({});
+    const calls = [];
+    let rejectFirst;
+    const first = saver._withSerializedSlotSave('sengoku_save_slot1', () => new Promise((_, reject) => {
+        calls.push('first'); rejectFirst = reject;
+    }));
+    const second = saver._withSerializedSlotSave('sengoku_save_slot1', async () => {
+        calls.push('second'); return 2;
+    });
+    await Promise.resolve();
+    assert.deepStrictEqual(calls, ['first']);
+    rejectFirst(new Error('DB write failed'));
+    await assert.rejects(first, /DB write failed/);
+    assert.strictEqual(await second, 2);
+    assert.deepStrictEqual(calls, ['first', 'second']);
+    assert.strictEqual(saver._slotSaveTasks.size, 0, 'エラー後も待機キューを解放');
+});
+
+test('r500 順番待ちの保存は遷移世代が失効した場合に新シナリオへ書き込まない', async () => {
+    const ctx = createContext({
+        console: {...console, error() {}},
+        document: {getElementById() {return null;}}
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    let generation = 1;
+    let snapshotStarted = 0;
+    let unblockFirst;
+    const written = [];
+    ctx.__write = data => written.push(data.saveTimestamp);
+    vm.runInContext(`
+        loadFromDB = async () => null;
+        saveToDB = async (_, data) => { __write(data); };
+    `, ctx);
+    const game = {
+        scenarioFolder: '1560_okehazama',
+        turnManager: {captureTurnFlowGeneration: () => generation, isTurnFlowGenerationLatest: n => n === generation}
+    };
+    const saver = new ctx.SaveManager(game);
+    saver.showSaveGuard = () => {};
+    saver.hideSaveGuard = () => {};
+    saver._createSaveDataObj = async () => {
+        snapshotStarted++;
+        return new Promise(resolve => { unblockFirst = resolve; });
+    };
+    saver._validateSaveDataStructure = () => true;
+    saver._encryptData = value => value;
+    saver.isLoadableSaveData = () => true;
+    const first = saver.saveGameToLocal(1);
+    const second = saver.saveGameToLocal(1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(snapshotStarted, 1);
+    generation = 2;
+    game.scenarioFolder = '1570_anegawa';
+    unblockFirst({saveTimestamp: 1});
+    await Promise.all([first, second]);
+    assert.deepStrictEqual(written, [], '旧世代の待機保存は一件も実行しない');
+    assert.strictEqual(snapshotStarted, 1, '待機中だった旧保存は新シナリオのスナップショットを生成しない');
 });
 
 Promise.all(pendingTests).then(() => {

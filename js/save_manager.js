@@ -39,6 +39,26 @@ class SaveManager {
         }
     }
 
+    // 同一スロットへの複数の保存要求を要求順に処理する。
+    // save-guard は入力遮断だけを担い、非同期の書込順序までは保証しない。
+    // スロット単位で待機するため、他スロットやファイル保存を不要に直列化しない。
+    _withSerializedSlotSave(storageKey, work) {
+        const tasks = this._slotSaveTasks || (this._slotSaveTasks = new Map());
+        const previous = tasks.get(storageKey);
+        const task = (async () => {
+            if (previous) {
+                try { await previous; } catch (_) { /* 前の保存が失敗しても後続は実行可能 */ }
+            }
+            return work();
+        })();
+        tasks.set(storageKey, task);
+        const release = () => {
+            if (tasks.get(storageKey) === task) tasks.delete(storageKey);
+        };
+        task.then(release, release);
+        return task;
+    }
+
     // baseFamilyIds / familyIds は親子・養子・婚姻から再構築できる派生キャッシュなので保存しません。
     // 4,000人超の配列重複をセーブへ持ち込まず、JSON化・IndexedDB structured clone時の容量と一時メモリを抑えます。
     _serializePersonForSave(person) {
@@ -740,46 +760,51 @@ class SaveManager {
     }
     
     // スロットへセーブ (IndexedDB)
-    async saveGameToLocal(slotNo = 1) { 
-        this.showSaveGuard(); // ★追加：保存中のバリアを張ります
+    async saveGameToLocal(slotNo = 1) {
+        const storageKey = "sengoku_save_slot" + slotNo;
+        // 順番待ちの間にタイトル復帰・別シナリオ開始が発生した保存要求は破棄する。
+        // 世代取得をキュー内へ遅らせると、古い要求が新シナリオを保存してしまう。
+        const requestFlow = this._captureLoadRequestFlow();
+        const requestScenarioFolder = this.game.scenarioFolder;
+        const isRequestCurrent = () => (!requestFlow || requestFlow.isLatest())
+            && this.game.scenarioFolder === requestScenarioFolder;
+        this.showSaveGuard();
         try {
-            const storageKey = "sengoku_save_slot" + slotNo;
-            // 一覧表示後に保存領域の読込が失敗し始めた場合は、
-            // 読めない既存スロットを上書きしない。新しい大容量スナップショットの
-            // 生成前に確認し、低メモリ端末で旧・新データを同時保持しない。
-            try {
-                await loadFromDB(storageKey);
-            } catch (error) {
-                throw new Error('保存先スロットの読込に失敗したため、既存データを保護して保存を中止しました。');
-            }
-            const data = await this._createSaveDataObj(); // ★待つように変更
-            if (!data) return; // 保存準備中に別シナリオへ遷移した場合は書き込まない。
-            // 保存済みデータの正本検査と同じ条件で検証してから上書きする。
-            // 読めない新データで既存の正常なスロットを置き換える事故を防止。
-            this._validateSaveDataStructure(data);
-            const encryptedData = this._encryptData(data); // ★暗号化します
-            await saveToDB(storageKey, encryptedData);
-            // IndexedDBの完了通知だけで「ロード可能」とは報告しない。
-            // 実際に再読込でき、保存時刻を含む現行スキーマが復元できたことを確認する。
-            const writtenData = this.decodeStoredData(await loadFromDB(storageKey));
-            if (!this.isLoadableSaveData(writtenData) || Number(writtenData.saveTimestamp) !== Number(data.saveTimestamp)) {
-                throw new Error('保存直後の読み戻し検証に失敗しました。');
-            }
-            this.game.hasSaveData = true; // ★追加：セーブしたので「データあり」の印をつけます
-            
-            // ★追加：もしメニューが開いていたら、ロードボタンを押せるように画面を更新します
-            if (this.game.ui && typeof this.game.ui.renderCommandMenu === 'function') {
-                this.game.ui.renderCommandMenu();
-            }
-
-            if (this.game.ui) this.game.ui.showDialog(`スロット${slotNo}にセーブが完了しました。`, false);
+            await this._withSerializedSlotSave(storageKey, async () => {
+                if (!isRequestCurrent()) return;
+                // 一覧表示後に保存領域の読込が失敗し始めた場合は、
+                // 読めない既存スロットを上書きしない。スナップショット生成前に検証する。
+                try {
+                    await loadFromDB(storageKey);
+                } catch (_) {
+                    throw new Error('保存先スロットの読込に失敗したため、既存データを保護して保存を中止しました。');
+                }
+                if (!isRequestCurrent()) return;
+                const data = await this._createSaveDataObj();
+                if (!data || !isRequestCurrent()) return;
+                this._validateSaveDataStructure(data);
+                const encryptedData = this._encryptData(data);
+                if (!isRequestCurrent()) return;
+                await saveToDB(storageKey, encryptedData);
+                // 読み戻しも同じキュー内に保持し、後続保存との照合を取り違えない。
+                const writtenData = this.decodeStoredData(await loadFromDB(storageKey));
+                if (!this.isLoadableSaveData(writtenData) || Number(writtenData.saveTimestamp) !== Number(data.saveTimestamp)) {
+                    throw new Error('保存直後の読み戻し検証に失敗しました。');
+                }
+                if (!isRequestCurrent()) return;
+                this.game.hasSaveData = true;
+                if (this.game.ui && typeof this.game.ui.renderCommandMenu === 'function') {
+                    this.game.ui.renderCommandMenu();
+                }
+                if (this.game.ui) this.game.ui.showDialog(`スロット${slotNo}にセーブが完了しました。`, false);
+            });
         } catch (e) {
             console.error("セーブエラーの詳細:", e);
-            if (this.game.ui) {
+            if (isRequestCurrent() && this.game.ui) {
                 this.game.ui.showDialog("セーブに失敗しました。エラー原因: " + e.message, false);
             }
         } finally {
-            this.hideSaveGuard(); // ★追加：保存が終わったらバリアを解除します
+            this.hideSaveGuard();
         }
     }
 
