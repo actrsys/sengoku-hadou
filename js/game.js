@@ -385,7 +385,7 @@ class GameManager {
         if (!isScenarioLoadLatest()) return;
 
         try {
-            document.getElementById('title-screen').classList.add('hidden'); 
+            this.ui.showGameSurface();
 
             const data = await DataManager.loadAll(folder, {
                 isCurrent: isScenarioLoadLatest,
@@ -538,7 +538,6 @@ class GameManager {
             
             this.preloadFaceIcons();
             
-            document.getElementById('app').classList.remove('hidden');
 
             // Round27：タイトルから観戦を選んだ場合は、大名選択画面を経由しません。
             // 先に観戦状態へしておくことで、ゲーム開始直後の月初イベントも通常の観戦ルール（AI分岐・自動送り）で処理されます。

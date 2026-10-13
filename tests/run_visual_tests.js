@@ -1806,6 +1806,54 @@ async function validateCastleIconLoading(cdp) {
     console.log('✓ r492 PC/スマホ CSS擬似要素の拠点アイコン読込・decode完了後にロード幕解除 (実ブラウザ)');
 }
 
+// r493: 通常の<img>はcomplete=trueでもdecodeが未完了の場合がある。
+// 画面が安定していても画像デコード完了前に幕が消えないことを実ブラウザで確認する。
+async function validateDomImageDecode(cdp) {
+    const source = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const start = source.indexOf('    showLoadingScreen(');
+    const end = source.indexOf('    // タイトル画面の「続きから／ロード」', start);
+    const classSource = `window.TestLoadingUI = class TestLoadingUI {${source.slice(start, end)}};`;
+    for (const [width, height, pc] of [[1280, 720, true], [390, 844, false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !pc });
+        const html = `<!doctype html><html><head><style>.hidden{display:none!important}
+            #game-screen{width:100%;height:100%}img{display:block;width:80px;height:80px}
+            #global-loading-screen{position:fixed;inset:0;background:#111;z-index:999}</style></head>
+            <body><div id="game-screen"><img id="preview"><div id="global-loading-screen" class="hidden"></div></div></body></html>`;
+        await cdp.call('Runtime.evaluate', {
+            expression: `document.open();document.write(${JSON.stringify(html)});document.close();${classSource}true`, returnByValue: true
+        });
+        const started = await cdp.call('Runtime.evaluate', {
+            expression: `(async () => {
+                const img=document.getElementById('preview');
+                const svg='<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="7" fill="red"/></svg>';
+                img.src='data:image/svg+xml,'+encodeURIComponent(svg);
+                await new Promise((resolve,reject)=>{if(img.complete && img.naturalWidth) return resolve(); img.onload=resolve;img.onerror=reject;});
+                img.decode=()=>new Promise(resolve=>{window.releaseDecode=resolve;});
+                const ui=new TestLoadingUI();ui.globalLoadingScreen=document.getElementById('global-loading-screen');
+                window.ui=ui;window.dismissResult=undefined;
+                ui.showLoadingScreen();ui.hideLoadingScreen().then(ok=>{window.dismissResult=ok;});
+                return {complete:img.complete,loaded:img.naturalWidth>0,covered:!ui.globalLoadingScreen.classList.contains('hidden')};
+            })()`, returnByValue: true, awaitPromise: true
+        });
+        assert.ok(started.result.value.complete && started.result.value.loaded && started.result.value.covered);
+        await new Promise(resolve => setTimeout(resolve, 140));
+        const before = await cdp.call('Runtime.evaluate', {
+            expression: `({covered:!ui.globalLoadingScreen.classList.contains('hidden'), pending:typeof releaseDecode==='function'})`, returnByValue: true
+        });
+        assert.strictEqual(before.result.value.covered, true, '通常imgのdecode完了前に幕を閉じない');
+        assert.strictEqual(before.result.value.pending, true, '既読の通常imgにもdecodeを適用する');
+        await cdp.call('Runtime.evaluate', { expression: 'releaseDecode();true', returnByValue: true });
+        const finished = await cdp.call('Runtime.evaluate', {
+            expression: `new Promise(resolve=>{let n=0;const tick=()=>{if(window.dismissResult!==undefined)
+                resolve({done:window.dismissResult,covered:!ui.globalLoadingScreen.classList.contains('hidden')});
+                else if(++n>100)resolve({timeout:true});else requestAnimationFrame(tick);};tick();})`,
+            returnByValue: true, awaitPromise: true
+        });
+        assert.deepStrictEqual(finished.result.value, {done:true,covered:false});
+    }
+    console.log('✓ r493 PC/スマホ 通常imgのdecode完了後にロード幕解除 (実ブラウザ)');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -1878,6 +1926,7 @@ async function main() {
         await validateMapCompositor(cdp);
         await validateLoadingPresentation(cdp);
         await validateCastleIconLoading(cdp);
+        await validateDomImageDecode(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

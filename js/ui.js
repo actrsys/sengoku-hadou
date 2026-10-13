@@ -1871,6 +1871,16 @@ class UIManager {
     }
     // ==========================================
 
+    // ゲーム本体を可視化する操作はUI層が所有する。シナリオ開始・セーブ復元の
+    // いずれもこの入口を通し、制御層がタイトルやゲームDOMを個別に操作しない。
+    // ロード幕の解除は別責務。地図・モーダルの準備前に幕を閉じない。
+    showGameSurface() {
+        const title = document.getElementById('title-screen');
+        const app = document.getElementById('app');
+        if (title) title.classList.add('hidden');
+        if (app) app.classList.remove('hidden');
+    }
+
     // ロード画面。装飾アニメーションではなく、実際の処理段階と進捗率を表示します。
     showLoadingScreen(label = '準備しています', progress = 0) {
         // 以前の非同期終了処理は、新しい画面遷移のロード幕を閉じてはならない。
@@ -1950,6 +1960,47 @@ class UIManager {
         return pending;
     }
 
+    // img.completeはネットワーク読込の状態であり、画像のdecode完了を保証しない。
+    // 表示画像ごとにload/errorとdecodeを待ち、同一srcへの再decode要求を防ぐ。
+    // 子要素の後付けやsrc変更時も、次の安定判定で必ず新しい画像を検査する。
+    _collectLoadingDomImages(root, assets) {
+        if (!root || typeof root.querySelectorAll !== 'function') return [];
+        const pending = [];
+        for (const img of root.querySelectorAll('img[src]')) {
+            if (!img || img.loading === 'lazy'
+                || (typeof img.getClientRects === 'function' && !img.getClientRects().length)) continue;
+            if (this.globalLoadingScreen && this.globalLoadingScreen.contains(img)) continue;
+            const src = img.currentSrc || img.src || '';
+            let entry = assets.get(img);
+            if (!entry || entry.src !== src) {
+                entry = { src, ready: false, promise: null };
+                const currentEntry = entry;
+                entry.promise = (async () => {
+                    if (!img.complete) {
+                        await new Promise(resolve => {
+                            const done = () => {
+                                img.removeEventListener('load', done);
+                                img.removeEventListener('error', done);
+                                resolve();
+                            };
+                            img.addEventListener('load', done, { once: true });
+                            img.addEventListener('error', done, { once: true });
+                            if (img.complete) done();
+                        });
+                    }
+                    // 読込失敗画像は待機を続けない。decode非対応端末も従来どおり。
+                    if (img.complete && img.naturalWidth > 0 && typeof img.decode === 'function') {
+                        try { await img.decode(); } catch (error) { /* load済みなら表示可能 */ }
+                    }
+                    currentEntry.ready = true;
+                })();
+                assets.set(img, entry);
+            }
+            if (!entry.ready) pending.push(entry.promise);
+        }
+        return pending;
+    }
+
     // ロード幕の裏で、全画面とモーダルのレイアウトが安定するまで待つ共通窓口。
     // MutationObserverは配下へ後から追加された要素も自動監視する。
     async _waitForLoadingPresentation(generation) {
@@ -1961,6 +2012,7 @@ class UIManager {
         const root = document.getElementById('game-screen') || document.body;
         let revision = 0;
         const cssAssets = new Map();
+        const domImageAssets = new WeakMap();
         let lastCssRevision = -1;
         const isLoadingMutation = record => this.globalLoadingScreen
             && (record.target === this.globalLoadingScreen || this.globalLoadingScreen.contains(record.target));
@@ -1992,23 +2044,7 @@ class UIManager {
                 if (!isCurrent()) return false;
                 // 新しく追加された可視画像の読込も待つ。遅延読込画像や
                 // 非表示の大量の顔グラは待たず、古いスマホのメモリを圧迫しない。
-                const images = root && typeof root.querySelectorAll === 'function'
-                    ? root.querySelectorAll('img[src]') : [];
-                const pendingImages = [];
-                for (const img of images) {
-                    if (img.complete || img.loading === 'lazy') continue;
-                    if (typeof img.getClientRects === 'function' && !img.getClientRects().length) continue;
-                    pendingImages.push(new Promise(resolve => {
-                        const done = () => {
-                            img.removeEventListener('load', done);
-                            img.removeEventListener('error', done);
-                            resolve();
-                        };
-                        img.addEventListener('load', done, { once: true });
-                        img.addEventListener('error', done, { once: true });
-                        if (img.complete) done();
-                    }));
-                }
+                const pendingImages = this._collectLoadingDomImages(root, domImageAssets);
                 if (pendingImages.length) {
                     await Promise.all(pendingImages);
                     stableFrames = 0;
@@ -3866,7 +3902,7 @@ class UIManager {
                         if (el.textContent === '---') return;
 
                         if (id === 'war-def-wall-info') {
-                            el.innerHTML = `<span class="war-highlight-value">${val}</span>`;
+                            el.innerHTML = `<span class="war-highlight-value">${StatPresenter.escapePlainText(val)}</span>`;
                         } else if (id.includes('soldier')) {
                             el.textContent = val + '人';
                         } else {
@@ -4055,7 +4091,7 @@ class UIManager {
         setHtmlEl(turnEl, `残り <span class="turn-number">${Math.max(0, maxRounds - s.round + 1)}</span>ターン`);
         
         const wallEl = document.getElementById('war-def-wall-info');
-        setHtmlEl(wallEl, `<span class="war-highlight-value">${s.defender.defense}</span>`);
+        setHtmlEl(wallEl, `<span class="war-highlight-value">${StatPresenter.escapePlainText(s.defender.defense)}</span>`);
 
         const titleNameEl = document.getElementById('war-title-name');
         if (titleNameEl) {

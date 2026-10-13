@@ -557,8 +557,7 @@ class SaveManager {
         const courtRanks = commonData.courtRanks.map(row => new CourtRank(row));
         this.game.courtRankSystem.setRankData(courtRanks);
 
-        document.getElementById('title-screen').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden'); 
+        this.game.ui.showGameSurface();
         
         this.game.phase = 'game';
         

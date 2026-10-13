@@ -1,0 +1,21 @@
+戦国覇道 r493 通常画像デコードとロード幕解除の共通監査記録
+
+■ 正本
+r492 完全版ZIP。r490のロード幕完了判定共通化とr492の可視CSS背景画像のload/decode待機を継承。
+
+■ 確認した問題
+UIManager._waitForLoadingPresentation() は可視<img>について img.complete が真なら通過し、画像のload完了後もdecode()を呼ばなかった。ブラウザでは読み込み済みでもデコードが遅れるため、タイトル・地図・モーダルなどの画像だけがロード幕解除後に遅れて表示され得た。CSS背景はr492でdecode完了を待っており、通常画像との監視条件に不一致があった。
+
+■ 再現
+r492のロード画面共通メソッドを用い、complete=true / naturalWidth>0 の可視imgでdecode未完了の状態を作成すると旧版は幕を消した。追加した回帰テストは修正前に失敗し、修正後は成功した。load待機中に追加された通常imgもdecodeまで監視すること、および同一画像にdecodeを重複要求しないことを確認した。PC・スマホのChromium実ブラウザでも意図的にdecodeを遅延させ、ロード幕保持を検証した。
+
+■ 改修
+UIManager._collectLoadingDomImages() を追加。可視通常imgのload/errorとdecodeを共通待機し、ロード期間中はWeakMapで要素と画像URLに対応する完了状態を記録。同一srcの繰返しdecodeを避け、src変更時は改めて検査する。非表示・lazy画像を不要にプリロードせず、読み込みエラーやdecode非対応・decode失敗でも無限待機しない。r492のCSS背景読み込み、および既存の画面・モーダル・フォント・非同期タスク・世代管理を維持する。
+
+■ 検証
+旧版失敗の再現テスト、基本回帰772件、PC/スマホの実ブラウザdecode待機および既存表示16項目、シミュレーション4件、Excel/BINと主要数式の整合性確認を実施。配布ZIPは再展開後に再検証する。
+
+■ 変更ファイル
+追加: docs/audits/r493_通常画像デコードロード幕監査記録.txt
+更新: ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/ui.js、tests/run_tests.js、tests/run_visual_tests.js
+削除: なし

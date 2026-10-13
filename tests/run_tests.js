@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r492');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r495');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -17574,6 +17574,67 @@ test('r492 CSS擬似要素の城アイコンは読込とdecodeが完了するま
     assert.ok(observers[0].disconnected);
 });
 
+test('r493 通常imgのload後decodeと既読画像のdecode完了までロード幕を維持する', async () => {
+    const source = read('js/ui.js');
+    const start = source.indexOf('    showLoadingScreen(');
+    const end = source.indexOf('    // タイトル画面の「続きから／ロード」', start);
+    const frames = [];
+    const cover = { classList: new FakeClassList(['hidden']), contains: target => target === cover };
+    const images = [];
+    const makeImg = (loaded) => {
+        let resolveDecode;
+        const listeners = {};
+        const image = {
+            src: `/assets/${images.length}.png`, currentSrc: `/assets/${images.length}.png`,
+            loading: 'eager', complete: loaded, naturalWidth: loaded ? 32 : 0,
+            getClientRects: () => [1],
+            addEventListener(name, fn) { listeners[name] = fn; },
+            removeEventListener(name) { delete listeners[name]; },
+            decode() { this.decodeCount = (this.decodeCount || 0) + 1;
+                return new Promise(resolve => { resolveDecode = resolve; }); },
+            finishLoad() { this.complete = true; this.naturalWidth = 32;
+                if (listeners.load) listeners.load(); },
+            finishDecode() { if (resolveDecode) resolveDecode(); }
+        };
+        images.push(image);
+        return image;
+    };
+    const loaded = makeImg(true);
+    const root = { querySelectorAll(selector) { return selector === 'img[src]' ? images : []; } };
+    const ctx = createContext({
+        document: { getElementById: () => root, body: root, fonts: { ready: Promise.resolve(), status: 'loaded' } },
+        requestAnimationFrame: fn => { frames.push(fn); },
+        MutationObserver: class { constructor(cb) { this.cb = cb; } observe() {} disconnect() {} },
+        setTimeout, console
+    });
+    vm.runInContext(`class TestLoadingUI {${source.slice(start, end)}} this.TestLoadingUI = TestLoadingUI;`, ctx);
+    const ui = new ctx.TestLoadingUI(); ui.globalLoadingScreen = cover;
+    const tick = async () => {
+        await new Promise(resolve => setImmediate(resolve));
+        if (frames.length) frames.shift()(0);
+        await new Promise(resolve => setImmediate(resolve));
+    };
+    ui.showLoadingScreen();
+    const closed = ui.hideLoadingScreen();
+    for (let i = 0; i < 5; i++) await tick();
+    assert.strictEqual(cover.classList.contains('hidden'), false, 'complete済みのimgもdecode待機する');
+    assert.strictEqual(loaded.decodeCount, 1, '同じimgに毎フレームdecodeを要求しない');
+    // decode待機中に別の画像が生成され、loadを終えてもdecode完了までは閉じない。
+    const appended = makeImg(false);
+    loaded.finishDecode();
+    for (let i = 0; i < 4; i++) await tick();
+    assert.strictEqual(cover.classList.contains('hidden'), false, '追加imgがload待ちなら幕を維持');
+    appended.finishLoad();
+    for (let i = 0; i < 4; i++) await tick();
+    assert.strictEqual(cover.classList.contains('hidden'), false, 'load直後のdecodeも待機');
+    assert.strictEqual(appended.decodeCount, 1);
+    appended.finishDecode();
+    for (let i = 0; i < 9; i++) await tick();
+    assert.strictEqual(await closed, true);
+    assert.strictEqual(cover.classList.contains('hidden'), true);
+    assert.strictEqual(loaded.decodeCount, 1);
+});
+
 test('r490 タイトル・シナリオ・セーブ復元はレイアウト確定窓口をawaitする', () => {
     const ui = read('js/ui.js');
     const game = read('js/game.js');
@@ -17640,6 +17701,101 @@ test('r491 単体・輸送スライダーの属性は改変セーブ由来の引
     };
     simulate('headhunt_gold');
     simulate('transport');
+});
+
+
+// r494: 保存値から到達し得る城防御値は、戦闘の通常更新・遅延更新ともHTMLへ直接入れない。
+test('r494 攻城戦の城防御値は通常更新とダメージ演出更新の双方でHTMLとして解釈されない', () => {
+    const context = createContext({
+        setTimeout(fn, delay) { if (delay === 400) context.warDelayed = fn; return 1; },
+        clearTimeout() {},
+        StatPresenter: { escapePlainText(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[ch]);
+        } }
+    });
+    const wall = { innerHTML: '', textContent: '120', classList: new FakeClassList() };
+    const stop = new Error('通常更新の城防御描画後に停止');
+    const hostile = '<img src=x onerror="window.injection=1">';
+    const document = {
+        getElementById(id) {
+            if (id === 'war-def-wall-info') return wall;
+            if (id === 'war-title-name') throw stop;
+            return null;
+        }
+    };
+    context.document = document;
+    context.WarParams = { Military: { WarMaxRounds: 10 } };
+    context.window.WarParams = context.WarParams;
+    context.window.AudioManager = null;
+    loadScript(context, 'js/ui.js');
+    const UIManager = vm.runInContext('UIManager', context);
+    const currentStats = { wallDefense: hostile };
+    const ui = {
+        game: { year: 1570, month: 2, warManager: { state: { active: true,
+            round: 1, defender: { defense: hostile, isKunishu: false } } } }
+    };
+    assert.throws(() => UIManager.prototype.updateWarUI.call(ui), error => error === stop);
+    assert.ok(!wall.innerHTML.includes(hostile), '通常更新でHTMLタグを直接挿入しない');
+    assert.ok(wall.textContent === '120' || wall.innerHTML.includes('war-highlight-value'), '城防御の強調枠は維持');
+
+    wall.innerHTML = '';
+    UIManager.prototype.playDamageAnimation.call(ui, {
+        type: 'damage', currentStats
+    });
+    assert.strictEqual(typeof context.warDelayed, 'function', '400ms後の戦況更新を確認');
+    context.warDelayed();
+    assert.ok(!wall.innerHTML.includes(hostile), '演出後の更新でHTMLタグを直接挿入しない');
+    assert.ok(wall.innerHTML.includes('war-highlight-value'), '演出後も城防御の強調枠を維持');
+    assert.ok(wall.innerHTML.includes('&lt;img'), '不正文字列はテキストとしてエスケープ');
+});
+
+// r495: 制御層から固定DOMの可視状態を直接変更せず、画面切替をUIの入口に集約する。
+test('r495 新規開始とセーブ復元のゲーム画面切替はUIManagerの単一窓口を使用する', () => {
+    const gameSource = read('js/game.js');
+    const saveSource = read('js/save_manager.js');
+    assert.ok(gameSource.includes('this.ui.showGameSurface();'), 'シナリオ開始はViewへ委譲する');
+    assert.ok(saveSource.includes('this.game.ui.showGameSurface();'), 'セーブ復元はViewへ委譲する');
+    for (const source of [gameSource, saveSource]) {
+        assert.ok(!/document\.getElementById\(['"](?:title-screen|app)['"]\)\.classList/.test(source),
+            '制御層が直接固定画面のclassを切り替えない');
+    }
+    const title = {classList: new FakeClassList()};
+    const app = {classList: new FakeClassList(['hidden'])};
+    const ctx = createContext({ document: {getElementById(id) {
+        return ({'title-screen': title, 'app': app})[id] || null;
+    }}});
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    UI.prototype.showGameSurface.call({});
+    assert.ok(title.classList.contains('hidden'), 'タイトルを背面へ退避');
+    assert.ok(!app.classList.contains('hidden'), 'ゲーム画面を表示');
+    UI.prototype.showGameSurface.call({});
+    assert.ok(title.classList.contains('hidden') && !app.classList.contains('hidden'),
+        '複数回呼んでも状態を壊さない');
+    assert.ok(read('js/ui.js').includes('async _waitForLoadingPresentation('),
+        'ロード完了判定の責務と混在させない');
+});
+
+// r495: 独立動作させるViewの同名責務は、仕様差のない出力境界として契約を固定する。
+test('r495 独立Viewの安全文字列・顔画像ポリシーは共通表示ルールと一致する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/stat_presenter.js');
+    loadScript(ctx, 'js/ui_info.js');
+    loadScript(ctx, 'js/save_load_view.js');
+    const info = vm.runInContext('UIInfoManager.prototype', ctx);
+    const slots = vm.runInContext('SaveLoadView.prototype', ctx);
+    for (const input of [null, undefined, '', '織田&徳川', '<img src=x onerror="bad">',
+        `"'＆ <script>`, 0, 123, true]) {
+        const expected = ctx.StatPresenter.escapePlainText(input);
+        assert.strictEqual(info._escapePlainText(input), expected);
+        assert.strictEqual(slots._escapeSlotText(input), expected);
+    }
+    for (const face of [null, '', '../other.webp', 'a\" onerror=bad.png',
+        'nobunaga.webp', 'unknown_face.webp', 'portrait_9-2.jpg']) {
+        assert.strictEqual(info._safeFaceIconPath(face), ctx.StatPresenter.safeFaceIconPath(face));
+    }
 });
 
 Promise.all(pendingTests).then(() => {
