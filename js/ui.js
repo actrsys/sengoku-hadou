@@ -894,13 +894,16 @@ class UIManager {
     // 同じ顔を短時間に何度も使う場合は、小さな先読みキャッシュを共有します。
     _getDialogFaceTemplatePromise(faceIcon) {
         if (!faceIcon || typeof Image === 'undefined') return Promise.resolve(null);
+        // 外部セーブから復元した顔名は、共通Presenterで同梱ファイル名だけに限定する。
+        // URLへの連結前に正規化し、不正値を巨大なキャッシュキーとして保持しない。
+        const safeSrc = StatPresenter.safeFaceIconPath(faceIcon);
         if (!this._dialogFacePreloadCache) this._dialogFacePreloadCache = new Map();
 
-        if (this._dialogFacePreloadCache.has(faceIcon)) {
-            const hit = this._dialogFacePreloadCache.get(faceIcon);
+        if (this._dialogFacePreloadCache.has(safeSrc)) {
+            const hit = this._dialogFacePreloadCache.get(safeSrc);
             // Mapの末尾へ移し、直近使用順にします。
-            this._dialogFacePreloadCache.delete(faceIcon);
-            this._dialogFacePreloadCache.set(faceIcon, hit);
+            this._dialogFacePreloadCache.delete(safeSrc);
+            this._dialogFacePreloadCache.set(safeSrc, hit);
             return hit;
         }
 
@@ -945,14 +948,14 @@ class UIManager {
         };
 
         const promise = (async () => {
-            let img = await loadOne(`data/images/faceicons/${faceIcon}`);
-            if (!img && faceIcon !== 'unknown_face.webp') {
+            let img = await loadOne(safeSrc);
+            if (!img && safeSrc !== 'data/images/faceicons/unknown_face.webp') {
                 img = await loadOne('data/images/faceicons/unknown_face.webp');
             }
             return img;
         })();
 
-        this._dialogFacePreloadCache.set(faceIcon, promise);
+        this._dialogFacePreloadCache.set(safeSrc, promise);
         const limit = Math.max(2, this._dialogFacePreloadCacheLimit || 4);
         while (this._dialogFacePreloadCache.size > limit) {
             const oldestKey = this._dialogFacePreloadCache.keys().next().value;

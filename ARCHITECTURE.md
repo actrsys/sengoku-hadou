@@ -1719,3 +1719,28 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 
 - `UIInfoManager._renderBushoSelector()` の姓名圧縮表示、基本タブの身分名、状態タブの勢力名・所在拠点名・派閥名は、共通の `_escapePlainText()` を通してから一覧の `cells` HTMLへ組み込む。
 - 圧縮spanや行装飾・タブ・仮想スクロールの構造を維持する。詳細: `docs/audits/r485_武将一覧表示文字列境界監査記録.txt`。
+
+
+## r486 通常会話の顔画像先読み境界
+
+- `UIManager._getDialogFaceTemplatePromise()` は外交・イベント・謀反など通常会話の顔画像先読みの共通入口。顔画像名は外部セーブから復元され得るため、画像URL組み立て前に `StatPresenter.safeFaceIconPath()` を必ず通し、同梱顔画像のファイル名以外は `unknown_face.webp` へ置き換える。
+- キャッシュは検証済みの画像パスをキーとし、不正値で大きな生文字列を保持せず、正規画像・姫の既定画像・読み込み失敗時のフォールバックを従来どおり維持する。ダイアログの待機・引き渡し・顔の左右配置などの演出は変更しない。詳細は `docs/audits/r486_通常会話顔画像先読み境界監査記録.txt`。
+
+## r487 情報詳細の数値表示境界
+
+- 外部セーブの構造検査が通っても、勢力の収入・資源や諸勢力の兵士・士気などが実行時に常に数値型とは限らない。`UIInfoManager._renderDaimyoDetail()` と `_renderKunishuDetail()` の表示用 `makeRow` は、受け取った値を `_escapePlainText()` で文字列化してからHTMLテンプレートへ挿入する。数値計算、入力値の正規化、ゲームデータ本体は変更しない。
+- 大名選択時の `showDaimyoConfirmModal()` の表示用数値行にも同じ境界を適用する。名前・拠点名など、既にエスケープ済みの値を二重エスケープしないよう、`makeRow` が保護する値は生の表示文字列として渡す。詳細は `docs/audits/r487_勢力詳細数値表示境界監査記録.txt`。
+
+
+## r488 セキュリティ監査：武将複数選択の費用・所持資源の表示境界
+
+- `UIInfoManager._updateBushoSelectorUI()` の複数選択用「消費予定／所持」表示では、拠点の `gold` / `rice` がセーブ由来の値であるため、正規のデータでは数値でもHTMLへ直接埋め込まない。
+- 固定の費用表示の構造と従来の選択操作は維持し、表示用の所持資源値だけを `_escapePlainText()` でエスケープする。資源・費用の計算、選択上限、在庫・セーブ形式を変更しない。
+- 正常な所持金・所持米と、改変した文字列の両方について、実際の `_updateBushoSelectorUI()` を通るテストを行う。詳細は `docs/audits/r488_武将複数選択費用表示境界監査記録.txt`。
+
+
+## r489 セキュリティ監査：米売買相場の取引上限表示
+
+- `UISliderManager` の米購入・米売却に共通する相場欄は、相場テキストと拠点の取引上限（`castle.tradeLimit`）を `StatPresenter.escapePlainText()` を通して表示する。
+- 相場欄に必要な `<span class="slider-emphasis">` はView内の固定装飾として残し、セーブから復元された上限値でHTML構造を生成しない。経済Rulesの相場計算・取引上限判定は変更しない。
+- 表示専用の `_renderRiceTradeRateInfo()` を `UISliderManager` 内に置き、購入・売却が同じ境界を共有する。正常な相場文言・表示順・強調表示を維持し、改変セーブのタグ文字列に対するテストを加える。詳細は `docs/audits/r489_米売買相場取引上限表示境界監査記録.txt`。

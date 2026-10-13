@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r485');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r489');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -17226,6 +17226,180 @@ test('r485 武将一覧の姓名・勢力・所在・派閥をHTMLとして解�
     assert.ok(!virtualRow.includes(hostile), '仮想一覧も姓名と所属名をHTMLとして挿入しない');
     assert.ok(virtualRow.includes('派閥&lt;img'), '仮想一覧も派閥名を保護する');
 });
+
+
+
+test('r486 通常会話の顔画像先読みは保存データ由来の不正パスを読み込まず正規顔を維持する', async () => {
+    const sources = [];
+    class FakeImage {
+        constructor() { this.naturalWidth = 64; }
+        set src(value) { sources.push(value); this._src = value; }
+        get src() { return this._src; }
+        async decode() { return undefined; }
+    }
+    const ctx = createContext({ Image: FakeImage });
+    loadScript(ctx, 'js/stat_presenter.js');
+    loadScript(ctx, 'js/ui.js');
+    const ui = Object.create(vm.runInContext('UIManager', ctx).prototype);
+    await ui._getDialogFaceTemplatePromise('../map/japan_map.png');
+    assert.deepStrictEqual(sources, ['data/images/faceicons/unknown_face.webp'], '上位ディレクトリへの参照を遮断');
+    await ui._getDialogFaceTemplatePromise('portrait_valid.webp');
+    assert.strictEqual(sources.at(-1), 'data/images/faceicons/portrait_valid.webp', '通常の顔画像は保持');
+    await ui._getDialogFaceTemplatePromise('unknown_princess_face.webp');
+    assert.strictEqual(sources.at(-1), 'data/images/faceicons/unknown_princess_face.webp', '姫の既定画像を維持');
+    await ui._getDialogFaceTemplatePromise('a.webp?x=1');
+    assert.strictEqual(sources.length, 3, '不正値は既定画像の先読みキャッシュを共有');
+});
+
+
+test('r487 勢力詳細の保存由来の収入・資源値はHTMLとして解釈しない', () => {
+    const dom = new Map();
+    const ctx = createContext({
+        document: { getElementById: id => {
+            if (!dom.has(id)) dom.set(id, { onclick: null });
+            return dom.get(id);
+        } },
+        BushoStatusRules: { isActive: () => true, isRonin: () => false },
+        MainParams: { Economy: { ConsumeRicePerSoldier: 1 } }
+    });
+    loadScript(ctx, 'js/ui_info.js');
+    const View = vm.runInContext('UIInfoManager', ctx);
+    const view = Object.create(View.prototype);
+    const hostile = '<img src=x onerror="window.__injected=1">';
+    const clan = { id: 2, name: '試験家', yomi: '', leaderId: 10, princessIds: [], goldIncome: hostile, riceIncome: 40 };
+    const castle = { id: 4, gold: hostile, rice: 500, soldiers: 300, horses: 20, guns: 10, population: 1000, kokudaka: 50, commerce: 30 };
+    view.game = {
+        getClan: () => clan,
+        getBusho: () => ({ id: 10, name: '試験大名', faceIcon: 'unknown_face.webp', innovation: 50 }),
+        getClanCastles: () => [castle], getClanBushos: () => [], getCastleBushos: () => []
+    };
+    const container = { style: {}, innerHTML: '', scrollTop: 0 };
+    view._openInfoShell = () => ({ listContainer: container });
+    view._bindImageFallbacks = () => {};
+    view._renderDaimyoDetail(2);
+    assert.ok(container.innerHTML.includes('0&lt;img src=x'), '資源集計文字列はテキストに変換');
+    assert.ok(container.innerHTML.includes('value">&lt;img src=x'), '月収入はテキストに変換');
+    assert.ok(!container.innerHTML.includes('<img src=x'), '注入タグを生成しない');
+    assert.ok(container.innerHTML.includes('value">40</span>'), '正規の数値表示を維持');
+});
+
+test('r487 諸勢力詳細の保存由来の兵士・士気値はHTMLとして解釈しない', () => {
+    const elements = new Map();
+    const ctx = createContext({ document: { getElementById: id => {
+        if (!elements.has(id)) elements.set(id, { onclick: null });
+        return elements.get(id);
+    } } });
+    loadScript(ctx, 'js/ui_info.js');
+    const View = vm.runInContext('UIInfoManager', ctx);
+    const view = Object.create(View.prototype);
+    const hostile = '<svg onload="window.__injected=1">';
+    const kunishu = { id: 5, leaderId: 7, castleId: 8, ideology: '地縁',
+        soldiers: hostile, training: 60, morale: hostile, horses: 0, guns: 0, defense: 5,
+        getName: () => '国衆', getYomi: () => 'こくしゅう' };
+    view.game = { provinces: [{}], getBusho: () => ({ id: 7, name: '頭領', faceIcon: 'unknown_face.webp' }),
+        getCastle: () => ({ name: '拠点', provinceId: 2 }), getProvince: () => ({ province: '国' }),
+        kunishuSystem: { getKunishu: () => kunishu, getKunishuMembers: () => [] } };
+    const container = { style: {}, innerHTML: '', scrollTop: 0 };
+    view._openInfoShell = () => ({ listContainer: container });
+    view._bindImageFallbacks = () => {};
+    view._renderKunishuDetail(5);
+    assert.ok(container.innerHTML.includes('&lt;svg onload='));
+    assert.ok(!container.innerHTML.includes('<svg onload='));
+    assert.ok(container.innerHTML.includes('value">60</span>'), '通常の訓練値を維持');
+    assert.ok(container.innerHTML.includes('value">拠点</span>'), '拠点名の表示を維持');
+});
+
+test('r487 大名選択確認の兵数・資源値は表示専用文字列として扱う', () => {
+    const hostile = '<img src=x onerror="window.__injected=1">';
+    const dom = new Map();
+    const document = {
+        body: { classList: new FakeClassList() },
+        querySelector: () => null,
+        getElementById: id => { if (!dom.has(id)) dom.set(id, { classList: new FakeClassList() }); return dom.get(id); }
+    };
+    const ctx = createContext({ document, LifeStatusRules: { isPresent: () => true } });
+    loadScript(ctx, 'js/ui_info.js');
+    const View = vm.runInContext('UIInfoManager', ctx);
+    const view = Object.create(View.prototype);
+    view.ui = { daimyoConfirmModal: { classList: new FakeClassList() }, daimyoConfirmBody: { innerHTML: '' },
+        updateCastleGlows: () => {} };
+    view.game = { getClanCastles: () => [{ population: 500, kokudaka: 300, commerce: 2, horses: 10, guns: 3 }],
+        getClanBushos: () => [], getClan: () => ({ id: 1, yomi: 'てすと', princessIds: [] }) };
+    view._bindImageFallbacks = () => {};
+    view.showDaimyoConfirmModal(1, '試験', hostile, { name: '武将', faceIcon: 'unknown_face.webp' }, () => {});
+    assert.ok(view.ui.daimyoConfirmBody.innerHTML.includes('&lt;img src=x'));
+    assert.ok(!view.ui.daimyoConfirmBody.innerHTML.includes('<img src=x'));
+    assert.ok(view.ui.daimyoConfirmBody.innerHTML.includes('value">500</span>'));
+});
+
+
+test('r488 武将複数選択の費用・所持資源は不正なHTMLを構築しない', () => {
+    const nodes = new Map();
+    const document = { getElementById: id => {
+        if (!nodes.has(id)) nodes.set(id, fakeElement(id));
+        return nodes.get(id);
+    } };
+    const ctx = createContext({ document });
+    loadScript(ctx, 'js/ui_info.js');
+    loadScript(ctx, 'js/ui_info_busho.js');
+    const Info = vm.runInContext('UIInfoManager', ctx);
+    const info = Object.create(Info.prototype);
+    info.ui = { selectorList: fakeElement('selector-list') };
+    info.selectorView = { setAssistState() {}, setConfirmEnabled() {} };
+    info._getBushoAssistState = () => ({ visible: false, label: '', disabled: true });
+    info.commonSelectedIds = [101, 102];
+    const payload = '<img src=x onerror="window.pwned=1">';
+    info._bushoSelectorContext = {
+        isMulti: true, isViewMode: false, actionType: 'reward',
+        costGold: 3, costRice: 0, c: { gold: payload, rice: 500 }
+    };
+    info._updateBushoSelectorUI();
+    const line = document.getElementById('selector-context-info').innerHTML;
+    assert.ok(line.includes('消費予定 金: 6'), '費用・選択人数を維持する');
+    assert.ok(line.includes('&lt;img src=x'), '所持金はテキストとして表示する');
+    assert.ok(!line.includes('<img src=x'), '保存値からHTML要素を生成しない');
+    info._bushoSelectorContext = {
+        ...info._bushoSelectorContext, costGold: 0, costRice: 4,
+        c: { gold: 200, rice: payload }
+    };
+    info._updateBushoSelectorUI();
+    const riceLine = document.getElementById('selector-context-info').innerHTML;
+    assert.ok(riceLine.includes('消費予定 米: 8'), '米を使う場合の費用を維持する');
+    assert.ok(riceLine.includes('&lt;img src=x'), '所持米も文字列扱いにする');
+    info._bushoSelectorContext.c.rice = 150;
+    info._updateBushoSelectorUI();
+    assert.ok(document.getElementById('selector-context-info').innerHTML.includes('所持: 150'), '正常な残高表示を維持する');
+});
+
+
+test('r489 米売買相場の取引上限をHTMLとして解釈しない', () => {
+    const ctx = createContext({ StatPresenter: {
+        escapePlainText: value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[ch])
+    }});
+    loadScript(ctx, 'js/ui_slider.js');
+    const Slider = vm.runInContext('UISliderManager', ctx);
+    const info = { innerHTML: '', classList: new FakeClassList() };
+    const slider = Object.create(Slider.prototype);
+    slider.ui = { tradeTypeInfo: info };
+    const hostile = '<img src=x onerror="window.pwned=1">';
+    slider._renderRiceTradeRateInfo('金1＝兵糧2.0', hostile);
+    assert.ok(info.innerHTML.includes('金1＝兵糧2.0'), '米相場の説明表示を維持');
+    assert.ok(info.innerHTML.includes('&lt;img src=x'), '不正な取引上限は文字列化');
+    assert.ok(!info.innerHTML.includes('<img src=x'), '不正なHTMLタグを生成しない');
+    assert.ok(info.innerHTML.includes('<span class="slider-emphasis">'), '従来の取引上限強調は維持');
+    slider._renderRiceTradeRateInfo('金1＝兵糧2.0', 750);
+    assert.ok(info.innerHTML.includes('>750</span>'), '正常な取引上限は従来どおり');
+});
+
+test('r489 米の購入・売却経路が共通の安全な相場描画窓口を使う', () => {
+    const source = read('js/ui_slider.js');
+    assert.ok(source.includes("if (type === 'buy_rice' || type === 'sell_rice')"));
+    assert.ok(source.includes('this._renderRiceTradeRateInfo('), '画面経路から検証済み描画を使う');
+    assert.ok(!source.includes('${c.tradeLimit || 0}</span>'), '旧来の未処理な取引上限挿入を残さない');
+});
+
 
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);

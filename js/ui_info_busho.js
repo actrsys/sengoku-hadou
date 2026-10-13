@@ -650,7 +650,8 @@ Object.assign(UIInfoManager.prototype, {
             if (ctx.costGold > 0) { cost = checkedCount * ctx.costGold; item = "金"; }
             if (ctx.costRice > 0) { cost = checkedCount * ctx.costRice; item = "米"; }
             if (cost > 0) {
-                contextEl.innerHTML = `<div>消費予定 ${item}: ${cost} (所持: ${item==='金'?ctx.c.gold:ctx.c.rice})</div>`;
+                const available = item === '金' ? ctx.c.gold : ctx.c.rice;
+                contextEl.innerHTML = `<div>消費予定 ${item}: ${cost} (所持: ${this._escapePlainText(available)})</div>`;
             } else if (['war_deploy', 'def_intercept_deploy', 'def_reinf_deploy', 'atk_reinf_deploy', 'def_self_reinf_deploy', 'atk_self_reinf_deploy', 'kunishu_subjugate_deploy'].includes(ctx.actionType)) {
                 contextEl.innerHTML = `<div>出陣武将: ${checkedCount}名 / 最大5名</div>`;
             }

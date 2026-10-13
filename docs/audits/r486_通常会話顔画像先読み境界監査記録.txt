@@ -1,0 +1,18 @@
+r486 通常会話の顔画像先読み境界監査記録
+
+【対象】
+- `js/ui.js` の `UIManager._getDialogFaceTemplatePromise()`。通常会話・外交・歴史イベント・謀反等の共通の顔画像先読み経路。
+
+【再現した問題】
+- r485では顔画像ファイル名を未検証のまま `data/images/faceicons/${faceIcon}` に連結して `new Image().src` に代入していた。
+- 細工されたセーブの `faceIcon: '../map/japan_map.png'` を渡すと `data/images/faceicons/../map/japan_map.png` が画像ロードに使われる。これは同梱faceiconsだけを参照する方針に反する。
+- 修正前に直接呼び出す新規テストは `759 passed, 1 failed`。
+
+【修正】
+- 同梱顔画像の検証正本 `StatPresenter.safeFaceIconPath()` により、画像URLを組み立てる前に正規化する。
+- 先読みキャッシュのキーも検証済みパスに統一。不正入力は既定顔画像のキャッシュを共有する。
+- 正規顔と `unknown_princess_face.webp` を維持。通常顔のロード失敗時は既定画像へ引き続きフォールバック。
+
+【検証】
+- 新規テストで上位パスが画像URLに使われないこと、通常の顔・姫既定画像・不正値のキャッシュ再利用を確認。
+- AI判断・ゲームルール・シナリオ・セーブ形式・画面CSS・画像データは変更しない。

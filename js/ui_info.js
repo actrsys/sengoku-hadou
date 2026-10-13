@@ -1088,7 +1088,7 @@ class UIInfoManager {
 
         const makeRow = (label, value) => {
             const longLabelClass = label.length >= 3 ? ' is-long-label' : '';
-            return `<div class="info-detail-stat-box"><span class="info-detail-stat-label${longLabelClass}">${label}</span><span class="info-detail-stat-value">${value}</span></div>`;
+            return `<div class="info-detail-stat-box"><span class="info-detail-stat-label${longLabelClass}">${label}</span><span class="info-detail-stat-value">${this._escapePlainText(value)}</span></div>`;
         };
         const makeEmptyRow = () => `<div class="info-detail-stat-box is-placeholder"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
@@ -2649,7 +2649,7 @@ class UIInfoManager {
 
         const makeRow = (label, value) => {
             const longLabelClass = label.length >= 3 ? ' is-long-label' : '';
-            return `<div class="daimyo-confirm-stat-box"><span class="daimyo-confirm-stat-label${longLabelClass}">${label}</span><span class="daimyo-confirm-stat-value">${value}</span></div>`;
+            return `<div class="daimyo-confirm-stat-box"><span class="daimyo-confirm-stat-label${longLabelClass}">${label}</span><span class="daimyo-confirm-stat-value">${this._escapePlainText(value)}</span></div>`;
         };
         const makeEmptyRow = () => `<div class="daimyo-confirm-stat-box is-placeholder"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
@@ -2792,7 +2792,7 @@ class UIInfoManager {
 
         const makeRow = (label, value) => {
             const longLabelClass = label.length >= 3 ? ' is-long-label' : '';
-            return `<div class="info-detail-stat-box"><span class="info-detail-stat-label${longLabelClass}">${label}</span><span class="info-detail-stat-value">${value}</span></div>`;
+            return `<div class="info-detail-stat-box"><span class="info-detail-stat-label${longLabelClass}">${label}</span><span class="info-detail-stat-value">${this._escapePlainText(value)}</span></div>`;
         };
         const makeEmptyRow = () => `<div class="info-detail-stat-box is-placeholder"><span>&nbsp;</span><span>&nbsp;</span></div>`;
 
@@ -2832,7 +2832,7 @@ class UIInfoManager {
                         <!-- 左列：武将・所在・空箱 -->
                         <div class="info-detail-group">
                             ${makeRow('武将', bushosCount)}
-                            ${makeRow('所在', this._escapePlainText(baseCastleName))}
+                            ${makeRow('所在', baseCastleName)}
                             ${makeEmptyRow()}
                         </div>
                         

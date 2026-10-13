@@ -10,6 +10,14 @@ class UISliderManager {
         this._unitDivideScrollbarRaf = 0;
     }
 
+    // 相場説明は装飾タグだけを固定で生成し、取引上限などの保存値は表示用テキストにする。
+    // 取引上限は改変セーブから非数値になり得るため、HTMLへ生の値を埋め込まない。
+    _renderRiceTradeRateInfo(rateText, tradeLimit) {
+        const escape = value => StatPresenter.escapePlainText(value);
+        this.ui.tradeTypeInfo.classList.remove('hidden');
+        this.ui.tradeTypeInfo.innerHTML = `${escape(rateText)} （取引上限：<span class="slider-emphasis">${escape(tradeLimit || 0)}</span>）`;
+    }
+
     cancelUnitDivideDeferredUpdates() {
         const cancel = (handle) => {
             if (!handle) return;
@@ -560,10 +568,8 @@ class UISliderManager {
 
             let extraStr = "";
             if (type === 'buy_rice' || type === 'sell_rice') {
-                extraStr = `（取引上限：<span class="slider-emphasis">${c.tradeLimit || 0}</span>）`;
                 const rateInfo = EconomyRules.getRiceActualRate(type, c, this.game.provinces, this.game);
-                this.ui.tradeTypeInfo.classList.remove('hidden');
-                this.ui.tradeTypeInfo.innerHTML = `${EconomyRules.formatRiceMarketRate(rateInfo.ricePerGold)} ${extraStr}`;
+                this._renderRiceTradeRateInfo(EconomyRules.formatRiceMarketRate(rateInfo.ricePerGold), c.tradeLimit);
                 const costDiv = document.createElement('div');
                 costDiv.id = 'dynamic-cost-display';
                 this.ui.quantityContainer.appendChild(costDiv);
