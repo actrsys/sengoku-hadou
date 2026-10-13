@@ -59,6 +59,17 @@ class SaveManager {
         return task;
     }
 
+    // セーブ一覧・直接ロードは、呼び出し時点で同じスロットへ書込中の保存があれば
+    // その確定後に読み取る。書込キューの内側で使う事前照合・読戻しは
+    // 引き続き loadFromDB を直接呼び、キューの自己待機を起こさない。
+    async _readSlotAfterPendingSave(storageKey) {
+        const pending = this._slotSaveTasks && this._slotSaveTasks.get(storageKey);
+        if (pending) {
+            try { await pending; } catch (_) { /* 保存失敗時もDBに残る実データを確認する */ }
+        }
+        return loadFromDB(storageKey);
+    }
+
     // baseFamilyIds / familyIds は親子・養子・婚姻から再構築できる派生キャッシュなので保存しません。
     // 4,000人超の配列重複をセーブへ持ち込まず、JSON化・IndexedDB structured clone時の容量と一時メモリを抑えます。
     _serializePersonForSave(person) {
@@ -692,6 +703,8 @@ class SaveManager {
 
     // ファイルへセーブ
     async saveGameToFile() { 
+        // ファイル保存の遅延失敗も、手動・自動保存と同じ保存要求寿命で扱う。
+        const isRequestCurrent = this._captureSaveRequestCurrent();
         this.showSaveGuard(); // ★追加：保存中のバリアを張ります
         try {
             const data = await this._createSaveDataObj(); // ★待つように変更
@@ -707,7 +720,7 @@ class SaveManager {
             URL.revokeObjectURL(url); 
         } catch (e) {
             console.error('ファイルセーブに失敗しました:', e);
-            if (this.game.ui) this.game.ui.showDialog('ファイルセーブに失敗しました。エラー原因: ' + e.message, false);
+            if (isRequestCurrent() && this.game.ui) this.game.ui.showDialog('ファイルセーブに失敗しました。エラー原因: ' + e.message, false);
         } finally {
             this.hideSaveGuard(); // ★追加：保存が終わったらバリアを解除します
         }
@@ -824,7 +837,7 @@ class SaveManager {
 
         let rawData = null;
         try {
-            rawData = await loadFromDB(prefix + slotNo);
+            rawData = await this._readSlotAfterPendingSave(prefix + slotNo);
         } catch (e) {
             if (!requestFlow.isLatest()) return;
             console.error("ロードエラー:", e);
@@ -984,7 +997,7 @@ class SaveManager {
         const rows = await Promise.all(
             Array.from({ length: count }, (_, index) => {
                 const slotNo = index + 1;
-                return loadFromDB(prefix + slotNo)
+                return this._readSlotAfterPendingSave(prefix + slotNo)
                     .then(rawData => ({ slotNo, rawData, readError: false }))
                     // DBへのアクセス失敗を「空スロット」と見なすと、読めない既存データを
                     // 空き扱いして上書きできてしまう。復号・形式不一致とは区別する。
@@ -1021,6 +1034,8 @@ class SaveManager {
         let latestSlot = -1;
         let latestTime = 0;
         let latestPrefix = "";
+        let hasReadError = false;
+        let hasInvalidData = false;
 
         // 手動セーブとオートセーブ、両方のお部屋を探しに行きます
         const prefixes = ["sengoku_save_slot", "sengoku_autosave_slot"];
@@ -1029,6 +1044,10 @@ class SaveManager {
             const slots = await this.readSaveSlots(prefix);
             if (!requestFlow.isLatest()) return;
             for (const slot of slots) {
+                // 読込失敗・非対応レコードは空スロットではない。
+                // SaveLoadView と同じ SaveManager.readSaveSlots の分類を用いる。
+                if (slot.readError) hasReadError = true;
+                if (slot.invalidData) hasInvalidData = true;
                 if (!slot.hasData) continue;
                 const time = slot.saveTimestamp;
                 if (time > latestTime) {
@@ -1046,7 +1065,12 @@ class SaveManager {
         } else {
             if (this.game.ui) {
                 this.game.ui.hideLoadingScreen(); // ★データがなくてやめる時は蓋を開けます
-                this.game.ui.showDialog("セーブデータが見つかりません。", false);
+                const message = hasReadError
+                    ? '一部のセーブスロットを読み取れませんでした。保存領域を確認して再試行してください。'
+                    : hasInvalidData
+                        ? '保存データはありますが、現在の形式で読み込めるセーブデータはありません。セーブ一覧で確認してください。'
+                        : 'セーブデータが見つかりません。';
+                this.game.ui.showDialog(message, false);
             }
         }
     }

@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r502');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r505');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4811,7 +4811,8 @@ test('SaveManager がスロット読込・保存時刻抽出の公開窓口を�
     assert.ok(source.includes('async readSaveSlots(prefix, count = 5)'));
     assert.ok(source.includes('decodeStoredData(rawData)'));
     assert.ok(source.includes('getSaveTimestamp(data)'));
-    assert.ok(source.includes('loadFromDB(prefix + slotNo)'));
+    assert.ok(source.includes('this._readSlotAfterPendingSave(prefix + slotNo)'));
+    assert.ok(source.includes('return loadFromDB(storageKey)')); // キュー外の正規DB読込
     assert.ok(source.includes('isLoadableSaveData(data)'));
     assert.ok(source.includes('const hasData = !readError && this.isLoadableSaveData(data);'));
     assert.ok(source.includes('readError'), 'DB読込例外を空きと区別する');
@@ -14156,7 +14157,7 @@ test('r430ではセーブ復元完了まで入力抑止を維持し旧復元を�
     const localAt = save.indexOf('async loadGameFromLocal(slotNo = 1');
     const localEnd = save.indexOf('\n    // ★追加：オートセーブ', localAt);
     const localBlock = save.slice(localAt, localEnd);
-    const dbAwaitAt = localBlock.indexOf('rawData = await loadFromDB(prefix + slotNo);');
+    const dbAwaitAt = localBlock.indexOf('rawData = await this._readSlotAfterPendingSave(prefix + slotNo);');
     const dbRecheckAt = localBlock.indexOf('if (!requestFlow.isLatest()) return;', dbAwaitAt);
     assert.ok(localBlock.includes('const requestFlow = this._captureLoadRequestFlow();'));
     assert.ok(dbAwaitAt >= 0 && dbRecheckAt > dbAwaitAt, 'IndexedDB待ち後に旧ロード要求を止める');
@@ -18236,6 +18237,212 @@ test('r502 同一世代の自動保存二重呼出しは従来どおり抑止す
     release();
     await first;
     assert.strictEqual(game._autoSaveInProgress, false);
+});
+
+
+// r503: 「続きから」の全候補が読込不能でも、既存保存の消失と誤案内しない。
+test('r503 続きからの読込エラーは空スロットと区別して案内する', async () => {
+    const dialogs = [];
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    let generation = 1;
+    const game = {
+        ui: {
+            showLoadingScreen() {}, hideLoadingScreen() {},
+            showDialog(message) { dialogs.push(message); }
+        },
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationLatest: value => generation === value
+        }
+    };
+    const saver = new ctx.SaveManager(game);
+    saver.readSaveSlots = async () => [
+        { originalSlotNo: 1, hasData: false, readError: true, invalidData: false, saveTimestamp: 0 },
+        { originalSlotNo: 2, hasData: false, readError: false, invalidData: false, saveTimestamp: 0 }
+    ];
+    await saver.continueGame();
+    assert.strictEqual(dialogs.length, 1);
+    assert.match(dialogs[0], /読込|保存領域/,
+        'IndexedDB読込失敗時は保存が存在しないと断定せず再試行を案内する');
+    assert.ok(!dialogs[0].includes('見つかりません'), '既存データの消失を断定しない');
+});
+
+test('r503 続きからの非対応保存と真の空欄を区別し、有効保存があればロードする', async () => {
+    const dialogs = [];
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    const game = {
+        ui: {
+            showLoadingScreen() {}, hideLoadingScreen() {},
+            showDialog(message) { dialogs.push(message); }
+        },
+        turnManager: {
+            captureTurnFlowGeneration: () => 1,
+            isTurnFlowGenerationLatest: value => value === 1
+        }
+    };
+    const saver = new ctx.SaveManager(game);
+    let mode = 'invalid';
+    saver.readSaveSlots = async prefix => mode === 'invalid'
+        ? [{ originalSlotNo: 1, hasData: false, readError: false, invalidData: true, saveTimestamp: 0 }]
+        : mode === 'empty'
+        ? [{ originalSlotNo: 1, hasData: false, readError: false, invalidData: false, saveTimestamp: 0 }]
+        : prefix === 'sengoku_autosave_slot'
+        ? [{ originalSlotNo: 4, hasData: true, readError: false, invalidData: false, saveTimestamp: 100 }]
+        : [{ originalSlotNo: 1, hasData: false, readError: true, invalidData: false, saveTimestamp: 0 }];
+    const loaded = [];
+    saver.loadGameFromLocal = async (slot, prefix) => { loaded.push([slot, prefix]); };
+    await saver.continueGame();
+    assert.strictEqual(dialogs.length, 1);
+    assert.match(dialogs[0], /読み込める|非対応|読込不可/,
+        '現行形式で復元不能な既存レコードは空欄扱いしない');
+    mode = 'empty';
+    await saver.continueGame();
+    assert.ok(dialogs[1].includes('見つかりません'), '真の空スロットは従来の案内');
+    mode = 'loadable';
+    await saver.continueGame();
+    assert.strictEqual(loaded.length, 1, '一部スロットでエラーでも有効な保存はロード可能');
+    assert.strictEqual(loaded[0][0], 4);
+    assert.strictEqual(loaded[0][1], 'sengoku_autosave_slot');
+});
+
+
+// r504: ファイル保存も手動スロット保存と同じ要求寿命判定に従う。
+test('r504 失効したファイル保存の遅延失敗は新画面へエラーを表示しない', async () => {
+    const dialogs = [];
+    let generation = 1;
+    const ctx = createContext({ console: {...console, error() {}} });
+    loadScript(ctx, 'js/save_manager.js');
+    const game = {
+        scenarioFolder: '1560_okehazama',
+        ui: {showDialog(message) { dialogs.push(message); }},
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationLatest: n => n === generation
+        }
+    };
+    const manager = new ctx.SaveManager(game);
+    const guards = [];
+    manager.showSaveGuard = () => guards.push('show');
+    manager.hideSaveGuard = () => guards.push('hide');
+    let rejectOld;
+    manager._createSaveDataObj = () => new Promise((_, reject) => { rejectOld = reject; });
+    const old = manager.saveGameToFile();
+    generation = 2;
+    game.scenarioFolder = '1570_anegawa';
+    rejectOld(new Error('旧画面の画像作成失敗'));
+    await old;
+    assert.deepStrictEqual(dialogs, [], '旧保存の遅延失敗を新しい画面に表示しない');
+    assert.deepStrictEqual(guards, ['show', 'hide'], '失効時も保存入力ガードは解除する');
+});
+
+test('r504 現在有効なファイル保存失敗だけはエラーを案内する', async () => {
+    const dialogs = [];
+    const ctx = createContext({ console: {...console, error() {}} });
+    loadScript(ctx, 'js/save_manager.js');
+    const game = {
+        scenarioFolder: '1560_okehazama',
+        ui: {showDialog(message) { dialogs.push(message); }},
+        turnManager: {
+            captureTurnFlowGeneration: () => 1,
+            isTurnFlowGenerationLatest: n => n === 1
+        }
+    };
+    const manager = new ctx.SaveManager(game);
+    manager.showSaveGuard = () => {};
+    manager.hideSaveGuard = () => {};
+    manager._createSaveDataObj = async () => { throw new Error('現行保存失敗'); };
+    await manager.saveGameToFile();
+    assert.strictEqual(dialogs.length, 1, '現在の保存失敗は通知を残す');
+    assert.ok(dialogs[0].includes('現行保存失敗'));
+});
+
+
+// r505: 同スロットの保存が完了する前の読込で古い内容を提示しない。
+test('r505 同一スロットの書込待機中は一覧読込を旧版で確定しない', async () => {
+    const stored = new Map([['sengoku_save_slot1', {saveSchemaVersion: 2, saveTimestamp: 1}]]);
+    let finishWrite;
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__read = key => Promise.resolve(stored.get(key));
+    ctx.__write = (key, value) => new Promise(resolve => {
+        finishWrite = () => { stored.set(key, value); resolve(); };
+    });
+    vm.runInContext('loadFromDB = __read; saveToDB = __write;', ctx);
+    const manager = new ctx.SaveManager({
+        scenarioFolder: '1560_okehazama', hasSaveData: false,
+        ui: {showDialog() {}, renderCommandMenu() {}},
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationLatest: n => n === 1}
+    });
+    manager.showSaveGuard = () => {};
+    manager.hideSaveGuard = () => {};
+    manager._createSaveDataObj = async () => ({saveSchemaVersion: 2, saveTimestamp: 2});
+    manager._validateSaveDataStructure = () => true;
+    manager._encryptData = data => data;
+    manager.isLoadableSaveData = () => true;
+    const saving = manager.saveGameToLocal(1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(typeof finishWrite, 'function', '同スロットの保存がDB書込中');
+    const listing = manager.readSaveSlots('sengoku_save_slot', 1);
+    await new Promise(resolve => setImmediate(resolve));
+    finishWrite();
+    const [rows] = await Promise.all([listing, saving]);
+    assert.strictEqual(rows[0].saveTimestamp, 2, '保存要求より後に開始した一覧は完了後のスロットを表示');
+});
+
+test('r505 保存失敗後も読込が再開し、他スロットの読込を妨げない', async () => {
+    const reads = [];
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__read = async key => { reads.push(key); return {saveSchemaVersion: 2, saveTimestamp: 10}; };
+    vm.runInContext('loadFromDB = __read;', ctx);
+    const manager = new ctx.SaveManager({});
+    let rejectWrite;
+    const writing = manager._withSerializedSlotSave('sengoku_save_slot1',
+        () => new Promise((_, reject) => { rejectWrite = reject; }));
+    const sameSlot = manager._readSlotAfterPendingSave('sengoku_save_slot1');
+    await manager._readSlotAfterPendingSave('sengoku_save_slot2');
+    assert.deepStrictEqual(reads, ['sengoku_save_slot2'], '別スロットには不要な大域ロックを掛けない');
+    rejectWrite(new Error('DB書込失敗'));
+    await writing.catch(() => {});
+    const value = await sameSlot;
+    assert.strictEqual(value.saveTimestamp, 10, '保存失敗後も残存レコードを読み取れる');
+    assert.deepStrictEqual(reads, ['sengoku_save_slot2', 'sengoku_save_slot1']);
+});
+
+test('r505 同一スロットの書込待機中は直接ロードも書込完了を待つ', async () => {
+    const stored = new Map([['sengoku_save_slot1', {saveSchemaVersion: 2, saveTimestamp: 1}]]);
+    let finishWrite;
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__read = key => Promise.resolve(stored.get(key));
+    ctx.__write = (key, value) => new Promise(resolve => {
+        finishWrite = () => { stored.set(key, value); resolve(); };
+    });
+    vm.runInContext('loadFromDB = __read; saveToDB = __write;', ctx);
+    const restored = [];
+    const manager = new ctx.SaveManager({
+        scenarioFolder: '1560_okehazama', hasSaveData: false,
+        ui: {showDialog() {}, showLoadingScreen() {}, renderCommandMenu() {}},
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationLatest: n => n === 1}
+    });
+    manager.showSaveGuard = () => {};
+    manager.hideSaveGuard = () => {};
+    manager._createSaveDataObj = async () => ({saveSchemaVersion: 2, saveTimestamp: 2});
+    manager._validateSaveDataStructure = () => true;
+    manager._encryptData = data => data;
+    manager.isLoadableSaveData = () => true;
+    manager._restoreSaveDataObj = async data => { restored.push(data.saveTimestamp); };
+    const saving = manager.saveGameToLocal(1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(typeof finishWrite, 'function');
+    const loading = manager.loadGameFromLocal(1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepStrictEqual(restored, [], '未完了のスロットから旧データを復元しない');
+    finishWrite();
+    await Promise.all([saving, loading]);
+    assert.deepStrictEqual(restored, [2], '同スロットの新しい保存完了後に復元する');
 });
 
 Promise.all(pendingTests).then(() => {
