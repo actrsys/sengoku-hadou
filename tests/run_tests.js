@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r506');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r507');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -18488,6 +18488,100 @@ test('r506 自動保存の順番待ちでは年月と城データを同じ時点
     assert.strictEqual(written[0].data.year, 1561);
     assert.strictEqual(written[0].data.castles[0].gold, 200);
     assert.strictEqual(values.get('autoSaveIndex'), '2');
+});
+
+// r507: 正常書込／読込と非同期aborted経路でも既存のclose-once契約を保つ。
+test('r507 IndexedDB正常完了・非同期中断でも接続を一度だけ閉じる', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    const stored = new Map();
+    let closeCount = 0;
+    let abortNextWrite = false;
+    ctx.__openDb = async () => ({
+        close() { closeCount++; },
+        transaction(_name, mode) {
+            const tx = {
+                error: null,
+                objectStore() {
+                    return {
+                        put(data, key) {
+                            Promise.resolve().then(() => {
+                                if (abortNextWrite) {
+                                    abortNextWrite = false;
+                                    tx.error = new Error('asynchronous write abort');
+                                    tx.onabort();
+                                    tx.onerror(); // 両方通知されても二重closeしない
+                                } else {
+                                    stored.set(key, JSON.parse(JSON.stringify(data)));
+                                    tx.oncomplete();
+                                }
+                            });
+                        },
+                        get(key) {
+                            const request = {result: null, error: null};
+                            Promise.resolve().then(() => {
+                                request.result = stored.get(key);
+                                request.onsuccess();
+                                tx.oncomplete();
+                            });
+                            return request;
+                        }
+                    };
+                }
+            };
+            return tx;
+        }
+    });
+    vm.runInContext('initDB = __openDb;', ctx);
+    await vm.runInContext('saveToDB("sengoku_save_slot1", {saveTimestamp: 7})', ctx);
+    assert.strictEqual(closeCount, 1);
+    const read = await vm.runInContext('loadFromDB("sengoku_save_slot1")', ctx);
+    assert.strictEqual(read.saveTimestamp, 7);
+    assert.strictEqual(closeCount, 2);
+    abortNextWrite = true;
+    await assert.rejects(vm.runInContext('saveToDB("sengoku_save_slot1", {saveTimestamp: 8})', ctx), /asynchronous write abort/);
+    assert.strictEqual(closeCount, 3);
+    assert.strictEqual(stored.get('sengoku_save_slot1').saveTimestamp, 7, '失敗した書込で保存内容を変更しない');
+});
+
+// r507: IndexedDBの同期失敗でも開いたDB接続を解放し、後続のセーブ／ロードを阻害しない。
+test('r507 IndexedDBトランザクション開始・要求生成の同期例外でも接続を閉じる', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    let closeCount = 0;
+    const scenarios = [
+        {name: 'transaction', failAt: 'transaction'},
+        {name: 'objectStore', failAt: 'objectStore'},
+        {name: 'request', failAt: 'request'}
+    ];
+    for (const scenario of scenarios) {
+        for (const kind of ['save', 'load']) {
+            let closes = 0;
+            const db = {
+                close() { closes++; closeCount++; },
+                transaction() {
+                    if (scenario.failAt === 'transaction') throw new Error('transaction failure');
+                    return {
+                        objectStore() {
+                            if (scenario.failAt === 'objectStore') throw new Error('objectStore failure');
+                            return {
+                                put() { throw new Error('request failure'); },
+                                get() { throw new Error('request failure'); }
+                            };
+                        }
+                    };
+                }
+            };
+            ctx.__openDb = async () => db;
+            vm.runInContext('initDB = __openDb;', ctx);
+            await assert.rejects(
+                vm.runInContext(kind === 'save' ? 'saveToDB("test", {id: 1})' : 'loadFromDB("test")', ctx),
+                new RegExp(`${scenario.name} failure`)
+            );
+            assert.strictEqual(closes, 1, `${kind}/${scenario.failAt}: DB接続は1回閉じる`);
+        }
+    }
+    assert.strictEqual(closeCount, scenarios.length * 2);
 });
 
 Promise.all(pendingTests).then(() => {

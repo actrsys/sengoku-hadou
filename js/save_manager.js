@@ -1098,7 +1098,6 @@ function initDB() {
 async function saveToDB(key, data) {
     const db = await initDB();
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
         let finished = false;
         const closeAndFinish = (ok, value) => {
             if (finished) return;
@@ -1108,18 +1107,23 @@ async function saveToDB(key, data) {
             else reject(value);
         };
 
-        tx.objectStore(STORE_NAME).put(data, key);
-        tx.oncomplete = () => closeAndFinish(true);
-        tx.onerror = () => closeAndFinish(false, tx.error);
-        tx.onabort = () => closeAndFinish(false, tx.error || new Error('IndexedDB transaction aborted'));
+        // transaction / objectStore / put が同期的に投げる場合も接続を残さない。
+        // 失敗経路を含め、DB接続の解放はこの保存部署だけで完結させる。
+        try {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.oncomplete = () => closeAndFinish(true);
+            tx.onerror = () => closeAndFinish(false, tx.error);
+            tx.onabort = () => closeAndFinish(false, tx.error || new Error('IndexedDB transaction aborted'));
+            tx.objectStore(STORE_NAME).put(data, key);
+        } catch (error) {
+            closeAndFinish(false, error);
+        }
     });
 }
 
 async function loadFromDB(key) {
     const db = await initDB();
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const request = tx.objectStore(STORE_NAME).get(key);
         let result;
         let finished = false;
         const closeAndFinish = (ok, value) => {
@@ -1130,10 +1134,18 @@ async function loadFromDB(key) {
             else reject(value);
         };
 
-        request.onsuccess = () => { result = request.result; };
-        request.onerror = () => closeAndFinish(false, request.error);
-        tx.oncomplete = () => closeAndFinish(true, result);
-        tx.onerror = () => closeAndFinish(false, tx.error || request.error);
-        tx.onabort = () => closeAndFinish(false, tx.error || request.error || new Error('IndexedDB transaction aborted'));
+        // 読取専用トランザクションでも同期例外時は必ず接続を閉じる。
+        try {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            let request = null;
+            tx.oncomplete = () => closeAndFinish(true, result);
+            tx.onerror = () => closeAndFinish(false, tx.error || (request && request.error));
+            tx.onabort = () => closeAndFinish(false, tx.error || (request && request.error) || new Error('IndexedDB transaction aborted'));
+            request = tx.objectStore(STORE_NAME).get(key);
+            request.onsuccess = () => { result = request.result; };
+            request.onerror = () => closeAndFinish(false, request.error);
+        } catch (error) {
+            closeAndFinish(false, error);
+        }
     });
 }

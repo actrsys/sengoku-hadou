@@ -1,0 +1,30 @@
+戦国覇道 r507 通常・設計・セキュリティ監査：IndexedDBの同期例外とDB接続寿命
+
+正本：r506完全版ZIP。ARCHITECTURE.mdの最優先ルールと直近の保存関連監査記録（r499～r506）を照合。
+
+【確認した不具合】
+保存・読込用のIndexedDB接続を開いた後、saveToDB/loadFromDB が transaction() からobjectStore().put/get()までをPromise executor内で無条件に呼んでいた。この過程が同期的にthrowした場合、executorはPromiseをrejectする一方、DB接続のclose()を担うcloseAndFinish()を実行しない。このため、不正なDB状態・DataCloneError等で同期例外が繰り返されると、不要な接続を残す。
+
+【最小改修】
+- saveToDB/loadFromDB のトランザクション生成・ストア取得・要求生成をtry/catchで囲み、同期例外でも既存のcloseAndFinish(false, error)を通す。
+- トランザクションイベントを要求作成前に登録し、正常完了・onerror・onabortも従来どおりcloseAndFinishへ委譲。closeAndFinishのfinishedガードを維持し、複数イベントによる二重解放を防ぐ。
+- 読込の非同期エラーは従来どおりtx.errorとrequest.errorを参照。APIや保存構造を変更せず、例外回復・ユーザー表示は既存の上位窓口に委ねる。
+
+【再現・検証】
+- r506へ先に回帰テストを追加：readwrite/readonly両方でtransaction・objectStore・put/getの同期throwを注入すると、新規テスト1件が失敗（DB接続未解放）。
+- 修正後は正常書込・正常読込・非同期abort/onerror重複通知のclose-once確認も含め、798件の通常テストが成功。
+- PC/スマホの実ブラウザ表示テスト、Excel/BIN差分・数式整合、ソース検証、およびシミュレーション単体テストも最終成果物で確認する。
+
+【非変更】
+セーブスキーマ・保存内容・保存先ローテーション・同一スロット直列化・読込一貫性、画面/モーダル、ゲームルール、AI/合戦、管理Excel/BIN、画像・音声、CSS。
+
+【変更ファイル】
+追加:
+- docs/audits/r507_IndexedDB接続例外解放監査記録.txt
+更新:
+- ARCHITECTURE.md
+- docs/audits/README.md
+- js/config.js
+- js/save_manager.js
+- tests/run_tests.js
+削除: なし
