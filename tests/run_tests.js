@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r505');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r506');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -18443,6 +18443,51 @@ test('r505 同一スロットの書込待機中は直接ロードも書込完了
     finishWrite();
     await Promise.all([saving, loading]);
     assert.deepStrictEqual(restored, [2], '同スロットの新しい保存完了後に復元する');
+});
+
+// r506: オートセーブは同スロットの先行書込が終わってから最新状態を一括採取する。
+// 書込待機の前にスナップショットを作ると、年月と参照中の城・武将値が食い違う。
+test('r506 自動保存の順番待ちでは年月と城データを同じ時点で採取する', async () => {
+    const values = new Map([['autoSaveIndex', '1']]);
+    const written = [];
+    const ctx = createContext({
+        document: {getElementById() {return null;}},
+        localStorage: {
+            getItem(key) {return values.get(key) ?? null;},
+            setItem(key, value) {values.set(key, String(value));}
+        }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__save = (key, data) => { written.push(JSON.parse(JSON.stringify({key, data}))); };
+    vm.runInContext('saveToDB = async (key, data) => __save(key, data);', ctx);
+    const game = {
+        scenarioFolder: '1560_okehazama', year: 1560,
+        castles: [{id: 1, gold: 100}], hasSaveData: false
+    };
+    const manager = new ctx.SaveManager(game);
+    manager.showSaveGuard = () => {};
+    manager.hideSaveGuard = () => {};
+    let captureCount = 0;
+    manager._createSaveDataObj = async () => {
+        captureCount++;
+        return {saveTimestamp: 1, year: game.year, castles: game.castles};
+    };
+    manager._validateSaveDataStructure = () => true;
+    let releaseEarlier;
+    const earlier = manager._withSerializedSlotSave('sengoku_autosave_slot1',
+        () => new Promise(resolve => { releaseEarlier = resolve; }));
+    const autosave = manager.executeAutoSave();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(captureCount, 0, 'キュー待機中にスナップショットの参照を採らない');
+    game.year = 1561;
+    game.castles[0].gold = 200;
+    releaseEarlier();
+    await Promise.all([earlier, autosave]);
+    assert.strictEqual(captureCount, 1);
+    assert.strictEqual(written.length, 1);
+    assert.strictEqual(written[0].data.year, 1561);
+    assert.strictEqual(written[0].data.castles[0].gold, 200);
+    assert.strictEqual(values.get('autoSaveIndex'), '2');
 });
 
 Promise.all(pendingTests).then(() => {

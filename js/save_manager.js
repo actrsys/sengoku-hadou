@@ -905,16 +905,16 @@ class SaveManager {
                 ? storedIndex : 1;
             const storageKey = 'sengoku_autosave_slot' + autoSaveIndex;
 
-            // オートセーブは内部IndexedDB専用なので勢力図サムネイルを省き、
-            // 低メモリ端末向けに巨大な暗号化バッファも生成しない。
-            const data = await this._createSaveDataObj({ includeThumbnail: false });
-            if (!data || !request.isCurrent()) return;
-            this._validateSaveDataStructure(data);
-            if (!request.isCurrent()) return;
-
             // 手動保存と同じスロット単位の直列化を使う。旧ゲームの書込みが
             // 開始済みでも、後発ゲームのセーブが先に完了してから巻き戻されない。
+            // スナップショットの生成もキュー内で行う。待機前に参照を集めると、
+            // 順番待ちの間に変化した城・武将情報が古い年月の保存に混在してしまう。
             await this._withSerializedSlotSave(storageKey, async () => {
+                if (!request.isCurrent()) return;
+                // 内部IndexedDB専用のためサムネイルと暗号化バッファは生成しない。
+                const data = await this._createSaveDataObj({ includeThumbnail: false });
+                if (!data || !request.isCurrent()) return;
+                this._validateSaveDataStructure(data);
                 if (!request.isCurrent()) return;
                 await saveToDB(storageKey, data);
                 if (!request.isCurrent()) return;
