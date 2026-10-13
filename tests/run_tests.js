@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r514');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r517');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2768,6 +2768,67 @@ test('通常会話と面談会話は同じDialogueTextRulesを使い軍師だけ
     assert.ok(!gunshi.includes('厳しい交渉になるでしょう。。'), '軍師助言に残っていた二重句点も除去する');
     const dialogueFiles = ['js/diplomacy.js', 'js/event/event_text.js', 'js/interview_system.js'];
     for (const file of dialogueFiles) assert.ok(!read(file).includes('。」'), `${file} の固定会話文に 。」 を残さない`);
+});
+
+
+test('面談イベント実行中にシナリオが変わったら旧イベント完了を新しいflagsへ記録しない', async () => {
+    const ctx = createContext();
+    let release;
+    let generation = 1;
+    const pending = new Promise(resolve => { release = resolve; });
+    ctx.window.GameEvents = [{
+        id: 'interview_delayed_one_time', timing: 'interview_after_greeting', isOneTime: true,
+        checkCondition: () => true,
+        execute: () => pending
+    }];
+    loadScript(ctx, 'js/event_manager.js');
+    const EventManager = vm.runInContext('EventManager', ctx);
+    const game = {
+        phase: 'game', flags: {}, writeSystemDiagnostic() {},
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: value => value === generation
+        }
+    };
+    const manager = new EventManager(game);
+    const running = manager.processInterviewEvent();
+    generation += 1;
+    game.flags = {};
+    release();
+    const handled = await running;
+    assert.strictEqual(handled, false, '旧イベントの終了は現面談に受け渡さない');
+    assert.strictEqual(game.flags.interview_delayed_one_time, undefined, '新シナリオへ旧スタンプを記録しない');
+});
+
+test('面談イベント待機中のタイトル復帰では旧武将の面談メニューを再表示しない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/interview_system.js');
+    const InterviewSystem = vm.runInContext('InterviewSystem', ctx);
+    let release;
+    let generation = 1;
+    let showCount = 0;
+    const game = {
+        phase: 'game', ui: { interviewView: {} },
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: value => value === generation
+        },
+        eventManager: { processInterviewEvent: () => new Promise(resolve => { release = resolve; }) }
+    };
+    const system = new InterviewSystem(game);
+    system.showMainMenu = () => { showCount++; };
+    const old = { id: 101 };
+    const running = system._continueInterviewAfterGreeting(old);
+    generation += 1;
+    game.phase = 'title';
+    release(false);
+    await running;
+    assert.strictEqual(showCount, 0, '旧面談画面を表示しない');
+
+    game.phase = 'game';
+    game.eventManager.processInterviewEvent = () => Promise.resolve(false);
+    await system._continueInterviewAfterGreeting(old);
+    assert.strictEqual(showCount, 1, '通常の面談は維持する');
 });
 
 test('面談コモンイベントは挨拶直後に最大1件だけ処理し通常画面refreshを使わない', () => {
@@ -5760,7 +5821,7 @@ test('武将寿命のゲーム中変更は LifeSystem を唯一の正規窓口�
     assert.ok(!interview.includes('busho.endYear ='), '面談はendYearを直接変更しない');
     assert.ok(!interview.includes('_shouldOfferDoctor') && !interview.includes('_showDoctorPrompt'), 'InterviewSystem に医師固有処理を残さない');
     assert.ok(interview.includes('processInterviewEvent({'), '面談挨拶後の特殊処理はEventManagerへ委譲する');
-    assert.ok(interview.includes('returnToInterviewTop: () => this.showInterviewerList()'), '面談内イベント終了後は面談セッションを閉じずトップへ戻せる');
+    assert.ok(interview.includes('returnToInterviewTop: () =>') && interview.includes('this.showInterviewerList()'), '面談内イベント終了後は面談セッションを閉じずトップへ戻せる');
     assert.ok(!interview.includes('endInterview: () => this.close()'), '面談内イベントから面談セッションを直接閉じる旧経路を残さない');
     assert.ok(common.includes("id: 'common_interview_doctor'") && common.includes("timing: 'interview_after_greeting'"), '医師延命を面談コモンイベントとして登録する');
     assert.ok(common.includes("const returnToInterviewTop = typeof context.returnToInterviewTop === 'function'"), '医師イベントは面談トップ復帰コールバックを使う');
@@ -19127,6 +19188,196 @@ test('r514 婚姻コマンドは外交会話完了後に事後イベントとhan
     await completeFlow;
     assert(order.indexOf('marriage-start') < order.indexOf('after_command'), '事後イベントは婚姻会話後');
     assert(order.indexOf('after_command') < order.indexOf('handoff-end'), 'handoffは事後イベント後に解放');
+});
+
+
+// r515: コマンドがbefore_command/実行中のawaitで旧シナリオ・旧ターンへ戻らない。
+test('r515 before_command中のロード後は旧コマンド本体もafter_commandも動かさない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const oldCastle = { id: 10 }, newCastle = { id: 20 };
+    let generation = 1, resumeBefore, holdCount = 0;
+    const calls = [];
+    const game = {
+        phase: 'game', currentIndex: 0, turnQueue: [oldCastle],
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: token => token === generation && game.phase === 'game'
+        },
+        ui: {
+            beginDialogHandoffHold: () => { holdCount++; },
+            endDialogHandoffHold: () => { holdCount--; },
+            completeVisualHandoff: () => calls.push('visual-end')
+        },
+        eventManager: {
+            processEvents: type => {
+                calls.push(type);
+                if (type === 'before_command') return new Promise(resolve => { resumeBefore = resolve; });
+            }
+        }
+    };
+    const cmd = new Command(game);
+    const task = cmd.executeWithEvent('alliance', () => { calls.push('old-command'); });
+    assert.deepStrictEqual(calls, ['before_command']);
+    assert.strictEqual(holdCount, 1);
+    // 古い画面は強制リセットされ、次シナリオのhandoffが開始した状態。
+    generation = 2;
+    game.turnQueue = [newCastle];
+    holdCount = 1;
+    resumeBefore();
+    await task;
+    assert.deepStrictEqual(calls, ['before_command'], '旧本体・事後イベント・旧UI後始末を新シナリオに及ぼさない');
+    assert.strictEqual(holdCount, 1, '旧handoffは新シナリオのhandoffを解放しない');
+});
+
+test('r515 before_command中に同一シナリオで次の拠点ターンになったら実行しない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const first = { id: 10 }, second = { id: 11 };
+    let resumeBefore;
+    const calls = [];
+    const game = {
+        phase: 'game', currentIndex: 0, turnQueue: [first, second],
+        turnManager: {
+            captureTurnFlowGeneration: () => 1,
+            isTurnFlowGenerationCurrent: token => token === 1
+        },
+        eventManager: { processEvents: type => {
+            calls.push(type);
+            if (type === 'before_command') return new Promise(resolve => { resumeBefore = resolve; });
+        } }
+    };
+    const cmd = new Command(game);
+    const task = cmd.executeWithEvent('farm', () => calls.push('old-command'));
+    game.currentIndex = 1;
+    resumeBefore();
+    await task;
+    assert.deepStrictEqual(calls, ['before_command']);
+});
+
+test('r515 コマンド本体await中のロード後は事後イベントを発火させない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    let generation = 1, resumeCommand;
+    const calls = [];
+    const game = {
+        phase: 'game', currentIndex: 0, turnQueue: [{ id: 10 }],
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: token => token === generation
+        },
+        eventManager: { processEvents: type => calls.push(type) }
+    };
+    const cmd = new Command(game);
+    const task = cmd.executeWithEvent('investigate', () => new Promise(resolve => {
+        calls.push('command-start');
+        resumeCommand = resolve;
+    }));
+    await Promise.resolve();
+    assert.deepStrictEqual(calls, ['before_command', 'command-start']);
+    generation = 2;
+    game.turnQueue = [{ id: 20 }];
+    resumeCommand();
+    await task;
+    assert.deepStrictEqual(calls, ['before_command', 'command-start']);
+});
+
+test('r515 同一拠点ターンの正常な事前・本体・事後イベントと外交handoffは従来どおり', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const calls = [];
+    const game = {
+        phase: 'game', currentIndex: 0, turnQueue: [{ id: 10 }],
+        turnManager: {
+            captureTurnFlowGeneration: () => 1,
+            isTurnFlowGenerationCurrent: token => token === 1
+        },
+        ui: {
+            beginDialogHandoffHold: () => calls.push('hold'),
+            completeVisualHandoff: () => calls.push('visual-end'),
+            endDialogHandoffHold: () => calls.push('end')
+        },
+        eventManager: { processEvents: async type => { calls.push(type); } }
+    };
+    const cmd = new Command(game);
+    await cmd.executeWithEvent('alliance', async () => { calls.push('command'); });
+    assert.deepStrictEqual(calls, ['hold', 'before_command', 'command', 'after_command', 'visual-end', 'end']);
+});
+
+
+// r516: 軍師助言を開いた時のターンと、確定する時のターンは同一でなければならない。
+test('r516 軍師助言の確認待ちに新シナリオへ移った場合は旧コマンドもhandoffも実行しない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const oldCastle = { id: 10 }, nextCastle = { id: 20 };
+    let generation = 3;
+    let confirmAdvice;
+    const calls = [];
+    const game = {
+        currentIndex: 0, turnQueue: [oldCastle],
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: token => token === generation
+        },
+        gunshiSystem: { showCommandAdvice: (action, onConfirm) => { confirmAdvice = onConfirm; } }
+    };
+    const cmd = new Command(game);
+    cmd.executeWithEvent = () => calls.push('execute');
+    cmd.showAdviceAndExecute('alliance', () => {}, { trueProb: 0.5 }, { beforeConfirm: () => calls.push('handoff') });
+    generation = 4;
+    game.turnQueue = [nextCastle];
+    confirmAdvice();
+    assert.deepStrictEqual(calls, [], '後発シナリオに旧確定を実行・handoffしない');
+});
+
+test('r516 軍師助言中に同一シナリオの次拠点ターンへ移った場合も旧コマンドを実行しない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const a = { id: 10 }, b = { id: 11 };
+    let confirmAdvice;
+    const calls = [];
+    const game = {
+        currentIndex: 0, turnQueue: [a, b],
+        turnManager: {
+            captureTurnFlowGeneration: () => 3,
+            isTurnFlowGenerationCurrent: token => token === 3
+        },
+        gunshiSystem: { showCommandAdvice: (action, onConfirm) => { confirmAdvice = onConfirm; } }
+    };
+    const cmd = new Command(game);
+    cmd.executeWithEvent = () => calls.push('execute');
+    cmd.showAdviceAndExecute('truce', () => {}, { trueProb: 0.6 });
+    game.currentIndex = 1;
+    confirmAdvice();
+    assert.deepStrictEqual(calls, []);
+});
+
+test('r516 同一拠点ターンで助言を確定した場合は従来どおり一度だけ実行する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const a = { id: 10 };
+    let confirmAdvice;
+    const calls = [];
+    const game = {
+        currentIndex: 0, turnQueue: [a],
+        turnManager: {
+            captureTurnFlowGeneration: () => 3,
+            isTurnFlowGenerationCurrent: token => token === 3
+        },
+        gunshiSystem: { showCommandAdvice: (action, onConfirm) => { confirmAdvice = onConfirm; } }
+    };
+    const cmd = new Command(game);
+    cmd.executeWithEvent = () => calls.push('execute');
+    cmd.showAdviceAndExecute('alliance', () => {}, {}, { beforeConfirm: () => calls.push('handoff') });
+    confirmAdvice();
+    assert.deepStrictEqual(calls, ['handoff', 'execute']);
 });
 
 Promise.all(pendingTests).then(() => {

@@ -74,18 +74,26 @@ class InterviewSystem {
     }
 
     async _continueInterviewAfterGreeting(busho) {
+        // EventManagerが旧イベントを中断しても、その戻り値を受けた面談側が
+        // 旧武将のメニューを再表示しないよう、同じTurnManager世代を確認する。
+        const turnManager = this.game?.turnManager;
+        const generation = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration() : null;
+        const isCurrent = () => generation === null || !turnManager
+            || typeof turnManager.isTurnFlowGenerationCurrent !== 'function'
+            || turnManager.isTurnFlowGenerationCurrent(generation);
         const eventManager = this.game && this.game.eventManager;
         if (eventManager && typeof eventManager.processInterviewEvent === 'function') {
             const handled = await eventManager.processInterviewEvent({
                 busho,
-                resumeInterview: () => this.showMainMenu(busho),
+                resumeInterview: () => { if (isCurrent()) this.showMainMenu(busho); },
                 // 面談内の特殊イベントを終えた後も面談セッション自体は閉じない。
                 // 将来、面談中だけBGMを切り替える場合も open/close の境界を保てる。
-                returnToInterviewTop: () => this.showInterviewerList()
+                returnToInterviewTop: () => { if (isCurrent()) this.showInterviewerList(); }
             });
-            if (handled) return;
+            if (!isCurrent() || handled) return;
         }
-        this.showMainMenu(busho);
+        if (isCurrent()) this.showMainMenu(busho);
     }
 
     _getPlayerDaimyo() {

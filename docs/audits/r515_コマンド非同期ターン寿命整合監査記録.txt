@@ -1,0 +1,23 @@
+戦国覇道 r515：コマンド非同期ターン寿命整合監査
+
+基準：r514完全版。ARCHITECTURE.mdのTurnManager世代境界、EventManagerのイベント寿命、CommandSystemの前後イベント／外交handoffを照合。
+
+【発見した問題】
+1. CommandSystem.executeWithEvent() が before_command を await した後、シナリオ復元やタイトル復帰で旧処理が失効しても executeFunc() と after_command を続行していた。
+2. 同じシナリオの別拠点ターンに移っても、旧選択のコマンド本体・事後イベントが続行していた。
+3. コマンド実行本体を待っている間にシナリオが切り替わると、旧after_commandとfinally内の旧画面handoff終了処理が新画面を変更し得た。
+
+【修正】
+- 既存TurnManagerのcaptureTurnFlowGeneration()/isTurnFlowGenerationCurrent()と開始時のcurrentIndex、turnQueueのCastle実体を、コマンド前後のawait境界で照合する。
+- 旧ターンに失効した場合は、実行本体や事後イベントを進めない。同一ターンの正常操作は変更しない。
+- 新シナリオでUIのhandoffが初期化された後、旧処理のfinallyが新画面のhandoffを解除しないようにする。正常終了・同一世代での失敗時は従来どおり解放する。
+- 独自の世代管理・固定時間待機・コマンド個別の例外判定を増やさない。ゲームルール・管理Excel/BIN・セーブ形式は変更しない。
+
+【回帰テスト】
+- r514：既存813件成功、追加4件中3件失敗（合計814成功・3失敗）。
+- r515：追加4件を含む817件が成功、失敗0件。開始世代・旧ターン失効・外交handoffの新世代分離、正常時の処理順を検証。
+
+【変更ファイル】
+追加：docs/audits/r515_コマンド非同期ターン寿命整合監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/command_system.js、js/config.js、tests/run_tests.js
+削除：なし

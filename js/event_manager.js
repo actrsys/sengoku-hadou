@@ -378,11 +378,17 @@ class EventManager {
         const timing = 'interview_after_greeting';
         const targetEvents = this.events[timing] || [];
         if (targetEvents.length === 0) return false;
+        // 通常イベントと同じTurnManager世代を使い、旧面談の非同期完了を
+        // 新しいシナリオの一度きりフラグや画面へ引き継がない。
+        const flowGeneration = window.EventFlowGuard.capture(this.game);
+        const isCurrentFlow = () => window.EventFlowGuard.isCurrent(this.game, flowGeneration);
+        if (!isCurrentFlow()) return false;
 
         this.game.flags = this.game.flags || {};
         const isHistoricalOff = (window.UserSettings && window.UserSettings.historicalEvent === false);
 
         for (const ev of targetEvents) {
+            if (!isCurrentFlow()) return false;
             const isHistorical = !!(ev.id && ev.id.startsWith('historical_'));
             if (isHistoricalOff && isHistorical) continue;
             if (ev.isOneTime && this.game.flags[ev.id]) continue;
@@ -401,13 +407,14 @@ class EventManager {
                     this.game.writeSystemDiagnostic(`event:${timing}:${ev.id}:execute`);
                 }
                 await ev.execute(this.game, context);
+                if (!isCurrentFlow()) return false;
                 if (ev.isOneTime) this.game.flags[ev.id] = true;
                 if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                     this.game.writeSystemDiagnostic(`event:${timing}:${ev.id}:done`);
                 }
                 return true;
             } catch (error) {
-                if (window.EventFlowGuard.isAbortError(error)) return false;
+                if (window.EventFlowGuard.isAbortError(error) || !isCurrentFlow()) return false;
                 console.warn(`面談イベント ${ev.id} の実行中にエラーが出ましたが、通常面談へ戻します:`, error);
                 return false;
             }

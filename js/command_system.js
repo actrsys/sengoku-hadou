@@ -1324,7 +1324,42 @@ class CommandSystem {
         }
     }
 
+    // コマンドの開始元を表す読取スナップショット。世代の正本はTurnManager、
+    // どの拠点ターンで選択したかはGameManagerのturnQueueに置いたまま共有する。
+    _captureCommandTurnContext() {
+        const turnManager = this.game?.turnManager;
+        const generation = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration() : null;
+        const startIndex = Number(this.game?.currentIndex);
+        const hasTurnPosition = Number.isInteger(startIndex)
+            && Array.isArray(this.game?.turnQueue)
+            && this.game.turnQueue[startIndex] != null;
+        return {
+            turnManager, generation, startIndex, hasTurnPosition,
+            startCastle: hasTurnPosition ? this.game.turnQueue[startIndex] : null
+        };
+    }
+
+    _isCommandScenarioCurrent(context) {
+        const { turnManager, generation } = context;
+        return generation === null
+            || !turnManager || typeof turnManager.isTurnFlowGenerationCurrent !== 'function'
+            || turnManager.isTurnFlowGenerationCurrent(generation);
+    }
+
+    _isCommandTurnCurrent(context) {
+        return this._isCommandScenarioCurrent(context)
+            && (!context.hasTurnPosition || (Number(this.game.currentIndex) === context.startIndex
+                && this.game.turnQueue?.[context.startIndex] === context.startCastle));
+    }
+
     async executeWithEvent(type, executeFunc, extraContext = {}) {
+        // before_commandやコマンド本体のawait中にロード・タイトル復帰・次拠点へ
+        // 進んだ場合、旧コマンドを新しい状態に適用しない。寿命の正本はTurnManager。
+        const turnContext = this._captureCommandTurnContext();
+        const isSameScenario = () => this._isCommandScenarioCurrent(turnContext);
+        const isSameCommandTurn = () => this._isCommandTurnCurrent(turnContext);
+
         // 外交は軍師助言・事前イベント・人物画像decodeなど複数の await をまたいで会話へ遷移します。
         // その間だけ旧ダイアログを保持し、固定msのタイムアウトによる黒画面の露出を防ぎます。
         const diplomacyHandoffTypes = new Set([
@@ -1339,23 +1374,33 @@ class CommandSystem {
 
         if (holdDialogHandoff) ui.beginDialogHandoffHold();
         try {
+            if (!isSameCommandTurn()) return;
             if (this.game.eventManager) {
                 await this.game.eventManager.processEvents('before_command', { commandType: type, ...extraContext });
             }
+            if (!isSameCommandTurn()) return;
             await executeFunc();
+            if (!isSameCommandTurn()) return;
             if (this.game.eventManager) {
                 await this.game.eventManager.processEvents('after_command', { commandType: type, ...extraContext });
             }
         } finally {
-            // 実行途中で対象消失などにより会話/結果が出なかった場合も、使者選択画面を残しっぱなしにしません。
-            if (holdDialogHandoff && typeof ui.completeVisualHandoff === 'function') ui.completeVisualHandoff();
-            if (holdDialogHandoff) ui.endDialogHandoffHold();
+            // シナリオ切替後はUIが新世代のhandoffを管理している。旧処理の後始末で触らない。
+            // 同一世代の通常終了・失敗時だけ、旧選択画面のhandoffを閉じる。
+            if (holdDialogHandoff && isSameScenario()) {
+                if (typeof ui.completeVisualHandoff === 'function') ui.completeVisualHandoff();
+                ui.endDialogHandoffHold();
+            }
         }
     }
 
     showAdviceAndExecute(actionType, executeCallback, extraContext = {}, uiFlow = null) {
+        // 軍師助言の［実行］は画面待機後に呼ばれる。ここで開始元を固定しないと、
+        // executeWithEvent() が新ターン側の世代を採って旧選択を実行してしまう。
+        const turnContext = this._captureCommandTurnContext();
         const adviceAction = { type: actionType, ...extraContext };
         this.game.gunshiSystem.showCommandAdvice(adviceAction, () => {
+            if (!this._isCommandTurnCurrent(turnContext)) return;
             // 候補一覧の上に軍師助言を重ねている経路は、助言を了承した時だけ次画面へhandoffします。
             // ［戻る］で助言を取り消した場合は何も閉じず、背後の候補一覧へそのまま戻せます。
             if (uiFlow && typeof uiFlow.beforeConfirm === 'function') uiFlow.beforeConfirm();

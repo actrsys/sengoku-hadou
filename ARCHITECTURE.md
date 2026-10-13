@@ -1874,3 +1874,25 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `CommandSystem.executeWithEvent()` が `before_command → 実行本体 → after_command` の完了順と、外交ダイアログhandoffの寿命を管理する正本である。外交の会話を伴う実行本体がPromiseを返す場合は、選択・軍師助言側のコールバックが**必ずそのPromiseを返す**。呼出し元で非同期結果を握り潰して事後イベントとhandoffの解放だけ先に進めない。
 - 対外婚姻の `marriage_kinsman` 選択後は、`DiplomacyManager.executeMarriage()` の完了を `showAdviceAndExecute()` 経由で共通コマンドフローへ返す。他の外交コマンドと同じ非同期契約とし、婚姻の成功率・姫の移動・友好度・功績などの判定には変更を加えない。
 - 修正前に会話途中で `after_command` とhandoff終了が先行することをテストで再現し、修正後は会話が解決されるまで双方を実行しないことを確認する。詳細は `docs/audits/r514_婚姻コマンド非同期完了順序監査記録.txt`。
+
+
+## r515：コマンド実行の非同期ターン寿命照合
+
+- `CommandSystem.executeWithEvent()` は、`before_command → 実行本体 → after_command` の各非同期境界で、操作開始時の同一シナリオ・同一拠点ターンが継続しているか確認する。寿命の正本は既存 `TurnManager.captureTurnFlowGeneration()` / `isTurnFlowGenerationCurrent()` であり、コマンド専用世代番号を追加しない。
+- 開始時に保持した `currentIndex` と `turnQueue[currentIndex]` のCastleオブジェクトが変化した場合も、古い選択からの実行や事後イベントを中止する。同一IDの別シナリオを同一対象と見なさない。イベント中断の検知をEventManagerの返り値へ押し付けず、実行責務側で照合する。
+- シナリオ切替時は `UIManager.forceResetModals()` が旧handoffを破棄する。失効した `executeWithEvent()` の `finally` が新シナリオの `completeVisualHandoff()` / `endDialogHandoffHold()` を呼ばないようにし、同一シナリオの正常完了・失敗時には従来の後始末を維持する。
+- 既存の外交ルール、イベントの実行内容、正常時の前後イベント・表示順、ターン進行・セーブスキーマには変更を加えない。修正前の旧ロード／旧拠点／旧事後イベントの3つの回帰再現テストを追加する。詳細は `docs/audits/r515_コマンド非同期ターン寿命整合監査記録.txt`。
+
+
+## r516：軍師助言確定前の旧ターン選択排除
+
+- `showAdviceAndExecute()` が助言ダイアログを表示する時点で、選択元のターン世代・ターン位置・拠点実体を固定する。「実行」確認の呼出し時に同一元ターンでなければ、その後の画面handoffやコマンド本体を呼ばない。新シナリオや次拠点に移った後で `executeWithEvent()` が新しい世代を取得して旧選択を受理する問題を防ぐ。
+- `executeWithEvent()` の非同期前後の検証と軍師助言の確定前検証は、`CommandSystem._captureCommandTurnContext()` / `_isCommandTurnCurrent()` を共通の読取窓口とする。世代を進める正本は従来どおりTurnManagerであり、独立トークンや固定時間待機は追加しない。
+- 同一ターンの正常な助言確定、外交handoff、ゲームルール、セーブ形式、マスターデータ、レイアウトは変更しない。詳細は `docs/audits/r516_軍師助言確定前ターン寿命監査記録.txt`。
+
+
+## r517：面談イベントの非同期結果と画面寿命
+
+- 面談挨拶後の専用イベントも `EventManager.processInterviewEvent()` で通常イベントと同じ `EventFlowGuard`（正本は `TurnManager` の世代）を確認する。イベントの `execute()` が非同期で完了する間にロード・タイトル復帰へ移った場合は、旧一度きりフラグへの完了記録、後続イベント処理、旧イベントの処理済み扱いを行わない。
+- `InterviewSystem._continueInterviewAfterGreeting()` は面談イベントの待機前に `TurnManager` 世代を捕捉し、失効後は旧武将の面談メニューを復活させない。特殊イベントに渡す `resumeInterview` / `returnToInterviewTop` も同じ世代を確認して画面を切り替える。
+- 面談内のイベントはあくまで面談セッションの子処理とし、正常系の面談トップ・通常会話復帰、医師イベント・延命条件、UI配置、セーブ形式を変えない。詳細は `docs/audits/r517_面談イベント非同期ターン寿命監査記録.txt`。
