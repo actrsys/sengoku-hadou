@@ -2411,10 +2411,11 @@ class UIManager {
         
         const commander = this.game.getBusho(legion.commanderId);
         if (!commander) return;
+        const confirmedCommanderId = Number(legion.commanderId);
 
         this.showDialog(`${commander.name}を国主の座から解任しますか？`, true, 
             () => {
-                this.game.commandSystem.executeDismissLegionLeader(legionNo);
+                this.game.commandSystem.executeDismissLegionLeader(legionNo, legion, confirmedCommanderId);
             },
             null,
             { okText: '解任する', okClass: 'btn-danger', cancelText: 'やめる', closeBeforeCancel: true }

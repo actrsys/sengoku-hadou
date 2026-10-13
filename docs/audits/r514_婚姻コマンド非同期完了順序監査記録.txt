@@ -1,0 +1,25 @@
+戦国覇道 r514：婚姻コマンド非同期実行完了・事後イベント／画面handoff順序監査
+
+基準：r513完全版。ARCHITECTURE.mdの外交コマンド、イベント前後処理、画面handoffの設計を確認。
+
+【問題と再現】
+- CommandSystem.handleBushoSelection('marriage_kinsman') は軍師助言後の実行コールバックを中括弧付きで作成し、DiplomacyManager.executeMarriage() のPromiseを返していなかった。
+- executeWithEvent() の await executeFunc() は undefined を受け取るため、婚姻外交会話中にも after_command、completeVisualHandoff()、endDialogHandoffHold() が先行し得た。
+- 他の主要外交コマンドは結果Promiseをコールバックから返しており、婚姻のみ同一契約を満たしていなかった。
+- r513へ新規回帰テストを追加すると、婚姻会話が未解決でも事後イベントが走ったことを検出して失敗した（812成功・1失敗）。
+
+【修正】
+- CommandSystemの婚姻実行コールバックを、非同期のexecuteMarriage()を返す式形式に変更する。
+- 共通のexecuteWithEvent()、外交の判定・表示、歴史イベント、保存形式、管理用Excel/BINには手を加えない。
+- 会話中は事後イベントとhandoffの解放が保留され、婚姻完了後は従来の共通順序で実行されることを検証。
+- 他のexecuteDiplomacy()／executeVassalage()呼出箇所も点検し、同種のPromise消失は見つからなかったため変更しない。
+
+【検証】
+- r513修正前：812成功、1失敗（追加再現テスト）。
+- r514修正後：813成功、0失敗（回帰テスト）。
+- PC/スマホ visual、シミュレーション、Excel/BIN整合、構文・ZIP構成を検証。
+
+【ファイル】
+追加：docs/audits/r514_婚姻コマンド非同期完了順序監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/command_system.js、js/config.js、tests/run_tests.js
+削除：なし

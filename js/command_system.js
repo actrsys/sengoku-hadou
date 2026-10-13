@@ -973,9 +973,12 @@ class CommandSystem {
                     // 最終確認が通った時だけ選択セッションを閉じ、軍師助言・外交会話へ引き渡します。
                     const prob = this.game.diplomacyManager.getDiplomacyProb(doerId, targetId, 'marriage');
                     this.game.ui.info.closeCommonModal();
-                    this.showAdviceAndExecute('marriage', () => {
-                        this.game.diplomacyManager.executeMarriage(doerId, targetId, princessId, targetBushoId);
-                    }, { trueProb: prob / 100 });
+                    // 外交会話の完了Promiseを共通コマンドフローへ返し、事後イベントと
+                    // ダイアログhandoffの解放が婚姻結果より先に進まないようにする。
+                    this.showAdviceAndExecute('marriage', () =>
+                        this.game.diplomacyManager.executeMarriage(doerId, targetId, princessId, targetBushoId),
+                        { trueProb: prob / 100 }
+                    );
                 },
                 null,
                 { okText: '嫁がせる', cancelText: '戻る', closeBeforeCancel: true }
@@ -1732,15 +1735,24 @@ class CommandSystem {
     executeAppointLegionLeader(bushoId, legionNo, castleId) {
         const busho = this.game.getBusho(bushoId);
         const castle = this.game.getCastle(castleId);
-        if (!busho || !castle || Number(castle.ownerClan) !== Number(this.game.playerClanId)) return;
+        const clanId = Number(this.game.playerClanId);
+        if (!busho || !castle || Number(castle.ownerClan) !== clanId) return;
+        // 候補選択から確定までに人物の死亡・寝返り・他軍団就任が生じ得る。
+        // Legion.commanderIdを正本に実行直前で判定し、既存国主の上書き・二重任命を防ぐ。
+        if (!Number.isInteger(legionNo) || legionNo < 1 || legionNo > 8
+            || Number(busho.clan) !== clanId || busho.isDaimyo || busho.isCommander
+            || !window.BushoStatusRules.isActive(busho)
+            || (this.game.legions || []).some(l => Number(l.commanderId) === Number(busho.id))) return;
+        const existingSeat = this.game.getLegionByClanNo(clanId, legionNo);
+        if (existingSeat && Number(existingSeat.commanderId) > 0) return;
         // 在城地ではなく直轄本拠地を保護。確認モーダル中の移動や直接呼出しも防ぐ。
-        const home = this.game.getDaimyoHomeCastle(this.game.playerClanId);
+        const home = this.game.getDaimyoHomeCastle(clanId);
         if (home && Number(castle.id) === Number(home.id)) return;
 
         this.game.affiliationSystem.moveCastle(busho, castleId);
 
         if (!this.game.legions) this.game.legions = [];
-        let legion = this.game.getLegionByClanNo(this.game.playerClanId, legionNo);
+        let legion = existingSeat;
         if (!legion) {
             const maxId = this.game.legions.length > 0 ? Math.max(...this.game.legions.map(l => Number(l.id) || 0)) : 0;
             const legionData = {
@@ -2172,12 +2184,38 @@ class CommandSystem {
         this.finishCommand(`${targetBusho.name}を養子として迎え入れました。以降、${targetBusho.name}は当家の一門武将となります。`);
     }
 
+    // 確認画面を開いた時の軍団実体と国主を、現在の軍団正本と照合する。
+    // 同じ席次への後任就任や、シナリオ切替による同一IDの別軍団を誤操作しない。
+    _getConfirmedLegionSeat(legionNo, expectedLegion, expectedCommanderId) {
+        if (!Number.isInteger(legionNo) || legionNo < 1 || legionNo > 8) return null;
+        const legion = this.game.getLegionByClanNo(this.game.playerClanId, legionNo);
+        if (!legion || legion !== expectedLegion || Number(legion.commanderId) <= 0
+            || Number(legion.commanderId) !== Number(expectedCommanderId)) return null;
+        return legion;
+    }
+
     // ★追加：所領分配の実行
-    executeAllotFief(legionNo, selectedCastleIds, candidateCastles) {
+    executeAllotFief(legionNo, selectedCastleIds, candidateCastles, expectedLegion, expectedCommanderId) {
+        // 古い選択で解任済み軍団・後任の軍団へ所領を配らない。
+        const legion = this._getConfirmedLegionSeat(legionNo, expectedLegion, expectedCommanderId);
+        if (!legion) return;
+
+        // 国主の在城地は一覧でも選択対象外。実行時にも現在の正本から再取得する。
+        // 各国主のcastellanId表示キャッシュではなく、Legion.commanderIdと本人の所在を見る。
+        const commanderCastleIds = new Set();
+        let ownCommanderCastleId = 0;
+        for (const activeLegion of this.game.legions || []) {
+            if (Number(activeLegion.clanId) !== Number(this.game.playerClanId)
+                || Number(activeLegion.commanderId) <= 0) continue;
+            const leader = this.game.getBusho(activeLegion.commanderId);
+            const leaderCastleId = Number(leader?.castleId || 0);
+            if (leaderCastleId <= 0) continue;
+            commanderCastleIds.add(leaderCastleId);
+            if (Number(activeLegion.legionNo) === legionNo) ownCommanderCastleId = leaderCastleId;
+        }
+
         let count = 0;
-        
-        const legion = this.game.getLegionByClanNo(this.game.playerClanId, legionNo) || null;
-        
+
         // どんな形でIDが送られてきても、確実に「数字」として取り出せるようにする安全装置です
         const numSelectedIds = new Set(selectedCastleIds.map(item => {
             if (typeof item === 'object' && item !== null) return Number(item.id);
@@ -2197,8 +2235,18 @@ class CommandSystem {
             // 選択済み一覧が古くても、直轄居城を軍団領へ移さない。
             if (homeId && Number(realCastle.id) === homeId) return;
 
-            const isCommanderCastle = legion && Number(realCastle.castellanId) === Number(legion.commanderId);
-            const isSelected = numSelectedIds.has(Number(realCastle.id)) || isCommanderCastle;
+            const castleId = Number(realCastle.id);
+            // 他軍団国主の在城地は、古い候補一覧から選ばれても操作しない。
+            if (commanderCastleIds.has(castleId) && castleId !== ownCommanderCastleId) return;
+            // 自軍団国主の在城地は選択不要。従来の城主参照も維持して移動中を保護する。
+            if (castleId === ownCommanderCastleId || Number(realCastle.castellanId) === Number(legion.commanderId)) {
+                if (Number(realCastle.legionId) !== legionNo) {
+                    realCastle.legionId = legionNo;
+                    count++;
+                }
+                return;
+            }
+            const isSelected = numSelectedIds.has(Number(realCastle.id));
 
             if (isSelected) {
                 if (Number(realCastle.legionId) !== Number(legionNo)) {
@@ -2236,10 +2284,10 @@ class CommandSystem {
     }
 
     // ★追加：国主解任の実行
-    executeDismissLegionLeader(legionNo) {
+    executeDismissLegionLeader(legionNo, expectedLegion, expectedCommanderId) {
         if (!this.game.legions) return;
-        const legion = this.game.getLegionByClanNo(this.game.playerClanId, legionNo);
-        if (!legion || !legion.commanderId) return;
+        const legion = this._getConfirmedLegionSeat(legionNo, expectedLegion, expectedCommanderId);
+        if (!legion) return;
 
         const commander = this.game.getBusho(legion.commanderId);
         // 軍団モデル・所属城・AI計画の破棄は CastleManager の正規窓口へ任せます。

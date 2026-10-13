@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r509');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r514');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -14865,16 +14865,17 @@ test('r446 所領分配は実行側で本拠地を保護し、他の拠点は従
         { id: 3, ownerClan: 4, legionId: 0, castellanId: 0 },
         { id: 4, ownerClan: 5, legionId: 0, castellanId: 0 }
     ];
+    const seat = { commanderId: 44 };
     const game = {
         playerClanId: 4, getCastle: id => castles.find(c => c.id === Number(id)),
         getClanCastles: id => castles.filter(c => c.ownerClan === id),
         getDaimyoHomeCastle: () => castles[0],
-        getLegionByClanNo: () => ({ commanderId: 44 }),
+        getLegionByClanNo: () => seat,
         getClan: () => ({ name: '試験家' })
     };
     const cmd = new Command(game);
     cmd.finishCommand = () => {};
-    cmd.executeAllotFief(1, [1, 2, 4], castles);
+    cmd.executeAllotFief(1, [1, 2, 4], castles, seat, 44);
     assert.strictEqual(castles[0].legionId, 0, '本拠は選択されても直轄のまま');
     assert.strictEqual(castles[1].legionId, 1, 'その他の直轄は従来通り分配');
     assert.strictEqual(castles[2].legionId, 0, '非選択は変更しない');
@@ -14882,12 +14883,13 @@ test('r446 所領分配は実行側で本拠地を保護し、他の拠点は従
 });
 
 test('r446 国主任命は出陣中の本拠地を拒否し、通常拠点は任命できる', () => {
-    const ctx = createContext({ Legion: class Legion { constructor(data) { Object.assign(this, data); } } });
+    const ctx = createContext({ Legion: class Legion { constructor(data) { Object.assign(this, data); } },
+        BushoStatusRules: { isActive: () => true } });
     loadScript(ctx, 'js/command_system.js');
     const Command = vm.runInContext('CommandSystem', ctx);
     const home = { id: 1, ownerClan: 4, legionId: 0, castellanId: 40 };
     const normal = { id: 2, ownerClan: 4, legionId: 0, castellanId: 0 };
-    const commander = { id: 44, isCommander: false, isCastellan: false };
+    const commander = { id: 44, clan: 4, isCommander: false, isCastellan: false };
     const game = {
         playerClanId: 4, legions: [],
         getCastle: id => [home, normal].find(c => c.id === Number(id)),
@@ -18711,6 +18713,420 @@ test('r507 IndexedDBトランザクション開始・要求生成の同期例外
         }
     }
     assert.strictEqual(closeCount, scenarios.length * 2);
+});
+
+// r510: 国主任命の確定までに候補・席次が変わっても、Legionと城主の正本を破壊しない。
+test('r510 国主任命済み席次への遅延確定は既存国主を残し、武将も移動させない', () => {
+    const ctx = createContext({ Legion: class Legion { constructor(data) { Object.assign(this, data); } },
+        BushoStatusRules: { isActive: () => true } });
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const home = { id: 1, ownerClan: 4, legionId: 0, castellanId: 40 };
+    const target = { id: 2, ownerClan: 4, legionId: 1, castellanId: 41 };
+    const original = { id: 41, clan: 4, isCommander: true, isCastellan: true, castleId: 2 };
+    const candidate = { id: 44, clan: 4, isCommander: false, isCastellan: false, castleId: 3 };
+    const seat = { id: 8, clanId: 4, legionNo: 1, commanderId: 41, establishedTurnId: 12 };
+    let moved = 0;
+    let result = 0;
+    const game = {
+        playerClanId: 4, legions: [seat],
+        getCastle: id => [home, target].find(c => Number(c.id) === Number(id)),
+        getBusho: id => [original, candidate].find(b => b.id === Number(id)),
+        getLegionByClanNo: (clan, no) => game.legions.find(l => l.clanId === clan && l.legionNo === no),
+        getDaimyoHomeCastle: () => home,
+        affiliationSystem: { moveCastle() { moved++; }, clearGunshiRole() {} },
+        getCurrentTurnId: () => 25, getClan: () => ({ name: '試験家' })
+    };
+    const command = new Command(game);
+    command.finishCommand = () => result++;
+    command.executeAppointLegionLeader(44, 1, 2);
+    assert.strictEqual(seat.commanderId, 41, '旧国主は変更されない');
+    assert.strictEqual(original.isCommander, true);
+    assert.strictEqual(target.castellanId, 41, '城主を置換しない');
+    assert.strictEqual(target.legionId, 1);
+    assert.strictEqual(candidate.isCommander, false);
+    assert.strictEqual(moved, 0, '席次の競合判定より前に移動しない');
+    assert.strictEqual(result, 0, '不成立を任命成功と表示しない');
+});
+
+test('r510 他軍団の現役国主・他家武将・失効候補の国主任命を拒否する', () => {
+    const ctx = createContext({ Legion: class Legion { constructor(data) { Object.assign(this, data); } },
+        BushoStatusRules: { isActive: b => b.status !== 'dead' } });
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const home = { id: 1, ownerClan: 4, legionId: 0, castellanId: 40 };
+    const target = { id: 2, ownerClan: 4, legionId: 0, castellanId: 42 };
+    const candidate = { id: 44, clan: 4, isCommander: false, isDaimyo: false, castleId: 3 };
+    const occupied = { id: 9, clanId: 4, legionNo: 2, commanderId: 44 };
+    let moved = 0;
+    const game = {
+        playerClanId: 4, legions: [occupied],
+        getCastle: id => [home, target].find(c => Number(c.id) === Number(id)),
+        getBusho: id => Number(id) === 44 ? candidate : null,
+        getLegionByClanNo: (clan, no) => game.legions.find(l => l.clanId === clan && l.legionNo === no),
+        getDaimyoHomeCastle: () => home,
+        affiliationSystem: { moveCastle() { moved++; }, clearGunshiRole() {} },
+        getCurrentTurnId: () => 25, getClan: () => ({ name: '試験家' })
+    };
+    const command = new Command(game);
+    command.finishCommand = () => { throw new Error('任命が実行されてはいけない'); };
+    command.executeAppointLegionLeader(44, 1, 2);
+    assert.strictEqual(moved, 0, '別軍団の正本に国主がいる武将は二重任命しない');
+    assert.strictEqual(game.legions.length, 1);
+    game.legions = [];
+    candidate.clan = 5;
+    command.executeAppointLegionLeader(44, 1, 2);
+    assert.strictEqual(moved, 0, '他家武将を自家国主として移動させない');
+    candidate.clan = 4;
+    candidate.status = 'dead';
+    command.executeAppointLegionLeader(44, 1, 2);
+    assert.strictEqual(moved, 0, '死亡・非活動候補を移動しない');
+    assert.strictEqual(target.castellanId, 42);
+});
+
+test('r510 解任後の空席は同一Legionを再利用して正常任命できる', () => {
+    const ctx = createContext({ Legion: class Legion { constructor(data) { Object.assign(this, data); } },
+        BushoStatusRules: { isActive: () => true } });
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const home = { id: 1, ownerClan: 4, legionId: 0, castellanId: 40 };
+    const target = { id: 2, ownerClan: 4, legionId: 0, castellanId: 42 };
+    const candidate = { id: 44, clan: 4, isCommander: false, isCastellan: false, isGunshi: true };
+    const oldLord = { id: 42, clan: 4, isCastellan: true };
+    const emptySeat = { id: 8, clanId: 4, legionNo: 1, commanderId: 0, establishedTurnId: 12 };
+    let released = 0;
+    let moved = 0;
+    let results = 0;
+    const game = {
+        playerClanId: 4, legions: [emptySeat],
+        getCastle: id => [home, target].find(c => Number(c.id) === Number(id)),
+        getBusho: id => [candidate, oldLord].find(b => b.id === Number(id)),
+        getLegionByClanNo: (clan, no) => game.legions.find(l => l.clanId === clan && l.legionNo === no),
+        getDaimyoHomeCastle: () => home,
+        affiliationSystem: { moveCastle(b, id) { moved++; b.castleId = id; }, clearGunshiRole() { released++; } },
+        getCurrentTurnId: () => 25, getClan: () => ({ name: '試験家' })
+    };
+    const command = new Command(game);
+    command.finishCommand = () => results++;
+    command.executeAppointLegionLeader(44, 1, 2);
+    assert.strictEqual(game.legions.length, 1, '空席のLegionを再利用');
+    assert.strictEqual(emptySeat.commanderId, 44);
+    assert.strictEqual(emptySeat.establishedTurnId, 25);
+    assert.strictEqual(target.castellanId, 44);
+    assert.strictEqual(target.legionId, 1);
+    assert.strictEqual(oldLord.isCastellan, false);
+    assert.strictEqual(candidate.isCommander, true);
+    assert.strictEqual(candidate.isCastellan, true);
+    assert.strictEqual(released, 1, '軍師兼任を解除');
+    assert.strictEqual(moved, 1);
+    assert.strictEqual(results, 1);
+});
+
+// r511: 所領分配モーダル確定直前に軍団・国主の所在が変わった場合の実行整合性。
+test('r511 解任済み・不正席次への所領分配は実行境界で拒否する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const castles = [
+        { id: 1, ownerClan: 4, legionId: 0, castellanId: 40 },
+        { id: 2, ownerClan: 4, legionId: 0, castellanId: 42 }
+    ];
+    const seat = { id: 11, clanId: 4, legionNo: 1, commanderId: 0 };
+    const game = {
+        playerClanId: 4, legions: [seat],
+        getLegionByClanNo: (clan, no) => game.legions.find(l => l.clanId === clan && l.legionNo === no),
+        getBusho: () => null,
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getClanCastles: () => castles,
+        getDaimyoHomeCastle: () => castles[0],
+        getClan: () => ({ name: '試験家' })
+    };
+    const cmd = new Command(game);
+    let completed = 0;
+    cmd.finishCommand = () => { completed++; };
+    cmd.executeAllotFief(1, [2], [...castles], seat, 42);
+    assert.strictEqual(castles[1].legionId, 0, '解任後に旧選択を実行しても無所属のまま');
+    assert.strictEqual(completed, 0, '解任済み分配を成功扱いしない');
+    seat.commanderId = 42;
+    cmd.executeAllotFief(9, [2], [...castles], seat, 42);
+    assert.strictEqual(castles[1].legionId, 0, '第9席など不正な軍団番号への割当を拒否');
+    assert.strictEqual(completed, 0);
+});
+
+test('r511 所領分配の古い候補は他軍団国主の在城地を変更せず、自軍団国主の在城地を維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const castles = [
+        { id: 1, ownerClan: 4, legionId: 0, castellanId: 40 },
+        { id: 2, ownerClan: 4, legionId: 1, castellanId: 0 },
+        { id: 3, ownerClan: 4, legionId: 2, castellanId: 0 },
+        { id: 4, ownerClan: 4, legionId: 0, castellanId: 44 }
+    ];
+    const leaders = [{ id: 41, castleId: 2 }, { id: 42, castleId: 3 }];
+    const legions = [
+        { id: 11, clanId: 4, legionNo: 1, commanderId: 41 },
+        { id: 12, clanId: 4, legionNo: 2, commanderId: 42 }
+    ];
+    const game = {
+        playerClanId: 4, legions,
+        getLegionByClanNo: (clan, no) => legions.find(l => l.clanId === clan && l.legionNo === no),
+        getBusho: id => leaders.find(b => b.id === Number(id)),
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getClanCastles: () => castles,
+        getDaimyoHomeCastle: () => castles[0],
+        getClan: () => ({ name: '試験家' })
+    };
+    const cmd = new Command(game);
+    let completed = 0;
+    cmd.finishCommand = () => { completed++; };
+    // 選択画面を開いた後、3番拠点へ別軍団国主が着任し、
+    // 2番拠点のcastellanIdキャッシュが古い場合を再現する。
+    cmd.executeAllotFief(1, [3, 4], [castles[1], castles[2], castles[3]], legions[0], 41);
+    assert.strictEqual(castles[1].legionId, 1, '現役国主の在城地は未選択でも第1席に留める');
+    assert.strictEqual(castles[2].legionId, 2, '他軍団国主の在城地は選択に関係なく保護する');
+    assert.strictEqual(castles[3].legionId, 1, '一般拠点は従来どおり分配できる');
+    assert.strictEqual(completed, 1, '正常な部分の分配は成立する');
+});
+
+// r512: 確認画面と確定時の軍団席次が入れ替わっても、別の国主へ操作を誤適用しない。
+test('r512 国主解任確認は席次の後任を誤って解任しない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    loadScript(ctx, 'js/ui.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const UI = vm.runInContext('UIManager', ctx);
+    const oldSeat = { id: 12, clanId: 4, legionNo: 1, commanderId: 44 };
+    const seats = [oldSeat];
+    const people = [{ id: 44, name: '旧国主' }, { id: 45, name: '新国主' }];
+    let disbands = 0;
+    const game = {
+        playerClanId: 4, legions: seats,
+        getLegionByClanNo: (clan, no) => seats.find(l => l.clanId === clan && l.legionNo === no),
+        getBusho: id => people.find(b => b.id === Number(id)),
+        getClan: () => ({ name: '試験家' }),
+        castleManager: { disbandLegion: () => { disbands++; return 1; } }
+    };
+    game.commandSystem = new Command(game);
+    let finished = 0;
+    game.commandSystem.finishCommand = () => { finished++; };
+    const ui = Object.create(UI.prototype);
+    ui.game = game;
+    let confirm = null;
+    ui.showDialog = (message, _, onOk) => { confirm = onOk; assert(message.includes('旧国主')); };
+    ui.showDismissLegionLeaderConfirm(1);
+    assert.strictEqual(typeof confirm, 'function');
+    oldSeat.commanderId = 45; // 確認中に旧国主を解任し、同じ席次へ別の国主を就任させた。
+    confirm();
+    assert.strictEqual(disbands, 0, '別人の国主を解任しない');
+    assert.strictEqual(finished, 0, '失効した確認で結果を表示しない');
+    // 同番号・同国主IDであっても、別シナリオの席次実体へ操作を持ち越さない。
+    seats[0] = { id: 12, clanId: 4, legionNo: 1, commanderId: 44 };
+    confirm();
+    assert.strictEqual(disbands, 0, '別の軍団インスタンスを誤操作しない');
+    // 現在の確認を改めて開き直した場合は正常に解任できる。
+    ui.showDismissLegionLeaderConfirm(1);
+    confirm();
+    assert.strictEqual(disbands, 1, '改めて確認した操作は正常に実行する');
+    assert.strictEqual(finished, 1);
+});
+
+test('r512 所領分配の旧画面から後任軍団への誤割当を防ぐ', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const castles = [
+        { id: 1, ownerClan: 4, legionId: 0, castellanId: 40 },
+        { id: 2, ownerClan: 4, legionId: 1, castellanId: 44 },
+        { id: 3, ownerClan: 4, legionId: 0, castellanId: 0 }
+    ];
+    const seat = { id: 12, clanId: 4, legionNo: 1, commanderId: 44 };
+    const seats = [seat];
+    const people = [{ id: 44, castleId: 2 }, { id: 45, castleId: 2 }];
+    const game = {
+        playerClanId: 4, legions: seats,
+        getLegionByClanNo: (clan, no) => seats.find(l => l.clanId === clan && l.legionNo === no),
+        getBusho: id => people.find(b => b.id === Number(id)),
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getClanCastles: () => castles,
+        getDaimyoHomeCastle: () => castles[0],
+        getClan: () => ({ name: '試験家' })
+    };
+    const cmd = new Command(game);
+    let finished = 0;
+    cmd.finishCommand = () => { finished++; };
+    seat.commanderId = 45;
+    cmd.executeAllotFief(1, [3], [...castles], seat, 44);
+    assert.strictEqual(castles[2].legionId, 0, '後任の軍団に旧選択が反映されない');
+    assert.strictEqual(finished, 0);
+    // 初回選択画面が別シナリオの同一席次の実体を参照していた場合も拒否する。
+    seat.commanderId = 44;
+    seats[0] = { id: 12, clanId: 4, legionNo: 1, commanderId: 44 };
+    cmd.executeAllotFief(1, [3], [...castles], seat, 44);
+    assert.strictEqual(castles[2].legionId, 0);
+    assert.strictEqual(finished, 0);
+    // 現在の軍団への新規分配だけは正常に成功する。
+    cmd.executeAllotFief(1, [3], [...castles], seats[0], 44);
+    assert.strictEqual(castles[2].legionId, 1);
+    assert.strictEqual(finished, 1);
+});
+
+test('r512 所領分配画面は対象国主の実体とIDを最初の画面から保持する', () => {
+    const ctx = createContext({ document: { getElementById: () => null } });
+    loadScript(ctx, 'js/ui_info.js');
+    loadScript(ctx, 'js/ui_info_kyoten.js');
+    const Info = vm.runInContext('UIInfoManager', ctx);
+    const seat = { id: 10, clanId: 4, legionNo: 1, commanderId: 44 };
+    const castles = [
+        { id: 1, ownerClan: 4, legionId: 0, castellanId: 40, name: '本拠' },
+        { id: 2, ownerClan: 4, legionId: 1, castellanId: 44, name: '国主拠点' },
+        { id: 3, ownerClan: 4, legionId: 0, castellanId: 0, name: '分配拠点', soldiers: 0, defense: 0 }
+    ];
+    const game = {
+        playerClanId: 4, legions: [seat], provinces: [],
+        getLegionByClanNo: () => seat,
+        getDaimyoHomeCastle: () => castles[0],
+        getClanCastles: () => castles,
+        getBusho: id => id === 44 ? { id: 44, name: '旧国主', castleId: 2 } : null,
+        getProvince: () => null,
+        commandSystem: { executeAllotFief: (...args) => { game.confirmArgs = args; } }
+    };
+    const info = Object.create(Info.prototype);
+    info.game = game;
+    info.commonSelectedIds = [];
+    info.closeCommonModal = () => {};
+    info._escapePlainText = s => s;
+    info.pushModal = (_, args) => { info.pageArgs = args; };
+    info._renderListModal = o => { info.modal = o; };
+    info.showAllotFiefModal(1);
+    assert.strictEqual(info.pageArgs[1], seat, '選択開始時のLegionオブジェクトを保持');
+    assert.strictEqual(info.pageArgs[2], 44, '選択開始時の国主IDを保持');
+    info._renderAllotFief(...info.pageArgs, 0);
+    info.commonSelectedIds = [3];
+    seat.commanderId = 45;
+    info.modal.onConfirm();
+    assert.strictEqual(game.confirmArgs[3], seat, 'レンダリングと確定の間に席次を再取得しない');
+    assert.strictEqual(game.confirmArgs[4], 44, '確定時にも当初の国主を識別する');
+});
+
+// r513: 婚姻交渉は失敗時も外交履歴と結果画面まで完了する。
+test('婚姻交渉が失敗しても当事者名付き履歴と結果が残る', async () => {
+    const ctx = createContext({ MainParams: { Diplomacy: { FailureSentiment: { Alliance: -5 } } } });
+    loadScript(ctx, 'js/diplomacy.js');
+    const Diplomacy = vm.runInContext('DiplomacyManager', ctx);
+    const doer = { id: 10, clan: 1, name: '使者', diplomacy: 80, isActionDone: false, achievementTotal: 0 };
+    const princess = { id: 30, name: '姫', status: 'unmarried' };
+    const targetBusho = { id: 40, name: '婿候補' };
+    const source = { id: 1, name: '甲家' };
+    const target = { id: 2, name: '乙家' };
+    const records = { history: [], results: [], changed: [], applied: [] };
+    const game = {
+        playerClanId: 1,
+        getBusho: id => ({ 10: doer, 40: targetBusho })[id],
+        getCastle: id => id === 20 ? { id: 20, ownerClan: 2 } : null,
+        getClan: id => ({ 1: source, 2: target })[id],
+        getPrincess: id => id === 30 ? princess : null,
+        getClanDaimyo: () => null,
+        factionSystem: { updateRecognition: () => {} }
+    };
+    const diplomacy = new Diplomacy(game);
+    diplomacy.checkDiplomacySuccess = () => false;
+    diplomacy.calcDiplomacyExp = () => {};
+    diplomacy.updateSentiment = (...args) => records.changed.push(args);
+    diplomacy.applyMarriageData = (...args) => records.applied.push(args);
+    diplomacy._recordDiplomacyHistory = (...args) => records.history.push(args);
+    diplomacy.showDiplomacyResult = (...args) => records.results.push(args);
+    await diplomacy.executeMarriage(10, 20, 30, 40);
+    assert.strictEqual(records.history.length, 1, '失敗時も履歴に到達する');
+    assert.ok(records.history[0][0].includes('甲家と乙家の婚姻交渉は成立しませんでした'));
+    assert.deepStrictEqual(Array.from(records.history[0][1]), [1, 2], '外交当事者の双方を記録する');
+    assert.strictEqual(records.results.length, 1, '失敗時も結果画面へ進む');
+    assert.ok(records.results[0][2].includes('婚姻交渉に失敗'));
+    assert.strictEqual(records.applied.length, 0, '婚姻リンクを成立させない');
+    assert.strictEqual(doer.isActionDone, true);
+    assert.strictEqual(doer.achievementTotal, 5);
+    assert.strictEqual(princess.status, 'unmarried');
+});
+
+test('婚姻交渉が成功した場合の婚姻リンクと結果表示は維持する', async () => {
+    const ctx = createContext({ MainParams: { Diplomacy: { FailureSentiment: { Alliance: -5 } } } });
+    loadScript(ctx, 'js/diplomacy.js');
+    const Diplomacy = vm.runInContext('DiplomacyManager', ctx);
+    const doer = { id: 10, clan: 1, name: '使者', diplomacy: 80, isActionDone: false, achievementTotal: 0 };
+    const records = { applied: [], results: [] };
+    const game = {
+        playerClanId: 1,
+        getBusho: id => id === 10 ? doer : { id: 40, name: '婿候補' },
+        getCastle: id => id === 20 ? { id: 20, ownerClan: 2 } : null,
+        getClan: id => ({ 1: { id: 1, name: '甲家' }, 2: { id: 2, name: '乙家' } })[id],
+        getPrincess: () => ({ id: 30, name: '姫' }),
+        getClanDaimyo: () => null,
+        factionSystem: { updateRecognition: () => {} }
+    };
+    const diplomacy = new Diplomacy(game);
+    diplomacy.checkDiplomacySuccess = () => true;
+    diplomacy.calcDiplomacyExp = () => {};
+    diplomacy.applyMarriageData = (...args) => records.applied.push(args);
+    diplomacy.showDiplomacyResult = (...args) => records.results.push(args);
+    await diplomacy.executeMarriage(10, 20, 30, 40);
+    assert.deepStrictEqual(Array.from(records.applied[0]), [30, 40, 2, true]);
+    assert.strictEqual(records.results.length, 1);
+    assert.ok(records.results[0][2].includes('婚姻関係を結びました'));
+    assert.strictEqual(doer.isActionDone, true);
+});
+
+// r514: 婚姻の外交会話が完了する前に事後イベントとhandoff解放を実行しない。
+test('r514 婚姻コマンドは外交会話完了後に事後イベントとhandoffを実行する', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    let completeMarriage;
+    let completeFlow;
+    const order = [];
+    const game = {
+        playerClanId: 1,
+        getCastle: id => ({ id, ownerClan: 2 }),
+        getClan: id => ({ id, name: id === 1 ? '甲家' : '乙家' }),
+        getBusho: id => ({ id, name: `武将${id}` }),
+        getPrincess: id => ({ id, name: `姫${id}` }),
+        diplomacyManager: {
+            getDiplomacyProb: () => 100,
+            executeMarriage: () => {
+                order.push('marriage-start');
+                return new Promise(resolve => { completeMarriage = resolve; });
+            }
+        },
+        ui: {
+            info: { closeCommonModal: () => order.push('modal-close') },
+            showDialog: (text, _, onOk) => { game.confirm = onOk; },
+            beginDialogHandoffHold: () => order.push('handoff-hold'),
+            endDialogHandoffHold: () => order.push('handoff-end'),
+            completeVisualHandoff: () => order.push('visual-end')
+        },
+        gunshiSystem: { showCommandAdvice: (info, onOk) => { game.confirmAdvice = onOk; } },
+        eventManager: {
+            processEvents: async type => { order.push(type); }
+        }
+    };
+    const cmd = new Command(game);
+    // 事前イベント・外交会話・事後イベントの実際の非同期処理を共通窓口から通す。
+    const executeOriginal = cmd.executeWithEvent.bind(cmd);
+    cmd.executeWithEvent = (...args) => {
+        const pending = executeOriginal(...args);
+        completeFlow = pending;
+        return pending;
+    };
+    cmd.handleBushoSelection('marriage_kinsman', [40], 20, { doerId: 10, princessId: 30 });
+    game.confirm();
+    game.confirmAdvice();
+    await new Promise(resolve => setImmediate(resolve));
+    assert(order.includes('marriage-start'), '事前イベント後に婚姻交渉を開始する');
+    assert(!order.includes('after_command'), '婚姻会話の完了前に事後イベントを呼ばない');
+    assert(!order.includes('handoff-end'), '婚姻会話の完了前にhandoffを解放しない');
+    completeMarriage();
+    await completeFlow;
+    assert(order.indexOf('marriage-start') < order.indexOf('after_command'), '事後イベントは婚姻会話後');
+    assert(order.indexOf('after_command') < order.indexOf('handoff-end'), 'handoffは事後イベント後に解放');
 });
 
 Promise.all(pendingTests).then(() => {

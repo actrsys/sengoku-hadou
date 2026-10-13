@@ -1,0 +1,32 @@
+戦国覇道 r512：国主解任・所領分配の確認対象同一性監査
+
+基準：r511完全版。ARCHITECTURE.mdのCommandSystem実行正本、Legionモデル、
+UIInfoManagerの既存modalHistory、旧画面操作の中断・失効規則を照合。
+
+【問題・再現】
+1. 国主Aの解任確認を開いた後、同じ席次の国主がBへ変わっても、確定時は
+   席番号だけから軍団を再取得してBを解任できた。
+2. 国主Aの所領分配画面を開いた後、同じ席次の国主がBへ変わっても、
+   旧選択をBの軍団の所領として実行できた。
+3. 別シナリオの同番号・同国主IDの軍団実体にも、旧画面の操作が紛れ得た。
+
+【修正】
+- UIManagerの国主解任確認では、表示したLegion参照と表示時点の国主IDを捕捉。
+- UIInfoManagerの所領分配では、初回開画時のLegion参照・国主IDを
+  modalHistoryの既存renderArgsとして保持し、再描画・確定時にも同じ値を使用。
+- CommandSystem._getConfirmedLegionSeat()に同一性検証を集約。現在の自家と
+  席番号で得られる軍団実体が一致し、その国主が変わっていない場合だけ実行。
+- 失効した操作は解任・所領変更・結果ログを行わない。正常な解任・分配は維持。
+- UIへ独立したルールや長寿命キャッシュ、画面の時限ロックを追加しない。
+
+【再現テスト】
+- 追加3件はr511の実装で807件成功・3件失敗。
+- r512改修後は全810件成功・失敗0件。
+- 既存の所領分配テストは新しい確定APIの引数（軍団実体・当初の国主ID）を追加。
+
+【変更範囲】
+変更：js/command_system.js、js/ui.js、js/ui_info_kyoten.js、
+      js/config.js、tests/run_tests.js、ARCHITECTURE.md、docs/audits/README.md
+追加：本監査記録
+削除：なし
+管理用Excel／BIN、ゲームルール、戦闘・AI、画面レイアウト、セーブ形式は変更なし。

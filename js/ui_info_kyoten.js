@@ -638,12 +638,15 @@ Object.assign(UIInfoManager.prototype, {
     // ==========================================
     showAllotFiefModal(legionNo) {
         this.closeCommonModal();
+        const legion = this.game.getLegionByClanNo(this.game.playerClanId, legionNo);
+        if (!legion || Number(legion.commanderId) <= 0) return;
         this.allotFiefSelectedIds = null;
         this.allotFiefSavedState = false;
-        this.pushModal('allot_fief', [legionNo]);
+        // 画面を再描画しても最初に選んだ国主を保持し、後任への操作持越しを防ぐ。
+        this.pushModal('allot_fief', [legionNo, legion, Number(legion.commanderId)]);
     },
 
-    _renderAllotFief(legionNo, scrollPos = 0) {
+    _renderAllotFief(legionNo, expectedLegion, expectedCommanderId, scrollPos = 0) {
         const daimyoHome = this.game.getDaimyoHomeCastle(this.game.playerClanId);
         const daimyoCastleId = daimyoHome ? Number(daimyoHome.id) : -1;
         
@@ -790,7 +793,7 @@ Object.assign(UIInfoManager.prototype, {
                 this.commonSelectedIds = [];
                 this.allotFiefSavedState = false;
                 this.allotFiefInitialIds = null; // ★お掃除
-                this.game.commandSystem.executeAllotFief(legionNo, selectedIds, myCastles);
+                this.game.commandSystem.executeAllotFief(legionNo, selectedIds, myCastles, expectedLegion, expectedCommanderId);
             }
         });
         

@@ -2794,6 +2794,8 @@ class DiplomacyManager {
         const targetClan = this.game.getClan(targetClanId);
         const targetBusho = this.game.getBusho(targetBushoId);
         const princess = this.game.getPrincess(princessId);
+        // 婚姻の成否どちらでも当事者名を使うため、分岐前に取得する。
+        const doerClan = this.game.getClan(doer.clan);
 
         const isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, 'marriage');
         
@@ -2811,7 +2813,6 @@ class DiplomacyManager {
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
             this.game.factionSystem.updateRecognition(doer, 30);
 
-            const doerClan = this.game.getClan(doer.clan);
             const msg = `${targetClan.name}と婚姻関係を結びました！\n${princess.name}は${targetBusho.name}の正室として迎えられました。`;
             const logMsg = `${doerClan.name}が${targetClan.name}と婚姻関係を結びました`;
 
