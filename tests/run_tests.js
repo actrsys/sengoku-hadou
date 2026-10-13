@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r491');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r492');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -17509,6 +17509,69 @@ test('r490 ロード幕は追加された可視画像の読込完了まで閉じ
         await new Promise(resolve => setImmediate(resolve));
     }
     assert.strictEqual(await done, true);
+});
+
+test('r492 CSS擬似要素の城アイコンは読込とdecodeが完了するまでロード幕を維持し、後付けも監視', async () => {
+    const source = read('js/ui.js');
+    const start = source.indexOf('    showLoadingScreen(');
+    const end = source.indexOf('    // タイトル画面の「続きから／ロード」', start);
+    const frames = [];
+    const observers = [];
+    const requests = [];
+    const cover = { classList: new FakeClassList(['hidden']), contains: target => target === cover };
+    const makeCard = tier => ({ tier, getClientRects: () => [1] });
+    const cards = [makeCard(1), makeCard(2)];
+    const root = { querySelectorAll(selector) {
+        if (selector === 'img[src]') return [];
+        if (selector === '*') return cards;
+        return [];
+    }};
+    class FakeImage {
+        constructor() { this.complete = false; this.naturalWidth = 0; this.onload = null; this.onerror = null; this._resolveDecode = null; }
+        set src(url) { this._src = url; requests.push(this); }
+        get src() { return this._src; }
+        decode() { return new Promise(resolve => { this._resolveDecode = resolve; }); }
+        finishLoad() { this.complete = true; this.naturalWidth = 16; if (this.onload) this.onload(); }
+        finishDecode() { if (this._resolveDecode) this._resolveDecode(); }
+    }
+    const ctx = createContext({
+        document: { getElementById: () => root, body: root, fonts: { ready: Promise.resolve(), status: 'loaded' } },
+        requestAnimationFrame: fn => { frames.push(fn); },
+        MutationObserver: class { constructor(callback) { this.callback = callback; observers.push(this); } observe() {} disconnect() { this.disconnected = true; } },
+        getComputedStyle: (el, pseudo) => pseudo === '::before'
+            ? { content: '""', backgroundImage: `url("https://game.example/map/shiro_icon00${el.tier}.webp")` }
+            : { content: 'none', backgroundImage: 'none' },
+        Image: FakeImage, setTimeout, console
+    });
+    vm.runInContext(`class TestLoadingUI {${source.slice(start, end)}} this.TestLoadingUI = TestLoadingUI;`, ctx);
+    const ui = new ctx.TestLoadingUI(); ui.globalLoadingScreen = cover;
+    const tick = async () => {
+        await new Promise(resolve => setImmediate(resolve));
+        if (frames.length) frames.shift()(0);
+        await new Promise(resolve => setImmediate(resolve));
+    };
+    ui.showLoadingScreen();
+    const closed = ui.hideLoadingScreen();
+    for (let i = 0; i < 4; i++) await tick();
+    assert.strictEqual(requests.length, 2, 'CSS ::beforeの4段階画像を重複なく取得');
+    assert.strictEqual(cover.classList.contains('hidden'), false, '城アイコン画像の読込前は表示しない');
+    requests[0].finishLoad(); requests[1].finishLoad();
+    for (let i = 0; i < 4; i++) await tick();
+    assert.strictEqual(cover.classList.contains('hidden'), false, '画像のdecode完了も待機する');
+    requests[0].finishDecode(); requests[1].finishDecode();
+    // 待機中に子要素が増える場合、次の安定判定で新しい背景画像も捕捉する。
+    cards.push(makeCard(3));
+    observers[0].callback([{ target: cards[2] }]);
+    for (let i = 0; i < 5; i++) await tick();
+    assert.strictEqual(requests.length, 3, '追加カードの新しいCSS背景画像も自動検出');
+    assert.strictEqual(cover.classList.contains('hidden'), false);
+    requests[2].finishLoad();
+    await tick();
+    requests[2].finishDecode();
+    for (let i = 0; i < 12; i++) await tick();
+    assert.strictEqual(await closed, true);
+    assert.strictEqual(cover.classList.contains('hidden'), true);
+    assert.ok(observers[0].disconnected);
 });
 
 test('r490 タイトル・シナリオ・セーブ復元はレイアウト確定窓口をawaitする', () => {

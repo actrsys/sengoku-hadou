@@ -1739,6 +1739,73 @@ async function validateLoadingPresentation(cdp) {
     console.log('✓ r490 ロード画面終了はPC/スマホの追加モーダル完成・レイアウト安定後 (実ブラウザ)');
 }
 
+// r492: CSS ::before背景画像はDOMの<img>に現れない。実ブラウザのcomputedStyleで
+// 城アイコンを拾い、load/decodeを終える前にロード幕が開かないことを検証する。
+async function validateCastleIconLoading(cdp) {
+    const source = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const start = source.indexOf('    showLoadingScreen(');
+    const end = source.indexOf('    // タイトル画面の「続きから／ロード」', start);
+    const classSource = `window.TestLoadingUI = class TestLoadingUI {${source.slice(start, end)}};`;
+    for (const [width, height, pc] of [[1280, 720, true], [390, 844, false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !pc });
+        const html = `<!doctype html><html><head><style>
+          .hidden{display:none!important}#game-screen{position:relative;width:100%;height:100%}
+          .castle-card{width:40px;height:40px;position:relative}
+          .castle-card::before{content:"";position:absolute;inset:0;background-image:var(--icon-bg);background-size:contain}
+          #global-loading-screen{position:absolute;inset:0;background:#111;z-index:900}
+          </style></head><body><div id="game-screen">
+          <div id="test-castle" class="castle-card"></div><div id="global-loading-screen" class="hidden"></div>
+          </div></body></html>`;
+        await cdp.call('Runtime.evaluate', {
+            expression: `document.open();document.write(${JSON.stringify(html)});document.close();${classSource}true`, returnByValue: true
+        });
+        const started = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                const svg = new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle r="8" cx="8" cy="8" fill="red"/></svg>'],{type:'image/svg+xml'});
+                const url = URL.createObjectURL(svg);
+                document.documentElement.style.setProperty('--icon-bg', 'url("'+url+'")');
+                window.pendingIcons=[];
+                window.Image = class {
+                    set src(value) { window.pendingIcons.push(this); this._src=value; }
+                    get src() { return this._src; }
+                    decode() { return new Promise(resolve => { this.finishDecode=resolve; }); }
+                };
+                const ui = new TestLoadingUI();
+                ui.globalLoadingScreen = document.getElementById('global-loading-screen');
+                window.ui=ui;window.done=undefined;
+                ui.showLoadingScreen();
+                ui.hideLoadingScreen().then(ok=>{window.done=ok;});
+                return {covered:!ui.globalLoadingScreen.classList.contains('hidden')};
+            })()`, returnByValue: true
+        });
+        assert.ok(started.result.value.covered);
+        await new Promise(resolve => setTimeout(resolve, 150));
+        const before = await cdp.call('Runtime.evaluate', {
+            expression: `({covered:!ui.globalLoadingScreen.classList.contains('hidden'),
+                imageCount:pendingIcons.length, iconCount:document.querySelectorAll('.castle-card').length, html:document.body.innerHTML.slice(0,400), css:document.querySelector('.castle-card') ? getComputedStyle(document.querySelector('.castle-card'),'::before').backgroundImage : 'missing'})`, returnByValue: true
+        });
+        assert.ok(before.result && before.result.value, '実ブラウザの取得に失敗: '+JSON.stringify(before));
+        assert.strictEqual(before.result.value.imageCount, 1, 'CSS擬似要素のアイコン画像を抽出');
+        assert.strictEqual(before.result.value.covered, true, '城アイコン読み込み中はロード幕を保持');
+        assert.ok(before.result.value.css.includes('blob:'), 'CSSから実際の背景画像URLを取得');
+        await cdp.call('Runtime.evaluate', { expression: 'pendingIcons[0].onload();true', returnByValue: true });
+        await new Promise(resolve => setTimeout(resolve, 70));
+        const still = await cdp.call('Runtime.evaluate', {
+            expression: '!ui.globalLoadingScreen.classList.contains("hidden")', returnByValue: true
+        });
+        assert.strictEqual(still.result.value, true, '画像decode中もロード幕を保持');
+        await cdp.call('Runtime.evaluate', { expression: 'pendingIcons[0].finishDecode();true', returnByValue: true });
+        const complete = await cdp.call('Runtime.evaluate', {
+            expression: `new Promise(resolve=>{let frames=0;const tick=()=>{
+                if(window.done!==undefined)resolve({done:window.done,covered:!ui.globalLoadingScreen.classList.contains('hidden')});
+                else if(++frames>100)resolve({timeout:true});else requestAnimationFrame(tick);
+            };tick();})`, returnByValue: true, awaitPromise: true
+        });
+        assert.deepStrictEqual(complete.result.value, { done: true, covered: false });
+    }
+    console.log('✓ r492 PC/スマホ CSS擬似要素の拠点アイコン読込・decode完了後にロード幕解除 (実ブラウザ)');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -1810,6 +1877,7 @@ async function main() {
         await validateTitleMenuStability(cdp);
         await validateMapCompositor(cdp);
         await validateLoadingPresentation(cdp);
+        await validateCastleIconLoading(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

@@ -1898,6 +1898,58 @@ class UIManager {
         return task;
     }
 
+    // CSSの背景画像は<img>ではないため、従来のimg.complete監視だけでは
+    // 城アイコン（.castle-card::before）などの読込・デコードを捕捉できない。
+    // 画面内の可視要素と擬似要素からURLを抽出し、同一ロード中はURL単位で1回だけ待つ。
+    // 特定の城アイコンクラスに依存しないため、今後の画面やモーダルでも共通適用する。
+    _collectLoadingCssImages(root, assets) {
+        if (!root || typeof root.querySelectorAll !== 'function'
+            || typeof getComputedStyle !== 'function' || typeof Image !== 'function') return [];
+        const pending = [];
+        const elements = root.nodeType === 1 ? [root, ...root.querySelectorAll('*')] : root.querySelectorAll('*');
+        for (const element of elements) {
+            if (!element || (typeof element.getClientRects === 'function' && !element.getClientRects().length)) continue;
+            if (this.globalLoadingScreen && (element === this.globalLoadingScreen
+                || this.globalLoadingScreen.contains(element))) continue;
+            for (const pseudo of [null, '::before', '::after']) {
+                let style;
+                try { style = getComputedStyle(element, pseudo); } catch (e) { continue; }
+                if (!style || (pseudo && (style.content === 'none' || style.content === 'normal'))) continue;
+                const background = String(style.backgroundImage || '');
+                // 複数レイヤーおよびimage-set()内のurl()を含む。
+                const pattern = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\s*\)/g;
+                let match;
+                while ((match = pattern.exec(background))) {
+                    const url = String(match[1] || match[2] || match[3] || '').trim();
+                    if (!url || url.startsWith('data:')) continue;
+                    // 既に表示用としてdecode済みの地図本体は、CSS背景でも再デコードしない。
+                    if (this._mapBaseImage && this._mapBaseImage.src === url
+                        && this._mapBaseImage.complete && this._mapBaseImage.naturalWidth > 0) continue;
+                    if (!assets.has(url)) {
+                        const entry = { ready: false, promise: null };
+                        entry.promise = new Promise(resolve => {
+                            const image = new Image();
+                            const done = () => { entry.ready = true; resolve(); };
+                            image.onload = async () => {
+                                // load済みでも、特にCSS擬似要素はdecodeの遅れで後から描かれる。
+                                if (typeof image.decode === 'function') {
+                                    try { await image.decode(); } catch (error) { /* load済みなら表示可能 */ }
+                                }
+                                done();
+                            };
+                            image.onerror = done; // 欠落画像で幕を永久に固定しない。
+                            image.src = url;
+                        });
+                        assets.set(url, entry);
+                    }
+                    const entry = assets.get(url);
+                    if (!entry.ready) pending.push(entry.promise);
+                }
+            }
+        }
+        return pending;
+    }
+
     // ロード幕の裏で、全画面とモーダルのレイアウトが安定するまで待つ共通窓口。
     // MutationObserverは配下へ後から追加された要素も自動監視する。
     async _waitForLoadingPresentation(generation) {
@@ -1908,6 +1960,8 @@ class UIManager {
         });
         const root = document.getElementById('game-screen') || document.body;
         let revision = 0;
+        const cssAssets = new Map();
+        let lastCssRevision = -1;
         const isLoadingMutation = record => this.globalLoadingScreen
             && (record.target === this.globalLoadingScreen || this.globalLoadingScreen.contains(record.target));
         const observer = typeof MutationObserver === 'function' && root
@@ -1967,6 +2021,19 @@ class UIManager {
                     previousLayout = null;
                     continue;
                 }
+                // 要素追加・class/style変更があった場合は、CSS背景と擬似要素も再検査。
+                // DOM全体を毎フレーム走査せず、低メモリスマホの負担を抑える。
+                if (revision !== lastCssRevision) {
+                    lastCssRevision = revision;
+                    const cssImages = this._collectLoadingCssImages(root, cssAssets);
+                    if (cssImages.length) {
+                        await Promise.all(cssImages);
+                        if (!isCurrent()) return false;
+                        stableFrames = 0;
+                        previousLayout = null;
+                        continue;
+                    }
+                }
                 // すべてのモーダルを共通セレクタで捕捉。将来の子要素追加も
                 // MutationObserverと外形測定で待機対象となる。
                 const panels = root && typeof root.querySelectorAll === 'function'
@@ -1980,6 +2047,7 @@ class UIManager {
                     parts.push(`${rect.x},${rect.y},${rect.width},${rect.height}`);
                 }
                 const layout = parts.join('|');
+                if (layout !== previousLayout) lastCssRevision = -1;
                 if (revision === previousRevision && layout === previousLayout && !this._loadingTasks?.size) {
                     stableFrames++;
                 } else {
