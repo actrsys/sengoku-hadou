@@ -609,7 +609,8 @@ class SaveManager {
         }
 
         // ★追加：画面の準備が整ったので、ここでロード画面を隠します
-        if (this.game.ui) this.game.ui.hideLoadingScreen();
+        if (this.game.ui) await this.game.ui.hideLoadingScreen();
+        if (!isRestoreFlowLatest()) return false;
 
         await this.game.ui.showCutin(`ロード完了: ${this.game.year}年 ${this.game.month}月`);
         if (!isRestoreFlowLatest()) return false;

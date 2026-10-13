@@ -1,0 +1,26 @@
+戦国覇道 r490 ロード画面のレイアウト完成待機共通化記録
+
+■ 正本
+r489 の配布ソースを正本に、ゲーム表示・シナリオ開始・タイトル・セーブ復元のロード終了を監査。
+
+■ 発見した問題
+従来 UIManager.hideLoadingScreen() は同期で hidden を付けるだけであり、個々の呼出元が1回だけ waitForNextPaint() を呼んでも、追加モーダル・フォント・可視画像の読込完了や後続DOMのレイアウト変化を共通で待機できなかった。さらに終了要求と新しいロードの世代が衝突し得る。
+
+■ 対応
+- UIManager.showLoadingScreen() に世代管理と共通のロードタスク集合を導入。
+- UIManager.hideLoadingScreen() をPromiseを返す完成待ち共通窓口とした。同一世代の二重終了要求はまとめ、別世代の終了予約は新しいロード幕を隠さない。
+- 共通 _waitForLoadingPresentation() がMutationObserverで全ゲーム画面内の子要素・属性・テキスト変更を捕捉し、可視モーダル・画面の矩形が複数フレーム安定するまで待つ。画面の子要素増設のたびに検証対象を手動追加する必要はない。
+- document.fonts.ready、表示中の非lazy画像のload/errorも待つ。非表示画像を無理にdecodeせず低メモリ端末を保護。
+- 複数awaitにまたがる後続部品生成にはtrackLoadingTask(promise)を使用する明示的な登録口を用意。
+- タイトル初期表示、タイトル復帰、シナリオ開始、セーブ復元の正常遷移では共通終了窓口をawaitし、世代確認を維持。エラー時などの非await呼出しも共通の幕維持動作を使用する。
+- 画面・モーダルの静的形状、既存CSS、地図Canvas、セーブ形式、ゲームルール、AIは変更しない。
+
+■ 回帰検証
+- 追加テストでロード中の非同期モーダル増設、寸法変化、フォント待機、可視画像待機、古い終了予約、重複終了を検証。
+- 実ブラウザでPC・スマホ両方の後付けモーダルを確認。
+- 配布前に既存回帰テスト、表示検証、シミュレーションおよび管理データ整合性を検証。
+
+■ 変更範囲
+- 更新: ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/game.js、js/save_manager.js、js/ui.js、tests/run_tests.js、tests/run_visual_tests.js
+- 追加: 本記録
+- 削除: なし

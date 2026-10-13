@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r489');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r491');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -17400,6 +17400,184 @@ test('r489 米の購入・売却経路が共通の安全な相場描画窓口を
     assert.ok(!source.includes('${c.tradeLimit || 0}</span>'), '旧来の未処理な取引上限挿入を残さない');
 });
 
+
+test('r490 ロード幕は共通レイアウト安定まで維持し、後付けモーダル・非同期部品も待つ', async () => {
+    const source = read('js/ui.js');
+    const start = source.indexOf('    showLoadingScreen(');
+    const end = source.indexOf('    // タイトル画面の「続きから／ロード」', start);
+    assert.ok(start > 0 && end > start);
+    const frames = [];
+    const observers = [];
+    const cover = { classList: new FakeClassList(['hidden']), contains: target => target === cover };
+    const modal = { width: 200, getClientRects: () => [1], getBoundingClientRect() { return { x: 1, y: 2, width: this.width, height: 120 }; } };
+    const root = {
+        querySelectorAll(selector) {
+            if (selector === 'img[src]') return [];
+            return [modal];
+        }
+    };
+    let resolveFont;
+    const fontReady = new Promise(resolve => { resolveFont = resolve; });
+    const doc = { getElementById: id => id === 'game-screen' ? root : null,
+        body: root, fonts: { ready: fontReady, status: 'loading' } };
+    const ctx = createContext({
+        document: doc, setTimeout, console,
+        requestAnimationFrame: callback => { frames.push(callback); return frames.length; },
+        MutationObserver: class {
+            constructor(callback) { this.callback = callback; observers.push(this); }
+            observe(node, options) { assert.strictEqual(node, root); assert.strictEqual(options.subtree, true); }
+            disconnect() { this.disconnected = true; }
+        }
+    });
+    vm.runInContext(`class TestLoadingUI {${source.slice(start, end)}} this.TestLoadingUI = TestLoadingUI;`, ctx);
+    const ui = new ctx.TestLoadingUI();
+    ui.globalLoadingScreen = cover;
+    ui.showLoadingScreen('準備中', 10);
+    let closed = ui.hideLoadingScreen();
+    assert.strictEqual(cover.classList.contains('hidden'), false, '終了要求だけでは覆いを外さない');
+    assert.strictEqual(ui.hideLoadingScreen(), closed, '同世代の二重終了をまとめる');
+    await Promise.resolve();
+    assert.strictEqual(frames.length, 0, 'フォント準備完了までフレーム判定を始めない');
+    resolveFont(); doc.fonts.status = 'loaded';
+    const tick = async () => {
+        await new Promise(resolve => setImmediate(resolve));
+        if (frames.length) frames.shift()(0);
+        await new Promise(resolve => setImmediate(resolve));
+    };
+    await tick();
+    assert.strictEqual(cover.classList.contains('hidden'), false);
+    modal.width = 330; // 非同期でモーダルに追加された部品が幅を変える
+    observers[0].callback([{ target: modal }]);
+    let finishTask;
+    ui.trackLoadingTask(new Promise(resolve => { finishTask = resolve; }));
+    for (let i = 0; i < 6; i++) await tick();
+    assert.strictEqual(cover.classList.contains('hidden'), false, '部品生成が続く間はロード幕を維持');
+    finishTask();
+    for (let i = 0; i < 8; i++) await tick();
+    assert.strictEqual(await closed, true);
+    assert.strictEqual(cover.classList.contains('hidden'), true);
+    assert.strictEqual(observers[0].disconnected, true);
+
+    // 旧画面の終了待機中に新たなロードが始まった場合は旧処理で消さない。
+    ui.showLoadingScreen('旧画面', 0);
+    const staleClose = ui.hideLoadingScreen();
+    await tick();
+    ui.showLoadingScreen('新画面', 0);
+    for (let i = 0; i < 5; i++) await tick();
+    assert.strictEqual(await staleClose, false);
+    assert.strictEqual(cover.classList.contains('hidden'), false, '新世代の覆いを古い終了要求から守る');
+    closed = ui.hideLoadingScreen();
+    for (let i = 0; i < 6; i++) await tick();
+    assert.strictEqual(await closed, true);
+});
+
+test('r490 ロード幕は追加された可視画像の読込完了まで閉じない', async () => {
+    const source = read('js/ui.js');
+    const start = source.indexOf('    showLoadingScreen(');
+    const end = source.indexOf('    // タイトル画面の「続きから／ロード」', start);
+    const frames = [];
+    const listeners = {};
+    const cover = { classList: new FakeClassList(['hidden']), contains: target => target === cover };
+    const image = {
+        complete: false, loading: 'eager', getClientRects: () => [1],
+        addEventListener(name, fn) { listeners[name] = fn; },
+        removeEventListener(name) { delete listeners[name]; }
+    };
+    const root = { querySelectorAll: selector => selector === 'img[src]' ? [image] : [] };
+    const ctx = createContext({
+        document: { getElementById: () => root, body: root, fonts: { ready: Promise.resolve(), status: 'loaded' } },
+        requestAnimationFrame: fn => { frames.push(fn); },
+        MutationObserver: class { constructor() {} observe() {} disconnect() {} },
+        setTimeout, console
+    });
+    vm.runInContext(`class TestLoadingUI {${source.slice(start, end)}} this.TestLoadingUI = TestLoadingUI;`, ctx);
+    const ui = new ctx.TestLoadingUI(); ui.globalLoadingScreen = cover;
+    ui.showLoadingScreen();
+    const done = ui.hideLoadingScreen();
+    for (let i = 0; i < 5; i++) {
+        await new Promise(resolve => setImmediate(resolve));
+        if (frames.length) frames.shift()(0);
+        await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.strictEqual(cover.classList.contains('hidden'), false, '追加画像が読込中のまま覆いを外さない');
+    assert.strictEqual(typeof listeners.load, 'function');
+    image.complete = true;
+    listeners.load();
+    for (let i = 0; i < 7; i++) {
+        await new Promise(resolve => setImmediate(resolve));
+        if (frames.length) frames.shift()(0);
+        await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.strictEqual(await done, true);
+});
+
+test('r490 タイトル・シナリオ・セーブ復元はレイアウト確定窓口をawaitする', () => {
+    const ui = read('js/ui.js');
+    const game = read('js/game.js');
+    const save = read('js/save_manager.js');
+    assert.ok(ui.includes('await this.hideLoadingScreen();'), 'タイトル解放も共通待機');
+    assert.ok(game.includes('await this.ui.hideLoadingScreen();'), 'シナリオ解放も共通待機');
+    assert.ok(save.includes('await this.game.ui.hideLoadingScreen();'), 'セーブ復元も共通待機');
+    assert.ok(ui.includes('new MutationObserver(records =>'), '今後増える子要素の変化も監視');
+    assert.ok(ui.includes('document.fonts.ready'), '文字幅が確定してから画面を出す');
+    assert.ok(ui.includes("root.querySelectorAll('img[src]')"), '追加された可視画像も共通監視する');
+    assert.ok(ui.includes('trackLoadingTask(task) {'), '非同期部品生成の待機窓口を統一');
+});
+
+
+// r491: スライダーの属性も表示文字列同様に入力境界で保護する。
+test('r491 単体・輸送スライダーの属性は改変セーブ由来の引用符を解釈しない', () => {
+    const source = read('js/ui_slider.js');
+    const hostile = '500" autofocus onfocus="window.__injected=1';
+    const escapePlainText = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[ch]);
+    const simulate = (type) => {
+        let captured = null;
+        const stop = new Error('スライダー生成を確認');
+        const element = () => {
+            const controls = new Map();
+            return {
+                className: '', innerHTML: '', style: { setProperty() {} }, classList: new FakeClassList(),
+                querySelector(selector) {
+                    if (!controls.has(selector)) controls.set(selector, {
+                        value: 0, min: '0', max: '99999', style: { setProperty() {} },
+                        addEventListener() {}, classList: new FakeClassList()
+                    });
+                    return controls.get(selector);
+                }
+            };
+        };
+        const context = createContext({
+            document: { createElement: element, getElementById: () => ({ textContent: '' }) },
+            requestAnimationFrame() { return 1; },
+            StatPresenter: { escapePlainText }
+        });
+        vm.runInContext(source, context, { filename: 'js/ui_slider.js' });
+        const Slider = vm.runInContext('UISliderManager', context);
+        const currentCastle = { ownerClan: 1, castellanId: 2, gold: type === 'transport' ? 500 : hostile,
+            rice: 100, soldiers: 100, horses: 50, guns: 10 };
+        const targetCastle = { ...currentCastle, gold: hostile };
+        const ui = {
+            quantityModal: element(), currentCastle,
+            quantityContainer: {
+                innerHTML: '', appendChild(child) {
+                    if (child.className === 'qty-row') { captured = child.innerHTML; throw stop; }
+                }
+            },
+            hideAIGuardTemporarily() {}, prepareCoveredViewForOpen() {}
+        };
+        const game = { getClanDaimyo: () => ({}), getBusho: () => ({}),
+            getCastle: () => targetCastle };
+        assert.throws(() => new Slider(ui, game).openQuantitySelector(type, [], 2), error => error === stop);
+        assert.ok(captured, `${type}: スライダーの生成を確認`);
+        assert.ok(!captured.includes(hostile), `${type}: 未処理の属性混入を許さない`);
+        assert.ok(captured.includes('&quot;'), `${type}: 引用符は属性用にエスケープする`);
+        return captured;
+    };
+    simulate('headhunt_gold');
+    simulate('transport');
+});
 
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);

@@ -1666,6 +1666,79 @@ async function validateMapCompositor(cdp) {
 }
 
 
+// 実ブラウザでも共通ロード幕の完了条件を検証する。
+// PC・スマホとも「ロード幕解除後にモーダル外形が変化する」回帰を防ぐ。
+async function validateLoadingPresentation(cdp) {
+    const source = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const start = source.indexOf('    showLoadingScreen(');
+    const end = source.indexOf('    // タイトル画面の「続きから／ロード」', start);
+    const classSource = `class TestLoadingUI {${source.slice(start, end)}} window.TestLoadingUI = TestLoadingUI;`;
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><style>${css.replace(/<\/style/gi, '<\\/style')}</style></head><body class="is-pc">
+        <div id="game-screen" style="width:1280px;height:720px;position:relative;">
+            <div id="global-loading-screen" class="hidden"><div class="loading-stage">NOW LOADING</div></div>
+            <div id="test-modal" class="modal hidden"><div class="modal-content" id="test-modal-content" style="width:280px;">
+                <h3>準備中</h3><div id="later-child"></div></div><div class="modal-footer">決定</div></div>
+        </div></body></html>`;
+    for (const [width, height, pc] of [[1280, 720, true], [390, 844, false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !pc });
+        await cdp.call('Runtime.evaluate', {
+            expression: `document.open();document.write(${JSON.stringify(html)});document.close();${classSource}\ntrue;`,
+            returnByValue: true, awaitPromise: true
+        });
+        const init = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                document.body.classList.toggle('is-pc', ${pc});
+                const ui = new TestLoadingUI();
+                ui.globalLoadingScreen = document.getElementById('global-loading-screen');
+                window.testLoadingUI = ui;
+                window.dismissResult = undefined;
+                ui.showLoadingScreen('準備中', 5);
+                let release;
+                ui.trackLoadingTask(new Promise(resolve => { release = resolve; }));
+                window.releaseModal = release;
+                ui.hideLoadingScreen().then(result => { window.dismissResult = result; });
+                return !ui.globalLoadingScreen.classList.contains('hidden');
+            })()`, returnByValue: true
+        });
+        assert.strictEqual(init.result.value, true, '準備が完了するまではロード幕を表示');
+        await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                const modal = document.getElementById('test-modal');
+                const inner = document.getElementById('test-modal-content');
+                modal.classList.remove('hidden');
+                inner.style.width = '420px';
+                document.getElementById('later-child').textContent = 'あとから追加された説明と操作';
+                return true;
+            })()`, returnByValue: true
+        });
+        // 画面変更後でも非同期部品生成が終わる前にロード幕が消えてはいけない。
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const stillCovered = await cdp.call('Runtime.evaluate', {
+            expression: `!document.getElementById('global-loading-screen').classList.contains('hidden')`, returnByValue: true
+        });
+        assert.strictEqual(stillCovered.result.value, true, '非同期のモーダル生成中はロード幕を保持する');
+        await cdp.call('Runtime.evaluate', { expression: 'window.releaseModal();true', returnByValue: true });
+        const final = await cdp.call('Runtime.evaluate', {
+            expression: `new Promise(resolve => {
+                const done = () => {
+                    if (window.dismissResult !== undefined) {
+                        const rect = document.getElementById('test-modal-content').getBoundingClientRect();
+                        resolve({ closed: document.getElementById('global-loading-screen').classList.contains('hidden'),
+                            width: rect.width, text: document.getElementById('later-child').textContent, result: window.dismissResult });
+                    } else requestAnimationFrame(done);
+                };
+                done();
+            })`, returnByValue: true, awaitPromise: true
+        });
+        assert.strictEqual(final.result.value.closed, true, 'モーダル完成後だけ幕が閉じる');
+        assert.strictEqual(final.result.value.result, true);
+        assert.ok(final.result.value.width >= (pc ? 400 : 310), '追加後のモーダルの寸法が確定している');
+        assert.ok(final.result.value.text.includes('あとから追加'), '追加要素もロード幕の内側で生成済み');
+    }
+    console.log('✓ r490 ロード画面終了はPC/スマホの追加モーダル完成・レイアウト安定後 (実ブラウザ)');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -1736,6 +1809,7 @@ async function main() {
         await validateSiegeLayout(cdp);
         await validateTitleMenuStability(cdp);
         await validateMapCompositor(cdp);
+        await validateLoadingPresentation(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

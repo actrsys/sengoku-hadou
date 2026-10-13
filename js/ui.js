@@ -216,7 +216,7 @@ class UIManager {
                 menuButtons.classList.remove('hidden');
 
                 // ★追加：裏側の準備がすべて終わったら、ロード画面をサッと隠します！
-                this.hideLoadingScreen();
+                await this.hideLoadingScreen();
             };
             titleScreen.addEventListener('click', onTitleClick);
         }
@@ -1873,8 +1873,125 @@ class UIManager {
 
     // ロード画面。装飾アニメーションではなく、実際の処理段階と進捗率を表示します。
     showLoadingScreen(label = '準備しています', progress = 0) {
+        // 以前の非同期終了処理は、新しい画面遷移のロード幕を閉じてはならない。
+        this._loadingGeneration = Number(this._loadingGeneration || 0) + 1;
+        this._loadingDismissPromise = null;
+        this._loadingTasks = new Set();
         if (this.globalLoadingScreen) this.globalLoadingScreen.classList.remove('hidden');
         this.updateLoadingProgress(progress, label);
+    }
+
+    // 非同期で画面の子要素を生成する部署は、そのPromiseを登録するだけでよい。
+    // 追加された個々のDOM要素やモーダルをロード終了側へ列挙する必要はない。
+    trackLoadingTask(task) {
+        if (!task || typeof task.then !== 'function') return task;
+        if (!this.globalLoadingScreen || this.globalLoadingScreen.classList.contains('hidden')) return task;
+        const generation = Number(this._loadingGeneration || 0);
+        const pending = this._loadingTasks || (this._loadingTasks = new Set());
+        const tracked = Promise.resolve(task).then(() => {}, error => {
+            console.error('画面の準備中にエラーが発生しました:', error);
+        });
+        pending.add(tracked);
+        tracked.then(() => {
+            if (generation === Number(this._loadingGeneration || 0)) pending.delete(tracked);
+        });
+        return task;
+    }
+
+    // ロード幕の裏で、全画面とモーダルのレイアウトが安定するまで待つ共通窓口。
+    // MutationObserverは配下へ後から追加された要素も自動監視する。
+    async _waitForLoadingPresentation(generation) {
+        const isCurrent = () => Number(this._loadingGeneration || 0) === generation;
+        const nextFrame = () => new Promise(resolve => {
+            if (typeof requestAnimationFrame === 'function') requestAnimationFrame(resolve);
+            else setTimeout(resolve, 0);
+        });
+        const root = document.getElementById('game-screen') || document.body;
+        let revision = 0;
+        const isLoadingMutation = record => this.globalLoadingScreen
+            && (record.target === this.globalLoadingScreen || this.globalLoadingScreen.contains(record.target));
+        const observer = typeof MutationObserver === 'function' && root
+            ? new MutationObserver(records => {
+                if (records.some(record => !isLoadingMutation(record))) revision++;
+            }) : null;
+        if (observer) observer.observe(root, {
+            subtree: true, childList: true, characterData: true,
+            attributes: true, attributeFilter: ['class', 'style', 'src', 'hidden', 'open']
+        });
+        try {
+            // フォントの差し替わりで文字幅やモーダルの高さが後から変わらないようにする。
+            if (document.fonts && document.fonts.ready) {
+                try { await document.fonts.ready; } catch (error) { console.warn('フォントの待機に失敗:', error); }
+            }
+            let stableFrames = 0;
+            let previousLayout = null;
+            let previousRevision = -1;
+            while (isCurrent() && stableFrames < 2) {
+                const tasks = this._loadingTasks ? Array.from(this._loadingTasks) : [];
+                if (tasks.length) {
+                    await Promise.all(tasks);
+                    stableFrames = 0;
+                    previousLayout = null;
+                    continue;
+                }
+                await nextFrame();
+                if (!isCurrent()) return false;
+                // 新しく追加された可視画像の読込も待つ。遅延読込画像や
+                // 非表示の大量の顔グラは待たず、古いスマホのメモリを圧迫しない。
+                const images = root && typeof root.querySelectorAll === 'function'
+                    ? root.querySelectorAll('img[src]') : [];
+                const pendingImages = [];
+                for (const img of images) {
+                    if (img.complete || img.loading === 'lazy') continue;
+                    if (typeof img.getClientRects === 'function' && !img.getClientRects().length) continue;
+                    pendingImages.push(new Promise(resolve => {
+                        const done = () => {
+                            img.removeEventListener('load', done);
+                            img.removeEventListener('error', done);
+                            resolve();
+                        };
+                        img.addEventListener('load', done, { once: true });
+                        img.addEventListener('error', done, { once: true });
+                        if (img.complete) done();
+                    }));
+                }
+                if (pendingImages.length) {
+                    await Promise.all(pendingImages);
+                    stableFrames = 0;
+                    previousLayout = null;
+                    continue;
+                }
+                if (document.fonts && document.fonts.status === 'loading') {
+                    try { await document.fonts.ready; } catch (error) { console.warn('フォントの待機に失敗:', error); }
+                    stableFrames = 0;
+                    previousLayout = null;
+                    continue;
+                }
+                // すべてのモーダルを共通セレクタで捕捉。将来の子要素追加も
+                // MutationObserverと外形測定で待機対象となる。
+                const panels = root && typeof root.querySelectorAll === 'function'
+                    ? root.querySelectorAll('.modal:not(.hidden) .modal-content, .modal:not(.hidden) .modal-footer, [id$="-screen"]:not(.hidden), [id$="-modal"]:not(.hidden), #title-screen:not(.hidden) .title-content, #app:not(.hidden), #map-container') : [];
+                const parts = [];
+                for (const element of panels) {
+                    if (!element || typeof element.getBoundingClientRect !== 'function') continue;
+                    if (typeof element.getClientRects === 'function' && !element.getClientRects().length) continue;
+                    const rect = element.getBoundingClientRect();
+                    // 比較専用の物理矩形。同一レイアウト内でCSS pxと混用しない。
+                    parts.push(`${rect.x},${rect.y},${rect.width},${rect.height}`);
+                }
+                const layout = parts.join('|');
+                if (revision === previousRevision && layout === previousLayout && !this._loadingTasks?.size) {
+                    stableFrames++;
+                } else {
+                    stableFrames = 0;
+                }
+                previousRevision = revision;
+                previousLayout = layout;
+            }
+            return isCurrent();
+        } finally {
+            if (observer) observer.disconnect();
+        }
     }
 
     updateLoadingProgress(progress, label = null) {
@@ -1966,7 +2083,24 @@ class UIManager {
     }
 
     hideLoadingScreen() {
-        if (this.globalLoadingScreen) this.globalLoadingScreen.classList.add('hidden');
+        const cover = this.globalLoadingScreen;
+        if (!cover || cover.classList.contains('hidden')) return Promise.resolve(false);
+        if (this._loadingDismissPromise) return this._loadingDismissPromise;
+        const generation = Number(this._loadingGeneration || 0);
+        const task = (async () => {
+            // 呼び出し元の単発rAFや固定時間待機に頼らず、各画面の共通幕を保持する。
+            const ready = await this._waitForLoadingPresentation(generation);
+            if (!ready || generation !== Number(this._loadingGeneration || 0)) return false;
+            cover.classList.add('hidden');
+            return true;
+        })();
+        this._loadingDismissPromise = task;
+        task.then(() => {
+            if (this._loadingDismissPromise === task) this._loadingDismissPromise = null;
+        }, () => {
+            if (this._loadingDismissPromise === task) this._loadingDismissPromise = null;
+        });
+        return task;
     }
 
     // タイトル画面の「続きから／ロード」は、実際に読み込める保存データがある時だけ有効にします。
@@ -2436,7 +2570,7 @@ class UIManager {
         await this.waitForNextPaint();
         if (!isTitleFlowLatest()) return;
 
-        this.hideLoadingScreen();
+        await this.hideLoadingScreen();
     }
     
     // ★ ここをごっそり差し替え！：大名選択の確認画面を、ギュッと小さくコンパクトにする魔法です！

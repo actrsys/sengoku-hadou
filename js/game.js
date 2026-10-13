@@ -563,7 +563,8 @@ class GameManager {
             if (this.ui) this.ui.updateLoadingProgress(100, '準備完了');
             if (this.ui && typeof this.ui.waitForNextPaint === 'function') await this.ui.waitForNextPaint();
             if (!isScenarioLoadLatest()) return;
-            if (this.ui) this.ui.hideLoadingScreen();
+            if (this.ui) await this.ui.hideLoadingScreen();
+            if (!isScenarioLoadLatest()) return;
 
             // 観戦開始はロード画面を閉じてから。0ms継続もTurnManagerの世代管理へ結び、
             // 直後のタイトル復帰・別シナリオ読込で旧initを持ち越さない。

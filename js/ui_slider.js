@@ -236,6 +236,9 @@ class UISliderManager {
         };
         
         const createSlider = (label, id, max, currentVal, minVal = 0, isTransport = false, targetCurrent = 0, targetMaxLimit = 99999) => {
+            // スライダー枠内の文字と入力属性はすべてHTML生成の境界で保護する。
+            // 正規の数値・入力制約・数量計算は変えず、改変セーブの文字列が属性を増やす事故を防ぐ。
+            const safeMarkup = value => StatPresenter.escapePlainText(value);
             const wrap = document.createElement('div');
             wrap.className = 'qty-row';
             
@@ -278,14 +281,14 @@ class UISliderManager {
             if (isTransport) {
                 const actualMaxTransport = Math.min(max, targetMaxLimit - targetCurrent);
                 wrap.innerHTML = `
-                    <div class="slider-row-label">${label}</div>
+                    <div class="slider-row-label">${safeMarkup(label)}</div>
                     <div class="qty-control">
-                        <button class="qty-shortcut-btn qty-pos-start" id="btn-min-${id}">最小</button>
-                        <button class="qty-shortcut-btn qty-pos-end" id="btn-half-${id}">半分</button>
-                        <input class="qty-range-main" type="range" id="range-${id}" min="0" max="${actualMaxTransport}" value="0">
-                        <button class="qty-shortcut-btn qty-pos-end" id="btn-max-${id}">最大</button>
-                        <input class="qty-number-end" type="number" id="num-tgt-${id}" min="${targetCurrent}" max="${targetCurrent + actualMaxTransport}" value="${targetCurrent}">
-                        <input type="hidden" id="num-${id}" value="0">
+                        <button class="qty-shortcut-btn qty-pos-start" id="btn-min-${safeMarkup(id)}">最小</button>
+                        <button class="qty-shortcut-btn qty-pos-end" id="btn-half-${safeMarkup(id)}">半分</button>
+                        <input class="qty-range-main" type="range" id="range-${safeMarkup(id)}" min="0" max="${safeMarkup(actualMaxTransport)}" value="0">
+                        <button class="qty-shortcut-btn qty-pos-end" id="btn-max-${safeMarkup(id)}">最大</button>
+                        <input class="qty-number-end" type="number" id="num-tgt-${safeMarkup(id)}" min="${safeMarkup(targetCurrent)}" max="${safeMarkup(targetCurrent + actualMaxTransport)}" value="${safeMarkup(targetCurrent)}">
+                        <input type="hidden" id="num-${safeMarkup(id)}" value="0">
                     </div>
                 `;
                 
@@ -360,13 +363,13 @@ class UISliderManager {
             } else {
                 // isSingle（単体か複数か）に関わらず、全て同じ黄色い文字のデザインに統一します！
                 wrap.innerHTML = `
-                    <div class="slider-row-label">${label}</div>
+                    <div class="slider-row-label">${safeMarkup(label)}</div>
                     <div class="qty-control">
-                        <button class="qty-shortcut-btn qty-pos-start" id="btn-min-${id}">最小</button>
-                        <button class="qty-shortcut-btn qty-pos-end" id="btn-half-${id}">半分</button>
-                        <input class="qty-range-main" type="range" id="range-${id}" min="${minVal}" max="${max}" value="${currentVal}">
-                        <button class="qty-shortcut-btn qty-pos-end" id="btn-max-${id}">最大</button>
-                        <input class="qty-number-end" type="number" id="num-${id}" min="${minVal}" max="${max}" value="${currentVal}">
+                        <button class="qty-shortcut-btn qty-pos-start" id="btn-min-${safeMarkup(id)}">最小</button>
+                        <button class="qty-shortcut-btn qty-pos-end" id="btn-half-${safeMarkup(id)}">半分</button>
+                        <input class="qty-range-main" type="range" id="range-${safeMarkup(id)}" min="${safeMarkup(minVal)}" max="${safeMarkup(max)}" value="${safeMarkup(currentVal)}">
+                        <button class="qty-shortcut-btn qty-pos-end" id="btn-max-${safeMarkup(id)}">最大</button>
+                        <input class="qty-number-end" type="number" id="num-${safeMarkup(id)}" min="${safeMarkup(minVal)}" max="${safeMarkup(max)}" value="${safeMarkup(currentVal)}">
                     </div>
                 `;
                 
