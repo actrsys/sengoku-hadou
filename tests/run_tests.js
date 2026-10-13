@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r500');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r502');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -18013,6 +18013,229 @@ test('r500 順番待ちの保存は遷移世代が失効した場合に新シナ
     await Promise.all([first, second]);
     assert.deepStrictEqual(written, [], '旧世代の待機保存は一件も実行しない');
     assert.strictEqual(snapshotStarted, 1, '待機中だった旧保存は新シナリオのスナップショットを生成しない');
+});
+
+
+// r501: オートセーブも手動保存と同じ遷移世代の失効判定に従う。
+test('r501 オートセーブの旧シナリオ生成待ちは新シナリオへ保存しない', async () => {
+    let generation = 1;
+    const writes = [];
+    const localValues = new Map([['autoSaveIndex', '2']]);
+    const ctx = createContext({
+        document: {getElementById() { return null; }},
+        localStorage: {
+            getItem(key) { return localValues.get(key) ?? null; },
+            setItem(key, value) { localValues.set(key, String(value)); }
+        }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__writes = writes;
+    vm.runInContext('saveToDB = async (key, data) => { __writes.push(key); };', ctx);
+    const game = {
+        scenarioFolder: '1560_okehazama', hasSaveData: false,
+        turnManager: {captureTurnFlowGeneration: () => generation, isTurnFlowGenerationLatest: n => n === generation}
+    };
+    const manager = new ctx.SaveManager(game);
+    manager.showSaveGuard = () => {};
+    manager.hideSaveGuard = () => {};
+    manager._validateSaveDataStructure = () => true;
+    let resolveSnapshot;
+    manager._createSaveDataObj = () => new Promise(resolve => { resolveSnapshot = resolve; });
+    const task = manager.executeAutoSave();
+    assert.strictEqual(typeof resolveSnapshot, 'function', '旧シナリオの保存生成中');
+    generation = 2;
+    game.scenarioFolder = '1570_anegawa';
+    resolveSnapshot({saveTimestamp: 1});
+    await task;
+    assert.deepStrictEqual(writes, [], '失効した保存要求はDB書込を開始しない');
+    assert.strictEqual(game.hasSaveData, false);
+    assert.strictEqual(localValues.get('autoSaveIndex'), '2', '旧要求で次の保存先を進めない');
+    assert.strictEqual(game._autoSaveInProgress, false, '入力ガードは必ず解除する');
+});
+
+test('r501 オートセーブ書込待ちで遷移した旧要求は新ゲームの状態を更新しない', async () => {
+    let generation = 1;
+    const localValues = new Map([['autoSaveIndex', '4']]);
+    const ctx = createContext({
+        document: {getElementById() { return null; }},
+        localStorage: {
+            getItem(key) { return localValues.get(key) ?? null; },
+            setItem(key, value) { localValues.set(key, String(value)); }
+        }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    let releaseWrite;
+    const keys = [];
+    ctx.__save = (key) => { keys.push(key); return new Promise(resolve => { releaseWrite = resolve; }); };
+    vm.runInContext('saveToDB = async (key, data) => __save(key);', ctx);
+    const game = {
+        scenarioFolder: '1560_okehazama', hasSaveData: false,
+        turnManager: {captureTurnFlowGeneration: () => generation, isTurnFlowGenerationLatest: n => n === generation}
+    };
+    const manager = new ctx.SaveManager(game);
+    manager.showSaveGuard = () => {};
+    manager.hideSaveGuard = () => {};
+    manager._createSaveDataObj = async () => ({saveTimestamp: 1});
+    manager._validateSaveDataStructure = () => true;
+    const task = manager.executeAutoSave();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepStrictEqual(keys, ['sengoku_autosave_slot4']);
+    generation = 2;
+    game.scenarioFolder = '1570_anegawa';
+    releaseWrite();
+    await task;
+    assert.strictEqual(game.hasSaveData, false, '失効した旧世代が新ゲームに保存ありの印を付けない');
+    assert.strictEqual(localValues.get('autoSaveIndex'), '4', '保存先ローテーションを旧世代が変更しない');
+    assert.strictEqual(game._autoSaveInProgress, false);
+});
+
+test('r501 自動保存の保存先は1～5の範囲外なら正規スロットに復旧する', async () => {
+    const localValues = new Map([['autoSaveIndex', '999']]);
+    const keys = [];
+    const ctx = createContext({
+        document: {getElementById() { return null; }},
+        localStorage: {
+            getItem(key) { return localValues.get(key) ?? null; },
+            setItem(key, value) { localValues.set(key, String(value)); }
+        }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__save = key => keys.push(key);
+    vm.runInContext('saveToDB = async (key, data) => { __save(key); };', ctx);
+    const game = {scenarioFolder: '1560_okehazama', hasSaveData: false};
+    const manager = new ctx.SaveManager(game);
+    manager.showSaveGuard = () => {};
+    manager.hideSaveGuard = () => {};
+    manager._createSaveDataObj = async () => ({saveTimestamp: 1});
+    manager._validateSaveDataStructure = () => true;
+    await manager.executeAutoSave();
+    assert.deepStrictEqual(keys, ['sengoku_autosave_slot1'], '一覧が参照する1～5だけへ保存');
+    assert.strictEqual(localValues.get('autoSaveIndex'), '2', '正常ローテーションへ復帰');
+    assert.strictEqual(game.hasSaveData, true);
+});
+
+
+// r502: 旧シナリオの自動保存が書込待ちでも、後発シナリオの自動保存を欠落させない。
+test('r502 旧世代の自動保存待機は新世代の自動保存を阻害しない', async () => {
+    let generation = 1;
+    const saved = new Map();
+    const writes = [];
+    const localValues = new Map([['autoSaveIndex', '3']]);
+    let releaseOld;
+    const ctx = createContext({
+        document: {getElementById() {return null;}},
+        localStorage: {
+            getItem(k) {return localValues.get(k) ?? null;},
+            setItem(k, v) {localValues.set(k, String(v));}
+        }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__write = (key, data) => {
+        writes.push(data.saveTimestamp);
+        if (data.saveTimestamp === 1) {
+            return new Promise(resolve => {releaseOld = () => {saved.set(key, data); resolve();};});
+        }
+        saved.set(key, data);
+        return Promise.resolve();
+    };
+    vm.runInContext('saveToDB = (key, data) => __write(key, data);', ctx);
+    const game = {
+        scenarioFolder: '1560_okehazama', hasSaveData: false,
+        turnManager: {captureTurnFlowGeneration: () => generation, isTurnFlowGenerationLatest: n => n === generation}
+    };
+    const saver = new ctx.SaveManager(game);
+    saver.showSaveGuard = () => {};
+    saver.hideSaveGuard = () => {};
+    saver._validateSaveDataStructure = () => true;
+    saver._createSaveDataObj = async () => ({saveTimestamp: generation});
+    const old = saver.executeAutoSave();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(typeof releaseOld, 'function', '古い自動保存がDBの書込待ち');
+    generation = 2;
+    game.scenarioFolder = '1570_anegawa';
+    const current = saver.executeAutoSave();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(game._autoSaveInProgress, true, '現在世代の保存要求が有効');
+    releaseOld();
+    await Promise.all([old, current]);
+    assert.deepStrictEqual(writes, [1, 2], '新しいシナリオの自動保存が取りこぼされない');
+    assert.strictEqual(saved.get('sengoku_autosave_slot3').saveTimestamp, 2, '同スロットには新しいセーブが残る');
+    assert.strictEqual(localValues.get('autoSaveIndex'), '4', '新世代の正常保存が次回保存先を進める');
+    assert.strictEqual(game.hasSaveData, true);
+    assert.strictEqual(game._autoSaveInProgress, false);
+});
+
+// r502: 異なるシナリオから同スロットへの書込が重なっても、順序は必ず守る。
+test('r502 世代をまたぐ自動保存も同一スロットでは直列化される', async () => {
+    let generation = 1;
+    const starts = [];
+    let releaseOld, releaseNew;
+    const localValues = new Map([['autoSaveIndex', '1']]);
+    const ctx = createContext({
+        document: {getElementById() {return null;}},
+        localStorage: {
+            getItem(k) {return localValues.get(k) ?? null;},
+            setItem(k, v) {localValues.set(k, String(v));}
+        }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__write = (key, data) => {
+        starts.push(data.saveTimestamp);
+        return new Promise(resolve => {
+            if (data.saveTimestamp === 1) releaseOld = resolve;
+            else releaseNew = resolve;
+        });
+    };
+    vm.runInContext('saveToDB = (key, data) => __write(key, data);', ctx);
+    const game = {
+        scenarioFolder: '1560_okehazama', hasSaveData: false,
+        turnManager: {captureTurnFlowGeneration: () => generation, isTurnFlowGenerationLatest: n => n === generation}
+    };
+    const saver = new ctx.SaveManager(game);
+    saver.showSaveGuard = () => {};
+    saver.hideSaveGuard = () => {};
+    saver._validateSaveDataStructure = () => true;
+    saver._createSaveDataObj = async () => ({saveTimestamp: generation});
+    const old = saver.executeAutoSave();
+    await new Promise(resolve => setImmediate(resolve));
+    generation = 2;
+    game.scenarioFolder = '1570_anegawa';
+    const current = saver.executeAutoSave();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepStrictEqual(starts, [1], '古い書込の完了前に同スロットの新書込を開始しない');
+    releaseOld();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepStrictEqual(starts, [1, 2], '新世代の保存は同スロットの後続へ並ぶ');
+    assert.strictEqual(game._autoSaveInProgress, true, '古い保存の終了では新しい保存中フラグを解除しない');
+    releaseNew();
+    await Promise.all([old, current]);
+    assert.strictEqual(game._autoSaveInProgress, false);
+    assert.strictEqual(localValues.get('autoSaveIndex'), '2');
+});
+
+test('r502 同一世代の自動保存二重呼出しは従来どおり抑止する', async () => {
+    const writes = [];
+    let release;
+    const ctx = createContext({
+        document: {getElementById() {return null;}},
+        localStorage: {getItem() {return '2';}, setItem() {}}
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__write = (_, data) => {writes.push(data.saveTimestamp); return new Promise(resolve => {release = resolve;});};
+    vm.runInContext('saveToDB = (key, data) => __write(key, data);', ctx);
+    const game = {scenarioFolder: '1560_okehazama', hasSaveData: false};
+    const saver = new ctx.SaveManager(game);
+    saver.showSaveGuard = () => {};
+    saver.hideSaveGuard = () => {};
+    saver._validateSaveDataStructure = () => true;
+    saver._createSaveDataObj = async () => ({saveTimestamp: 1});
+    const first = saver.executeAutoSave();
+    await new Promise(resolve => setImmediate(resolve));
+    await saver.executeAutoSave();
+    assert.deepStrictEqual(writes, [1]);
+    release();
+    await first;
+    assert.strictEqual(game._autoSaveInProgress, false);
 });
 
 Promise.all(pendingTests).then(() => {

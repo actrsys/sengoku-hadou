@@ -268,6 +268,14 @@ class SaveManager {
         };
     }
 
+    // 保存要求は発行時のターン世代とシナリオに属する。
+    // 手動・自動で同じ判定を使い、画面遷移後に旧保存が新ゲームを更新しないようにする。
+    _captureSaveRequestCurrent() {
+        const flow = this._captureLoadRequestFlow();
+        const scenarioFolder = this.game.scenarioFolder;
+        return () => (!flow || flow.isLatest()) && this.game.scenarioFolder === scenarioFolder;
+    }
+
     async _recoverFromFailedRestore() {
         const turnManager = this.game && this.game.turnManager;
         const recoveryGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
@@ -764,10 +772,7 @@ class SaveManager {
         const storageKey = "sengoku_save_slot" + slotNo;
         // 順番待ちの間にタイトル復帰・別シナリオ開始が発生した保存要求は破棄する。
         // 世代取得をキュー内へ遅らせると、古い要求が新シナリオを保存してしまう。
-        const requestFlow = this._captureLoadRequestFlow();
-        const requestScenarioFolder = this.game.scenarioFolder;
-        const isRequestCurrent = () => (!requestFlow || requestFlow.isLatest())
-            && this.game.scenarioFolder === requestScenarioFolder;
+        const isRequestCurrent = this._captureSaveRequestCurrent();
         this.showSaveGuard();
         try {
             await this._withSerializedSlotSave(storageKey, async () => {
@@ -871,31 +876,46 @@ class SaveManager {
 
     // ★追加：オートセーブを実行する魔法
     async executeAutoSave() {
-        // ★安定化：何らかの経路で二重呼び出しされても、同時に2本走らせません。
-        if (this.game._autoSaveInProgress) return;
+        // 同じゲーム内での二重実行は抑止する。ただし画面遷移で寿命が切れた
+        // 旧シナリオの書込待ちが、新しいシナリオの自動保存を阻害してはならない。
+        // 寿命判定は既存のTurnManager世代とシナリオ名を共通窓口から取得する。
+        if (this._activeAutoSaveRequest && this._activeAutoSaveRequest.isCurrent()) return;
+        const request = {isCurrent: this._captureSaveRequestCurrent()};
+        this._activeAutoSaveRequest = request;
         this.game._autoSaveInProgress = true;
         this.showSaveGuard();
         try {
-            let autoSaveIndex = parseInt(localStorage.getItem('autoSaveIndex')) || 1;
+            // 保存先はロード一覧が扱う1～5だけに限定する。破損したlocalStorage値で
+            // 参照されないスロットへ保存してしまうことを避ける。
+            const storedIndex = Number(localStorage.getItem('autoSaveIndex'));
+            const autoSaveIndex = Number.isInteger(storedIndex) && storedIndex >= 1 && storedIndex <= 5
+                ? storedIndex : 1;
+            const storageKey = 'sengoku_autosave_slot' + autoSaveIndex;
 
-            // ★低メモリ端末対策
-            // オートセーブは内部IndexedDB専用なので、勢力図サムネイルを省き、
-            // JSON.stringify→巨大文字列→TextEncoder→巨大Uint8Array という一時的な二重・三重保持も避けます。
-            // SaveManagerは現在仕様として、手動のUint8Arrayと低メモリ用オートセーブのオブジェクトを両方扱います。
+            // オートセーブは内部IndexedDB専用なので勢力図サムネイルを省き、
+            // 低メモリ端末向けに巨大な暗号化バッファも生成しない。
             const data = await this._createSaveDataObj({ includeThumbnail: false });
-            if (!data) return;
+            if (!data || !request.isCurrent()) return;
             this._validateSaveDataStructure(data);
-            await saveToDB("sengoku_autosave_slot" + autoSaveIndex, data);
-            // オートセーブもロード可能データなので、システムメニューのロード可否へ即時反映します。
-            this.game.hasSaveData = true;
+            if (!request.isCurrent()) return;
 
-            autoSaveIndex++;
-            if (autoSaveIndex > 5) autoSaveIndex = 1;
-            localStorage.setItem('autoSaveIndex', autoSaveIndex);
+            // 手動保存と同じスロット単位の直列化を使う。旧ゲームの書込みが
+            // 開始済みでも、後発ゲームのセーブが先に完了してから巻き戻されない。
+            await this._withSerializedSlotSave(storageKey, async () => {
+                if (!request.isCurrent()) return;
+                await saveToDB(storageKey, data);
+                if (!request.isCurrent()) return;
+                this.game.hasSaveData = true;
+                localStorage.setItem('autoSaveIndex', autoSaveIndex === 5 ? 1 : autoSaveIndex + 1);
+            });
         } catch (e) {
-            console.error("オートセーブに失敗しました:", e);
+            console.error('オートセーブに失敗しました:', e);
         } finally {
-            this.game._autoSaveInProgress = false;
+            // 古い保存のfinallyで新しい保存中フラグを解除しない。
+            if (this._activeAutoSaveRequest === request) {
+                this._activeAutoSaveRequest = null;
+                this.game._autoSaveInProgress = false;
+            }
             this.hideSaveGuard();
         }
     }
