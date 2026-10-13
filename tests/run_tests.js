@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r495');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r498');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -14136,7 +14136,7 @@ test('r430ではセーブ復元完了まで入力抑止を維持し旧復元を�
     assert.ok(titleBlock.includes('const titleFlowGeneration = turnManager.captureTurnFlowGeneration();'), 'タイトル復帰も同じTurnManager世代を所有する');
     assert.ok(titleBlock.includes('const isTitleFlowLatest = () => turnManager.isTurnFlowGenerationLatest(titleFlowGeneration);'));
     assert.ok(titleBlock.includes('await this.checkSaveDataForTitle({ isCurrent: isTitleFlowLatest });'), 'セーブ有無確認のawaitも旧タイトル復帰から新状態へ作用させない');
-    assert.ok((titleBlock.match(/if \(!isTitleFlowLatest\(\)\) return;/g) || []).length >= 3, 'タイトル復帰の主要await後に世代を再確認する');
+    assert.ok((titleBlock.match(/if \(!isTitleFlowLatest\(\)\) return false;/g) || []).length >= 3, 'タイトル復帰の主要await後に世代を再確認する');
     assert.ok(titleBlock.includes('if (this.game) this.game.isRestoringSave = false;'), 'タイトル復帰が旧復元の入力抑止を持ち越さない');
 
     const titleSaveAt = ui.indexOf('async checkSaveDataForTitle(options = {})');
@@ -17796,6 +17796,91 @@ test('r495 独立Viewの安全文字列・顔画像ポリシーは共通表示�
         'nobunaga.webp', 'unknown_face.webp', 'portrait_9-2.jpg']) {
         assert.strictEqual(info._safeFaceIconPath(face), ctx.StatPresenter.safeFaceIconPath(face));
     }
+});
+
+// r496: タイトル復帰の可視状態はUIManagerへ集約し、呼出元が#appを直接操作しない。
+test('r496 UIManagerの双方向固定画面切替とタイトル復帰の整合', async () => {
+    const cls = initial => { const flags = new Set(initial); return { add: x => flags.add(x), remove: x => flags.delete(x), contains: x => flags.has(x) }; };
+    const title = {classList: cls(['hidden'])};
+    const app = {classList: cls([])};
+    const ctx = createContext({document: {getElementById: id => ({'title-screen': title, app})[id] || null}});
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const turnManager = {g:0, abortForScenarioTransition(){this.g++;}, captureTurnFlowGeneration(){return this.g;}, isTurnFlowGenerationLatest(g){return g===this.g;}};
+    const ui = {showLoadingScreen(){},updateLoadingProgress(){},async waitForNextPaint(){},forceResetModals(){},resetMapViewState(){},async checkSaveDataForTitle(){},async hideLoadingScreen(){},showTitleSurface:UI.prototype.showTitleSurface,game:{phase:'game',isRestoringSave:false,turnManager,releaseScenarioMapResources(){}}};
+    await UI.prototype.returnToTitle.call(ui);
+    assert.ok(!title.classList.contains('hidden') && app.classList.contains('hidden'), 'タイトル復帰は背面の地図も隠す');
+    UI.prototype.showGameSurface.call(ui);
+    assert.ok(title.classList.contains('hidden') && !app.classList.contains('hidden'), 'ゲーム開始で双方を復元');
+});
+
+test('r496 戻り操作の呼出元は固定DOMの表示状態を独自変更しない', () => {
+    const command = read('js/command_system.js');
+    const map = read('js/ui_map.js');
+    const cmd = command.slice(command.indexOf("case 'title':"), command.indexOf('default:', command.indexOf("case 'title':")));
+    const back = map.slice(map.indexOf('backToScenarioBtn.onclick = async () =>'), map.indexOf('backToScenarioBtn.onclick = async () =>') + 900);
+    assert.ok(cmd.includes('this.game.ui.returnToTitle()') && !cmd.includes("getElementById('app')"));
+    assert.ok(back.includes('await this.returnToTitle()') && !back.includes("getElementById('app')"));
+});
+
+// r497: タイトル復帰中の後発遷移で古い「シナリオへ戻る」が新規ゲームを開始しない。
+test('r497 タイトル復帰の完了可否は後発遷移で失効し、シナリオ再選択は成功時だけ始める', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    let generation = 0;
+    let finishCheck;
+    let checkStarted;
+    const enteredCheck = new Promise(resolve => { checkStarted = resolve; });
+    const game = {
+        phase: 'game', isRestoringSave: false,
+        turnManager: {
+            abortForScenarioTransition() { generation++; },
+            captureTurnFlowGeneration() { return generation; },
+            isTurnFlowGenerationLatest(token) { return token === generation; }
+        },
+        releaseScenarioMapResources() {}
+    };
+    const ui = {
+        game,
+        showLoadingScreen() {}, updateLoadingProgress() {},
+        async waitForNextPaint() {}, forceResetModals() {}, resetMapViewState() {},
+        showTitleSurface() {},
+        checkSaveDataForTitle() {
+            checkStarted();
+            return new Promise(resolve => { finishCheck = resolve; });
+        },
+        async hideLoadingScreen() { return true; }
+    };
+    const pending = UI.prototype.returnToTitle.call(ui);
+    await enteredCheck;
+    game.turnManager.abortForScenarioTransition(); // 後発のシナリオ開始・ロードが所有権を取得
+    finishCheck();
+    assert.strictEqual(await pending, false, '失効した復帰は完了扱いにしない');
+    ui.checkSaveDataForTitle = async () => {};
+    assert.strictEqual(await UI.prototype.returnToTitle.call(ui), true, '正常復帰だけを完了と返す');
+    const mapSource = read('js/ui_map.js');
+    const back = mapSource.slice(mapSource.indexOf('backToScenarioBtn.onclick = async () =>'), mapSource.indexOf('backToScenarioBtn.onclick = async () =>') + 700);
+    assert.ok(/if\s*\(![\w]+\)\s*return;/.test(back), '呼出元は復帰失効時に新規ゲーム開始を中断する');
+
+    // 個別画面の実ハンドラを切り出し、失効後には新規ゲームを始めないことを実行確認する。
+    const start = mapSource.indexOf('backToScenarioBtn.onclick = async () =>');
+    const binding = mapSource.slice(start, mapSource.indexOf('};', start) + 2);
+    const button = {classList: new FakeClassList()};
+    let starts = 0;
+    const boundCtx = createContext({
+        backToScenarioBtn: button,
+        document: {body: {classList: new FakeClassList(['daimyo-select-mode'])}}
+    });
+    const bindHandler = vm.runInContext(`(function() { ${binding} })`, boundCtx);
+    const screen = {returnToTitle: async () => false, game: {startNewGame() {starts++;}}};
+    bindHandler.call(screen);
+    await button.onclick();
+    assert.strictEqual(starts, 0, '後発開始で旧タイトル復帰が失効した時は再選択を開始しない');
+    screen.returnToTitle = async () => true;
+    bindHandler.call(screen);
+    await button.onclick();
+    assert.strictEqual(starts, 1, '正常復帰だけ次のシナリオ選択へ進む');
 });
 
 Promise.all(pendingTests).then(() => {

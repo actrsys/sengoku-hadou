@@ -1881,6 +1881,15 @@ class UIManager {
         if (app) app.classList.remove('hidden');
     }
 
+    // タイトル復帰も同じ固定画面の可視化責務へ集約する。
+    // ロード幕・状態世代・地図資源の整理はreturnToTitle側で順序を維持する。
+    showTitleSurface() {
+        const title = document.getElementById('title-screen');
+        const app = document.getElementById('app');
+        if (app) app.classList.add('hidden');
+        if (title) title.classList.remove('hidden');
+    }
+
     // ロード画面。装飾アニメーションではなく、実際の処理段階と進捗率を表示します。
     showLoadingScreen(label = '準備しています', progress = 0) {
         // 以前の非同期終了処理は、新しい画面遷移のロード幕を閉じてはならない。
@@ -2634,7 +2643,7 @@ class UIManager {
         const turnManager = this.game && this.game.turnManager;
         if (!turnManager || typeof turnManager.abortForScenarioTransition !== 'function'
             || typeof turnManager.captureTurnFlowGeneration !== 'function'
-            || typeof turnManager.isTurnFlowGenerationLatest !== 'function') return;
+            || typeof turnManager.isTurnFlowGenerationLatest !== 'function') return false;
         turnManager.abortForScenarioTransition();
         const titleFlowGeneration = turnManager.captureTurnFlowGeneration();
         const isTitleFlowLatest = () => turnManager.isTurnFlowGenerationLatest(titleFlowGeneration);
@@ -2642,7 +2651,7 @@ class UIManager {
         // 入力抑止用フラグを持ち越さない。旧ロード側は世代不一致で以後の処理を停止する。
         if (this.game) this.game.isRestoringSave = false;
         await this.waitForNextPaint();
-        if (!isTitleFlowLatest()) return;
+        if (!isTitleFlowLatest()) return false;
 
         if (this.game && this.game.warManager && typeof this.game.warManager.abortForScenarioTransition === 'function') {
             this.game.warManager.abortForScenarioTransition();
@@ -2660,8 +2669,7 @@ class UIManager {
         // ゲームのステータスを「タイトル画面」に戻します。
         if (this.game) this.game.phase = 'title';
 
-        const ts = document.getElementById('title-screen');
-        if(ts) ts.classList.remove('hidden'); 
+        this.showTitleSurface(); 
         
         if (window.AudioManager) {
             window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
@@ -2669,12 +2677,15 @@ class UIManager {
 
         this.updateLoadingProgress(75, 'セーブデータを確認しています');
         await this.checkSaveDataForTitle({ isCurrent: isTitleFlowLatest });
-        if (!isTitleFlowLatest()) return;
+        if (!isTitleFlowLatest()) return false;
         this.updateLoadingProgress(100, '準備完了');
         await this.waitForNextPaint();
-        if (!isTitleFlowLatest()) return;
+        if (!isTitleFlowLatest()) return false;
 
-        await this.hideLoadingScreen();
+        // 続けて別の画面へ移る呼出元には、タイトル復帰が有効な世代で
+        // 最後まで完了したかを返す。失効した復帰からの後続画面生成を防ぐ。
+        const dismissed = await this.hideLoadingScreen();
+        return isTitleFlowLatest() && dismissed !== false;
     }
     
     // ★ ここをごっそり差し替え！：大名選択の確認画面を、ギュッと小さくコンパクトにする魔法です！

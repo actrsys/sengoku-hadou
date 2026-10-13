@@ -2027,13 +2027,9 @@ Object.assign(UIManager.prototype, {
                         document.body.classList.remove('daimyo-select-mode');
                         backToScenarioBtn.classList.add('hidden');
 
-                        // 裏に残っているマップの画面（app）をしっかり隠します！
-                        const appContainer = document.getElementById('app');
-                        if (appContainer) {
-                            appContainer.classList.add('hidden');
-                        }
-                        
-                        await this.returnToTitle();
+                        // 固定画面の可視化はreturnToTitle側が一元管理する。
+                        const titleReady = await this.returnToTitle();
+                        if (!titleReady) return; // 後発ロード・開始で復帰が失効した場合は何もしない。
                         if (this.game) this.game.startNewGame();
                     };
                 }

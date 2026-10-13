@@ -809,10 +809,8 @@ class CommandSystem {
                 break;
             case 'title':
                 this.game.ui.showDialog("タイトル画面に戻りますか？\n保存していないデータは失われます。", true, () => {
-                    // 「はい」を押した時だけ、タイトル画面を呼び出してゲーム画面を隠します
+                    // 固定画面の切替はUIManager.returnToTitleに委譲する。
                     this.game.ui.returnToTitle();
-                    const appScreen = document.getElementById('app');
-                    if (appScreen) appScreen.classList.add('hidden');
                 }, null, { closeBeforeOk: true, closeBeforeCancel: true });
                 break;
             default:
