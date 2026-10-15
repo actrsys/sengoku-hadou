@@ -247,7 +247,9 @@ class UIManager {
         let previousListSnapType = '';
 
         document.addEventListener('mousedown', (e) => {
-            if (!document.body.classList.contains('is-pc')) return;
+            // 右クリックは戻る操作、中央ボタンはブラウザ既定操作へ委譲。
+            // 一覧のドラッグは左ボタンで始まった時だけ受け付ける。
+            if (!document.body.classList.contains('is-pc') || e.button !== 0) return;
 
             const listObj = e.target.closest('.list-container, .result-body, #divide-list, .daimyo-list-container, .faction-list-container');
             if (listObj) {
@@ -272,8 +274,31 @@ class UIManager {
             }
         });
 
+        // ウィンドウ外でボタンを離すとdocumentのmouseupは届かない。
+        // 描画の終了と異なり、中断時は余分なスクロール補正をせず元の状態へ戻す。
+        const cancelListDrag = () => {
+            // 一覧ドラッグと無関係なblurが別UIのuserSelect設定を変えないようにする。
+            if (!isListMouseDown && !listDragReleaseTimer) return;
+            if (listDragReleaseTimer) {
+                clearTimeout(listDragReleaseTimer);
+                listDragReleaseTimer = null;
+            }
+            if (isListMouseDown && hasListDragged) {
+                if (currentDragList) currentDragList.style.scrollSnapType = previousListSnapType;
+                document.body.style.userSelect = '';
+            }
+            isListMouseDown = false;
+            hasListDragged = false;
+            currentDragList = null;
+        };
+
         document.addEventListener('mousemove', (e) => {
             if (!isListMouseDown || !currentDragList) return;
+            // 一度外へ出てmouseupを取り逃した場合は、次の移動時のボタン状態で復旧する。
+            if (typeof e.buttons === 'number' && (e.buttons & 1) === 0) {
+                cancelListDrag();
+                return;
+            }
             const walk = (e.pageY - listStartY) * 1.2; 
             
             if (Math.abs(walk) > 5) {
@@ -308,6 +333,10 @@ class UIManager {
         };
 
         document.addEventListener('mouseup', endListDrag);
+        window.addEventListener('blur', cancelListDrag);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) cancelListDrag();
+        });
 
         document.addEventListener('click', (e) => {
             if (hasListDragged) {

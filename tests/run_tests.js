@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r534');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r535');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -20722,10 +20722,10 @@ test('r534 PC結果画面のドラッグ後はCSS由来の非スナップ設定�
     const context = createContext({
         document: { body: { classList: { contains: value => value === 'is-pc' }, style: {} },
             addEventListener(name, fn) { handlers.set(name, fn); } },
-        setTimeout() { return 1; }, clearTimeout() {}
+        addEventListener() {}, setTimeout() { return 1; }, clearTimeout() {}
     });
     vm.runInContext(uiSource.slice(begin, end), context);
-    handlers.get('mousedown')({ target, clientX: 120, pageY: 100 });
+    handlers.get('mousedown')({ button: 0, target, clientX: 120, pageY: 100 });
     handlers.get('mousemove')({ pageY: 140 });
     assert.strictEqual(resultBody.style.scrollSnapType, 'none', 'ドラッグ中は吸着を無効にする');
     handlers.get('mouseup')();
@@ -20746,13 +20746,92 @@ test('r534 PC共通一覧はドラッグ前に設定された個別のsnap値を
     const context = createContext({
         document: { body: { classList: { contains: () => true }, style: {} },
             addEventListener(name, fn) { handlers.set(name, fn); } },
-        setTimeout() { return 1; }, clearTimeout() {}
+        addEventListener() {}, setTimeout() { return 1; }, clearTimeout() {}
     });
     vm.runInContext(uiSource.slice(begin, end), context);
-    handlers.get('mousedown')({ target, clientX: 120, pageY: 90 });
+    handlers.get('mousedown')({ button: 0, target, clientX: 120, pageY: 90 });
     handlers.get('mousemove')({ pageY: 115 });
     handlers.get('mouseup')();
     assert.strictEqual(list.style.scrollSnapType, 'y proximity', '一覧ごとの独自snap設定を上書きしない');
+});
+
+// r535: PC list gestures must not capture context-clicks or remain held when the browser loses mouseup.
+test('r535 PC共通一覧は右ボタンのドラッグでスクロールしない', () => {
+    const source = read('js/ui.js');
+    const begin = source.indexOf('let isListMouseDown = false;');
+    const end = source.indexOf('this.dialogQueue = [];', begin);
+    const handlers = new Map();
+    const list = { style: { scrollSnapType: '' }, scrollTop: 150,
+        getBoundingClientRect: () => ({ right: 500 }), scrollBy() {} };
+    const context = createContext({ document: {
+        body: { classList: { contains: name => name === 'is-pc' }, style: {} },
+        addEventListener(name, fn) { handlers.set(name, fn); }
+    }, addEventListener() {}, setTimeout: () => 1, clearTimeout() {} });
+    vm.runInContext(source.slice(begin, end), context);
+    handlers.get('mousedown')({ button: 2, clientX: 100, pageY: 100, target: { closest: () => list } });
+    handlers.get('mousemove')({ pageY: 130, buttons: 2 });
+    assert.strictEqual(list.scrollTop, 150, '右クリックの移動でリストをスクロールしない');
+    assert.strictEqual(list.style.scrollSnapType, '', '右クリックでスクロール設定を上書きしない');
+});
+
+test('r535 PC共通一覧はウィンドウ外へフォーカスを移すとドラッグを中断する', () => {
+    const source = read('js/ui.js');
+    const begin = source.indexOf('let isListMouseDown = false;');
+    const end = source.indexOf('this.dialogQueue = [];', begin);
+    const handlers = new Map(), windowHandlers = new Map();
+    const list = { style: { scrollSnapType: 'y proximity' }, scrollTop: 100,
+        getBoundingClientRect: () => ({ right: 500 }), scrollBy() {} };
+    const context = createContext({ document: {
+        body: { classList: { contains: () => true }, style: {} },
+        addEventListener(name, fn) { handlers.set(name, fn); }
+    }, addEventListener(name, fn) { windowHandlers.set(name, fn); }, setTimeout: () => 1, clearTimeout() {} });
+    vm.runInContext(source.slice(begin, end), context);
+    handlers.get('mousedown')({ button: 0, clientX: 100, pageY: 100, target: { closest: () => list } });
+    handlers.get('mousemove')({ pageY: 120, buttons: 1 });
+    assert.strictEqual(context.document.body.style.userSelect, 'none');
+    assert.strictEqual(list.style.scrollSnapType, 'none');
+    assert.ok(windowHandlers.get('blur'), 'ウィンドウ外解放を検知して解除できること');
+    windowHandlers.get('blur')();
+    assert.strictEqual(context.document.body.style.userSelect, '', '文字選択禁止を残さない');
+    assert.strictEqual(list.style.scrollSnapType, 'y proximity', '元のスクロール設定へ戻す');
+    const after = list.scrollTop;
+    handlers.get('mousemove')({ pageY: 180, buttons: 0 });
+    assert.strictEqual(list.scrollTop, after, 'ウィンドウ復帰後の移動ではスクロールしない');
+});
+
+test('r535 一覧ドラッグ中でないblurは別画面の文字選択設定に干渉しない', () => {
+    const source = read('js/ui.js');
+    const begin = source.indexOf('let isListMouseDown = false;');
+    const end = source.indexOf('this.dialogQueue = [];', begin);
+    const handlers = new Map();
+    const context = createContext({ document: {
+        body: { classList: { contains: () => true }, style: { userSelect: 'none' } },
+        addEventListener() {}
+    }, addEventListener(name, fn) { handlers.set(name, fn); },
+        setTimeout: () => 1, clearTimeout() {} });
+    vm.runInContext(source.slice(begin, end), context);
+    handlers.get('blur')();
+    assert.strictEqual(context.document.body.style.userSelect, 'none', '一覧未操作のblurは他UIの選択設定を上書きしない');
+});
+
+test('r535 PC共通一覧はmouseupを失ってもbuttons=0でドラッグを止める', () => {
+    const source = read('js/ui.js');
+    const begin = source.indexOf('let isListMouseDown = false;');
+    const end = source.indexOf('this.dialogQueue = [];', begin);
+    const handlers = new Map();
+    const list = { style: { scrollSnapType: '' }, scrollTop: 100,
+        getBoundingClientRect: () => ({ right: 500 }), scrollBy() {} };
+    const context = createContext({ document: {
+        body: { classList: { contains: () => true }, style: {} },
+        addEventListener(name, fn) { handlers.set(name, fn); }
+    }, addEventListener() {}, setTimeout: () => 1, clearTimeout() {} });
+    vm.runInContext(source.slice(begin, end), context);
+    handlers.get('mousedown')({ button: 0, clientX: 100, pageY: 100, target: { closest: () => list } });
+    handlers.get('mousemove')({ pageY: 120, buttons: 1 });
+    handlers.get('mousemove')({ pageY: 140, buttons: 0 });
+    assert.strictEqual(context.document.body.style.userSelect, '', 'ボタンが離れたら選択を復元');
+    assert.strictEqual(list.style.scrollSnapType, '', 'スナップ設定を復元');
+    assert.strictEqual(list.scrollTop, 76, 'mousedownから最初のdrag分だけ適用し、解放後の移動は無視');
 });
 
 Promise.all(pendingTests).then(() => {
