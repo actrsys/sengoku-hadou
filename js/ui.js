@@ -3213,6 +3213,32 @@ class UIManager {
         }
     }
     
+    // PC/スマホ共通：確認画面を開いた拠点ターンにだけ「命令終了」を適用する。
+    // ターンの正当性はTurnManager、確認画面の表示はUIManagerに分担する。
+    _confirmFinishTurn() {
+        if (!this._canRenderCommandMenuForCurrentCastle()) return;
+        const turnManager = this.game?.turnManager;
+        if (!turnManager || typeof turnManager.capturePlayerTurnContext !== 'function'
+            || typeof turnManager.isPlayerTurnContextCurrent !== 'function') return;
+        const turnContext = turnManager.capturePlayerTurnContext();
+        if (!turnManager.isPlayerTurnContextCurrent(turnContext)
+            || this.currentCastle !== turnContext.castle) return;
+
+        this.cancelMapSelection(true);
+        const nav = this.game.getNavigatorInfo(turnContext.castle);
+        this.showDialog("「今月の命令を終了しますか？」", true, () => {
+            if (!turnManager.isPlayerTurnContextCurrent(turnContext)
+                || this.currentCastle !== turnContext.castle
+                || !this._canRenderCommandMenuForCurrentCastle()) return;
+            this.game.finishTurn();
+        }, null, {
+            leftFace: nav.faceIcon,
+            leftName: nav.name,
+            closeBeforeOk: true,
+            closeBeforeCancel: true
+        });
+    }
+
     renderCommandMenu() {
         if (!this._canRenderCommandMenuForCurrentCastle()) {
             this.clearCommandMenu();
@@ -3255,19 +3281,7 @@ class UIManager {
                 const finishBtn = document.createElement('button');
                 finishBtn.className = `cmd-btn finish`;
                 finishBtn.textContent = "命令終了";
-                finishBtn.onclick = () => {
-                    if (!this._canRenderCommandMenuForCurrentCastle()) return;
-                    this.cancelMapSelection(true);
-                    const nav = this.game.getNavigatorInfo(this.currentCastle);
-                    this.showDialog("「今月の命令を終了しますか？」", true, () => {
-                        this.game.finishTurn();
-                    }, null, {
-                        leftFace: nav.faceIcon,
-                        leftName: nav.name,
-                        closeBeforeOk: true,
-                        closeBeforeCancel: true
-                    });
-                };
+                finishBtn.onclick = () => this._confirmFinishTurn();
                 mobileArea.appendChild(finishBtn);
             } else {
                 let currentMenuInfo = null;
@@ -3373,20 +3387,8 @@ class UIManager {
                 this.renderPcCommandMenu();
             }, isDisabled); // ★ここも忘れずに isDisabled を渡します
         });
-        createBtn(col1, "命令終了", "finish", () => {
-            if (!this._canRenderCommandMenuForCurrentCastle()) return;
-            this.cancelMapSelection(true);
-            const nav = this.game.getNavigatorInfo(this.currentCastle);
-            this.showDialog("「今月の命令を終了しますか？」", true, () => {
-                this.game.finishTurn();
-            }, null, {
-                leftFace: nav.faceIcon,
-                leftName: nav.name,
-                closeBeforeOk: true,
-                closeBeforeCancel: true
-            });
-        });
-        
+        createBtn(col1, "命令終了", "finish", () => this._confirmFinishTurn());
+
         const renderSubMenu = (menuList, pathIndex, parentCol) => {
             if (this.pcMenuPath.length <= pathIndex) return;
             

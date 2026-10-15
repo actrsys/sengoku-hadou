@@ -776,7 +776,7 @@ class CommandSystem {
                 this.game.ui.saveLoadView.open('save');
                 break;
             case 'reward_all':
-                this.game.ui.showDialog(`金${window.MainParams.CommandCost.RewardAll}を支払い、家臣全員に褒美を与えます。よろしいですか？`, true, () => {
+                this._showCommandConfirmation(`金${window.MainParams.CommandCost.RewardAll}を支払い、家臣全員に褒美を与えます。よろしいですか？`, () => {
                     this.executeRewardAll();
                 }, null, { okText: '実行', cancelText: 'やめる', closeBeforeCancel: true });
                 break;
@@ -803,12 +803,12 @@ class CommandSystem {
                 if (this.game.ui.legionCouncilView) this.game.ui.legionCouncilView.requestOpen();
                 break;
             case 'watch':
-                this.game.ui.showDialog("AI同士の戦いを観戦しますか？\n（画面の右クリック、または長押しで中断できます）", true, () => {
+                this._showCommandConfirmation("AI同士の戦いを観戦しますか？\n（画面の右クリック、または長押しで中断できます）", () => {
                     this.game.startWatchMode();
                 }, null, { okText: '観戦する', okClass: 'btn-primary', cancelText: 'やめる', closeBeforeOk: true, closeBeforeCancel: true });
                 break;
             case 'title':
-                this.game.ui.showDialog("タイトル画面に戻りますか？\n保存していないデータは失われます。", true, () => {
+                this._showCommandConfirmation("タイトル画面に戻りますか？\n保存していないデータは失われます。", () => {
                     // 固定画面の切替はUIManager.returnToTitleに委譲する。
                     this.game.ui.returnToTitle();
                 }, null, { closeBeforeOk: true, closeBeforeCancel: true });
@@ -857,9 +857,8 @@ class CommandSystem {
         }
 
         // 大雪警告は数量画面へ進む前に出し、［戻る］なら背後の武将選択へそのまま戻します。
-        this.game.ui.showDialog(
+        this._showCommandConfirmation(
             "大雪の影響により、出陣すると被害が出る場合があります。\n出陣準備を続けますか？",
-            true,
             openSupplies,
             null,
             {
@@ -935,7 +934,7 @@ class CommandSystem {
                 
                 const msg = `${busho.name}に${princess.name}を嫁がせます。よろしいですか？`;
                 
-                this.game.ui.showDialog(msg, true, 
+                this._showCommandConfirmation(msg, 
                     () => {
                         this.game.ui.info.closeCommonModal();
                         this.executeWithEvent('arrange_marriage', () => this.executeArrangeMarriage(busho, princess));
@@ -968,7 +967,7 @@ class CommandSystem {
 
             const msg = `${targetClan.name}の${targetBusho.name}に、当家の${princess.name}を嫁がせます。よろしいですか？`;
 
-            this.game.ui.showDialog(msg, true, 
+            this._showCommandConfirmation(msg, 
                 () => {
                     // 最終確認が通った時だけ選択セッションを閉じ、軍師助言・外交会話へ引き渡します。
                     const prob = this.game.diplomacyManager.getDiplomacyProb(doerId, targetId, 'marriage');
@@ -1018,7 +1017,7 @@ class CommandSystem {
                 const prob = this.game.diplomacyManager.getDiplomacyProb(firstId, targetId, 'subordinate');
                 this.showAdviceAndExecute('subordinate', () => this.game.diplomacyManager.executeDiplomacy(firstId, targetId, 'subordinate'), { trueProb: prob / 100 }, { beforeConfirm: beginDiplomacySelectorHandoff });
             } else if (extraData.subAction === 'vassalage') {
-                this.game.ui.showDialog(`本当に臣従しますか？\n当家は滅亡し、全ての領地を明け渡します。`, true, 
+                this._showCommandConfirmation(`本当に臣従しますか？\n当家は滅亡し、全ての領地を明け渡します。`, 
                     () => {
                         beginDiplomacySelectorHandoff();
                         this.executeWithEvent('vassalage', () => this.game.diplomacyManager.executeVassalage(firstId, targetId));
@@ -1177,7 +1176,7 @@ class CommandSystem {
 
         if (actionType === 'succession_target') {
             const bushoA = this.game.getBusho(firstId);
-            this.game.ui.showDialog(`${bushoA.name}に家督を譲りますか？`, true, 
+            this._showCommandConfirmation(`${bushoA.name}に家督を譲りますか？`, 
                 () => {
                     // 確定時だけ候補一覧を正式終了。［戻る］なら背後の候補一覧へ戻ります。
                     if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
@@ -1191,7 +1190,7 @@ class CommandSystem {
 
         if (actionType === 'adopt_son_target') {
             const bushoA = this.game.getBusho(firstId);
-            this.game.ui.showDialog(`${bushoA.name}を養子にしますか？`, true, 
+            this._showCommandConfirmation(`${bushoA.name}を養子にしますか？`, 
                 () => {
                     // 確定時だけ候補一覧を正式終了。［戻る］なら背後の候補一覧へ戻ります。
                     if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
@@ -1213,7 +1212,7 @@ class CommandSystem {
             if (!busho) return;
             // 追放は実行イベントへ入る前に確認します。取消時は候補一覧を残し、
             // 確定時だけ一覧を閉じて before/after_command を実行します。
-            this.game.ui.showDialog(`本当に${busho.name}を追放しますか？`, true, () => {
+            this._showCommandConfirmation(`本当に${busho.name}を追放しますか？`, () => {
                 if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
                 this.executeWithEvent('banish', () => this.executeCommand('banish', selectedIds, targetId));
             }, null, { cancelText: '戻る', closeBeforeCancel: true });
@@ -1336,6 +1335,7 @@ class CommandSystem {
             && this.game.turnQueue[startIndex] != null;
         return {
             turnManager, generation, startIndex, hasTurnPosition,
+            year: this.game?.year, month: this.game?.month,
             startCastle: hasTurnPosition ? this.game.turnQueue[startIndex] : null
         };
     }
@@ -1349,8 +1349,19 @@ class CommandSystem {
 
     _isCommandTurnCurrent(context) {
         return this._isCommandScenarioCurrent(context)
+            && this.game?.year === context.year && this.game?.month === context.month
             && (!context.hasTurnPosition || (Number(this.game.currentIndex) === context.startIndex
                 && this.game.turnQueue?.[context.startIndex] === context.startCastle));
+    }
+
+    // ユーザーの確定を待つ間も開始元のターンを固定する。
+    // executeWithEvent() 側で再取得するだけでは、古い［はい］が後発ターンで実行される。
+    _showCommandConfirmation(message, onConfirm, onCancel = null, options = {}) {
+        const context = this._captureCommandTurnContext();
+        this.game.ui.showDialog(message, true, () => {
+            if (!this._isCommandTurnCurrent(context)) return;
+            if (typeof onConfirm === 'function') onConfirm();
+        }, onCancel, options);
     }
 
     async executeWithEvent(type, executeFunc, extraContext = {}) {

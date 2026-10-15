@@ -287,6 +287,16 @@ class SaveManager {
         return () => (!flow || flow.isLatest()) && this.game.scenarioFolder === scenarioFolder;
     }
 
+    // ロードできなかった旨の案内は、ロード幕を取り除いてから出す。
+    // 待機中にタイトル復帰・後発ロードへ移った場合は、旧案内を新しい画面へ重ねない。
+    async _showLoadAbortDialog(requestFlow, message) {
+        const ui = this.game.ui;
+        if (!ui || !requestFlow || !requestFlow.isLatest()) return;
+        await ui.hideLoadingScreen();
+        if (!requestFlow.isLatest()) return;
+        ui.showDialog(message, false);
+    }
+
     async _recoverFromFailedRestore() {
         const turnManager = this.game && this.game.turnManager;
         const recoveryGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
@@ -310,7 +320,8 @@ class SaveManager {
         if (this.game.warManager && this.game.warManager.state) this.game.warManager.state.active = false;
         if (this.game.ui) {
             if (typeof this.game.ui.resetMapViewState === 'function') this.game.ui.resetMapViewState();
-            this.game.ui.hideLoadingScreen();
+            await this.game.ui.hideLoadingScreen();
+            if (!isRecoveryLatest()) return;
             if (typeof this.game.ui.forceResetModals === 'function') this.game.ui.forceResetModals();
 
             const message = "セーブデータの復元中に問題が発生したため、タイトルへ戻ります。";
@@ -764,18 +775,12 @@ class SaveManager {
                     await this._recoverFromFailedRestore();
                     return;
                 }
-                if (this.game.ui) {
-                    this.game.ui.hideLoadingScreen();
-                    this.game.ui.showDialog("セーブデータの構造を確認できなかったため、読み込みを中止しました。", false);
-                }
+                await this._showLoadAbortDialog(requestFlow,
+                    "セーブデータの構造を確認できなかったため、読み込みを中止しました。");
             } 
         }; 
-        reader.onerror = () => {
-            if (!requestFlow.isLatest()) return;
-            if (this.game.ui) {
-                this.game.ui.hideLoadingScreen();
-                this.game.ui.showDialog("セーブファイルを読み取れませんでした。", false);
-            }
+        reader.onerror = async () => {
+            await this._showLoadAbortDialog(requestFlow, "セーブファイルを読み取れませんでした。");
         };
         reader.readAsArrayBuffer(file); // ★テキストではなくバイナリとして読み込む魔法に変更します
     }
@@ -842,19 +847,15 @@ class SaveManager {
             if (!requestFlow.isLatest()) return;
             console.error("ロードエラー:", e);
             // DBアクセス失敗と実際の空スロットは別。ロードを中断して再試行を案内する。
-            if (this.game.ui) {
-                this.game.ui.hideLoadingScreen();
-                this.game.ui.showDialog(`スロット${slotNo}の読込に失敗しました。保存領域を確認して再試行してください。`, false);
-            }
+            await this._showLoadAbortDialog(requestFlow,
+                `スロット${slotNo}の読込に失敗しました。保存領域を確認して再試行してください。`);
             return;
         }
         if (!requestFlow.isLatest()) return;
 
         if (!rawData) {
-            if (this.game.ui) {
-                this.game.ui.hideLoadingScreen(); // ★エラーで止まる時は蓋を開けます
-                this.game.ui.showDialog(`スロット${slotNo}にはセーブデータがありません。`, false);
-            }
+            await this._showLoadAbortDialog(requestFlow,
+                `スロット${slotNo}にはセーブデータがありません。`);
             return;
         }
 
@@ -880,10 +881,8 @@ class SaveManager {
                 await this._recoverFromFailedRestore();
                 return;
             }
-            if (this.game.ui) {
-                this.game.ui.hideLoadingScreen();
-                this.game.ui.showDialog("セーブデータの構造を確認できなかったため、読み込みを中止しました。", false);
-            }
+            await this._showLoadAbortDialog(requestFlow,
+                "セーブデータの構造を確認できなかったため、読み込みを中止しました。");
         }
     }
 
@@ -1063,15 +1062,12 @@ class SaveManager {
         if (latestSlot !== -1) {
             await this.loadGameFromLocal(latestSlot, latestPrefix);
         } else {
-            if (this.game.ui) {
-                this.game.ui.hideLoadingScreen(); // ★データがなくてやめる時は蓋を開けます
-                const message = hasReadError
-                    ? '一部のセーブスロットを読み取れませんでした。保存領域を確認して再試行してください。'
-                    : hasInvalidData
-                        ? '保存データはありますが、現在の形式で読み込めるセーブデータはありません。セーブ一覧で確認してください。'
-                        : 'セーブデータが見つかりません。';
-                this.game.ui.showDialog(message, false);
-            }
+            const message = hasReadError
+                ? '一部のセーブスロットを読み取れませんでした。保存領域を確認して再試行してください。'
+                : hasInvalidData
+                    ? '保存データはありますが、現在の形式で読み込めるセーブデータはありません。セーブ一覧で確認してください。'
+                    : 'セーブデータが見つかりません。';
+            await this._showLoadAbortDialog(requestFlow, message);
         }
     }
 }

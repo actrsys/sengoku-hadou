@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r519');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r522');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2539,7 +2539,7 @@ test('家督相続・養子縁組・追放の最終確認取消は候補一覧�
     const banishHandlerStart = command.indexOf("if (actionType === 'banish')", handlerStart);
     const genericSpecStart = command.indexOf("if (spec &&", banishHandlerStart);
     const banishHandlerBlock = command.slice(banishHandlerStart, genericSpecStart);
-    assert.ok(banishHandlerBlock.includes("showDialog(`本当に${busho.name}を追放しますか？`"), '追放確認はexecuteWithEventの外側で行う');
+    assert.ok(banishHandlerBlock.includes("_showCommandConfirmation(`本当に${busho.name}を追放しますか？`"), '追放確認はexecuteWithEventの外側で行い、ターン寿命も照合する');
     assert.ok(banishHandlerBlock.indexOf('showDialog') < banishHandlerBlock.indexOf("executeWithEvent('banish'"), '確定してから実行イベントへ入る');
     const executeCommandStart = command.indexOf('executeCommand(type');
     const banishExecStart = command.indexOf("if (type === 'banish')", executeCommandStart);
@@ -19537,6 +19537,407 @@ test('r519 行動済み確認が同じ有効ターンで確定された場合は
     const { confirm, getFinished } = createAllActionsDoneConfirmationFixture();
     confirm();
     assert.strictEqual(getFinished(), 1);
+});
+
+// r520: 手動［命令終了］もr519自動確認と同じターン同一性の正本を使う。
+function createManualFinishConfirmationFixture() {
+    const ctx = createContext();
+    loadScript(ctx, 'js/turn_manager.js');
+    loadScript(ctx, 'js/ui.js');
+    const castleA = { id: 10, ownerClan: 1, isDone: false };
+    const castleB = { id: 11, ownerClan: 1, isDone: false };
+    let confirm = null;
+    let finished = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false, isWatchMode: false, year: 1560, month: 5,
+        playerClanId: 1, currentIndex: 0, turnQueue: [castleA, castleB],
+        isProcessingAI: false, selectionMode: null,
+        warManager: { state: { active: false } }, fieldWarManager: { active: false },
+        getCurrentTurnCastle() { return this.turnQueue[this.currentIndex]; },
+        getNavigatorInfo() { return { faceIcon: 'any.webp', name: '軍師' }; },
+        finishTurn() { finished++; },
+        commandSystem: { canAcceptPlayerCommandInput() { return true; } }
+    };
+    const manager = vm.runInContext('new TurnManager(window.__gameUnderTest)', Object.assign(ctx, { __gameUnderTest: game }));
+    game.turnManager = manager;
+    const ui = vm.runInContext('Object.create(UIManager.prototype)', ctx);
+    ui.game = game;
+    ui.currentCastle = castleA;
+    ui.cancelMapSelection = () => {};
+    ui.showDialog = (_msg, _isConfirm, onOk) => { confirm = onOk; };
+    ui._confirmFinishTurn();
+    assert.strictEqual(typeof confirm, 'function', '手動命令終了の確認を表示');
+    return { game, manager, ui, castleA, castleB, confirm, getFinished: () => finished };
+}
+
+test('r520 手動命令終了は通常の同一ターンで確定できる', () => {
+    const { confirm, getFinished } = createManualFinishConfirmationFixture();
+    confirm();
+    assert.strictEqual(getFinished(), 1);
+});
+
+test('r520 手動命令終了の旧確認は別拠点ターンを終了しない', () => {
+    const { game, confirm, getFinished } = createManualFinishConfirmationFixture();
+    game.currentIndex = 1;
+    confirm();
+    assert.strictEqual(getFinished(), 0);
+});
+
+test('r520 手動命令終了の旧確認は翌月の同じ席を終了しない', () => {
+    const { game, confirm, getFinished } = createManualFinishConfirmationFixture();
+    game.month = 6;
+    confirm();
+    assert.strictEqual(getFinished(), 0);
+});
+
+test('r520 手動命令終了の旧確認はロード後の同じ席を終了しない', () => {
+    const { game, manager, confirm, getFinished } = createManualFinishConfirmationFixture();
+    manager.abortForScenarioTransition();
+    game.phase = 'game';
+    confirm();
+    assert.strictEqual(getFinished(), 0);
+});
+
+test('r520 手動命令終了は拠点の所有者が変わったら実行しない', () => {
+    const { castleA, confirm, getFinished } = createManualFinishConfirmationFixture();
+    castleA.ownerClan = 2;
+    confirm();
+    assert.strictEqual(getFinished(), 0);
+});
+
+test('r520 手動命令終了は確認中に合戦が始まったら実行しない', () => {
+    const { game, confirm, getFinished } = createManualFinishConfirmationFixture();
+    game.fieldWarManager.active = true;
+    confirm();
+    assert.strictEqual(getFinished(), 0);
+});
+
+test('r520 PC/スマホの命令終了は共通のUI窓口を使う', () => {
+    const ui = read('js/ui.js');
+    assert.ok(ui.includes('    _confirmFinishTurn() {'), '共通確認窓口');
+    assert.strictEqual((ui.match(/this\._confirmFinishTurn\(\)/g) || []).length, 2, 'PCとスマホが共通窓口を呼ぶ');
+    const body = ui.slice(ui.indexOf('    _confirmFinishTurn() {'), ui.indexOf('    renderCommandMenu()'));
+    assert.ok(body.includes('capturePlayerTurnContext()'));
+    assert.ok(body.includes('isPlayerTurnContextCurrent('));
+});
+
+// r521: 確認画面を開いたターンから変わった後の人事確定を防ぐ。
+function createCommandConfirmationFixture(action = 'succession_target') {
+    const ctx = createContext();
+    ctx.window.COMMAND_SPECS = {};
+    ctx.window.MainParams = { CommandCost: { RewardAll: 300 } };
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const castleA = { id: 10 }, castleB = { id: 11 };
+    let generation = 3;
+    let confirm = null;
+    const calls = [];
+    const game = {
+        phase: 'game', year: 1560, month: 4, currentIndex: 0,
+        turnQueue: [castleA, castleB],
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: token => token === generation && game.phase === 'game'
+        },
+        ui: {
+            info: { closeCommonModal: () => calls.push('close-selector') },
+            showDialog: (_message, _isConfirm, onOk) => { confirm = onOk; }
+        },
+        getBusho: id => ({ id, name: `武将${id}` })
+    };
+    const command = new Command(game);
+    command.executeWithEvent = type => calls.push(type);
+    command.executeRewardAll = () => calls.push('reward-all');
+    if (action === 'reward_all') command.executeSystemCommand(action);
+    else command.handleBushoSelection(action, [99], null, {});
+    assert.strictEqual(typeof confirm, 'function', '確認画面が開いた');
+    return { game, command, castleA, castleB, calls, confirm,
+        setGeneration: value => { generation = value; } };
+}
+
+test('r521 人事確認の旧［はい］は翌月の同じ拠点に実行できない', () => {
+    for (const action of ['succession_target', 'adopt_son_target', 'banish']) {
+        const fixture = createCommandConfirmationFixture(action);
+        fixture.game.month = 5;
+        fixture.confirm();
+        assert.deepStrictEqual(fixture.calls, [], `${action} の旧確認が実行されない`);
+    }
+});
+
+test('r521 人事確認の旧［はい］は次拠点・シナリオ切替後に実行できない', () => {
+    for (const action of ['succession_target', 'adopt_son_target', 'banish']) {
+        const nextCastle = createCommandConfirmationFixture(action);
+        nextCastle.game.currentIndex = 1;
+        nextCastle.confirm();
+        assert.deepStrictEqual(nextCastle.calls, [], `${action}: 次拠点`);
+        const reloaded = createCommandConfirmationFixture(action);
+        reloaded.setGeneration(4);
+        reloaded.confirm();
+        assert.deepStrictEqual(reloaded.calls, [], `${action}: 別シナリオ`);
+    }
+});
+
+test('r521 人事確認の同一ターン正常確定は候補一覧を閉じ一度だけ実行する', () => {
+    for (const [action, expected] of [
+        ['succession_target', 'succession'],
+        ['adopt_son_target', 'adopt_son'],
+        ['banish', 'banish']
+    ]) {
+        const fixture = createCommandConfirmationFixture(action);
+        fixture.confirm();
+        assert.deepStrictEqual(fixture.calls, ['close-selector', expected], `${action}: 正常系`);
+    }
+});
+
+test('r521 全員褒美の旧確認は翌月の資金・家臣へ作用しない', () => {
+    const fixture = createCommandConfirmationFixture('reward_all');
+    fixture.game.month = 5;
+    fixture.confirm();
+    assert.deepStrictEqual(fixture.calls, []);
+});
+
+test('r521 全員褒美の同一ターン確定は従来どおり実行する', () => {
+    const fixture = createCommandConfirmationFixture('reward_all');
+    fixture.confirm();
+    assert.deepStrictEqual(fixture.calls, ['reward-all']);
+});
+
+test('r521 婚姻・臣従の確認待ちに旧世代へ戻っても選択終了・外交処理を呼ばない', () => {
+    for (const action of ['marriage_princess', 'marriage_kinsman', 'vassalage']) {
+        const ctx = createContext();
+        ctx.window.COMMAND_SPECS = {};
+        loadScript(ctx, 'js/command_system.js');
+        const Command = vm.runInContext('CommandSystem', ctx);
+        const oldCastle = { id: 10 };
+        const calls = [];
+        let generation = 1, confirm;
+        const game = {
+            phase: 'game', year: 1560, month: 6, currentIndex: 0, turnQueue: [oldCastle],
+            playerClanId: 1,
+            turnManager: {
+                captureTurnFlowGeneration: () => generation,
+                isTurnFlowGenerationCurrent: g => g === generation
+            },
+            getCastle: id => ({ id, ownerClan: 2 }),
+            getClan: id => ({ id, name: '某家' }),
+            getBusho: id => ({ id, name: '武将' }),
+            getPrincess: id => ({ id, name: '姫' }),
+            diplomacyManager: { getDiplomacyProb: () => 80, executeVassalage: () => calls.push('vassalage') },
+            ui: {
+                info: {
+                    arrangeMarriageBushoId: 10,
+                    closeCommonModal: () => calls.push('close-selector')
+                },
+                showDialog: (_m, _c, callback) => { confirm = callback; },
+                beginVisualHandoff: () => calls.push('handoff')
+            }
+        };
+        const command = new Command(game);
+        command.executeWithEvent = () => calls.push('execute');
+        command.showAdviceAndExecute = () => calls.push('advice');
+        if (action === 'vassalage') command.handleBushoSelection('diplomacy_doer', [99], 20, { subAction: 'vassalage' });
+        if (action === 'marriage_princess') command.handleBushoSelection('marriage_princess', [88], null, {});
+        if (action === 'marriage_kinsman') command.handleBushoSelection('marriage_kinsman', [99], 20, { doerId: 10, princessId: 88 });
+        assert.strictEqual(typeof confirm, 'function');
+        generation = 2;
+        confirm();
+        assert.deepStrictEqual(calls, [], `${action} は古い確認を棄却`);
+    }
+});
+
+test('r521 システム観戦・タイトル復帰確認は旧世代から現ゲームを変更しない', () => {
+    for (const action of ['watch', 'title']) {
+        const ctx = createContext();
+        loadScript(ctx, 'js/command_system.js');
+        const Command = vm.runInContext('CommandSystem', ctx);
+        let generation = 1, confirm;
+        const calls = [];
+        const game = {
+            phase: 'game', year: 1560, month: 6, currentIndex: 0, turnQueue: [{ id: 10 }],
+            turnManager: { captureTurnFlowGeneration: () => generation, isTurnFlowGenerationCurrent: g => g === generation },
+            startWatchMode: () => calls.push('watch'),
+            ui: { showDialog: (_m, _c, callback) => { confirm = callback; }, returnToTitle: () => calls.push('title') }
+        };
+        new Command(game).executeSystemCommand(action);
+        assert.strictEqual(typeof confirm, 'function');
+        generation = 2;
+        confirm();
+        assert.deepStrictEqual(calls, [], `${action} の旧確認は実行しない`);
+    }
+});
+
+test('r521 before_command中に翌月へ進んだコマンドは同じ拠点でも実行しない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const calls = [];
+    let resumeBefore;
+    const game = {
+        year: 1560, month: 1, currentIndex: 0, turnQueue: [{ id: 10 }],
+        turnManager: { captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: () => true },
+        eventManager: { processEvents: type => {
+            calls.push(type);
+            if (type === 'before_command') return new Promise(resolve => { resumeBefore = resolve; });
+        } }
+    };
+    const pending = new Command(game).executeWithEvent('farm', () => calls.push('command'));
+    game.month = 2;
+    resumeBefore();
+    await pending;
+    assert.deepStrictEqual(calls, ['before_command']);
+});
+
+// r522: ロード中断の案内はロード幕解除完了後に表示する。旧画面の遅延案内は出さない。
+test('r522 直接ロードの空欄・DB障害・形式不一致は幕を閉じてから案内する', async () => {
+    for (const outcome of ['empty', 'db-error', 'invalid']) {
+        const ctx = createContext({console: {...console, error() {}}});
+        loadScript(ctx, 'js/save_manager.js');
+        const events = [];
+        let releaseHide;
+        const game = {
+            ui: {
+                showLoadingScreen() { events.push('cover'); },
+                hideLoadingScreen() { events.push('hiding'); return new Promise(resolve => { releaseHide = resolve; }); },
+                showDialog(message) { events.push('dialog:' + message); }
+            },
+            turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationLatest: generation => generation === 1}
+        };
+        const saver = new ctx.SaveManager(game);
+        saver._readSlotAfterPendingSave = async () => {
+            if (outcome === 'db-error') throw new Error('IndexedDB unavailable');
+            return outcome === 'empty' ? null : {bad: true};
+        };
+        if (outcome === 'invalid') saver._validateSaveDataStructure = () => { throw new Error('schema mismatch'); };
+        const operation = saver.loadGameFromLocal(1);
+        await new Promise(resolve => setImmediate(resolve));
+        assert.strictEqual(typeof releaseHide, 'function', outcome + ' がロード幕の解除を依頼する');
+        assert.ok(!events.some(event => event.startsWith('dialog:')), outcome + ' は幕解除完了前に案内しない');
+        releaseHide(true);
+        await operation;
+        assert.ok(events.at(-1).startsWith('dialog:'), outcome + ' は正常な中断を案内する');
+    }
+});
+
+test('r522 ロード幕解除待ちに旧ロードが失効したら新画面へ旧エラーを表示しない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    let generation = 1, releaseHide;
+    const messages = [];
+    const saver = new ctx.SaveManager({
+        turnManager: {captureTurnFlowGeneration: () => generation, isTurnFlowGenerationLatest: n => n === generation},
+        ui: {
+            showLoadingScreen() {},
+            hideLoadingScreen() { return new Promise(resolve => { releaseHide = resolve; }); },
+            showDialog(message) { messages.push(message); }
+        }
+    });
+    saver._readSlotAfterPendingSave = async () => null;
+    const operation = saver.loadGameFromLocal(2);
+    await new Promise(resolve => setImmediate(resolve));
+    generation++;
+    releaseHide(true);
+    await operation;
+    assert.deepStrictEqual(messages, [], '後発タイトル・ロードへ古い空欄案内を出さない');
+});
+
+test('r522 続きからの空欄案内もロード幕の解除完了を待つ', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    let releaseHide;
+    const events = [];
+    const saver = new ctx.SaveManager({
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationLatest: n => n === 1},
+        ui: {
+            showLoadingScreen() {},
+            hideLoadingScreen() { events.push('hiding'); return new Promise(resolve => { releaseHide = resolve; }); },
+            showDialog(m) { events.push('dialog:' + m); }
+        }
+    });
+    saver.readSaveSlots = async () => [];
+    const operation = saver.continueGame();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(typeof releaseHide, 'function');
+    assert.deepStrictEqual(events, ['hiding']);
+    releaseHide(true);
+    await operation;
+    assert.ok(events.at(-1).startsWith('dialog:セーブデータが見つかりません'));
+});
+
+test('r522 ファイル読込の失敗案内はロード幕が閉じてから表示する', async () => {
+    let reader;
+    class FakeReader {
+        constructor() { reader = this; }
+        readAsArrayBuffer() {}
+    }
+    const ctx = createContext({FileReader: FakeReader});
+    loadScript(ctx, 'js/save_manager.js');
+    let releaseHide;
+    const events = [];
+    const manager = new ctx.SaveManager({
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationLatest: n => n === 1},
+        ui: {
+            showLoadingScreen() {},
+            hideLoadingScreen() { events.push('hiding'); return new Promise(resolve => { releaseHide = resolve; }); },
+            showDialog(message) { events.push('dialog:' + message); }
+        }
+    });
+    manager.loadGameFromFile({target: {files: [{size: 40}], value: 'save.sav'}});
+    assert.ok(reader);
+    const event = reader.onerror();
+    assert.deepStrictEqual(events, ['hiding'], 'ファイル障害を幕解除前に表示しない');
+    releaseHide(true);
+    await event;
+    assert.ok(events.at(-1).includes('セーブファイルを読み取れませんでした'));
+});
+
+test('r522 ファイル復号失敗でも幕を閉じてから案内する', async () => {
+    let reader;
+    class FakeReader {
+        constructor() { reader = this; }
+        readAsArrayBuffer() {}
+    }
+    const ctx = createContext({FileReader: FakeReader, console: {...console, error() {}}});
+    loadScript(ctx, 'js/save_manager.js');
+    let releaseHide;
+    const events = [];
+    const manager = new ctx.SaveManager({
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationLatest: n => n === 1},
+        ui: {
+            showLoadingScreen() {},
+            hideLoadingScreen() { events.push('hiding'); return new Promise(resolve => {releaseHide = resolve;}); },
+            showDialog(message) { events.push('dialog:' + message); }
+        }
+    });
+    manager._decryptData = () => { throw new Error('invalid file'); };
+    manager.loadGameFromFile({target: {files: [{size: 100}], value: 'save.sav'}});
+    const event = reader.onload({target: {result: new Uint8Array([1]).buffer}});
+    assert.deepStrictEqual(events, ['hiding']);
+    releaseHide(true);
+    await event;
+    assert.ok(events.at(-1).includes('セーブデータの構造を確認できなかった'));
+});
+
+test('r522 復元失敗からのタイトル復帰は幕解除中に失効したら後発UIに触れない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/save_manager.js');
+    let generation = 1, releaseHide;
+    const events = [];
+    const manager = new ctx.SaveManager({
+        turnManager: {captureTurnFlowGeneration: () => generation, isTurnFlowGenerationLatest: n => n === generation},
+        ui: {
+            resetMapViewState() { events.push('reset-map'); },
+            hideLoadingScreen() { events.push('hiding'); return new Promise(resolve => { releaseHide = resolve; }); },
+            forceResetModals() { events.push('reset-modals'); },
+            async showDialogAsync() { events.push('dialog'); },
+            async returnToTitle() { events.push('title'); }
+        }
+    });
+    const recovery = manager._recoverFromFailedRestore();
+    assert.deepStrictEqual(events, ['reset-map', 'hiding']);
+    generation++;
+    releaseHide(true);
+    await recovery;
+    assert.deepStrictEqual(events, ['reset-map', 'hiding'], '失効後に後発のモーダル・タイトルを変更しない');
 });
 
 Promise.all(pendingTests).then(() => {

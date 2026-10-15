@@ -69,6 +69,37 @@ class TurnManager {
         return Number(this._turnFlowGeneration || 0) === Number(generation);
     }
 
+    // 確認ダイアログを開いた時点の「プレイヤー拠点ターン」を保持する。
+    // 自動終了確認とPC/スマホの手動命令終了が同一の正本を参照する。
+    capturePlayerTurnContext() {
+        const game = this.game;
+        const index = Number(game?.currentIndex);
+        return {
+            generation: this.captureTurnFlowGeneration(),
+            year: Number(game?.year),
+            month: Number(game?.month),
+            index,
+            castle: Number.isInteger(index) && Array.isArray(game?.turnQueue)
+                ? (game.turnQueue[index] || null) : null
+        };
+    }
+
+    isPlayerTurnContextCurrent(context) {
+        const game = this.game;
+        const castle = context?.castle;
+        return !!(game && castle && this._isTurnFlowCurrent(context.generation)
+            && Number(game.year) === context.year
+            && Number(game.month) === context.month
+            && Number(game.currentIndex) === context.index
+            && game.turnQueue?.[context.index] === castle
+            && typeof game.getCurrentTurnCastle === 'function'
+            && game.getCurrentTurnCastle() === castle
+            && Number(castle.ownerClan) === Number(game.playerClanId)
+            && !castle.isDone && !game.isProcessingAI && game.selectionMode == null
+            && !(game.warManager?.state?.active)
+            && !game.fieldWarManager?.active);
+    }
+
     // timerを持たない会話・選択Promiseも、ロード／タイトル復帰で旧awaitを残さず終了するための通知窓口。
     // 正常終了時は返したunsubscribeで即座に購読を外し、長時間プレイ中に購読者を蓄積しない。
     subscribeTurnFlowAbort(generation, callback) {
@@ -748,16 +779,8 @@ class TurnManager {
              if (this._allActionsDonePromptTimer) return;
              const expectedCastleId = Number(c.id);
              const expectedTurnIndex = Number(game.currentIndex);
-             const expectedYear = Number(game.year);
-             const expectedMonth = Number(game.month);
-             const expectedGeneration = this.captureTurnFlowGeneration();
-             // 画面に出した確認は元の拠点ターンだけに属する。世代・年月・拠点が
-             // 変わっていれば表示予約も確定操作も新しいターンに適用しない。
-             const isExpectedTurn = () => this._isTurnFlowCurrent(expectedGeneration)
-                 && Number(game.year) === expectedYear
-                 && Number(game.month) === expectedMonth
-                 && Number(game.currentIndex) === expectedTurnIndex
-                 && game.turnQueue[expectedTurnIndex] === c;
+             const turnContext = this.capturePlayerTurnContext();
+             const isExpectedTurn = () => this.isPlayerTurnContextCurrent(turnContext);
              this._allActionsDonePromptTimer = setTimeout(() => {
                  this._allActionsDonePromptTimer = null;
                  if (!isExpectedTurn()) return;
