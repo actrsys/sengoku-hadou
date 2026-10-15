@@ -748,8 +748,19 @@ class TurnManager {
              if (this._allActionsDonePromptTimer) return;
              const expectedCastleId = Number(c.id);
              const expectedTurnIndex = Number(game.currentIndex);
+             const expectedYear = Number(game.year);
+             const expectedMonth = Number(game.month);
+             const expectedGeneration = this.captureTurnFlowGeneration();
+             // 画面に出した確認は元の拠点ターンだけに属する。世代・年月・拠点が
+             // 変わっていれば表示予約も確定操作も新しいターンに適用しない。
+             const isExpectedTurn = () => this._isTurnFlowCurrent(expectedGeneration)
+                 && Number(game.year) === expectedYear
+                 && Number(game.month) === expectedMonth
+                 && Number(game.currentIndex) === expectedTurnIndex
+                 && game.turnQueue[expectedTurnIndex] === c;
              this._allActionsDonePromptTimer = setTimeout(() => {
                  this._allActionsDonePromptTimer = null;
+                 if (!isExpectedTurn()) return;
                  const currentCastle = game.getCurrentTurnCastle();
                  if (game.phase !== 'game' || game.isProcessingAI || game.selectionMode != null) return;
                  if (!currentCastle || Number(currentCastle.id) !== expectedCastleId || Number(game.currentIndex) !== expectedTurnIndex) return;
@@ -762,6 +773,14 @@ class TurnManager {
 
                  const nav = game.getNavigatorInfo(currentCastle);
                  game.ui.showDialog("「すべての武将が行動を終えました。\n今月の命令を終了しますか？」", true, () => {
+                     // 確認を開いた後にもロード・別拠点・翌月へ進めるため、実行直前に再照合する。
+                     if (!isExpectedTurn() || game.isProcessingAI || game.selectionMode != null) return;
+                     if (Number(c.ownerClan) !== Number(game.playerClanId) || c.isDone) return;
+                     if (game.warManager && game.warManager.state && game.warManager.state.active) return;
+                     if (game.fieldWarManager && game.fieldWarManager.active) return;
+                     const remaining = game.getCastleBushos(c.id)
+                         .filter(b => b.clan === c.ownerClan && b.status === window.GameConstants.BushoStatus.ACTIVE);
+                     if (remaining.length === 0 || !remaining.every(b => b.isActionDone)) return;
                      game.finishTurn();
                  }, null, {
                      leftFace: nav.faceIcon,

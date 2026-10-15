@@ -1,0 +1,21 @@
+戦国覇道 r518：シナリオ開始前史実補正の非同期寿命監査
+
+基準：r517完全版。ARCHITECTURE.md のターン寿命、シナリオ初期化、歴史イベント正本規定に準拠。
+
+【確認した不具合】
+1. 途中年代シナリオの開始前史実補正をawaitしている間にタイトル復帰や新しいシナリオの開始が入ると、旧補正の完了が後発のgame.flagsへ書き込まれる。旧EventManagerのイベントキューも完了扱いにされる。
+2. 必須の開始前史実補正のawait中に世代が切り替わってから旧補正が失敗すると、旧ロードの失効にもかかわらず必須補正の失敗例外が投げられる。
+
+【修正】
+- EventManager.applyScenarioStartHistoricalSettlements()でTurnManagerの世代を捕捉する。ゲーム開始時にはphase==='game'を前提にできないためisTurnFlowGenerationLatest()を使用する。
+- 非同期補正の完了前後・イベント間・エラー処理に世代照合を置き、失効後はフラグ・キューの更新や必須エラー通知を行わず中断する。
+- 正常な初期補正と現行世代での必須補正失敗は維持。ルールや画面、管理用Excel・BIN、セーブ形式を変更しない。
+
+【テスト】
+- r517に追加した3件の再現・正常系テスト：失敗2件（823成功・2失敗）。
+- r518の通常テスト825件成功、失敗0件。PC/スマホの表示回帰、シミュレーション、Excel/BIN一致は別途実行して確認する。
+
+【変更ファイル】
+追加：docs/audits/r518_シナリオ開始前史実補正寿命監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/event_manager.js、tests/run_tests.js
+削除：なし

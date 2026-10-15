@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r517');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r519');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -19378,6 +19378,165 @@ test('r516 同一拠点ターンで助言を確定した場合は従来どおり
     cmd.showAdviceAndExecute('alliance', () => {}, {}, { beforeConfirm: () => calls.push('handoff') });
     confirmAdvice();
     assert.deepStrictEqual(calls, ['handoff', 'execute']);
+});
+
+
+test('r518 途中年代補正待機中に世代が変わっても新シナリオflagsへ完了記録しない', async () => {
+    const ctx = createContext();
+    let complete;
+    const pending = new Promise(resolve => { complete = resolve; });
+    ctx.window.GameEvents = [{
+        id: 'historical_r518_stale_start', timing: 'startMonth_before', isOneTime: true,
+        historicalDate: { year: 1565, month: 5 },
+        applyScenarioStartState: async () => pending,
+        checkCondition: () => true, execute: async () => {}
+    }];
+    loadScript(ctx, 'js/event_manager.js');
+    const EventManager = vm.runInContext('EventManager', ctx);
+    let generation = 7;
+    const game = {
+        gameStartYear: 1570, gameStartMonth: 5, year: 1570, month: 5, flags: {},
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationLatest: token => token === generation
+        },
+        writeSystemDiagnostic() {}
+    };
+    const manager = new EventManager(game);
+    const oldFlags = game.flags;
+    const running = manager.applyScenarioStartHistoricalSettlements();
+    generation = 8; // タイトルへ戻り、次シナリオの準備が始まる
+    game.flags = {};
+    complete();
+    const settled = await running;
+    assert.strictEqual(game.flags.historical_r518_stale_start, undefined);
+    assert.strictEqual(oldFlags.historical_r518_stale_start, undefined);
+    assert.strictEqual(manager.events.startMonth_before.length, 1, '旧イベントのキューを完了扱いにしない');
+    assert.strictEqual(settled.length, 0, '旧ロードの完了結果を返さない');
+});
+
+test('r518 必須史実補正の失敗後でも旧ロードが失効していれば後発ロードへエラーを伝播させない', async () => {
+    const ctx = createContext();
+    let complete;
+    const pending = new Promise((resolve, reject) => { complete = reject; });
+    ctx.window.GameEvents = [{
+        id: 'historical_r518_aborted_required', timing: 'startMonth_before', isOneTime: true,
+        historicalDate: { year: 1565, month: 5 }, scenarioStartSettlementRequired: true,
+        applyScenarioStartState: () => pending,
+        checkCondition: () => true, execute: async () => {}
+    }];
+    loadScript(ctx, 'js/event_manager.js');
+    const EventManager = vm.runInContext('EventManager', ctx);
+    let generation = 7;
+    const game = {
+        gameStartYear: 1570, gameStartMonth: 5, year: 1570, month: 5, flags: {},
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationLatest: token => token === generation
+        }
+    };
+    const manager = new EventManager(game);
+    const running = manager.applyScenarioStartHistoricalSettlements();
+    generation = 8;
+    complete(new Error('旧データ破棄による読込失敗'));
+    const settled = await running;
+    assert.strictEqual(settled.length, 0);
+    assert.strictEqual(game.flags.historical_r518_aborted_required, undefined);
+});
+
+test('r518 途中年代補正はシナリオ世代が有効な場合だけ従来どおり消化する', async () => {
+    const ctx = createContext();
+    ctx.window.GameEvents = [{
+        id: 'historical_r518_live_start', timing: 'startMonth_before', isOneTime: true,
+        historicalDate: { year: 1565, month: 5 },
+        applyScenarioStartState: async game => { game.corrected = true; },
+        checkCondition: () => true, execute: async () => {}
+    }];
+    loadScript(ctx, 'js/event_manager.js');
+    const EventManager = vm.runInContext('EventManager', ctx);
+    const game = {
+        gameStartYear: 1570, gameStartMonth: 5, year: 1570, month: 5, flags: {},
+        turnManager: {
+            captureTurnFlowGeneration: () => 7,
+            isTurnFlowGenerationLatest: token => token === 7
+        }
+    };
+    const manager = new EventManager(game);
+    const settled = await manager.applyScenarioStartHistoricalSettlements();
+    assert.deepStrictEqual(Array.from(settled), ['historical_r518_live_start']);
+    assert.strictEqual(game.flags.historical_r518_live_start, true);
+    assert.strictEqual(game.corrected, true);
+    assert.strictEqual(manager.events.startMonth_before.length, 0);
+});
+
+// r519: 全武将行動済み確認も「表示時の拠点ターン」でのみ確定できる。
+function createAllActionsDoneConfirmationFixture() {
+    let scheduled = null;
+    const ctx = createContext({
+        setTimeout(callback) { scheduled = callback; return 99; },
+        clearTimeout() {}
+    });
+    ctx.window.GameConstants = { BushoStatus: { ACTIVE: 'active' } };
+    loadScript(ctx, 'js/turn_manager.js');
+    const castleA = { id: 10, ownerClan: 1, isDone: false };
+    const castleB = { id: 11, ownerClan: 1, isDone: false };
+    const busho = { clan: 1, status: 'active', isActionDone: true };
+    let confirm = null;
+    let finished = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1560, month: 5,
+        playerClanId: 1, currentIndex: 0, turnQueue: [castleA, castleB],
+        isProcessingAI: false, selectionMode: null,
+        warManager: { state: { active: false } }, fieldWarManager: { active: false },
+        getCurrentTurnCastle() { return this.turnQueue[this.currentIndex]; },
+        getCastleBushos() { return [busho]; },
+        getNavigatorInfo() { return { faceIcon: 'any.webp', name: '軍師' }; },
+        finishTurn() { finished++; },
+        ui: { showDialog(_msg, _confirmMode, onOk) { confirm = onOk; } }
+    };
+    ctx.__gameUnderTest = game;
+    const manager = vm.runInContext('new TurnManager(window.__gameUnderTest)', ctx);
+    game.turnManager = manager;
+    manager.checkAllActionsDone();
+    assert.strictEqual(typeof scheduled, 'function', '行動済み確認を予約した');
+    scheduled();
+    assert.strictEqual(typeof confirm, 'function', '確認画面を提示した');
+    return { game, manager, castleA, castleB, confirm, getFinished: () => finished };
+}
+
+test('r519 行動済み確認の表示後に別拠点ターンへ進んでも旧確認から終了しない', () => {
+    const { game, confirm, getFinished } = createAllActionsDoneConfirmationFixture();
+    game.currentIndex = 1;
+    confirm();
+    assert.strictEqual(getFinished(), 0);
+});
+
+test('r519 行動済み確認の表示後にロードしても旧確認から終了しない', () => {
+    const { game, manager, confirm, getFinished } = createAllActionsDoneConfirmationFixture();
+    manager.abortForScenarioTransition();
+    game.phase = 'title';
+    confirm();
+    assert.strictEqual(getFinished(), 0);
+});
+
+test('r519 行動済み確認の表示後に翌月の同じ席へ戻っても旧確認から終了しない', () => {
+    const { game, confirm, getFinished } = createAllActionsDoneConfirmationFixture();
+    game.month = 6;
+    confirm();
+    assert.strictEqual(getFinished(), 0);
+});
+
+test('r519 行動済み確認の表示後に拠点の所有者が変わっても旧確認から終了しない', () => {
+    const { castleA, confirm, getFinished } = createAllActionsDoneConfirmationFixture();
+    castleA.ownerClan = 2;
+    confirm();
+    assert.strictEqual(getFinished(), 0);
+});
+
+test('r519 行動済み確認が同じ有効ターンで確定された場合は従来どおり終了する', () => {
+    const { confirm, getFinished } = createAllActionsDoneConfirmationFixture();
+    confirm();
+    assert.strictEqual(getFinished(), 1);
 });
 
 Promise.all(pendingTests).then(() => {

@@ -1896,3 +1896,17 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - 面談挨拶後の専用イベントも `EventManager.processInterviewEvent()` で通常イベントと同じ `EventFlowGuard`（正本は `TurnManager` の世代）を確認する。イベントの `execute()` が非同期で完了する間にロード・タイトル復帰へ移った場合は、旧一度きりフラグへの完了記録、後続イベント処理、旧イベントの処理済み扱いを行わない。
 - `InterviewSystem._continueInterviewAfterGreeting()` は面談イベントの待機前に `TurnManager` 世代を捕捉し、失効後は旧武将の面談メニューを復活させない。特殊イベントに渡す `resumeInterview` / `returnToInterviewTop` も同じ世代を確認して画面を切り替える。
 - 面談内のイベントはあくまで面談セッションの子処理とし、正常系の面談トップ・通常会話復帰、医師イベント・延命条件、UI配置、セーブ形式を変えない。詳細は `docs/audits/r517_面談イベント非同期ターン寿命監査記録.txt`。
+
+
+## r518：シナリオ開始前史実補正の非同期寿命境界
+
+- `EventManager.applyScenarioStartHistoricalSettlements()` は、シナリオロード中の正本である `TurnManager` の世代番号を処理開始時に捕捉し、各イベントの適用前・非同期 `applyScenarioStartState()` 完了直後・例外時に同じ世代であることを確認する。既存の `isTurnFlowGenerationLatest()` を用い、ロード中は `phase` が通常ゲーム状態ではないため通常ターン用の `isTurnFlowGenerationCurrent()` を流用しない。
+- 補正の await 中にタイトル復帰・セーブ復元・後発シナリオロードが開始された場合、旧補正が後発の `game.flags` へ一度きり完了記録を残すこと、旧イベントキューを処理済みにすること、失効した必須イベントの遅延例外を後発ロードへ伝播することを防ぐ。通常の補正成功時の処理、必須補正の同一世代での失敗扱い、史実イベントの成立条件やゲーム内容は維持する。
+- 世代更新は `TurnManager` に留め、`EventManager` に新しい寿命カウンタや旧セーブ互換処理を追加しない。詳細は `docs/audits/r518_シナリオ開始前史実補正寿命監査記録.txt`。
+
+
+## r519：全武将行動済み確認の実行時ターン照合
+
+- `TurnManager.checkAllActionsDone()` は全員行動済み確認の表示予約時と、ダイアログの［はい］確定時に、それぞれ操作開始元のターンを確認する。100ms予約中だけを検証して確定時に直接 `game.finishTurn()` を呼ばない。
+- 寿命の正本は `TurnManager.captureTurnFlowGeneration()` / `_isTurnFlowCurrent()` とし、表示元の年月・ターン位置・Castleオブジェクトを照合する。同じ位置へ翌月戻っても旧ダイアログは無効とする。確定時には所有勢力、全員行動済み、他画面／合戦／AI操作中ではないことを現在の状態から再判定する。
+- 通常の確認タイミング・文面・レイアウトと、確認画面を閉じてからターン終了する既存の契約を維持する。詳細は `docs/audits/r519_全武将行動済み確認の旧ターン確定監査記録.txt`。

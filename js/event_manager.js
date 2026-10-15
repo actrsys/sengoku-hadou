@@ -233,6 +233,16 @@ class EventManager {
      * - 「歴史イベントOFF」は未来のスクリプト発火設定であり、過去のシナリオ初期状態には適用しない。
      */
     async applyScenarioStartHistoricalSettlements(context = null) {
+        // 新規シナリオ構築中は phase==='game' とは限らないため、通常イベント用の
+        // isTurnFlowGenerationCurrent ではなく TurnManager の世代番号だけを照合する。
+        // 旧補正の await 完了が後発ロードの flags / イベントキューへ混入しないようにする。
+        const turnManager = this.game && this.game.turnManager;
+        const generation = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration() : null;
+        const isLatest = () => generation === null || !turnManager
+            || typeof turnManager.isTurnFlowGenerationLatest !== 'function'
+            || turnManager.isTurnFlowGenerationLatest(generation);
+        if (!isLatest()) return [];
         const targets = Array.isArray(this.scenarioStartHistoricalEvents)
             ? this.scenarioStartHistoricalEvents
             : [];
@@ -242,6 +252,7 @@ class EventManager {
         const settledIds = [];
 
         for (const ev of targets) {
+            if (!isLatest()) return [];
             if (!ev || !ev.id || ev.isOneTime !== true) continue;
             if (this.game.flags[ev.id]) continue;
             const shouldSettleAtScenarioStart = ev.scenarioStartSettlementDate
@@ -253,6 +264,7 @@ class EventManager {
                 if (typeof ev.applyScenarioStartState === 'function') {
                     await ev.applyScenarioStartState(this.game, context);
                 }
+                if (!isLatest()) return [];
 
                 // 状態補正が正常終了してから消化済みにする。途中エラー時に未補正のまま封印しない。
                 this.game.flags[ev.id] = true;
@@ -263,6 +275,7 @@ class EventManager {
                     this.game.writeSystemDiagnostic(`scenario_start_history:settled:${ev.id}`);
                 }
             } catch (error) {
+                if (!isLatest()) return [];
                 if (ev.scenarioStartSettlementRequired === true) {
                     throw new Error(`必須のシナリオ開始前歴史イベント補正 ${ev.id} に失敗しました: ${error && error.message ? error.message : error}`);
                 }
@@ -270,7 +283,7 @@ class EventManager {
             }
         }
 
-        return settledIds;
+        return isLatest() ? settledIds : [];
     }
 
     /**
