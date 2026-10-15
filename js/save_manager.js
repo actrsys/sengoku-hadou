@@ -752,7 +752,18 @@ class SaveManager {
         if (!requestFlow) return;
         if (this.game.ui) this.game.ui.showLoadingScreen('セーブデータを確認しています', 0);
         
-        const reader = new FileReader(); 
+        // FileReaderの生成・読込開始は同期的に失敗する場合がある。
+        // その場合も通常のロード失敗案内と同じ幕解除・世代照合を使用する。
+        const onReadStartFailure = error => {
+            console.error('セーブファイルの読込開始に失敗しました:', error);
+            return this._showLoadAbortDialog(requestFlow, 'セーブファイルを読み取れませんでした。');
+        };
+        let reader;
+        try {
+            reader = new FileReader();
+        } catch (error) {
+            return onReadStartFailure(error);
+        }
         reader.onload = async (evt) => {
             if (!requestFlow.isLatest()) return;
             let restoreStarted = false;
@@ -782,7 +793,14 @@ class SaveManager {
         reader.onerror = async () => {
             await this._showLoadAbortDialog(requestFlow, "セーブファイルを読み取れませんでした。");
         };
-        reader.readAsArrayBuffer(file); // ★テキストではなくバイナリとして読み込む魔法に変更します
+        reader.onabort = async () => {
+            await this._showLoadAbortDialog(requestFlow, "セーブファイルの読み込みが中断されました。");
+        };
+        try {
+            reader.readAsArrayBuffer(file); // バイナリとして読み込む
+        } catch (error) {
+            return onReadStartFailure(error);
+        }
     }
     
     // スロットへセーブ (IndexedDB)

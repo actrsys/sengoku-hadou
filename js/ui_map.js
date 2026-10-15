@@ -57,6 +57,9 @@ Object.assign(UIManager.prototype, {
         if (typeof this._cancelActiveMapFocus === 'function') this._cancelActiveMapFocus();
         this._cancelActiveMapFocus = null;
         this._mapViewResetToken = Number(this._mapViewResetToken || 0) + 1;
+        // 旧画面で先行読込中の別解像度画像は、後から現画面へ差し込ませない。
+        this._mapBaseImageSwapRequest = null;
+        this._mapLayoutRefreshPending = false;
         if (this._mapPresentationRecoveryFrame) {
             cancelAnimationFrame(this._mapPresentationRecoveryFrame);
             this._mapPresentationRecoveryFrame = null;
@@ -119,6 +122,28 @@ Object.assign(UIManager.prototype, {
         spacer.style.height = `${Math.ceil(Math.max(0, height))}px`;
     },
 
+    // レイアウト（PC/スマホ/軽量）に応じた表示専用素材の選択はここだけで行う。
+    _getMapBaseImageSource() {
+        const isPC = document.body.classList.contains('is-pc');
+        return isPC ? './data/images/map/japan_map.png'
+            : (window.__mobileLowMemoryMode
+                ? './data/images/map/japan_map_lowmem.png'
+                : './data/images/map/japan_map_mobile.png');
+    },
+
+    // レイアウト切替は通常ゲーム・大名選択で到達可能。キャンバス解像度を現モードに合わせる。
+    // 背景停止中は全画面Canvas再生成を避け、復帰時に1回だけ同期する。
+    syncMapLayoutResources() {
+        if (!this.hasInitializedMap || !this.mapEl || !this.game
+            || (this.game.phase !== 'game' && this.game.phase !== 'daimyo_select')) return;
+        if (this.isBackgroundPaused) {
+            this._mapLayoutRefreshPending = true;
+            return;
+        }
+        this._mapLayoutRefreshPending = false;
+        this.renderMap();
+    },
+
     // ★Round 14：地図本体をCSS backgroundではなく、常駐する画像要素として保持します。
     // 古いスマホでスクロール先の背景タイルが遅れて描画されるcheckerboardingを抑え、
     // renderMapのたびに地図画像の描画資源を捨てないようにします。
@@ -137,13 +162,9 @@ Object.assign(UIManager.prototype, {
                 if (this.mapEl) this.mapEl.classList.add('base-map-image-ready');
             };
             img.addEventListener('load', markReady, { once: true });
-            const isPC = document.body.classList.contains('is-pc');
-            const lowMemoryMobile = !isPC && !!window.__mobileLowMemoryMode;
-            // 通常スマホは75%解像度、古い小画面端末は50%解像度の表示専用画像を使う。
-            // 論理座標・城/国IDマップは従来どおり3140x2440なのでゲーム判定には影響しません。
-            img.src = isPC
-                ? './data/images/map/japan_map.png'
-                : (lowMemoryMobile ? './data/images/map/japan_map_lowmem.png' : './data/images/map/japan_map_mobile.png');
+            // 論理座標・城/国IDマップは端末によらず同一。表示解像度だけを切り替える。
+            this._mapBaseImageAssetSource = this._getMapBaseImageSource();
+            img.src = this._mapBaseImageAssetSource;
             this._mapBaseImage = img;
 
             // preload済みでもdecode済みとは限らないので、要素を保持したままdecodeを促します。
@@ -156,6 +177,54 @@ Object.assign(UIManager.prototype, {
 
         img.style.width = `${mapW}px`;
         img.style.height = `${mapH}px`;
+
+        const wantedSource = this._getMapBaseImageSource();
+        if (this._mapBaseImageAssetSource === wantedSource) {
+            // 回転を元に戻した場合、先行中の逆方向の画像差し替えを破棄する。
+            this._mapBaseImageSwapRequest = null;
+        } else if (!this._mapBaseImageSwapRequest || this._mapBaseImageSwapRequest.source !== wantedSource) {
+            // 表示中の画像を直接src変更すると、decode中に地図だけ白抜けする。
+            // 次の素材を裏で読み込み、表示準備ができてからDOMを入れ替える。
+            const next = new Image();
+            next.alt = '';
+            next.draggable = false;
+            next.loading = 'eager';
+            next.decoding = 'async';
+            const request = {
+                source: wantedSource,
+                resetToken: Number(this._mapViewResetToken || 0)
+            };
+            this._mapBaseImageSwapRequest = request;
+            let settled = false;
+            const finish = async () => {
+                if (settled) return;
+                settled = true;
+                if (typeof next.decode === 'function') {
+                    try { await next.decode(); } catch (e) {}
+                }
+                if (this._mapBaseImageSwapRequest !== request
+                    || request.resetToken !== Number(this._mapViewResetToken || 0)
+                    || this._mapBaseImage !== img
+                    || this._getMapBaseImageSource() !== request.source) return;
+                if (!next.naturalWidth || !next.naturalHeight) {
+                    this._mapBaseImageSwapRequest = null;
+                    return;
+                }
+                next.id = 'map-base-image';
+                next.style.width = img.style.width;
+                next.style.height = img.style.height;
+                if (img.parentNode === this.mapEl) img.replaceWith(next);
+                this._mapBaseImage = next;
+                this._mapBaseImageAssetSource = request.source;
+                this._mapBaseImageSwapRequest = null;
+            };
+            next.addEventListener('load', finish, { once: true });
+            next.addEventListener('error', () => {
+                if (this._mapBaseImageSwapRequest === request) this._mapBaseImageSwapRequest = null;
+            }, { once: true });
+            next.src = wantedSource;
+            if (next.complete && next.naturalWidth > 0) void finish();
+        }
         return img;
     },
 

@@ -258,18 +258,40 @@ class SaveLoadView {
                 const displayTitle = prefix === 'sengoku_autosave_slot' ? `オート ${displayIndex}` : `スロット ${i}`;
 
                 btn.onclick = () => {
-                    const closeSlotList = () => {
+                    // 選択後の確認待ちにも一覧の寿命を適用する。
+                    // TurnManager の既存世代を参照し、別シナリオ・翌月・別拠点への
+                    // 遷移後に古い［セーブする／ロードする］が新しい状態へ作用しないようにする。
+                    if (!isRenderCurrent()) return;
+                    const turnManager = this.game.turnManager;
+                    const generation = turnManager?.captureTurnFlowGeneration?.();
+                    const selectedPhase = this.game.phase;
+                    const selectedScenario = this.game.scenarioFolder;
+                    const selectedYear = this.game.year;
+                    const selectedMonth = this.game.month;
+                    const selectedIndex = this.game.currentIndex;
+                    const selectedCastle = this.game.turnQueue?.[selectedIndex] || null;
+                    const isSelectionCurrent = () => isRenderCurrent()
+                        && this.game.phase === selectedPhase
+                        && this.game.scenarioFolder === selectedScenario
+                        && this.game.year === selectedYear
+                        && this.game.month === selectedMonth
+                        && this.game.currentIndex === selectedIndex
+                        && (this.game.turnQueue?.[selectedIndex] || null) === selectedCastle
+                        && (generation === undefined
+                            || !!turnManager?.isTurnFlowGenerationLatest?.(generation));
+                    const executeSelected = action => {
+                        if (!isSelectionCurrent()) return;
                         this.close();
+                        action();
                     };
-                    
+
                     if (mode === 'save') {
                         // 確認を取り消した時はスロット一覧をそのまま残し、別スロットを選び直せるようにします。
                         const saveMessage = slotInfo.invalidData
                             ? `${displayTitle}には現在の形式で読み込めないデータが存在します。上書きすると元の保存内容は失われます。現在の状態をセーブしますか？`
                             : `${displayTitle}に現在の状態をセーブ（上書き）しますか？`;
                         this.ui.showDialog(saveMessage, true, () => {
-                            closeSlotList();
-                            this.game.saveGameToLocal(i);
+                            executeSelected(() => this.game.saveGameToLocal(i));
                         }, null, {
                             okText: 'セーブする',
                             okClass: 'btn-primary',
@@ -278,12 +300,10 @@ class SaveLoadView {
                         });
                     } else {
                         if (this.game.phase === 'title') {
-                            closeSlotList();
-                            this.game.loadGameFromLocal(i, prefix); 
+                            executeSelected(() => this.game.loadGameFromLocal(i, prefix));
                         } else {
                             this.ui.showDialog(`${displayTitle}のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
-                                closeSlotList();
-                                this.game.loadGameFromLocal(i, prefix); 
+                                executeSelected(() => this.game.loadGameFromLocal(i, prefix));
                             }, null, {
                                 okText: 'ロードする',
                                 okClass: 'btn-danger',

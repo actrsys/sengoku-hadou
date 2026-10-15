@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r522');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r526');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6573,7 +6573,7 @@ test('古いスマホ向け地図演出は城領域boundsと低解像度帯描�
     assert.ok(!map.includes('for (let i = 0; i < mapWidth * mapHeight; i++)'), '戦闘点滅に全地図走査fallbackを残さない');
     assert.ok(map.includes('_getMapOverlayRasterSize(mapW, mapH)'), '全画面エフェクトは端末別内部解像度を使う');
     assert.ok(map.includes('_paintCanvasByStrips(canvas, paintPixel'), '巨大ImageDataを一枚作らず帯状描画する');
-    assert.ok(map.includes("lowMemoryMobile ? './data/images/map/japan_map_lowmem.png' : './data/images/map/japan_map_mobile.png'"), '低メモリ端末はさらに縮小した表示専用地図を使う');
+    assert.ok((map.includes("window.__mobileLowMemoryMode") && map.includes("japan_map_lowmem.png") && map.includes("japan_map_mobile.png")), '低メモリ端末はさらに縮小した表示専用地図を使う');
     assert.ok(fs.existsSync(path.join(ROOT, 'data/images/map/japan_map_mobile.png')));
     assert.ok(fs.existsSync(path.join(ROOT, 'data/images/map/japan_map_lowmem.png')));
 });
@@ -6587,7 +6587,7 @@ test('新規開始とロードは実表示用地図Imageの読込・decode完了
 
     assert.ok(map.includes('async prepareMapBaseImage(mapW, mapH)'));
     assert.ok(map.includes("await img.decode();"), '表示用Imageは対応ブラウザでdecode完了まで待つ');
-    assert.ok(map.includes("lowMemoryMobile ? './data/images/map/japan_map_lowmem.png' : './data/images/map/japan_map_mobile.png'"), '実際の端末種別に応じた表示用Imageを待つ');
+    assert.ok((map.includes("window.__mobileLowMemoryMode") && map.includes("japan_map_lowmem.png") && map.includes("japan_map_mobile.png")), '実際の端末種別に応じた表示用Imageを待つ');
 
     const scenarioStart = game.indexOf("this.ui.updateLoadingProgress(90, '地図を読み込んでいます')");
     const scenarioEnd = game.indexOf('// 観戦開始はロード画面を閉じてから。', scenarioStart);
@@ -6647,7 +6647,7 @@ test('PCの地図はCSS下地へ一元化し、スマホの縮小imgと画面座
     assert.ok(map.includes('return `scale(${scale})`;'));
     assert.ok(!map.includes('scale(${scale}) translateZ(0)'));
     assert.ok(map.includes("document.body.classList.contains('is-pc') ? null : (this._mapBaseImage"));
-    assert.ok(map.includes("lowMemoryMobile ? './data/images/map/japan_map_lowmem.png' : './data/images/map/japan_map_mobile.png'"));
+    assert.ok((map.includes("window.__mobileLowMemoryMode") && map.includes("japan_map_lowmem.png") && map.includes("japan_map_mobile.png")));
 });
 
 test('最終coverは背景復旧後の2フレームまで維持し、先行する古いcloseを通さない', async () => {
@@ -11812,20 +11812,20 @@ test('確認後に非会話画面へ移る主要操作は先に確認ダイア�
 });
 
 
-test('セーブ・ロードの確認取消はスロット一覧を閉じず、確定時だけ閉じる', () => {
+test('セーブ・ロードの確認取消はスロット一覧を閉じず、有効な確定時だけ閉じる', () => {
     const source = read('js/save_load_view.js');
     const start = source.indexOf('btn.onclick = () => {');
-    const block = source.slice(start, start + 2600);
-    assert.ok(block.includes('const closeSlotList = () => {'));
+    const end = source.indexOf('list.appendChild(btn);', start);
+    const block = source.slice(start, end);
+    assert.ok(block.includes('const executeSelected = action => {'));
+    assert.ok(block.includes('if (!isSelectionCurrent()) return;'));
+    assert.ok(block.includes('this.close();\n                        action();'), '確定可否を確認してから閉じて実行する');
     assert.ok(block.includes('closeBeforeCancel: true'));
-    assert.ok(block.includes('closeSlotList();\n                            this.game.saveGameToLocal(i);'));
-    assert.ok(block.includes('closeSlotList();\n                                this.game.loadGameFromLocal(i, prefix);'));
-    const beforeSave = block.slice(0, block.indexOf("if (mode === 'save')"));
-    const closeFnEnd = beforeSave.indexOf('};', beforeSave.indexOf('const closeSlotList'));
-    const afterCloseFn = beforeSave.slice(closeFnEnd + 2);
-    assert.ok(!afterCloseFn.includes('closeSlotList();'), 'スロット選択直後には一覧を閉じない');
+    assert.ok(block.includes('executeSelected(() => this.game.saveGameToLocal(i))'));
+    assert.ok(block.includes('executeSelected(() => this.game.loadGameFromLocal(i, prefix))'));
+    const beforeConfirm = block.slice(0, block.indexOf("if (mode === 'save')"));
+    assert.ok(!beforeConfirm.includes('this.close();\n                    };'), 'スロット選択時には画面を閉じない');
 });
-
 
 
 test('野戦撤退と援軍大雪警告の取消は確認画面を戦場・親一覧へ残さない', () => {
@@ -19940,6 +19940,364 @@ test('r522 復元失敗からのタイトル復帰は幕解除中に失効した
     assert.deepStrictEqual(events, ['reset-map', 'hiding'], '失効後に後発のモーダル・タイトルを変更しない');
 });
 
+// r523: FileReaderの起動直後の同期例外・中断でもロード幕を残さない。
+test('r523 FileReaderのreadAsArrayBuffer同期失敗はロード幕を解除して案内する', async () => {
+    class BrokenReader { readAsArrayBuffer() { throw new Error('file is not accessible'); } }
+    const ctx = createContext({ FileReader: BrokenReader, console: {...console, error() {}} });
+    loadScript(ctx, 'js/save_manager.js');
+    const events = [];
+    let releaseHide;
+    const manager = new ctx.SaveManager({
+        turnManager: {captureTurnFlowGeneration: () => 2, isTurnFlowGenerationLatest: n => n === 2},
+        ui: {
+            showLoadingScreen() { events.push('cover'); },
+            hideLoadingScreen() { events.push('hiding'); return new Promise(resolve => {releaseHide = resolve;}); },
+            showDialog(message) { events.push('dialog:' + message); }
+        }
+    });
+    assert.doesNotThrow(() => manager.loadGameFromFile({target: {files: [{size: 1}], value: 'before'}}));
+    assert.strictEqual(typeof releaseHide, 'function', 'FileReader同期失敗時も共通ロード幕を解除する');
+    assert.deepStrictEqual(events, ['cover', 'hiding']);
+    releaseHide(true);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.ok(events.at(-1).includes('セーブファイルを読み取れませんでした'));
+});
+
+test('r523 FileReader生成が失敗しても共通ロード中断案内に戻る', async () => {
+    class BrokenConstructor { constructor() { throw new Error('unsupported file reader'); } }
+    const ctx = createContext({ FileReader: BrokenConstructor, console: {...console, error() {}} });
+    loadScript(ctx, 'js/save_manager.js');
+    const events = [];
+    const manager = new ctx.SaveManager({
+        turnManager: {captureTurnFlowGeneration: () => 4, isTurnFlowGenerationLatest: n => n === 4},
+        ui: {
+            showLoadingScreen() { events.push('cover'); },
+            hideLoadingScreen() { events.push('hiding'); return Promise.resolve(true); },
+            showDialog(message) { events.push('dialog:' + message); }
+        }
+    });
+    await manager.loadGameFromFile({target: {files: [{size: 1}], value: 'before'}});
+    assert.strictEqual(events.length, 3);
+    assert.strictEqual(events[0], 'cover');
+    assert.strictEqual(events[1], 'hiding');
+    assert.ok(events[2].includes('セーブファイルを読み取れませんでした'));
+});
+
+test('r523 FileReaderのabortはロード幕解除後に中断を案内する', async () => {
+    let reader;
+    class AbortedReader { constructor() { reader = this; } readAsArrayBuffer() {} }
+    const ctx = createContext({FileReader: AbortedReader});
+    loadScript(ctx, 'js/save_manager.js');
+    let releaseHide;
+    const events = [];
+    const manager = new ctx.SaveManager({
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationLatest: n => n === 1},
+        ui: {
+            showLoadingScreen() { events.push('cover'); },
+            hideLoadingScreen() { events.push('hiding'); return new Promise(resolve => {releaseHide = resolve;}); },
+            showDialog(message) {events.push('dialog:' + message);}
+        }
+    });
+    manager.loadGameFromFile({target: {files: [{size: 1}], value: 'before'}});
+    assert.strictEqual(typeof reader.onabort, 'function', 'abortイベントを必ず扱う');
+    const event = reader.onabort();
+    assert.deepStrictEqual(events, ['cover', 'hiding']);
+    releaseHide(true);
+    await event;
+    assert.ok(events.at(-1).includes('中断されました'));
+});
+
+test('r523 失効したFileReaderのabortは新しいロード画面を変更しない', async () => {
+    let reader;
+    class AbortedReader { constructor() { reader = this; } readAsArrayBuffer() {} }
+    const ctx = createContext({FileReader: AbortedReader});
+    loadScript(ctx, 'js/save_manager.js');
+    const events = [];
+    let generation = 1;
+    const manager = new ctx.SaveManager({
+        turnManager: {captureTurnFlowGeneration: () => generation, isTurnFlowGenerationLatest: n => n === generation},
+        ui: {
+            showLoadingScreen() { events.push('cover'); },
+            hideLoadingScreen() {events.push('hiding'); return Promise.resolve(true);},
+            showDialog() {events.push('dialog');}
+        }
+    });
+    manager.loadGameFromFile({target: {files: [{size: 1}], value: 'before'}});
+    generation++;
+    assert.strictEqual(typeof reader.onabort, 'function');
+    await reader.onabort();
+    assert.deepStrictEqual(events, ['cover'], '旧readerが新しい画面の幕を閉じない');
+});
+
+// r524: スロット一覧を開いてから確認ダイアログを確定するまでの寿命を固定する。
+function makeR524SlotSelection(mode) {
+    const elements = new Map();
+    const makeElement = id => ({
+        id, classList: new FakeClassList(), children: [], innerHTML: '',
+        appendChild(child) { this.children.push(child); },
+        set innerText(value) { this._text = value; }
+    });
+    for (const id of ['saveload-modal', 'saveload-title', 'saveload-list',
+        'saveload-tabs', 'saveload-tab-manual', 'saveload-tab-auto']) elements.set(id, makeElement(id));
+    const ctx = createContext({
+        document: {
+            body: {classList: new FakeClassList(['is-pc'])},
+            getElementById: id => elements.get(id) || null,
+            createElement: () => makeElement('new')
+        },
+        setTimeout: cb => { cb(); return 1; },
+        requestAnimationFrame: cb => { cb(); return 1; }
+    });
+    loadScript(ctx, 'js/save_load_view.js');
+    const castle = { id: 11 };
+    const game = {
+        phase: 'game', scenarioFolder: '1560_okehazama', year: 1560, month: 5,
+        currentIndex: 0, turnQueue: [castle],
+        _generation: 5, _operations: [],
+        turnManager: {
+            captureTurnFlowGeneration() { return game._generation; },
+            isTurnFlowGenerationLatest(n) { return n === game._generation; }
+        },
+        saveManager: { readSaveSlots: async prefix => Array.from({length: 5}, (_, i) => ({
+            originalSlotNo: i + 1,
+            data: mode === 'load' && prefix === 'sengoku_save_slot' && i === 0
+                ? {year: 1560, month: 5, gameStartYear: 1560, scenarioName: '1560年 桶狭間',
+                    saveTime: '2026/10/15', clans: [{id: 1, name:'織田家'}], playerClanId: 1}
+                : null,
+            hasData: mode === 'load' && prefix === 'sengoku_save_slot' && i === 0,
+            saveTimestamp: i === 0 ? 20 : 0,
+            readError: false, invalidData: false
+        })) },
+        saveGameToLocal(i) { this._operations.push('save:' + i); },
+        loadGameFromLocal(i, prefix) { this._operations.push('load:' + prefix + i); }
+    };
+    let confirm = null;
+    const ui = {
+        updateCustomScrollbars() {},
+        showDialog(message, isConfirm, onOk) { confirm = onOk; }
+    };
+    const view = new ctx.SaveLoadView(ui, game);
+    const select = async () => {
+        await view.open(mode);
+        await new Promise(resolve => setImmediate(resolve));
+        const btn = elements.get('saveload-list').children.slice(-5)[0];
+        assert.strictEqual(btn.disabled, false);
+        btn.onclick();
+        if (mode === 'save' || game.phase !== 'title') assert.strictEqual(typeof confirm, 'function');
+        return confirm;
+    };
+    return {game, view, select};
+}
+
+test('r524 旧シナリオのセーブ確認は新シナリオを保存しない', async () => {
+    const {game, select} = makeR524SlotSelection('save');
+    const accept = await select();
+    game._generation++;
+    game.scenarioFolder = '1570_anegawa';
+    game.year = 1570;
+    accept();
+    assert.deepStrictEqual(game._operations, [], '旧確認から別シナリオを保存してはならない');
+});
+
+test('r524 旧拠点のロード確認は翌ターンの新しいゲームを上書きしない', async () => {
+    const {game, select} = makeR524SlotSelection('load');
+    const accept = await select();
+    game.currentIndex = 1;
+    game.turnQueue.push({id: 12});
+    accept();
+    assert.deepStrictEqual(game._operations, [], '旧確認から別拠点ターンへロードしてはならない');
+});
+
+test('r524 翌月に同じ拠点へ戻った旧セーブ確認は失効する', async () => {
+    const {game, select} = makeR524SlotSelection('save');
+    const accept = await select();
+    game.month = 6;
+    accept();
+    assert.deepStrictEqual(game._operations, [], '世代・拠点位置が同じでも翌月の操作とは区別する');
+});
+
+test('r524 有効なセーブ・ロード確認は従来どおり実行できる', async () => {
+    for (const mode of ['save', 'load']) {
+        const {game, select} = makeR524SlotSelection(mode);
+        const accept = await select();
+        accept();
+        assert.deepStrictEqual(game._operations, [mode === 'save' ? 'save:1' : 'load:sengoku_save_slot1']);
+    }
+});
+
+test('r524 閉じて開き直した旧スロット確定は無効', async () => {
+    const {game, view, select} = makeR524SlotSelection('save');
+    const accept = await select();
+    view.close();
+    await view.open('save');
+    accept();
+    assert.deepStrictEqual(game._operations, [], '別のスロット一覧が開かれた後の旧確定を受理しない');
+});
+
+// r525: シナリオ読込エラーは、実際のタイトル→シナリオ選択→開始で発生し得る。
+// 同期的に失敗しない通常のUI引渡しと同様に、ロード幕解除を待ってから通知する。
+function makeR525ScenarioFailure() {
+    const events = [];
+    let completeHide;
+    let generation = 0;
+    const ctx = createContext({
+        addEventListener() {},
+        console: {...console, error() {}},
+        DataManager: {async loadAll() { throw new Error('Scenario data unavailable'); }}
+    });
+    loadScript(ctx, 'js/game.js');
+    const Manager = vm.runInContext('GameManager', ctx);
+    const ui = {
+        resetMapViewState() {},
+        showLoadingScreen() { events.push('cover'); },
+        waitForNextPaint: async () => {},
+        showGameSurface() { events.push('game-surface'); },
+        hideLoadingScreen() {
+            events.push('hiding');
+            return new Promise(resolve => { completeHide = resolve; });
+        },
+        showDialog() { events.push('error-dialog'); }
+    };
+    const game = {
+        ui,
+        turnManager: {
+            abortForScenarioTransition() { generation++; },
+            captureTurnFlowGeneration() { return generation; },
+            isTurnFlowGenerationLatest(captured) { return captured === generation; }
+        },
+        releaseScenarioMapResources() {}
+    };
+    return {
+        events, game, Manager,
+        completeHide: () => completeHide,
+        invalidate: () => { generation++; }
+    };
+}
+
+test('r525 シナリオ読み込み失敗はロード幕の解除完了後に通知する', async () => {
+    const f = makeR525ScenarioFailure();
+    const operation = f.Manager.prototype.loadScenario.call(f.game, 'broken');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(typeof f.completeHide(), 'function', '解除処理が開始している');
+    assert.ok(!f.events.includes('error-dialog'), 'ロード幕解除前には案内を表示しない');
+    f.completeHide()(true);
+    await operation;
+    assert.strictEqual(f.events.at(-1), 'error-dialog', 'ロード幕解除後に案内する');
+});
+
+test('r525 シナリオ読み込み失敗の通知待機中にタイトル復帰した場合は旧通知を出さない', async () => {
+    const f = makeR525ScenarioFailure();
+    const operation = f.Manager.prototype.loadScenario.call(f.game, 'broken');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(typeof f.completeHide(), 'function');
+    f.invalidate(); // 実際のタイトル復帰はTurnManagerの既存世代を失効させる。
+    f.completeHide()(false);
+    await operation;
+    assert.ok(!f.events.includes('error-dialog'), '失効したロードの通知で新画面を遮らない');
+});
+
+// r526: タブレットの縦横回転は通常UIから到達可能。地図は旧画像を表示したまま
+// 新解像度素材をdecodeしてから置き換える（表示中のsrc書換による白抜けを回避）。
+function makeResponsiveMapImageFixture() {
+    const imageInstances = [];
+    class TestImage {
+        constructor() {
+            this.style = {};
+            this.listeners = {};
+            this.complete = false;
+            this.naturalWidth = 0;
+            this.naturalHeight = 0;
+            this.parentNode = null;
+            imageInstances.push(this);
+        }
+        addEventListener(event, callback) {
+            if (!this.listeners[event]) this.listeners[event] = [];
+            this.listeners[event].push(callback);
+        }
+        decode() { return Promise.resolve(); }
+        fire(event) { (this.listeners[event] || []).forEach(callback => callback()); }
+        replaceWith(other) {
+            const parent = this.parentNode;
+            if (parent) { parent.child = other; other.parentNode = parent; }
+            this.parentNode = null;
+        }
+    }
+    class TestUIManager {}
+    const classes = new FakeClassList(['is-pc']);
+    const ctx = createContext({
+        Image: TestImage,
+        UIManager: TestUIManager,
+        document: { body: { classList: classes } },
+        __mobileLowMemoryMode: false
+    });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new TestUIManager();
+    const mapEl = { child: null };
+    ui.mapEl = mapEl;
+    const original = ui._ensureMapBaseImage(3140, 2440);
+    original.complete = true;
+    original.naturalWidth = 3140;
+    original.naturalHeight = 2440;
+    original.parentNode = mapEl;
+    mapEl.child = original;
+    return { ui, ctx, classes, imageInstances, mapEl, original };
+}
+
+test('r526 縦横回転時は旧地図を保持し、新解像度のdecode完了後に置換する', async () => {
+    const { ui, classes, imageInstances, mapEl, original } = makeResponsiveMapImageFixture();
+    classes.remove('is-pc');
+    assert.strictEqual(ui._ensureMapBaseImage(3140, 2440), original);
+    assert.strictEqual(mapEl.child, original, '旧画像は新画像完成まで表示する');
+    const alternate = imageInstances[1];
+    assert.ok(alternate && alternate.src.endsWith('japan_map_mobile.png'), 'モバイル素材を読み込む');
+    alternate.complete = true;
+    alternate.naturalWidth = 2355;
+    alternate.naturalHeight = 1830;
+    alternate.fire('load');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(ui._mapBaseImage, alternate);
+    assert.strictEqual(mapEl.child, alternate);
+    assert.strictEqual(alternate.style.width, '3140px', 'ゲーム論理座標の幅を維持');
+});
+
+test('r526 連続回転で旧方向への画像読込が後から届いても差し替えない', async () => {
+    const { ui, classes, imageInstances, mapEl, original } = makeResponsiveMapImageFixture();
+    classes.remove('is-pc');
+    ui._ensureMapBaseImage(3140, 2440);
+    classes.add('is-pc');
+    ui._ensureMapBaseImage(3140, 2440);
+    const stale = imageInstances[1];
+    stale.complete = true;
+    stale.naturalWidth = 2355;
+    stale.naturalHeight = 1830;
+    stale.fire('load');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(mapEl.child, original);
+    assert.strictEqual(ui._mapBaseImage, original);
+});
+
+test('r526 背景停止中の回転はCanvas再描画を復帰時まで延期する', () => {
+    const { ui } = makeResponsiveMapImageFixture();
+    let renders = 0;
+    ui.renderMap = () => { renders++; };
+    ui.game = { phase: 'game' };
+    ui.hasInitializedMap = true;
+    ui.isBackgroundPaused = true;
+    ui.syncMapLayoutResources();
+    assert.strictEqual(renders, 0);
+    assert.strictEqual(ui._mapLayoutRefreshPending, true);
+    ui.isBackgroundPaused = false;
+    ui.syncMapLayoutResources();
+    assert.strictEqual(renders, 1);
+    assert.strictEqual(ui._mapLayoutRefreshPending, false);
+});
+
+test('r526 レイアウト通知・背景復帰は地図資源同期の共通窓口へ委譲する', () => {
+    const code = read('js/ui.js');
+    assert.ok(code.includes("if (typeof this.syncMapLayoutResources === 'function') this.syncMapLayoutResources();"));
+    assert.ok(code.includes('if (this._mapLayoutRefreshPending && typeof this.syncMapLayoutResources'));
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
@@ -19948,3 +20306,4 @@ Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(1);
 });
+

@@ -429,6 +429,9 @@ class UIManager {
 
     handleLayoutModeChange() {
         if (!this.game) return;
+        // 端末回転でPC/スマホの地図素材とCanvas内部解像度も同期する。
+        // 旧画像は新画像のdecode完了まで保持し、地図だけ白抜けさせない。
+        if (typeof this.syncMapLayoutResources === 'function') this.syncMapLayoutResources();
 
         // 固定論理画面のmodeが縦横回転などで切り替わった時だけ、
         // 端末別に生成している通常画面DOMを現在modeへ同期する。
@@ -559,6 +562,10 @@ class UIManager {
 
         this.isBackgroundPaused = false;
         document.body.classList.remove('background-paused');
+        // モーダル中に縦横回転した場合、背面Canvasは復帰時に1回だけ同期する。
+        if (this._mapLayoutRefreshPending && typeof this.syncMapLayoutResources === 'function') {
+            this.syncMapLayoutResources();
+        }
         mark('recover_map_start');
         if (typeof this.recoverMobileMapResources === 'function') {
             this.recoverMobileMapResources();

@@ -588,7 +588,11 @@ class GameManager {
                 this._watchReturnInProgress = false;
                 this._watchReturnSafePoint = null;
             }
-            if (this.ui) this.ui.hideLoadingScreen();
+            // 読込失敗時も通常のシナリオ開始・セーブ復元と同じく、
+            // 共通ロード幕の解除が完了してから結果を案内する。
+            // 待機中にタイトル復帰や別の開始が起きた場合、旧エラーは表示しない。
+            if (this.ui) await this.ui.hideLoadingScreen();
+            if (!isScenarioLoadLatest()) return;
             console.error(e);
             if (this.ui) {
                 this.ui.showDialog("シナリオデータの読み込みに失敗しました。", false, () => {
