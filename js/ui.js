@@ -429,34 +429,43 @@ class UIManager {
 
     handleLayoutModeChange() {
         if (!this.game) return;
-        // 端末回転でPC/スマホの地図素材とCanvas内部解像度も同期する。
-        // 旧画像は新画像のdecode完了まで保持し、地図だけ白抜けさせない。
+        // 地図素材は背景停止中も既存のView側で切替予約を管理する。
         if (typeof this.syncMapLayoutResources === 'function') this.syncMapLayoutResources();
 
-        // 固定論理画面のmodeが縦横回転などで切り替わった時だけ、
-        // 端末別に生成している通常画面DOMを現在modeへ同期する。
-        if (this.game.phase === 'game' && this.currentCastle && !this.isBackgroundPaused) {
-            const isPc = document.body.classList.contains('is-pc');
-            if (this.panelEl) this.panelEl.classList.toggle('hidden', isPc);
-            if (this.pcNewUiContainer) this.pcNewUiContainer.classList.toggle('hidden', !isPc);
-
-            this.updatePanelHeader();
-
-            if (this.game.selectionMode) {
-                this.renderSelectionModeMenu();
-            } else if (this.game.isProcessingAI) {
-                this.clearCommandMenu();
-            } else if (Number(this.currentCastle.ownerClan) === Number(this.game.playerClanId)
-                && this.game.getCurrentTurnCastle() === this.currentCastle) {
-                this.renderCommandMenu();
+        // 端末回転でPC/スマホが切り替わった際、モーダル中は重い操作DOMの
+        // 作り直しを避ける。閉じた直後に現在modeへ同期しないと、旧modeで
+        // hiddenにした操作パネルが表示されないまま残る。
+        if (this.game.phase === 'game' && this.currentCastle) {
+            if (this.isBackgroundPaused) {
+                this._controlPanelLayoutRefreshPending = true;
             } else {
-                this.renderEnemyViewMenu();
+                this._controlPanelLayoutRefreshPending = false;
+                this.updatePanelHeader();
+                this._syncControlPanelForLayoutMode();
+                this.updateCastleGlows();
             }
-
-            this.updateCastleGlows();
         }
-
         this.updateCustomScrollbars();
+    }
+
+    // PC/スマホの操作パネル表示とコマンドDOMは、通常のレイアウト切替と
+    // モーダル復帰とで同じView窓口を使用する。情報パネル/地図の再描画は含めない。
+    _syncControlPanelForLayoutMode() {
+        if (!this.game || this.game.phase !== 'game' || !this.currentCastle) return;
+        const isPc = document.body.classList.contains('is-pc');
+        if (this.panelEl) this.panelEl.classList.toggle('hidden', isPc);
+        if (this.pcNewUiContainer) this.pcNewUiContainer.classList.toggle('hidden', !isPc);
+
+        if (this.game.selectionMode) {
+            this.renderSelectionModeMenu();
+        } else if (this.game.isProcessingAI) {
+            this.clearCommandMenu();
+        } else if (Number(this.currentCastle.ownerClan) === Number(this.game.playerClanId)
+            && this.game.getCurrentTurnCastle() === this.currentCastle) {
+            this.renderCommandMenu();
+        } else {
+            this.renderEnemyViewMenu();
+        }
     }
 
     _getCompressedTextHtml(text, threshold, isStrong = false) {
@@ -561,6 +570,8 @@ class UIManager {
         }
 
         this.isBackgroundPaused = false;
+        const refreshControlLayout = this._controlPanelLayoutRefreshPending === true;
+        this._controlPanelLayoutRefreshPending = false;
         document.body.classList.remove('background-paused');
         // モーダル中に縦横回転した場合、背面Canvasは復帰時に1回だけ同期する。
         if (this._mapLayoutRefreshPending && typeof this.syncMapLayoutResources === 'function') {
@@ -592,6 +603,11 @@ class UIManager {
         mark('info_start');
         if (activeCastle) {
             this.updateInfoPanel(activeCastle);
+        }
+        // モーダル表示中に回転した場合は、情報だけでなくPC/スマホの
+        // 操作パネル本体も復帰させる。画面の正本が切り替わった場合は触らない。
+        if (refreshControlLayout && this.game.phase === 'game') {
+            this._syncControlPanelForLayoutMode();
         }
         mark('info_done');
         if (typeof this.refreshCastlePresentations === 'function') {
@@ -1625,17 +1641,17 @@ class UIManager {
     initContextMenu() {
         this.contextMenu = document.getElementById('custom-context-menu');
 
+        // 検索・フォームのネイティブ操作と独自スクロールバーを共通ショートカットから除外する。
+        // 長押し完了後だけでなくtouchstart側でも同じ判定を行わないと、無効な長押しでも
+        // touchendがpreventDefaultされ、iOS等のテキスト選択・select操作を妨げる。
+        const isNativeContextMenuTarget = (e) => {
+            const actionTarget = e && e.target instanceof Element ? e.target : null;
+            return !!(actionTarget && actionTarget.closest('input, select, textarea, option, [contenteditable="true"], .custom-scrollbar-thumb, .custom-scrollbar-track, .custom-scrollbar-btn'));
+        };
+
         // ★右クリックやスマホの長押しで実行する中身をひとまとめにします
         const executeContextMenuAction = (e) => {
-            // 検索欄・選択欄・テキスト入力では、ブラウザ／OSのネイティブ編集操作を最優先します。
-            // document共通の右クリック／長押しをここで発火させると、検索中にモーダルを閉じたり
-            // テキスト選択・IME・selectの長押し操作を奪うため、共通ショートカットの対象外にします。
-            const actionTarget = e && e.target instanceof Element ? e.target : null;
-            // フォームだけでなく、独自スクロールバーもその操作自体を優先します。
-            // document共通の長押しがつまみ操作中に発火すると、観戦終了予約やモーダル取消へ誤接続するためです。
-            if (actionTarget && actionTarget.closest('input, select, textarea, option, [contenteditable="true"], .custom-scrollbar-thumb, .custom-scrollbar-track, .custom-scrollbar-btn')) {
-                return;
-            }
+            if (isNativeContextMenuTarget(e)) return;
 
             // Round26：観戦中の右クリック／長押しは、どんなイベント画面の最中でも
             // 「閉じる」等を押さず、まず観戦終了の予約だけを行います。
@@ -1784,7 +1800,11 @@ class UIManager {
                 return;
             }
             isLongPress = false;
-            
+            cancelPendingLongPress();
+            // フォーム／スクロールバーではゲーム用の長押し自体を始めない。
+            // 実行だけを無視すると600ms後にtouchendを抑止してしまう。
+            if (isNativeContextMenuTarget(e)) return;
+
             // 指を置いた瞬間にタイマーをスタートします（0.6秒）
             longPressTimer = setTimeout(() => {
                 isLongPress = true;
@@ -2716,6 +2736,52 @@ class UIManager {
         this.updateInfoPanel(this.currentCastle);
     }
 
+    // スマホ拠点の状態マーク自動切替。描画差分がなくても背景復帰時に再開する。
+    // UI表示の寿命だけを扱い、城の状態判定・HTML生成には介入しない。
+    _syncMobileStatusCarousel(panel) {
+        if (!panel || document.body.classList.contains('is-pc')) return;
+        const carousel = panel.querySelector('.status-marks-carousel');
+        if (!carousel) return;
+        const marks = carousel.querySelectorAll('.status-mark');
+        if (!marks.length) return;
+
+        if (marks.length === 1) {
+            marks[0].classList.add('active');
+            carousel.style.cursor = 'default';
+            carousel.onclick = (event) => event.stopPropagation();
+            return;
+        }
+
+        // DOMが作り直された時だけタップ処理とインデックスを初期化する。
+        // モーダルから戻っただけなら、既存の選択位置を保持してtimerのみ再開。
+        if (!carousel._advanceStatusMark) {
+            let currentIndex = Array.from(marks).findIndex(mark => mark.classList.contains('active'));
+            if (currentIndex < 0) currentIndex = 0;
+            marks[currentIndex].classList.add('active');
+            carousel.style.cursor = 'pointer';
+            const showNext = () => {
+                marks[currentIndex].classList.remove('active', 'fade-in');
+                currentIndex = (currentIndex + 1) % marks.length;
+                marks[currentIndex].classList.add('active', 'fade-in');
+            };
+            carousel._advanceStatusMark = showNext;
+            carousel.onclick = (event) => {
+                event.stopPropagation();
+                if (this._statusCarouselTimer) {
+                    clearInterval(this._statusCarouselTimer);
+                    this._statusCarouselTimer = null;
+                }
+                showNext();
+                if (!this.isBackgroundPaused) {
+                    this._statusCarouselTimer = setInterval(showNext, 2500);
+                }
+            };
+        }
+        if (!this.isBackgroundPaused && !this._statusCarouselTimer) {
+            this._statusCarouselTimer = setInterval(carousel._advanceStatusMark, 2500);
+        }
+    }
+
     updateInfoPanel(castle) {
         // ★ここを書き足し：背景ストップ中は、重たい画面の書き換えをサボります！
         if (this.isBackgroundPaused) return;
@@ -2886,35 +2952,12 @@ class UIManager {
                 if (castellanFace) {
                     castellanFace.addEventListener('error', () => castellanFace.classList.add('is-broken'), { once: true });
                 }
-
-                const carousel = targetPanel.querySelector('.status-marks-carousel');
-                if (carousel) {
-                    const marks = carousel.querySelectorAll('.status-mark');
-                    if (marks.length > 0) {
-                        let currentIndex = 0;
-                        marks[0].classList.add('active');
-                        if (marks.length > 1) {
-                            carousel.style.cursor = 'pointer';
-                            const showNext = () => {
-                                marks[currentIndex].classList.remove('active', 'fade-in');
-                                currentIndex = (currentIndex + 1) % marks.length;
-                                marks[currentIndex].classList.add('active', 'fade-in');
-                            };
-                            this._statusCarouselTimer = setInterval(showNext, 2500);
-                            carousel.onclick = (e) => {
-                                e.stopPropagation();
-                                clearInterval(this._statusCarouselTimer);
-                                showNext();
-                                this._statusCarouselTimer = setInterval(showNext, 2500);
-                            };
-                        } else {
-                            carousel.style.cursor = 'default';
-                            carousel.onclick = (e) => { e.stopPropagation(); };
-                        }
-                    }
-                }
             }
         }
+
+        // 背景復帰時は同一HTMLのためパネル再描画が省略されることがある。
+        // 一度止めたタイマーだけは再開し、不要なDOM再生成は行わない。
+        this._syncMobileStatusCarousel(targetPanel);
 
         // 非表示側へ同じ情報DOMを複製しない。端末モード切替時だけ古い側を掃除する。
         if (!isPc && this.pcNewStatusPanel && this.pcNewStatusPanel.innerHTML) this.pcNewStatusPanel.innerHTML = '';

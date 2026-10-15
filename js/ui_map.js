@@ -2592,7 +2592,10 @@ Object.assign(UIManager.prototype, {
         // 通常の落城/譲渡のように変更拠点が少数なら、その外接矩形だけを更新する。
         const dirtyIds = this.game._castleColorDirtyIds instanceof Set ? this.game._castleColorDirtyIds : null;
         const boundsByCastleId = DataManager.castlePixelBounds || null;
-        const canPartialPaint = this.lastClanColorsHash !== null
+        // 回転などでCanvasの内部解像度を変更すると、同じDOMでも全pixelが消える。
+        // 旧解像度の描画hashを持つ状態でdirty拠点だけ描き直すと、他領域が透明のまま残る。
+        const canPartialPaint = typeof this.lastClanColorsHash === 'string'
+            && this.lastClanColorsHash.startsWith(`${width}x${height}:`)
             && this._lastClanColorOverlay === overlay
             && dirtyIds && dirtyIds.size > 0 && dirtyIds.size <= 12
             && boundsByCastleId;

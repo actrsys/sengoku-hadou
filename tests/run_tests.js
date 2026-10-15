@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r526');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r530');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -11975,10 +11975,15 @@ test('フォーム部品上の右クリックと長押しはネイティブ入�
     const ui = read('js/ui.js');
     const formGuard = 'actionTarget.closest(\'input, select, textarea, option, [contenteditable="true"], .custom-scrollbar-thumb, .custom-scrollbar-track, .custom-scrollbar-btn\')';
     assert.ok(ui.includes(formGuard), 'フォーム部品と独自スクロールバーを共通右クリック／長押しの対象外にする');
+    const formAt = ui.indexOf(formGuard, ui.indexOf('initContextMenu() {'));
     const actionAt = ui.indexOf('const executeContextMenuAction = (e) => {');
-    const formAt = ui.indexOf(formGuard, actionAt);
+    const guardAt = ui.indexOf('if (isNativeContextMenuTarget(e)) return;', actionAt);
     const watchAt = ui.indexOf('if (this.game && this.game.isWatchMode)', actionAt);
-    assert.ok(actionAt >= 0 && formAt > actionAt && watchAt > formAt, '観戦終了予約より先にフォームのネイティブ操作を保護する');
+    const touchStartAt = ui.indexOf("document.addEventListener('touchstart', (e) => {", actionAt);
+    const touchGuardAt = ui.indexOf('if (isNativeContextMenuTarget(e)) return;', touchStartAt);
+    assert.ok(formAt >= 0 && actionAt > formAt && guardAt > actionAt && watchAt > guardAt,
+        'フォーム・スクロールバー共通判定を観戦終了予約より先に適用する');
+    assert.ok(touchGuardAt > touchStartAt, 'touchstartからも同じ除外判定を利用する');
 });
 
 test('右クリックと長押しは非モーダル入力遮断レイヤーを貫通しない', () => {
@@ -20296,6 +20301,202 @@ test('r526 レイアウト通知・背景復帰は地図資源同期の共通窓
     const code = read('js/ui.js');
     assert.ok(code.includes("if (typeof this.syncMapLayoutResources === 'function') this.syncMapLayoutResources();"));
     assert.ok(code.includes('if (this._mapLayoutRefreshPending && typeof this.syncMapLayoutResources'));
+});
+
+test('r527 端末回転によるCanvas解像度変更時は未反映の落城があっても勢力色を全面復元する', () => {
+    class TestUIManager {}
+    const overlay = { id: 'clan-color-overlay', width: 20, height: 2 };
+    const ctx = createContext({
+        UIManager: TestUIManager,
+        document: {
+            body: { classList: { contains(name) { return name === 'is-pc'; } } },
+            getElementById(id) { return id === 'clan-color-overlay' ? overlay : null; }
+        }
+    });
+    const source = new Uint8Array(40 * 4);
+    for (let y = 0; y < 4; y++) {
+        for (let x = 0; x < 40; x++) source[y * 40 + x] = x < 5 ? 1 : 2;
+    }
+    ctx.DataManager = {
+        castlePixelMap: source,
+        castlePixelBounds: [null,
+            { minX: 0, maxX: 4, minY: 0, maxY: 3 },
+            { minX: 5, maxX: 39, minY: 0, maxY: 3 }
+        ],
+        hexToRgb() { return {r: 255, g: 0, b: 0}; }
+    };
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.game = {
+        mapWidth: 40, mapHeight: 4,
+        castles: [{ id: 1, ownerClan: 1 }, { id: 2, ownerClan: 2 }],
+        clans: [{id: 1, color: '#ff0000'}, {id: 2, color: '#00ff00'}],
+        castleOwnershipVersion: 1,
+        _castleColorDirtyIds: new Set([1]),
+        isSuspendingColorUpdate: false
+    };
+    ui.pixelCastleMap = source;
+    // PC表示からスマホ表示へ切り替えた直後。canvas.width代入は既存全pixelを消去する。
+    ui.lastClanColorsHash = '40x4:0:2';
+    ui._lastClanColorOverlay = overlay;
+    let full = 0;
+    let partial = 0;
+    ui._paintCanvasByStrips = () => { full++; return true; };
+    ui._paintCanvasRegions = () => { partial++; return true; };
+    ui.updateClanColors();
+    assert.strictEqual(full, 1, '解像度変更後の空のCanvasは必ず全面描画する');
+    assert.strictEqual(partial, 0, '落城拠点のみの局所描画で他領域を透明のままにしない');
+    assert.strictEqual(ui.game._castleColorDirtyIds.size, 0, '全面描画で未処理の拠点変更も反映する');
+});
+
+test('r528 スマホ拠点状態マークはモーダルから戻ると同じDOMでも自動切替を再開する', () => {
+    const timers = new Map();
+    let nextId = 1;
+    const ctx = createContext({
+        document: { body: { classList: { contains: () => false } } },
+        setInterval(callback, delay) {
+            assert.strictEqual(delay, 2500);
+            const id = nextId++;
+            timers.set(id, callback);
+            return id;
+        },
+        clearInterval(id) { timers.delete(id); }
+    });
+    loadScript(ctx, 'js/ui.js');
+    const ui = Object.create(vm.runInContext('UIManager.prototype', ctx));
+    const marks = Array.from({ length: 3 }, () => ({ classList: new FakeClassList() }));
+    const carousel = {
+        style: {}, onclick: null,
+        querySelectorAll(selector) { return selector === '.status-mark' ? marks : []; }
+    };
+    const panel = { querySelector(selector) { return selector === '.status-marks-carousel' ? carousel : null; } };
+    ui.isBackgroundPaused = false;
+    ui._syncMobileStatusCarousel(panel);
+    assert.strictEqual(timers.size, 1, '複数の状態マークは自動切替する');
+    assert.strictEqual(marks[0].classList.contains('active'), true);
+    // モーダルを開くとpauseBackgroundUpdatesがタイマーを停止する。
+    ctx.clearInterval(ui._statusCarouselTimer);
+    ui._statusCarouselTimer = null;
+    ui.isBackgroundPaused = true;
+    ui._syncMobileStatusCarousel(panel);
+    assert.strictEqual(timers.size, 0, 'モーダル中はタイマーを生成しない');
+    // モーダルを閉じても同じ拠点/同じHTMLなら再レンダーは発生しない。
+    ui.isBackgroundPaused = false;
+    ui._syncMobileStatusCarousel(panel);
+    assert.strictEqual(timers.size, 1, 'DOMを再生成せずタイマーだけ再開する');
+    const callback = [...timers.values()][0];
+    callback();
+    assert.strictEqual(marks[1].classList.contains('active'), true, '次のマークへ切り替わる');
+    ui._syncMobileStatusCarousel(panel);
+    assert.strictEqual(timers.size, 1, '再同期時にタイマーを重複させない');
+    carousel.onclick({ stopPropagation() {} });
+    assert.strictEqual(marks[2].classList.contains('active'), true, '手動タップも維持する');
+    assert.strictEqual(timers.size, 1, '手動タップ後も単独タイマーで再開する');
+    assert.ok(read('js/ui.js').includes('this._syncMobileStatusCarousel(targetPanel);'),
+        '画面本体が差分描画を省略した場合も同期を行う');
+});
+
+test('r529 回転中のモーダルを閉じると操作パネルを新レイアウトへ復帰する', () => {
+    const testMode = (fromPc, toPc) => {
+        const bodyClasses = new FakeClassList();
+        if (toPc) bodyClasses.add('is-pc');
+        const ctx = createContext({
+            document: { body: { classList: bodyClasses } }
+        });
+        loadScript(ctx, 'js/ui.js');
+        const ui = Object.create(vm.runInContext('UIManager.prototype', ctx));
+        const mobileClasses = new FakeClassList();
+        const pcClasses = new FakeClassList();
+        for (const classes of [mobileClasses, pcClasses]) {
+            classes.toggle = (name, force) => {
+                if (force) classes.add(name);
+                else classes.remove(name);
+            };
+        }
+        if (fromPc) mobileClasses.add('hidden');
+        else pcClasses.add('hidden');
+        ui.panelEl = { classList: mobileClasses };
+        ui.pcNewUiContainer = { classList: pcClasses };
+        const castle = { id: 42, ownerClan: 7 };
+        ui.currentCastle = castle;
+        ui.game = {
+            phase: 'game', playerClanId: 7, selectionMode: null, isProcessingAI: false,
+            getCurrentTurnCastle: () => castle
+        };
+        ui.isBackgroundPaused = true;
+        let commandRenders = 0;
+        ui.renderCommandMenu = () => { commandRenders++; };
+        ui.updatePanelHeader = () => {};
+        ui.updateInfoPanel = () => {};
+        ui.updateCastleGlows = () => {};
+        ui.updateCustomScrollbars = () => {};
+        ui.syncMapLayoutResources = () => {};
+        ui.handleLayoutModeChange();
+        assert.strictEqual(commandRenders, 0, 'モーダル中に背面コマンドを構築しない');
+        ui.resumeBackgroundUpdates();
+        assert.strictEqual(mobileClasses.contains('hidden'), toPc, 'スマホパネルの可視性を新modeに一致');
+        assert.strictEqual(pcClasses.contains('hidden'), !toPc, 'PCパネルの可視性を新modeに一致');
+        assert.strictEqual(commandRenders, 1, '復帰時だけコマンドの表示を同期');
+    };
+    testMode(true, false);
+    testMode(false, true);
+});
+
+
+test('r530 スマホ共通長押しはフォームとスクロールバーのネイティブ操作を妨げない', () => {
+    const listeners = new Map();
+    const timers = new Map();
+    let nextTimer = 0;
+    const schedule = fn => {
+        const id = ++nextTimer;
+        timers.set(id, fn);
+        return id;
+    };
+    class TouchNode {
+        constructor(role) { this.role = role; }
+        closest(selector) {
+            if (this.role === 'input') return selector.includes('input') ? this : null;
+            if (this.role === 'textarea') return selector.includes('textarea') ? this : null;
+            if (this.role === 'select') return selector.includes('select') ? this : null;
+            if (this.role === 'editable') return selector.includes('[contenteditable="true"]') ? this : null;
+            if (this.role === 'scrollbar') return selector.includes('.custom-scrollbar-thumb') ? this : null;
+            return null;
+        }
+    }
+    const document = {
+        getElementById: () => null,
+        addEventListener: (event, fn) => listeners.set(event, fn),
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        body: { classList: { contains: () => false } }
+    };
+    const ctx = createContext({ document, Element: TouchNode, setTimeout: schedule,
+        clearTimeout: id => timers.delete(id), addEventListener() {} });
+    loadScript(ctx, 'js/ui.js');
+    const ui = Object.create(vm.runInContext('UIManager.prototype', ctx));
+    let returnRequests = 0;
+    ui.game = { isWatchMode: true, requestWatchReturn() { returnRequests++; return false; } };
+    ui.initContextMenu();
+    const start = listeners.get('touchstart');
+    const end = listeners.get('touchend');
+    assert.strictEqual(typeof start, 'function');
+    assert.strictEqual(typeof end, 'function');
+    for (const role of ['input', 'textarea', 'select', 'editable', 'scrollbar']) {
+        let prevented = 0;
+        start({ target: new TouchNode(role), touches: [{}] });
+        assert.strictEqual(timers.size, 0, `${role}上でゲーム用長押しtimerを予約しない`);
+        end({ target: new TouchNode(role), cancelable: true, preventDefault() { prevented++; } });
+        assert.strictEqual(prevented, 0, `${role}のtouchendを抑止しない`);
+    }
+    assert.strictEqual(returnRequests, 0, 'ネイティブ操作から観戦終了要求を出さない');
+    let prevented = 0;
+    start({ target: new TouchNode('map'), touches: [{}] });
+    assert.strictEqual(timers.size, 1, '通常の地図長押しは従来通り使える');
+    const timeout = [...timers.values()][0];
+    timeout();
+    end({ target: new TouchNode('map'), cancelable: true, preventDefault() { prevented++; } });
+    assert.strictEqual(returnRequests, 1, '地図長押しは観戦終了操作へ接続する');
+    assert.strictEqual(prevented, 1, '処理済みのゲーム長押しでは後続のタップだけを抑止する');
 });
 
 Promise.all(pendingTests).then(() => {
