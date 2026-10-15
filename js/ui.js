@@ -204,13 +204,18 @@ class UIManager {
                 // タイトル段階は城アイコンだけを先読みします。
                 // SEの canplaythrough 待ちは古いWebViewで止まりやすいため行わず、音は必要時にAudioManagerへ任せます。
                 this.updateLoadingProgress(10, '基本データを準備しています');
+                // タイトルは軽量subsetだけで即表示。タップ後のロード幕で
+                // ゲーム本体用の完全な2書体を準備し、最終表示まで待つ。
+                const gameFontTask = typeof window.__ensureGameFontsReady === 'function'
+                    ? window.__ensureGameFontsReady() : Promise.resolve(true);
                 await new Promise(res => {
                     const img = new Image();
                     img.onload = img.onerror = res;
                     img.decoding = 'async';
                     img.src = './data/images/map/shiro_icon001.webp';
                 });
-                this.updateLoadingProgress(85, '基本データを準備しています');
+                this.updateLoadingProgress(85, 'フォントと基本データを準備しています');
+                await gameFontTask;
                 await this.waitForNextPaint();
 
                 // セーブデータがあるかチェックしてボタンを制御します
@@ -2106,6 +2111,11 @@ class UIManager {
             attributes: true, attributeFilter: ['class', 'style', 'src', 'hidden', 'open']
         });
         try {
+            // タイトル以外でロード幕を開いた経路（直接ロード等）でも完全フォントを保証する。
+            if (typeof window.__ensureGameFontsReady === 'function') {
+                await window.__ensureGameFontsReady();
+                if (!isCurrent()) return false;
+            }
             // フォントの差し替わりで文字幅やモーダルの高さが後から変わらないようにする。
             if (document.fonts && document.fonts.ready) {
                 try { await document.fonts.ready; } catch (error) { console.warn('フォントの待機に失敗:', error); }

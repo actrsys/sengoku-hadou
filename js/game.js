@@ -572,9 +572,12 @@ class GameManager {
             if (this.ui) await this.ui.hideLoadingScreen();
             if (!isScenarioLoadLatest()) return;
 
-            // 観戦開始はロード画面を閉じてから。0ms継続もTurnManagerの世代管理へ結び、
-            // 直後のタイトル復帰・別シナリオ読込で旧initを持ち越さない。
+            // タイトル観戦も通常プレイと同じ平時BGMへ。ロード完了・世代確認後だけ
+            // 切り替えるため、タイトルで待機している間や失敗時に音楽を変えない。
             if (startInWatchMode) {
+                if (window.AudioManager) window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
+                // 観戦開始はロード画面を閉じてから。0ms継続もTurnManagerの世代管理へ結び、
+                // 直後のタイトル復帰・別シナリオ読込で旧initを持ち越さない。
                 this.turnManager.scheduleTurnFlowContinuation(() => this.init(), 0);
             }
             

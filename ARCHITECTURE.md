@@ -1,3 +1,6 @@
+- **タイトル初回表示は同一書体の軽量字形を使い、完全なゲーム用フォントはロード幕で待つ。** `data/fonts/title-abashiri-mincho.woff2` と `title-fude-goshirae.woff2` は元の網走明朝・筆ごしらえからタイトルに使う文字だけを抽出した派生物。通常端末の起動時はこの2ファイルだけをpreloadし、`#title-screen` の書体をこれらに固定して初期フォントの入れ替わりを防ぐ。`js/app_bootstrap.js` の `__ensureGameFontsReady()` は初回タップ後に必要時だけ元の完全フォント2種類を読み込み、`UIManager` は共通ロード幕の解除前にその完了を待つ。トップ画面で大容量の元フォントを再びpreloadしたり、ロード中の待機を固定msで代用しない。低メモリ端末は従来どおりOS標準明朝を使う。ライセンス表示と完全フォント原本は保持する。
+- **タイトル観戦のBGMはロード成功後に平時曲へ切り替える。** `GameManager.loadScenario()` のタイトル観戦分岐だけで `AudioManager.playBGM('SC_ex_Town2_Fortress.ogg')` を呼び、ロード幕解除・世代確認後かつ観戦ターン進行開始前に切り替える。通常開始の大名選択、ゲーム途中からの観戦、失敗したシナリオロードでは曲を変更せず、タイトル復帰では既存のタイトルBGMへ戻す。音源・音量・再生APIの正本は `AudioManager` とする。
+
 - **スマホの連続操作をダブルタップ防止で失わせない。** `body`の`touch-action: manipulation`を基本とし、古いWebView向けの補助的な`touchend.preventDefault()`は同一の非操作領域へ短時間で繰り返し触れた場合に限定する。通常ボタン・クリック可能な一覧行・独自スクロール操作では二度目のタップも標準クリックへ渡す。距離だけで別々のボタンの操作をダブルタップと判定しない。
 - **フォーム部品のネイティブ入力を壊さない。** `input` / `select` / `textarea` / `contenteditable` へ共通 `touchend` から `blur()` や `preventDefault()` を掛けない。共通長押しショートカットは実行直前だけでなく `touchstart` でフォームと独自スクロールバーを除外し、無効な長押しによる `touchend.preventDefault()` も発生させない。検索中は入力要素そのものを再生成せず、日本語IMEは `compositionend` 後に絞り込みへ反映する。
 - **独自スクロールバーの複数指入力は開始指だけを追う。** `CustomScrollbar` のつまみをドラッグしている間、別指の `touchend` / `touchcancel` がdocumentへ届いてもドラッグを終了しない。開始指の終了・中断時だけ終了し、`blur` / `pagehide` / 非表示では従来どおり無条件に解除する。PCマウス・単指タッチ・仮想一覧の行スナップ処理は保持する。
@@ -55,7 +58,7 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 
 ## 入口・基盤
 
-- `js/app_bootstrap.js` — ブラウザ起動処理。フォント、固定HTMLボタン、タイトル版表示、viewport、離脱警告。
+- `js/app_bootstrap.js` — ブラウザ起動処理。タイトル用軽量フォントの先行準備と本体フォントの遅延・ロード幕内完了待機、固定HTMLボタン、タイトル版表示、viewport、離脱警告。
 - `js/audio.js` — BGM/SE再生と音量設定反映の正本。Howlerのmin版が読めない場合の通常版フォールバックもここで管理し、一時SE用Howlは再生終了・読込失敗時に解放する。BGMのループ開始・終了はカタログ値を独立して適用し、`start: 0` でも終了点を無視しない。再生中の音量変更はHowler内部プロパティから曲名を推測せず `currentBgmName` を正本にする。タッチ端末の長尺BGMは `data/music/bgm_mobile/*.m4a` をHowlerのHTML5 Audio経路でストリーミングし、Web Audioの巨大な全曲PCM AudioBuffer常駐を避ける。mobile AACには各曲の `baseVolume` を音源側へ焼き込み、HTMLMediaElement.volumeが固定される古いiOSでもBGMだけ過大音量にならないようにする。PCは従来のOGG/Web Audio経路を維持する。 iOS/iPadOSでAudio Session APIが利用できる場合は `ambient` を明示し、HTML5 BGMを含むゲーム音全体をRing/Silent（マナーモード）に従わせる。音声ポリシーは `audio.js` 以外へ重複実装しない。
 - `js/config.js` — ゲームルール・バランス値と開発版メタ情報の正本。ユーザー個人の設定は置かない。タイトルの版番号は `GameConfig.Meta.Version` だけを参照する。
 - `js/constants.js` — 状態文字列と、複数状態をまとめた意味判定（LifeStatusRules / BushoStatusRules / DiplomacyRules）の正本。

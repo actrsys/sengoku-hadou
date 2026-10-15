@@ -113,13 +113,54 @@ function fakeElement(id) {
 // ---------------------------------------------------------------------------
 // 設定・定数
 // ---------------------------------------------------------------------------
+
+test('r540 タイトルは同じ2書体のsubsetを先に読み、ゲーム本体の完全書体はロード幕で後から待つ', () => {
+    const boot = read('js/app_bootstrap.js');
+    const css = read('css/style.css');
+    const ui = read('js/ui.js');
+    const html = read('index.html');
+    for (const [file, full] of [
+        ['title-abashiri-mincho.woff2', 'abashiri-mincho.woff2'],
+        ['title-fude-goshirae.woff2', 'fude-goshirae.woff2']
+    ]) {
+        const small = fs.statSync(path.join(ROOT, 'data/fonts', file)).size;
+        const large = fs.statSync(path.join(ROOT, 'data/fonts', full)).size;
+        assert.ok(small > 1000 && small < large / 10, file + ' は同一フォントの軽量字形');
+        assert.ok(boot.includes(file), 'トップのpreload対象は小型字形のみ');
+        assert.ok(css.includes(file), 'CSSも同じ小型字形を使用');
+    }
+    assert.ok(boot.indexOf('window.__ensureGameFontsReady = ensureGameFontsReady') > 0);
+    assert.ok(boot.includes('let gameFontsPromise = null'));
+    assert.ok(boot.includes("await document.fonts.ready;"), 'ゲーム本体書体の完了待ち');
+    assert.ok(ui.includes('await gameFontTask;'), 'タイトル初回タップ後のロード幕でゲーム書体を待つ');
+    assert.ok(ui.includes('await window.__ensureGameFontsReady();'), '直接ロード時も共通ロード幕で待つ');
+    assert.ok(css.includes("#title-screen .game-title { font-family: 'TitleFude'"));
+    assert.ok(css.includes("#title-screen .title-btn,"));
+    assert.ok(html.includes('class="fonts-loading"'), '最初の画面も字形が揃ってから表示する');
+    assert.ok(!boot.includes('FONT_TIMEOUT_MS = 6000'), '大容量フォントをトップの白画面待機対象にしない');
+});
+
+test('r540 トップ観戦はロード後にだけ平時BGMへ切替し、通常開始とタイトルでは変更しない', () => {
+    const game = read('js/game.js');
+    const start = game.indexOf('async loadScenario(folder, options = {})');
+    const end = game.indexOf('    preloadFaceIcons() {', start);
+    const load = game.slice(start, end);
+    const onSuccess = load.indexOf('await this.ui.hideLoadingScreen()');
+    const bgm = load.indexOf("window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg')");
+    const watch = load.indexOf('this.turnManager.scheduleTurnFlowContinuation(() => this.init(), 0);');
+    assert.ok(onSuccess >= 0 && bgm > onSuccess && watch > bgm, 'ロード完了後・観戦ターン開始前の切替');
+    assert.ok(load.slice(bgm - 130, bgm).includes('if (startInWatchMode)'), '途中観戦と通常開始へ混ぜない');
+    assert.ok(load.includes('if (!isScenarioLoadLatest()) return;'), '旧ロードの競合時に切替しない');
+    assert.ok(read('js/ui.js').includes("window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg')"), 'タイトルの曲は維持');
+});
+
 test('GameConfig / GameConstants が中央定義として読み込める', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/config.js');
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r539');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r540');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -320,14 +361,16 @@ test('旧端末安全モードは小型iPhoneをOS世代に関係なく判定し
     assert.ok(bootstrap.includes('shortEdge <= 390 && longEdge <= 700'));
     assert.ok(!bootstrap.includes('iosMajor > 0 && iosMajor <= 16'));
     assert.ok(bootstrap.includes("document.documentElement.classList.add('mobile-low-memory')"));
-    assert.ok(bootstrap.includes('if (!earlyMobileLowMemoryMode)'));
+    assert.ok(bootstrap.includes('if (earlyMobileLowMemoryMode) return Promise.resolve(true)'));
     assert.ok(css.includes("html.mobile-low-memory"));
-    assert.ok(bootstrap.includes('低メモリ端末ではWebフォントを読み込まずシステム明朝を使用します'));
+    assert.ok(bootstrap.includes('軽量モードは既存どおりOS標準書体を使用します'));
     assert.ok(css.includes('html.mobile-low-memory body,'));
     assert.ok(css.includes('Hiragino Mincho ProN'));
     assert.ok(!html.includes('preload" href="data/fonts/fude-goshirae.woff2'));
     assert.ok(!html.includes('data/fonts/abashiri-mincho.woff2?v=1" as="font'), '安全モード判定前の静的font preloadを置かない');
-    assert.ok(bootstrap.includes("fontPreload.href = 'data/fonts/abashiri-mincho.woff2?v=1'"), '通常端末だけbootstrapからpreloadする');
+    assert.ok(bootstrap.includes("'title-abashiri-mincho.woff2'"), '通常端末の初期preloadはタイトル専用の小型書体');
+    assert.ok(bootstrap.includes("'title-fude-goshirae.woff2'"));
+    assert.ok(!bootstrap.includes("fontPreload.href = 'data/fonts/abashiri-mincho.woff2?v=1'"), '元の大きな書体を最初からpreloadしない');
 });
 
 test('表示モードは自動判定を既定に通常/軽量を保存でき、軽量時はタイトルと指南書で説明する', () => {

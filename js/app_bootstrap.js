@@ -12,7 +12,7 @@
  * ゲームルールや画面固有の描画はここに置かない。
  */
 (function bootstrapApplication() {
-    const FONT_TIMEOUT_MS = 6000;
+    const TITLE_FONT_TIMEOUT_MS = 2500;
     const MOBILE_TRANSITION_CHECKPOINT_KEY = 'sengoku_mobile_transition_checkpoint_v1';
     const PC_LOGICAL_WIDTH = 1280;
     const PC_LOGICAL_HEIGHT = 720;
@@ -147,14 +147,17 @@
     if (earlyMobileLowMemoryMode) {
         document.documentElement.classList.add('mobile-low-memory');
     } else if (document && typeof document.createElement === 'function' && document.head) {
-        // 通常端末だけ従来の網走明朝preloadを維持する。低メモリ端末はfont fetch自体を始めない。
-        const fontPreload = document.createElement('link');
-        fontPreload.rel = 'preload';
-        fontPreload.href = 'data/fonts/abashiri-mincho.woff2?v=1';
-        fontPreload.as = 'font';
-        fontPreload.type = 'font/woff2';
-        fontPreload.crossOrigin = 'anonymous';
-        document.head.appendChild(fontPreload);
+        // トップ画面ではその画面で使用する小さな字形だけ先に読む。
+        // 20MBの元フォントは、タップ後のロード幕で確実に読み込む。
+        for (const filename of ['title-abashiri-mincho.woff2', 'title-fude-goshirae.woff2']) {
+            const fontPreload = document.createElement('link');
+            fontPreload.rel = 'preload';
+            fontPreload.href = `data/fonts/${filename}?v=1`;
+            fontPreload.as = 'font';
+            fontPreload.type = 'font/woff2';
+            fontPreload.crossOrigin = 'anonymous';
+            document.head.appendChild(fontPreload);
+        }
     }
 
     function showEarlyPersistentTransitionCheckpoint() {
@@ -181,66 +184,71 @@
         } catch (_) {}
     }
 
+    // タイトルのfont familyは軽量な同一書体subsetを使う。ゲーム本体の完全フォントは
+    // 初回タップ後に必要な時だけ呼び出す。ロード終了時点では元の全字形が揃う。
+    let gameFontsPromise = null;
+    function ensureGameFontsReady() {
+        if (earlyMobileLowMemoryMode) return Promise.resolve(true); // 従来どおりOS標準明朝
+        if (gameFontsPromise) return gameFontsPromise;
+        if (!document.fonts || typeof document.fonts.load !== 'function') return Promise.resolve(false);
+        const requests = [
+            ['400 16px "abashiri-mincho"', '戦国覇道徳川家康今川織田武田上杉一二三四五六七八九〇'],
+            ['700 16px "abashiri-mincho"', '戦国覇道徳川家康今川織田武田上杉一二三四五六七八九〇'],
+            ['400 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇'],
+            ['700 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇']
+        ];
+        gameFontsPromise = Promise.all(requests.map(([font, text]) => document.fonts.load(font, text)))
+            .then(async results => {
+                if (!results.every(faces => Array.isArray(faces) && faces.length > 0)) {
+                    throw new Error('ゲーム本体用の書体が見つかりませんでした');
+                }
+                // 元フォントはロード画面に隠れている間に確実に読み込み終える。
+                await document.fonts.ready;
+                return true;
+            })
+            .catch(error => {
+                console.warn('【FontLoader】ゲーム本体のフォントを読み込めませんでした:', error);
+                gameFontsPromise = null; // 次のロードでは再試行可能にする
+                return false;
+            });
+        return gameFontsPromise;
+    }
+    window.__ensureGameFontsReady = ensureGameFontsReady;
+
     function initializeFonts() {
         const root = document.documentElement;
         let revealed = false;
-
-        const reveal = (reason) => {
+        const reveal = (ready) => {
             if (revealed) return;
             revealed = true;
             root.classList.remove('fonts-loading');
-            root.classList.add(reason === 'loaded' ? 'fonts-ready' : 'fonts-fallback');
+            root.classList.add(ready ? 'fonts-ready' : 'fonts-fallback');
         };
-
-        // iPhone 6/7/8/SE級の低メモリ端末ではWebフォント2書体とも読まない。
-        // iOS標準の明朝系へ寄せ、フォント展開・glyph atlasの常駐メモリを抑える。
         if (earlyMobileLowMemoryMode) {
-            reveal('unsupported');
-            window.__gameFontLoadPromise = Promise.resolve(false);
-            console.info('【FontLoader】低メモリ端末ではWebフォントを読み込まずシステム明朝を使用します。');
+            reveal(false);
+            window.__titleFontLoadPromise = Promise.resolve(false);
+            console.info('【FontLoader】軽量モードは既存どおりOS標準書体を使用します。');
             return;
         }
-
-        const failSafeTimer = setTimeout(() => {
-            console.warn('【FontLoader】フォント待機がタイムアウトしたため、画面表示を優先します。');
-            reveal('timeout');
-        }, FONT_TIMEOUT_MS);
-
         if (!document.fonts || typeof document.fonts.load !== 'function') {
-            clearTimeout(failSafeTimer);
-            reveal('unsupported');
-            window.__gameFontLoadPromise = Promise.resolve(false);
+            reveal(false);
+            window.__titleFontLoadPromise = Promise.resolve(false);
             return;
         }
-
-        const requests = [
-            ['400 16px "abashiri-mincho"', '戦国覇道徳川家康今川織田武田上杉一二三四五六七八九〇'],
-            ['700 16px "abashiri-mincho"', '戦国覇道徳川家康今川織田武田上杉一二三四五六七八九〇']
-        ];
-        // 低メモリ端末は上でreturn済み。通常端末だけ従来どおり2書体を明示ロードする。
-        if (!earlyMobileLowMemoryMode) {
-            requests.push(
-                ['400 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇'],
-                ['700 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇']
-            );
-        }
-
-        window.__gameFontLoadPromise = Promise.all(
-            requests.map(([font, text]) => document.fonts.load(font, text))
-        ).then(async (results) => {
-            const loaded = results.every(list => Array.isArray(list) && list.length > 0);
-            if (!loaded) {
-                throw new Error('指定したWebフォントに一致するFontFaceが見つかりませんでした。');
-            }
-            await document.fonts.ready;
-            clearTimeout(failSafeTimer);
-            reveal('loaded');
-            console.info(`【FontLoader】Webフォント${earlyMobileLowMemoryMode ? '1書体（低メモリ）' : '2書体'}の明示ロードが完了しました。`);
-            return true;
-        }).catch((err) => {
-            clearTimeout(failSafeTimer);
-            console.warn('【FontLoader】Webフォントの読み込みに失敗しました。フォールバックで表示します。', err);
-            reveal('error');
+        // 大容量の元フォントを初期表示の待機対象に含めない。
+        const timer = setTimeout(() => reveal(false), TITLE_FONT_TIMEOUT_MS);
+        window.__titleFontLoadPromise = Promise.all([
+            document.fonts.load('400 16px "TitleAbashiri"', '戦国覇道観戦する指南書'),
+            document.fonts.load('400 16px "TitleFude"', '戦国覇道')
+        ]).then(results => {
+            const loaded = results.every(faces => Array.isArray(faces) && faces.length > 0);
+            clearTimeout(timer);
+            reveal(loaded);
+            return loaded;
+        }).catch(error => {
+            clearTimeout(timer);
+            console.warn('【FontLoader】タイトル書体を読み込めませんでした:', error);
+            reveal(false);
             return false;
         });
     }

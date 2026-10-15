@@ -110,8 +110,9 @@ subject to the following restrictions:
 
 3. Abashiri Mincho / 網走明朝
 ---------------------------
-Bundled file:
+Bundled files:
   data/fonts/abashiri-mincho.woff2
+  data/fonts/title-abashiri-mincho.woff2 (title glyph subset derived from the above)
 
 Font metadata in the bundled file includes:
   Copyright: (C)Nisetype 2023
@@ -126,8 +127,9 @@ License: SIL Open Font License 1.1
 
 4. Fude Goshirae / 筆ごしらえ
 -----------------------------
-Bundled file:
+Bundled files:
   data/fonts/fude-goshirae.woff2
+  data/fonts/title-fude-goshirae.woff2 (title glyph subset derived from the above)
 
 Font metadata in the bundled file includes:
   Copyright/author metadata: isMe
