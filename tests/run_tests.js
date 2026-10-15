@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r535');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r537');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -20832,6 +20832,179 @@ test('r535 PC共通一覧はmouseupを失ってもbuttons=0でドラッグを止
     assert.strictEqual(context.document.body.style.userSelect, '', 'ボタンが離れたら選択を復元');
     assert.strictEqual(list.style.scrollSnapType, '', 'スナップ設定を復元');
     assert.strictEqual(list.scrollTop, 76, 'mousedownから最初のdrag分だけ適用し、解放後の移動は無視');
+});
+
+// r536: PC map drag also needs the real browser focus/button-loss boundaries.
+test('r536 PC地図ドラッグ中にウィンドウがblurすると操作を中断する', () => {
+    const listeners = new Map(), winHandlers = new Map(), frames = new Map();
+    const classes = new Set();
+    const sc = { offsetLeft: 0, offsetTop: 0, scrollLeft: 240, scrollTop: 100,
+        style: {}, classList: { add(v) { classes.add(v); }, remove(v) { classes.delete(v); } },
+        addEventListener(name, fn) { listeners.set(name, fn); } };
+    const ctx = createContext({ UIManager: class UIManager {},
+        document: { getElementById: id => id === 'map-scroll-container' ? sc : null,
+            body: { classList: { contains: x => x === 'is-pc' } }, addEventListener() {} },
+        addEventListener(name, fn) { winHandlers.set(name, fn); },
+        requestAnimationFrame(fn) { const id = frames.size + 1; frames.set(id, fn); return id; },
+        cancelAnimationFrame(id) { frames.delete(id); },
+        performance: { now: () => 100 }, setTimeout: () => 1, clearTimeout() {} });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.initMapDrag();
+    listeners.get('mousedown')({ button: 0, pageX: 100, pageY: 100 });
+    listeners.get('mousemove')({ pageX: 145, pageY: 120, buttons: 1, preventDefault() {} });
+    assert.strictEqual(ui.isDraggingMap, true);
+    assert.ok(winHandlers.get('blur'), 'フォーカス喪失の解除窓口が必要');
+    winHandlers.get('blur')();
+    assert.strictEqual(ui.isMouseDown, false, 'マウス解放を取り逃しても押下状態を残さない');
+    assert.strictEqual(classes.has('grabbing'), false);
+    assert.strictEqual(frames.size, 0, '描画待ちフレームを破棄する');
+    const before = sc.scrollLeft;
+    listeners.get('mousemove')({ pageX: 210, pageY: 150, buttons: 0, preventDefault() {} });
+    assert.strictEqual(sc.scrollLeft, before, '復帰後の移動で地図を動かさない');
+});
+
+test('r536 PC地図はmouseup喪失後のbuttons=0で自動解除する', () => {
+    const listeners = new Map(), frames = new Map();
+    const classes = new Set();
+    const sc = { offsetLeft: 0, offsetTop: 0, scrollLeft: 200, scrollTop: 90,
+        style: {}, classList: { add(v) { classes.add(v); }, remove(v) { classes.delete(v); } },
+        addEventListener(name, fn) { listeners.set(name, fn); } };
+    const ctx = createContext({ UIManager: class UIManager {},
+        document: { getElementById: id => id === 'map-scroll-container' ? sc : null,
+            body: { classList: { contains: x => x === 'is-pc' } }, addEventListener() {} },
+        addEventListener() {},
+        requestAnimationFrame(fn) { const id = frames.size + 1; frames.set(id, fn); return id; },
+        cancelAnimationFrame(id) { frames.delete(id); },
+        performance: { now: () => 100 }, setTimeout: () => 1, clearTimeout() {} });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.initMapDrag();
+    listeners.get('mousedown')({ button: 0, pageX: 100, pageY: 100 });
+    listeners.get('mousemove')({ pageX: 135, pageY: 120, buttons: 1, preventDefault() {} });
+    assert.strictEqual(ui.isMouseDown, true);
+    listeners.get('mousemove')({ pageX: 190, pageY: 145, buttons: 0, preventDefault() {} });
+    assert.strictEqual(ui.isMouseDown, false, 'ボタンが離れた移動はドラッグを中止');
+    assert.strictEqual(classes.has('grabbing'), false);
+    assert.strictEqual(frames.size, 0);
+    assert.strictEqual(sc.scrollLeft, 200, '解放後の描画予約を適用しない');
+});
+
+test('r536 地図ドラッグ中断以外のblurは既存の慣性スクロールを変更しない', () => {
+    const listeners = new Map(), winHandlers = new Map(), frames = new Map();
+    const sc = { offsetLeft: 0, offsetTop: 0, scrollLeft: 200, scrollTop: 100,
+        style: {}, classList: { add() {}, remove() {} },
+        addEventListener(name, fn) { listeners.set(name, fn); } };
+    let id = 0;
+    const ctx = createContext({ UIManager: class UIManager {},
+        document: { getElementById: name => name === 'map-scroll-container' ? sc : null,
+            body: { classList: { contains: x => x === 'is-pc' } }, addEventListener() {} },
+        addEventListener(name, fn) { winHandlers.set(name, fn); },
+        requestAnimationFrame(fn) { frames.set(++id, fn); return id; },
+        cancelAnimationFrame(fid) { frames.delete(fid); },
+        performance: { now: () => 100 }, setTimeout: () => 1, clearTimeout() {} });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.initMapDrag();
+    listeners.get('mousedown')({ button: 0, pageX: 100, pageY: 100 });
+    ui.velocityX = 3; ui.velocityY = 1;
+    listeners.get('mouseup')();
+    assert.ok(frames.size > 0, '正常解放後は従来の慣性が開始する');
+    const before = frames.size;
+    if (winHandlers.get('blur')) winHandlers.get('blur')();
+    assert.strictEqual(frames.size, before, 'ドラッグをしていないblurで慣性を不必要に打ち消さない');
+});
+
+// r537: 共通縦スクロールバーでも、通常マウス入力のボタン区別と解放を維持する。
+function createScrollbarInputHarness() {
+    const listeners = new Map();
+    const docListeners = new Map();
+    const winListeners = new Map();
+    const makeElement = (kind = 'div') => {
+        const ownListeners = new Map();
+        const classes = new Set();
+        return {
+            kind, style: {}, dataset: {}, scrollTop: 0, scrollHeight: 600,
+            clientHeight: 150, isConnected: true,
+            parentElement: null, parentNode: null,
+            classList: {
+                contains(name) { return classes.has(name); },
+                add(name) { classes.add(name); },
+                remove(name) { classes.delete(name); },
+                toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); }
+            },
+            appendChild(child) { child.parentElement = this; },
+            addEventListener(name, cb) { ownListeners.set(name, cb); },
+            removeEventListener(name) { ownListeners.delete(name); },
+            remove() {}, querySelector() { return null; },
+            get _listeners() { return ownListeners; }
+        };
+    };
+    const wrapper = makeElement();
+    wrapper.classList.add('scroll-wrapper');
+    const list = makeElement();
+    list.parentElement = wrapper;
+    list.parentNode = wrapper;
+    const ctx = createContext({
+        document: {
+            body: { classList: { contains: () => false } }, hidden: false,
+            createElement: makeElement,
+            addEventListener(name, fn) { docListeners.set(name, fn); },
+            removeEventListener(name) { docListeners.delete(name); }
+        },
+        addEventListener(name, fn) { winListeners.set(name, fn); },
+        removeEventListener(name) { winListeners.delete(name); },
+        requestAnimationFrame() { return 1; }
+    });
+    loadScript(ctx, 'js/custom_scrollbar.js');
+    const bar = new ctx.CustomScrollbar(list);
+    bar.update();
+    return { bar, list, wrapper, docListeners, winListeners };
+}
+
+test('r537 カスタム縦スクロールバーは右ボタンでつまみドラッグを開始しない', () => {
+    const { bar, docListeners } = createScrollbarInputHarness();
+    bar.onStartY({ button: 2, clientY: 25, cancelable: true, preventDefault() { throw new Error('右クリックはブラウザ操作を保護する'); } });
+    assert.strictEqual(bar.isDraggingY, false);
+    assert.strictEqual(docListeners.has('mousemove'), false, '通常の右クリックでdocument捕捉を開始しない');
+    bar.destroy();
+});
+
+test('r537 つまみドラッグは画面外で解放した後のbuttons=0移動で解除する', () => {
+    const { bar, list, docListeners } = createScrollbarInputHarness();
+    bar.onStartY({ button: 0, clientY: 25, cancelable: true, preventDefault() {} });
+    assert.strictEqual(bar.isDraggingY, true);
+    bar.onDocMouseMove({ buttons: 1, clientY: 55, cancelable: true, preventDefault() {} });
+    const lastScrollTop = list.scrollTop;
+    bar.onDocMouseMove({ buttons: 0, clientY: 100, cancelable: true, preventDefault() {} });
+    assert.strictEqual(bar.isDraggingY, false, '押していないマウスでスクロールを継続しない');
+    assert.strictEqual(list.scrollTop, lastScrollTop);
+    assert.strictEqual(docListeners.has('mousemove'), false);
+    bar.destroy();
+});
+
+test('r537 開始指のtouchmoveとtouchendはマウス判定に妨げられない', () => {
+    const { bar, list, docListeners } = createScrollbarInputHarness();
+    bar.onStartY({ touches: [{ identifier: 7, clientY: 20 }], cancelable: true, preventDefault() {} });
+    assert.strictEqual(bar.isDraggingY, true);
+    bar.onDocMouseMove({ touches: [{ identifier: 7, clientY: 50 }], buttons: 0, cancelable: true, preventDefault() {} });
+    assert.strictEqual(bar.isDraggingY, true, 'touchmoveにbuttons=0があってもドラッグを続ける');
+    assert.ok(list.scrollTop > 0);
+    docListeners.get('touchend')();
+    assert.strictEqual(bar.isDraggingY, false);
+    bar.destroy();
+});
+
+test('r537 通常の左ドラッグとdocument mouseupによる解除は維持する', () => {
+    const { bar, list, docListeners } = createScrollbarInputHarness();
+    bar.onStartY({ button: 0, clientY: 25, cancelable: true, preventDefault() {} });
+    bar.onDocMouseMove({ buttons: 1, clientY: 45, cancelable: true, preventDefault() {} });
+    assert.strictEqual(bar.isDraggingY, true);
+    assert.ok(list.scrollTop > 0);
+    docListeners.get('mouseup')();
+    assert.strictEqual(bar.isDraggingY, false);
+    assert.strictEqual(docListeners.has('mouseup'), false);
+    bar.destroy();
 });
 
 Promise.all(pendingTests).then(() => {

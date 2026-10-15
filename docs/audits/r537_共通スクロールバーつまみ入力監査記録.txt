@@ -1,0 +1,22 @@
+戦国覇道 r537：共通縦スクロールバーのつまみ入力監査
+
+【基準と優先順位】
+r536完全版に基づく通常プレイの横断監査。ゲームの設計文書に従い、内部関数の特殊な直接実行でしか起きない問題ではなく、日常的なPCマウス操作から到達する入力境界に修正を限定した。
+
+【確認した問題】
+1. CustomScrollbarのつまみmousedownでbutton判定がなく、右クリックでもドラッグ開始・preventDefault・documentの移動監視が走る。
+2. 文書領域外などでmouseupを取り逃した後、documentのmousemoveにbuttons=0が届いても既存処理はドラッグを続行する。画面復帰後に予期せず一覧が動き得る。
+
+【修正】
+- onStartYでタッチ以外のbuttonを確認し、左以外ではドラッグを開始しない。すでにドラッグ中の重複開始も避ける。
+- onDocMouseMoveでマウスの左ボタンが押されていないことを確認したら、既存のonEndで終了する。touchmoveは開始touch identifierによる追跡を維持する。
+- UIManagerやゲームルールに同じ入力判定を追加せず、CustomScrollbar内で責務を完結させる。スクロール吸着・一覧更新・低メモリ端末のnative scrollは変更しない。
+
+【修正前後の検証】
+新規テスト4件（右クリック排除、mouseup取りこぼし解除、touchmove維持、左ドラッグ正常終了）を追加。基準版では前二者が失敗し後二者が通過、修正後は全件通過。
+操作イベントを模した単体テストによる確認であり、各実機OS/ブラウザでの手動右クリックと画面外解放は未実施。
+
+【変更ファイル】
+追加：docs/audits/r537_共通スクロールバーつまみ入力監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/custom_scrollbar.js、tests/run_tests.js
+削除：なし

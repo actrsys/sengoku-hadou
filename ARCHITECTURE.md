@@ -536,6 +536,7 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 
 ## r287 追加監査：仮想一覧のカスタムスクロール／スマホ観戦の災害Canvas
 - `CustomScrollbar` のつまみドラッグ中は、仮想一覧が行DOMを差し替える間だけ `scroll-snap-type` を一時停止し、ドラッグ終了後に2描画フレーム待って元の指定へ戻す。通常のリストスクロール／行スナップの見た目は維持し、カスタムつまみ操作と mandatory snap の再評価を同時に走らせない。
+- PCのカスタム縦スクロールバーのつまみは、マウス左ボタンのみドラッグ開始を許可し、右クリック等の標準操作を奪わない。`mouseup` をウィンドウ外で取り逃しても、以後の `mousemove.buttons` に左ボタンがなければ即座にドラッグを終了する。指入力は開始touch identifierの既存判定を維持し、マウスの `buttons` 状態を流用しない。ゲーム一覧の外観や行スナップ仕様は変更しない。
 - カスタムスクロールバーのドラッグ終了は対象要素の通常bubbleだけに依存しない。`touchend` / `touchcancel` / `mouseup` をcaptureで拾い、`blur` / `pagehide` / `visibilitychange` も終了境界として扱う。開始したtouch identifier以外の指移動でつまみを動かさず、古いWebViewで終了イベントを取りこぼした状態を次の操作へ持ち越さない。
 - 災害の地方色Canvasは表示上の補助であり、スマホAI観戦では安定性を優先して大きなCanvasの連続opacity CSSアニメーションを行わない。同じ地方色の静止Canvasを1描画フレーム提示した後、既存の観戦1秒自動送りへ進む。通常プレイとPC観戦の2秒点滅は維持する。
 - 実機停止診断は `event_effect:<name>:mask_done` の後を `mask_mobile_watch_static` / `mask_presented`（スマホ観戦）または `mask_animation_start` / `mask_animation_done`（通常経路）へ分割し、Canvas append直後・compositor描画待ち・入力待ちを区別する。
@@ -1993,3 +1994,8 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - PC共通一覧のマウスドラッグは左ボタンからの操作だけを対象にする。右クリックは共通の戻る操作、中央ボタンはブラウザの標準操作へ委譲し、一覧スクロールを混入させない。
 - ドラッグの `mouseup` はウィンドウ外での解放時に届かない場合がある。フォーカス喪失・ページ非表示・後続の `mousemove` で左ボタンが押されていないことを検知したら、共通ドラッグを中断し、`userSelect` と開始前の `scrollSnapType` を復元する。
 - 通常の左ドラッグ終了では既存の微調整・クリック抑止を維持するが、中断時は遅延したスクロール補正やクリック抑止を残さない。詳細は `docs/audits/r535_PC共通一覧マウス入力中断監査記録.txt`。
+
+## r536：PC地図ドラッグのマウス操作中断
+
+- PC地図のマウスドラッグは `UIManager` の地図Viewを正本とする。正常なmouse up/mouse leaveでは既存の慣性・クリック抑止を維持する。Alt+Tab等のwindow blur・document hidden・`mousemove.buttons`が左ボタン無しを示す場合は、中断として押下状態、旧rAF描画予約、grabbing表示と残留速度を解除する。
+- 中断時の操作を通常の解放と同一視して慣性を始めない。非ドラッグ時のblurでは既存の慣性や他画面の操作に干渉しない。詳細は `docs/audits/r536_PC地図ドラッグ入力中断監査記録.txt`。

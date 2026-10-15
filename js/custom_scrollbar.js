@@ -221,7 +221,10 @@ class CustomScrollbar {
         }
 
         this.onStartY = (e) => {
-            if (this._destroyed || !this._hasOverflow) return;
+            if (this._destroyed || !this._hasOverflow || this.isDraggingY) return;
+            // つまみは左ボタンのドラッグのみ。右クリック等を共通の戻る操作や
+            // ブラウザ標準操作から奪わない（touchstartにはbutton属性がない）。
+            if (!e.touches && typeof e.button === 'number' && e.button !== 0) return;
             // つまみドラッグは1本指だけを正本にする。途中から複数指になった場合はdocument側moveで
             // 開始指だけを追いますが、最初から複数指ならピンチ等の別操作として開始しません。
             if (e.touches && e.touches.length !== 1) return;
@@ -289,6 +292,14 @@ class CustomScrollbar {
 
         this.onDocMouseMove = (e) => {
             if (!this.isDraggingY) return;
+            // 文書外でmouseupを取り逃したときも、復帰後の移動がスクロールを
+            // 続けないようマウスの現在のボタン状態を正本とする。
+            // touchmoveは開始した指の識別子で扱い、mouse buttonsとは混同しない。
+            if (!e.touches && this._activeTouchId === null
+                && typeof e.buttons === 'number' && (e.buttons & 1) === 0) {
+                this.onEnd();
+                return;
+            }
             this.onMoveY(e);
             if (e.cancelable) e.preventDefault();
         };

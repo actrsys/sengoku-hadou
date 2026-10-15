@@ -811,13 +811,24 @@ Object.assign(UIManager.prototype, {
             sc.classList.add('grabbing');
         });
 
-        const endDrag = () => {
+        // マウス解放とブラウザの操作中断を区別する。通常解放では慣性と
+        // click抑止の短い猶予を残し、blur等の中断では保留フレームを破棄して復帰後に持ち越さない。
+        const endDrag = (interrupted = false) => {
             if (!this.isMouseDown) return;
             this.isMouseDown = false;
             this._cancelPendingMapDragMove();
             sc.classList.remove('grabbing');
-            
-            if (this._mapDragReleaseTimer) clearTimeout(this._mapDragReleaseTimer);
+
+            if (this._mapDragReleaseTimer) {
+                clearTimeout(this._mapDragReleaseTimer);
+                this._mapDragReleaseTimer = null;
+            }
+            if (interrupted) {
+                this.isDraggingMap = false;
+                this.velocityX = 0;
+                this.velocityY = 0;
+                return;
+            }
             this._mapDragReleaseTimer = setTimeout(() => {
                 this._mapDragReleaseTimer = null;
                 this.isDraggingMap = false;
@@ -827,15 +838,25 @@ Object.assign(UIManager.prototype, {
                 this.applyInertia(sc);
             }
         };
-        
-        sc.addEventListener('mouseleave', endDrag);
-        sc.addEventListener('mouseup', endDrag);
+
+        sc.addEventListener('mouseleave', () => endDrag());
+        sc.addEventListener('mouseup', () => endDrag());
+        // Alt+Tabや別ウィンドウ操作ではmouseupが地図まで届かない。
+        window.addEventListener('blur', () => endDrag(true));
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) endDrag(true);
+        });
 
         // ★追加：マウスが動きすぎた時にブラウザがパンクしないよう、処理を間引くためのスイッチです
         this.isMapTicking = false;
 
         sc.addEventListener('mousemove', (e) => {
             if (!this.isMouseDown) return;
+            // ウィンドウ外のmouseupを取り逃しても、戻ってきた時点の実ボタン状態に従う。
+            if (typeof e.buttons === 'number' && (e.buttons & 1) === 0) {
+                endDrag(true);
+                return;
+            }
             e.preventDefault();
             const x = e.pageX - sc.offsetLeft;
             const y = e.pageY - sc.offsetTop;
