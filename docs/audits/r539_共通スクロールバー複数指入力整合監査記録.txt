@@ -1,0 +1,20 @@
+戦国覇道 r539：共通スクロールバーの複数指入力整合監査
+
+【基準・到達性】
+r538完全版の設計・既存テストを基準に、画面操作・共通スクロールバー・PC/スマホ入力の責務を横断監査した。基準テスト890件成功。今回の不具合はスマホ／タブレットでつまみを指Aで保持したまま別の指Bを離す操作で到達可能。単指操作には影響しないため発生頻度は限定的で、実機手動再現は未実施。
+
+【再現】
+CustomScrollbarはtouchmoveでは開始指のidentifierを追っていたが、document captureのtouchend/touchcancelは指を区別せずonEndを呼んでいた。指Bのtouchend/touchcancelでAのドラッグも終了し、次のAの移動が無視される。r538の実装に追加した2件の回帰テストは失敗した。
+
+【修正】
+- CustomScrollbarのtouchend/touchcancelだけをonTouchEndへ集約し、changedTouches内に開始指が含まれる場合に限って終了。
+- mouseup、ウィンドウblur、pagehide、visibilitychangeは従来のonEndを維持。タッチ識別子が取得できない場合も従来互換の解除を維持。
+- 開始指の移動、単指終了、仮想一覧snap復元、PCマウスドラッグの仕様は変更しない。HTML/CSS・マスターデータへの変更なし。
+
+【検証】
+修正前：追加2件失敗。修正後：自動回帰テスト892件成功・失敗0件（旧テストのイベントhandler名固定の期待値は、変更後の共通touch終了窓口を検査するよう更新）。PC・スマホブラウザ表示回帰、シミュレーション、Excel/BIN一致等の結果は別途実施記録に従う。実機の複数指入力は未確認。
+
+【変更ファイル】
+追加：docs/audits/r539_共通スクロールバー複数指入力整合監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/custom_scrollbar.js、tests/run_tests.js
+削除：なし

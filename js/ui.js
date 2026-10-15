@@ -1692,7 +1692,11 @@ class UIManager {
 
         // ★右クリックやスマホの長押しで実行する中身をひとまとめにします
         const executeContextMenuAction = (e) => {
+            // ゲーム領域だけブラウザの右クリックメニューを抑止する。
+            // 編集フォーム・独自スクロールバーはネイティブ操作を優先する。
+            // game.js の一律document抑止は廃止し、この共通Viewだけで判断する。
             if (isNativeContextMenuTarget(e)) return;
+            if (e && e.type === 'contextmenu' && e.preventDefault) e.preventDefault();
 
             // Round26：観戦中の右クリック／長押しは、どんなイベント画面の最中でも
             // 「閉じる」等を押さず、まず観戦終了の予約だけを行います。

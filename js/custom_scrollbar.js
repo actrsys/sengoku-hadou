@@ -152,8 +152,8 @@ class CustomScrollbar {
         document.addEventListener('mousemove', this.onDocMouseMove, { passive: false, capture: true });
         document.addEventListener('touchmove', this.onDocMouseMove, { passive: false, capture: true });
         document.addEventListener('mouseup', this.onEnd, true);
-        document.addEventListener('touchend', this.onEnd, true);
-        document.addEventListener('touchcancel', this.onEnd, true);
+        document.addEventListener('touchend', this.onTouchEnd, true);
+        document.addEventListener('touchcancel', this.onTouchEnd, true);
         window.addEventListener('blur', this.onEnd, true);
         window.addEventListener('pagehide', this.onEnd, true);
         document.addEventListener('visibilitychange', this.onVisibilityChange, true);
@@ -165,8 +165,8 @@ class CustomScrollbar {
         document.removeEventListener('mousemove', this.onDocMouseMove, true);
         document.removeEventListener('touchmove', this.onDocMouseMove, true);
         document.removeEventListener('mouseup', this.onEnd, true);
-        document.removeEventListener('touchend', this.onEnd, true);
-        document.removeEventListener('touchcancel', this.onEnd, true);
+        document.removeEventListener('touchend', this.onTouchEnd, true);
+        document.removeEventListener('touchcancel', this.onTouchEnd, true);
         window.removeEventListener('blur', this.onEnd, true);
         window.removeEventListener('pagehide', this.onEnd, true);
         document.removeEventListener('visibilitychange', this.onVisibilityChange, true);
@@ -284,6 +284,25 @@ class CustomScrollbar {
             if (this.list && typeof this.list._scheduleVirtualRowSnap === 'function') {
                 this.list._scheduleVirtualRowSnap(80);
             }
+        };
+
+        // タッチ終了は document へ届くすべての指について通知される。
+        // つまみを掴んだ指以外のtouchend/touchcancelで解除すると、
+        // 2本目の指が離れただけで1本目のスクロールが途切れる。
+        this.onTouchEnd = (e) => {
+            if (!this.isDraggingY) return;
+            if (this._activeTouchId != null && e && e.changedTouches && e.changedTouches.length) {
+                let activeFingerEnded = false;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === this._activeTouchId) {
+                        activeFingerEnded = true;
+                        break;
+                    }
+                }
+                if (!activeFingerEnded) return;
+            }
+            // OS割込み（blur/pagehide）は従来通りonEndを直接使い、指IDを問わず解除する。
+            this.onEnd();
         };
 
         this.onVisibilityChange = () => {

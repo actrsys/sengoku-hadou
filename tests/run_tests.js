@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r537');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r539');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -12485,8 +12485,8 @@ test('仮想一覧のカスタムスクロールはドラッグ中だけsnapを�
     assert.ok(scroll.includes("this.list.style.scrollSnapType = 'none';"), 'つまみドラッグ中だけmandatory snapを止める');
     assert.ok(scroll.includes('_restoreScrollSnapAfterDrag()'));
     assert.ok(scroll.includes('raf(() => raf(() => {'), '仮想DOMが現在scrollTopへ追随してからsnapを戻す');
-    assert.ok(scroll.includes("document.addEventListener('touchend', this.onEnd, true);"), 'touchendをcaptureで拾う');
-    assert.ok(scroll.includes("document.addEventListener('touchcancel', this.onEnd, true);"), 'touchcancelも終了扱いにする');
+    assert.ok(scroll.includes("document.addEventListener('touchend', this.onTouchEnd, true);"), 'touchendをcaptureで拾う');
+    assert.ok(scroll.includes("document.addEventListener('touchcancel', this.onTouchEnd, true);"), '開始指のtouchcancelを終了扱いにする');
     assert.ok(scroll.includes("window.addEventListener('blur', this.onEnd, true);"), '画面フォーカス喪失も終了境界にする');
     assert.ok(scroll.includes("document.addEventListener('visibilitychange', this.onVisibilityChange, true);"), 'アプリ非表示でもドラッグ状態を残さない');
     assert.ok(scroll.includes('candidate.identifier === this._activeTouchId'), '開始した指以外のtouchmoveをドラッグへ流用しない');
@@ -21005,6 +21005,80 @@ test('r537 通常の左ドラッグとdocument mouseupによる解除は維持�
     assert.strictEqual(bar.isDraggingY, false);
     assert.strictEqual(docListeners.has('mouseup'), false);
     bar.destroy();
+});
+
+// r539: another finger leaving the screen must not finish the active thumb drag.
+test('r539 スクロールバーの開始指以外が離れてもつまみドラッグを継続する', () => {
+    const { bar, list, docListeners } = createScrollbarInputHarness();
+    bar.onStartY({ touches: [{ identifier: 7, clientY: 20 }], cancelable: true, preventDefault() {} });
+    assert.strictEqual(bar.isDraggingY, true);
+    // The second finger touches elsewhere and lifts while finger #7 is still down.
+    docListeners.get('touchend')({
+        changedTouches: [{ identifier: 8, clientY: 30 }],
+        touches: [{ identifier: 7, clientY: 30 }]
+    });
+    assert.strictEqual(bar.isDraggingY, true, '別の指の解放では現在のドラッグを終了しない');
+    const before = list.scrollTop;
+    docListeners.get('touchmove')({
+        touches: [{ identifier: 7, clientY: 60 }], cancelable: true, preventDefault() {}
+    });
+    assert.ok(list.scrollTop > before, '開始指によるスクロールは継続する');
+    docListeners.get('touchend')({ changedTouches: [{ identifier: 7 }], touches: [] });
+    assert.strictEqual(bar.isDraggingY, false, '開始指の解放時だけ終了する');
+    bar.destroy();
+});
+
+test('r539 別指のtouchcancelでは停止せず、開始指の中断と画面中断で終了する', () => {
+    const { bar, docListeners, winListeners } = createScrollbarInputHarness();
+    const start = () => bar.onStartY({ touches: [{ identifier: 3, clientY: 10 }], cancelable: true, preventDefault() {} });
+    start();
+    docListeners.get('touchcancel')({ changedTouches: [{ identifier: 4 }], touches: [{ identifier: 3 }] });
+    assert.strictEqual(bar.isDraggingY, true, '別指のキャンセルは無関係');
+    docListeners.get('touchcancel')({ changedTouches: [{ identifier: 3 }], touches: [] });
+    assert.strictEqual(bar.isDraggingY, false, '開始指キャンセル時に解除');
+    start();
+    winListeners.get('blur')();
+    assert.strictEqual(bar.isDraggingY, false, 'OS操作中断では入力を解除');
+    bar.destroy();
+});
+
+// r538: PC native editing menus must not be suppressed by a second global listener.
+test('r538 PC右クリックは入力欄を保護し、それ以外のゲーム領域だけを抑止する', () => {
+    const listeners = new Map();
+    class ContextNode {
+        constructor(role) { this.role = role; }
+        closest(selector) {
+            if (['input', 'textarea', 'select', 'editable', 'scrollbar'].includes(this.role)) {
+                const tokens = { input: 'input', textarea: 'textarea', select: 'select', editable: '[contenteditable="true"]', scrollbar: '.custom-scrollbar-thumb' };
+                return selector.includes(tokens[this.role]) ? this : null;
+            }
+            return null;
+        }
+    }
+    const document = {
+        addEventListener(name, handler) { listeners.set(name, handler); },
+        getElementById() { return null; },
+        querySelector() { return null; },
+        querySelectorAll() { return []; },
+        body: { classList: { contains: () => true } }
+    };
+    const ctx = createContext({ document, Element: ContextNode, addEventListener() {} });
+    loadScript(ctx, 'js/ui.js');
+    const ui = Object.create(vm.runInContext('UIManager.prototype', ctx));
+    ui.game = { isWatchMode: false };
+    ui.initContextMenu();
+    const onContextMenu = listeners.get('contextmenu');
+    assert.strictEqual(typeof onContextMenu, 'function');
+    for (const role of ['input', 'textarea', 'select', 'editable', 'scrollbar']) {
+        let prevented = 0;
+        onContextMenu({ type: 'contextmenu', target: new ContextNode(role), preventDefault() { prevented++; } });
+        assert.strictEqual(prevented, 0, `${role}ではOS/ブラウザのコンテキストメニューを保護する`);
+    }
+    let prevented = 0;
+    onContextMenu({ type: 'contextmenu', target: new ContextNode('background'), preventDefault() { prevented++; } });
+    assert.strictEqual(prevented, 1, 'ゲームの非編集領域では従来通りブラウザメニューを抑止する');
+    assert.ok(!read('js/game.js').includes("document.addEventListener('contextmenu'"),
+        'GameManagerに別のdocument共通抑止を重複させずUIを唯一の窓口にする');
 });
 
 Promise.all(pendingTests).then(() => {
