@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r530');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r532');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -20497,6 +20497,127 @@ test('r530 スマホ共通長押しはフォームとスクロールバーのネ
     end({ target: new TouchNode('map'), cancelable: true, preventDefault() { prevented++; } });
     assert.strictEqual(returnRequests, 1, '地図長押しは観戦終了操作へ接続する');
     assert.strictEqual(prevented, 1, '処理済みのゲーム長押しでは後続のタップだけを抑止する');
+});
+
+
+test('r531 連続タップ保護は通常ボタン操作を妨げず同一非操作領域だけを抑止する', () => {
+    const source = read('js/ui.js');
+    const start = source.indexOf('        let lastTouchEnd = 0;');
+    const end = source.indexOf("        // ★iOS Safari系のブラウザ標準ピンチ拡大を停止。", start);
+    const registered = new Map();
+    let clock = 0;
+    class TapNode {
+        constructor(role) { this.role = role; }
+        closest(selector) {
+            if (this.role === 'button' && selector.includes('button')) return this;
+            if (this.role === 'selectItem' && selector.includes('.select-item.is-clickable')) return this;
+            if (this.role === 'input' && selector.includes('input')) return this;
+            return null;
+        }
+    }
+    const doc = {
+        addEventListener(type, handler) { registered.set(type, handler); },
+        activeElement: null
+    };
+    const ctx = createContext({
+        document: doc, Element: TapNode,
+        Date: { now() { return clock; } },
+        setTimeout: () => {}
+    });
+    vm.runInContext(source.slice(start, end), ctx);
+    const onEnd = registered.get('touchend');
+    assert.strictEqual(typeof onEnd, 'function');
+    const press = (target, x, y, time) => {
+        clock = time;
+        let prevented = 0;
+        onEnd({ target, cancelable: true, changedTouches: [{ clientX: x, clientY: y }],
+            preventDefault() { prevented++; } });
+        return prevented;
+    };
+    const firstButton = new TapNode('button');
+    const secondButton = new TapNode('button');
+    assert.strictEqual(press(firstButton, 120, 120, 1000), 0);
+    assert.strictEqual(press(firstButton, 120, 120, 1160), 0, '同じボタンを素早く再タップしても2回目のclickを妨げない');
+    assert.strictEqual(press(secondButton, 143, 120, 1320), 0, '近接する別ボタンもタップできる');
+    const selectable = new TapNode('selectItem');
+    assert.strictEqual(press(selectable, 220, 220, 2000), 0);
+    assert.strictEqual(press(selectable, 220, 220, 2180), 0, '一覧の選択行の連続タップも妨げない');
+    const back = new TapNode('background');
+    assert.strictEqual(press(back, 300, 300, 3000), 0);
+    assert.strictEqual(press(back, 302, 300, 3160), 1, '非操作領域の近接ダブルタップには従来のズーム防止を維持');
+    const other = new TapNode('background');
+    assert.strictEqual(press(other, 305, 302, 3320), 0, '異なる領域へ移った操作は連続ダブルタップと見なさない');
+    const form = new TapNode('input');
+    assert.strictEqual(press(form, 300, 300, 3480), 0, 'フォーム標準操作は妨げない');
+});
+
+// r532: mousemove is throttled to an animation frame; release/reset must cancel an unpainted drag.
+test('r532 PC地図ドラッグのマウス解放後に保留フレームが地図を動かさない', () => {
+    const listeners = new Map();
+    const frames = new Map();
+    let nextFrameId = 1;
+    const scroll = {
+        offsetLeft: 0, offsetTop: 0, scrollLeft: 250, scrollTop: 130,
+        style: {}, classList: { add() {}, remove() {} },
+        addEventListener(type, handler) { listeners.set(type, handler); }
+    };
+    const ctx = createContext({
+        UIManager: class UIManager {},
+        document: { getElementById: id => id === 'map-scroll-container' ? scroll : null,
+            body: { classList: { contains: name => name === 'is-pc' } },
+            addEventListener() {} },
+        addEventListener() {},
+        requestAnimationFrame(cb) { const id = nextFrameId++; frames.set(id, cb); return id; },
+        cancelAnimationFrame(id) { frames.delete(id); },
+        performance: { now: () => 100 },
+        setTimeout: () => 1, clearTimeout() {}
+    });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.initMapDrag();
+    listeners.get('mousedown')({ button: 0, pageX: 100, pageY: 100 });
+    listeners.get('mousemove')({ pageX: 145, pageY: 120, preventDefault() {} });
+    assert.strictEqual(frames.size, 1, 'ドラッグ移動は次描画フレームへ予約される');
+    listeners.get('mouseup')();
+    for (const callback of Array.from(frames.values())) callback();
+    assert.strictEqual(scroll.scrollLeft, 250, 'マウス解放後は保留中の移動を反映しない');
+    assert.strictEqual(scroll.scrollTop, 130, 'マウス解放後は縦位置も変わらない');
+    assert.strictEqual(ui.isMapTicking, false, '次のドラッグを妨げる描画中フラグが残らない');
+    assert.strictEqual(frames.size, 0, '解放時に未実行の描画予約をキャンセルする');
+});
+
+test('r532 地図画面リセットで保留ドラッグを破棄し再ドラッグは正常に開始できる', () => {
+    const listeners = new Map();
+    const frames = new Map();
+    let nextFrameId = 1;
+    const grabbing = new Set();
+    const scroll = { offsetLeft: 0, offsetTop: 0, scrollLeft: 250, scrollTop: 130,
+        style: {}, classList: { add(x) { grabbing.add(x); }, remove(x) { grabbing.delete(x); } },
+        addEventListener(type, fn) { listeners.set(type, fn); } };
+    const ctx = createContext({ UIManager: class UIManager {},
+        document: { getElementById: id => id === 'map-scroll-container' ? scroll : null,
+            body: { classList: { contains: name => name === 'is-pc' } }, addEventListener() {} },
+        addEventListener() {},
+        requestAnimationFrame(cb) { const id = nextFrameId++; frames.set(id, cb); return id; },
+        cancelAnimationFrame(id) { frames.delete(id); },
+        performance: { now: () => 100 }, setTimeout: () => 1, clearTimeout() {} });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.initMapDrag();
+    listeners.get('mousedown')({ button: 0, pageX: 100, pageY: 100 });
+    listeners.get('mousemove')({ pageX: 170, pageY: 130, preventDefault() {} });
+    ui.resetMapViewState();
+    assert.strictEqual(ui.isMouseDown, false, '新しい画面へドラッグ中のポインタ状態を持ち越さない');
+    assert.strictEqual(ui.isDraggingMap, false);
+    assert.strictEqual(grabbing.has('grabbing'), false, '旧画面の掴み表示を残さない');
+    for (const callback of Array.from(frames.values())) callback();
+    assert.strictEqual(scroll.scrollLeft, 0, '地図リセット後に旧mousemoveを再適用しない');
+    assert.strictEqual(scroll.scrollTop, 0);
+    listeners.get('mousedown')({ button: 0, pageX: 100, pageY: 100 });
+    listeners.get('mousemove')({ pageX: 140, pageY: 130, preventDefault() {} });
+    assert.strictEqual(frames.size, 1, '新しいドラッグで描画が予約できる');
+    for (const callback of Array.from(frames.values())) { frames.clear(); callback(); }
+    assert.strictEqual(scroll.scrollLeft, -40, '新しいドラッグは従来どおりスクロールする');
 });
 
 Promise.all(pendingTests).then(() => {

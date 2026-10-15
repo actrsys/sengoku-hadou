@@ -122,6 +122,7 @@ class UIManager {
         let lastTouchEnd = 0;
         let lastTouchX = 0;
         let lastTouchY = 0;
+        let lastTouchTarget = null;
         document.addEventListener('touchend', (event) => {
             const target = event.target instanceof Element ? event.target : null;
             const editingControl = target && target.closest('input, select, textarea, option, [contenteditable="true"]');
@@ -130,6 +131,7 @@ class UIManager {
             // touchend直後のblurやpreventDefaultは、古い実機でselectが開かない・IME変換が確定する原因になる。
             if (editingControl) {
                 lastTouchEnd = 0;
+                lastTouchTarget = null;
                 return;
             }
 
@@ -140,14 +142,20 @@ class UIManager {
             const dx = x - lastTouchX;
             const dy = y - lastTouchY;
             const isNearPreviousTap = (dx * dx + dy * dy) <= (40 * 40);
-
-            if (now - lastTouchEnd <= 320 && isNearPreviousTap && event.cancelable) {
+            // body側のtouch-action:manipulationが基本。古いWebView向けの補助抑止は
+            // 同じ非操作領域へのダブルタップだけとし、連続のボタン/一覧操作を奪わない。
+            const interactiveTarget = target && target.closest(
+                'button, a, label, [role="button"], [tabindex], .cmd-btn, .title-btn, .zoom-btn, .select-item.is-clickable, .custom-scrollbar-btn, .custom-scrollbar-track, .custom-scrollbar-thumb'
+            );
+            if (!interactiveTarget && target && target === lastTouchTarget
+                && now - lastTouchEnd <= 320 && isNearPreviousTap && event.cancelable) {
                 event.preventDefault();
             }
 
             lastTouchEnd = now;
             lastTouchX = x;
             lastTouchY = y;
+            lastTouchTarget = target;
 
             if (target && typeof target.blur === 'function') {
                 setTimeout(() => {

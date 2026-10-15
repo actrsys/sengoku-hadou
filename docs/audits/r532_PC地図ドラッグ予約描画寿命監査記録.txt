@@ -1,0 +1,26 @@
+戦国覇道 r532：PC地図ドラッグの予約描画寿命監査
+
+基準：r531完全版。通常プレイの地図マウス操作から発生し得る問題を対象とした。
+
+【到達経路と不具合】
+- PC地図で左ボタンを押しmousemoveすると、スクロール処理はrequestAnimationFrameへ予約される。
+- その描画フレーム前にmouseupまたはmouseleaveとなっても予約は取消されず、操作を離した後に旧mousemoveの座標で地図を動かし得た。
+- 同じ予約中にタイトル復帰・ロードでresetMapViewState()しても、旧ドラッグのisMouseDown/掴み表示が残り、旧予約により初期位置を動かし得た。
+- どちらも既存のマウス操作と表示切替から到達可能。ただし実機での発生頻度は未測定。
+
+【修正方針と内容】
+- `UIManager`地図Viewの既存ドラッグ責務内に、未処理rAFの取消窓口 `_cancelPendingMapDragMove()` を設ける。
+- mouseup/mouseleaveで保留フレームを取消し、isMapTickingを解除。操作解放後に未処理mousemoveが地図を動かさない。
+- resetMapViewState()でも保留フレーム・マウス押下状態・ドラッグ判定・旧50ms解除タイマーと掴み表示を整理。
+- 旧rAFには既存の `_mapViewResetToken` を確認させ、新画面の同じDOMへ旧予約を反映させない。
+- 通常のドラッグ中移動・慣性・ズーム・タッチのピンチ、ゲームルールは変更しない。
+
+【再現・検証】
+- r531へ動作テスト2件を追加した時点で両方失敗。1件目はマウス解放後の保留mousemoveによるscrollLeft変更、2件目は地図リセット後もisMouseDownが残ることを検出。
+- 修正後は両方成功し、新たなドラッグで地図が動く正常経路も確認。
+- 自動回帰・実ブラウザ表示・シミュレーション・管理用Excel/BIN・ZIP差分を検証する。実機での低FPS再現は未検証。
+
+【変更ファイル】
+追加：docs/audits/r532_PC地図ドラッグ予約描画寿命監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/ui_map.js、tests/run_tests.js
+削除：なし

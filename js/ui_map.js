@@ -32,6 +32,16 @@ Object.assign(UIManager.prototype, {
         this.velocityY = 0;
     },
 
+    // PC地図ドラッグはmousemoveをrAFで間引く。mouseup・画面切替後に旧フレームを
+    // 再生すると、クリック後や新しい地図の初期位置を後から動かしてしまうため破棄する。
+    _cancelPendingMapDragMove() {
+        if (this._mapDragMoveFrame != null) {
+            cancelAnimationFrame(this._mapDragMoveFrame);
+            this._mapDragMoveFrame = null;
+        }
+        this.isMapTicking = false;
+    },
+
     // PCホイール・スマホピンチ共通の入力間隔。解除予約を単一所有して、
     // 画面の切替／前操作の遅延タイマーが後発操作のロックを外さないようにする。
     _beginMapZoomCooldown() {
@@ -51,6 +61,13 @@ Object.assign(UIManager.prototype, {
         // 内部へ残すと、次シナリオの正常なズーム完了時に古いcheckpointを書き戻し得ます。
         if (typeof this._endMapZoomDiagnostic === 'function') this._endMapZoomDiagnostic();
         this._stopMapInertia();
+        this._cancelPendingMapDragMove();
+        this.isMouseDown = false;
+        this.isDraggingMap = false;
+        if (this._mapDragReleaseTimer) {
+            clearTimeout(this._mapDragReleaseTimer);
+            this._mapDragReleaseTimer = null;
+        }
         if (typeof this.abortMapEffectsForScenarioTransition === 'function') {
             this.abortMapEffectsForScenarioTransition();
         }
@@ -86,6 +103,7 @@ Object.assign(UIManager.prototype, {
 
         const sc = document.getElementById('map-scroll-container');
         if (sc) {
+            if (sc.classList) sc.classList.remove('grabbing');
             sc.style.pointerEvents = '';
             sc.scrollLeft = 0;
             sc.scrollTop = 0;
@@ -757,7 +775,8 @@ Object.assign(UIManager.prototype, {
         this.lastDragY = 0;
         this.inertiaFrame = null;
         this._mapDragReleaseTimer = null;
-        
+        this._mapDragMoveFrame = null;
+
         const sc = document.getElementById('map-scroll-container');
         if (!sc) return;
 
@@ -793,6 +812,7 @@ Object.assign(UIManager.prototype, {
         const endDrag = () => {
             if (!this.isMouseDown) return;
             this.isMouseDown = false;
+            this._cancelPendingMapDragMove();
             sc.classList.remove('grabbing');
             
             if (this._mapDragReleaseTimer) clearTimeout(this._mapDragReleaseTimer);
@@ -818,7 +838,13 @@ Object.assign(UIManager.prototype, {
             
             // ★追加：まだ前の画面を描き終わっていない時は、新しいマウスの動きを一旦無視します（カクツキ防止！）
             if (!this.isMapTicking) {
-                window.requestAnimationFrame(() => {
+                const dragViewToken = this._mapViewResetToken;
+                this._mapDragMoveFrame = window.requestAnimationFrame(() => {
+                    this._mapDragMoveFrame = null;
+                    if (!this.isMouseDown || dragViewToken !== this._mapViewResetToken) {
+                        this.isMapTicking = false;
+                        return;
+                    }
                     const x = e.pageX - sc.offsetLeft;
                     const y = e.pageY - sc.offsetTop;
                     const walkX = (x - this.dragStartX);
