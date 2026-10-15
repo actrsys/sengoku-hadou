@@ -40,6 +40,7 @@ Object.assign(UIManager.prototype, {
             this._mapDragMoveFrame = null;
         }
         this.isMapTicking = false;
+        this._mapDragMovePosition = null;
     },
 
     // PCホイール・スマホピンチ共通の入力間隔。解除予約を単一所有して、
@@ -776,6 +777,7 @@ Object.assign(UIManager.prototype, {
         this.inertiaFrame = null;
         this._mapDragReleaseTimer = null;
         this._mapDragMoveFrame = null;
+        this._mapDragMovePosition = null;
 
         const sc = document.getElementById('map-scroll-container');
         if (!sc) return;
@@ -834,32 +836,35 @@ Object.assign(UIManager.prototype, {
 
         sc.addEventListener('mousemove', (e) => {
             if (!this.isMouseDown) return;
-            e.preventDefault(); 
-            
-            // ★追加：まだ前の画面を描き終わっていない時は、新しいマウスの動きを一旦無視します（カクツキ防止！）
+            e.preventDefault();
+            const x = e.pageX - sc.offsetLeft;
+            const y = e.pageY - sc.offsetTop;
+            const walkX = x - this.dragStartX;
+            const walkY = y - this.dragStartY;
+
+            // ドラッグかクリックかは描画待ちにせず、この入力イベントで確定する。
+            // mouseupが次のrAFより早くても、拠点のclickが誤発火しないようにする。
+            if (!this.isDraggingMap) {
+                if (Math.abs(walkX) <= 10 && Math.abs(walkY) <= 10) return;
+                this.isDraggingMap = true;
+            }
+
+            // 描画は従来どおり1フレームに集約。ただし最初のイベントを閉じ込めず
+            // 最新座標へ更新し、連続mousemoveで地図が指より遅れないようにする。
+            this._mapDragMovePosition = { x, y };
             if (!this.isMapTicking) {
                 const dragViewToken = this._mapViewResetToken;
                 this._mapDragMoveFrame = window.requestAnimationFrame(() => {
                     this._mapDragMoveFrame = null;
-                    if (!this.isMouseDown || dragViewToken !== this._mapViewResetToken) {
+                    const position = this._mapDragMovePosition;
+                    this._mapDragMovePosition = null;
+                    if (!this.isMouseDown || dragViewToken !== this._mapViewResetToken || !position) {
                         this.isMapTicking = false;
                         return;
                     }
-                    const x = e.pageX - sc.offsetLeft;
-                    const y = e.pageY - sc.offsetTop;
-                    const walkX = (x - this.dragStartX);
-                    const walkY = (y - this.dragStartY);
-                    
-                    // ★遊び（デッドゾーン）の追加：10ピクセル動くまではクリックのブレとみなします
-                    if (!this.isDraggingMap) {
-                        if (Math.abs(walkX) > 10 || Math.abs(walkY) > 10) {
-                            this.isDraggingMap = true;
-                        } else {
-                            this.isMapTicking = false; // ★忘れずにスイッチを戻します
-                            return; // まだ遊びの範囲内なので、ここで処理をストップして地図を動かしません
-                        }
-                    }
-
+                    const { x, y } = position;
+                    const walkX = x - this.dragStartX;
+                    const walkY = y - this.dragStartY;
                     sc.scrollLeft = this.scrollLeft - walkX;
                     sc.scrollTop = this.scrollTop - walkY;
 

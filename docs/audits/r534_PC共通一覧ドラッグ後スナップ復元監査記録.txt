@@ -1,0 +1,19 @@
+戦国覇道 r534：PC共通スクロール一覧のドラッグ後スナップ復元監査
+
+【基準と通常操作による到達経路】
+r533完全版を基準にPCの一覧・結果画面の共通マウススクロールを監査。
+PCで `.result-body` や `#divide-list` の一覧をマウスで掴み、5px超移動して離すと、共通 `UIManager` はドラッグ中 `scrollSnapType = none` を設定する一方、終了時は元の状態にかかわらず `y mandatory` をinline設定していた。
+`.list-container` の行スナップはCSSの契約だが、`.result-body` / `#divide-list` のCSSにはmandatory snapの指定がない。従って、通常のドラッグ終了操作だけで一覧ごとのスクロール設定が書き換わる問題がある。特定のスクロール吸着が見えるかは、子要素のscroll-snap-align等に依存する。
+
+【修正】
+ドラッグ開始時の対象要素のinline scrollSnapTypeを保存し、終了後に復元する。inline指定が空文字であればCSSの定義へ戻る。個別設定（例：y proximity）も保持する。
+マウスドラッグ中の一時的なsnap無効化、慣性に代わる終了時の微調整、クリック抑止、モバイル操作等は維持。
+
+【修正前後の再現】
+新規の実コード断片実行テスト2件はr533で失敗（876成功・2失敗）。修正後は既存876件と新規2件の計878件が成功。
+PC／スマホ／低メモリスマホの実ブラウザレイアウト検査を通過。シミュレーション4件、配布ソース検査、管理用ExcelとBINの一致・数式検査を通過。実機の手動ドラッグ確認は未実施。
+
+【変更ファイル】
+追加：docs/audits/r534_PC共通一覧ドラッグ後スナップ復元監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/ui.js、tests/run_tests.js
+削除：なし

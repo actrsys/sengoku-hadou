@@ -1975,3 +1975,15 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 - `game-layout-mode-change` の際、地図画像とCanvasの表示資源は既存の `syncMapLayoutResources()` が同期する。一方、コマンド/操作パネルはDOM構造を持つので、共通モーダル中の `isBackgroundPaused` では再生成を見送り、復帰後に切替結果を反映する。
 - `UIManager.handleLayoutModeChange()` と `resumeBackgroundUpdates()` は、同じ `_syncControlPanelForLayoutMode()` を使用して、スマホ側・PC側コンテナの `hidden` と選択中コマンドの表示を同期する。モーダル中に大きいDOMを背面再構築せず、復帰後には旧modeで隠した操作パネルを残さない。通常の背景復帰ではコマンドを再構築しない。
 - `body.is-pc` と既存の `GameManager` 状態を正本とし、端末種別・入力許可・コマンドルールの独自判定を追加しない。地図座標、ゲームルール、セーブ形式、Excel/BINは変更しない。詳細は `docs/audits/r529_モーダル中端末回転操作パネル復帰監査記録.txt`。
+
+## r533：PC地図ドラッグの即時判定と最新座標採用
+
+- `UIManager.initMapDrag()` のドラッグ意図（開始点から10px超の移動）は `mousemove` を受けた時点で判定する。rAF内でしか `isDraggingMap` を立てないと、マウス解放がその描画フレームより早い通常操作で拠点カードの `click` が誤って通るため、入力判定は描画負荷の影響を受けさせない。
+- 地図スクロール更新は従来どおり1描画フレームに集約するが、先行フレームのクロージャで最初のmousemoveを固定しない。保留中の移動座標を最新の入力へ更新し、連続mousemove後は最後の座標を反映する。
+- r532の `mouseup` / `mouseleave` / 画面リセット時の描画予約破棄を維持し、解放後に古い位置のスクロールを適用しない。10px以内の小さな手ぶれは通常クリックとして扱う。追加の非同期制御や地図の新しい状態正本は増やさず、地図View内で完結する。詳細は `docs/audits/r533_PC地図ドラッグ即時判定監査記録.txt`。
+
+## r534：PC共通スクロール一覧のドラッグ後スナップ復元
+
+- PC共通一覧のマウスドラッグでは、移動中だけ `scrollSnapType = 'none'` とする。ドラッグ終了時にすべての一覧を `y mandatory` へ固定してはならない。開始時の要素のinline `scrollSnapType` を保存し、終了時にはその値を復元する。
+- `.list-container` の行スナップはCSSの `scroll-snap-type: y mandatory` が正本。一方、`.result-body`、`#divide-list` 等は独自のスクロール挙動なので、共通JSが新たにmandatory snapを付与しない。個別に明示されたinline設定も保持する。
+- PCのドラッグ中のスクロール量・選択抑止・終了時の微調整・スマホ操作には変更を加えない。詳細は `docs/audits/r534_PC共通一覧ドラッグ後スナップ復元監査記録.txt`。

@@ -244,6 +244,7 @@ class UIManager {
         let currentDragList = null;
         let lastDragDelta = 0;
         let listDragReleaseTimer = null;
+        let previousListSnapType = '';
 
         document.addEventListener('mousedown', (e) => {
             if (!document.body.classList.contains('is-pc')) return;
@@ -261,6 +262,9 @@ class UIManager {
                     isListMouseDown = true;
                     hasListDragged = false;
                     currentDragList = listObj;
+                    // スナップは一覧ごとのCSS/inline設定が正本。ドラッグ終了時に
+                    // 全一覧を mandatory へ統一せず、開始前のinline値へ戻す。
+                    previousListSnapType = listObj.style.scrollSnapType;
                     listStartY = e.pageY;
                     listStartScrollY = listObj.scrollTop;
                     lastDragDelta = 0; 
@@ -284,7 +288,7 @@ class UIManager {
         const endListDrag = () => {
             if (isListMouseDown) {
                 if (currentDragList && hasListDragged) {
-                    currentDragList.style.scrollSnapType = 'y mandatory';
+                    currentDragList.style.scrollSnapType = previousListSnapType;
                     document.body.style.userSelect = '';
                     if (lastDragDelta < 0) {
                         currentDragList.scrollBy({ top: 15, behavior: 'smooth' }); 

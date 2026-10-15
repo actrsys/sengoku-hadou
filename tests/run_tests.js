@@ -119,7 +119,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r532');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r534');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -20618,6 +20618,141 @@ test('r532 地図画面リセットで保留ドラッグを破棄し再ドラッ
     assert.strictEqual(frames.size, 1, '新しいドラッグで描画が予約できる');
     for (const callback of Array.from(frames.values())) { frames.clear(); callback(); }
     assert.strictEqual(scroll.scrollLeft, -40, '新しいドラッグは従来どおりスクロールする');
+});
+
+// r533: pointer intent must be resolved during mousemove, not after the next animation frame.
+test('r533 PC地図の短時間ドラッグは描画前の解放でも拠点クリックとして扱わない', () => {
+    const listeners = new Map();
+    const frames = new Map();
+    const timers = new Map();
+    let nextId = 1;
+    const scroll = { offsetLeft: 0, offsetTop: 0, scrollLeft: 200, scrollTop: 100,
+        style: {}, classList: { add() {}, remove() {} },
+        addEventListener(type, fn) { listeners.set(type, fn); } };
+    const ctx = createContext({ UIManager: class UIManager {},
+        document: { getElementById: id => id === 'map-scroll-container' ? scroll : null,
+            body: { classList: { contains: name => name === 'is-pc' } }, addEventListener() {} },
+        addEventListener() {},
+        requestAnimationFrame(cb) { const id = nextId++; frames.set(id, cb); return id; },
+        cancelAnimationFrame(id) { frames.delete(id); },
+        performance: { now: () => 100 },
+        setTimeout(cb) { const id = nextId++; timers.set(id, cb); return id; },
+        clearTimeout(id) { timers.delete(id); }
+    });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.initMapDrag();
+    listeners.get('mousedown')({ button: 0, pageX: 100, pageY: 100 });
+    listeners.get('mousemove')({ pageX: 145, pageY: 125, preventDefault() {} });
+    assert.strictEqual(ui.isDraggingMap, true, '10pxを超えた動きはrAF待ちでもドラッグと判定');
+    listeners.get('mouseup')();
+    assert.strictEqual(ui.isDraggingMap, true, '離した直後の城カードclickは抑止する');
+    assert.strictEqual(frames.size, 0, '旧フレームはr532同様破棄する');
+    assert.strictEqual(scroll.scrollLeft, 200, 'mouseup後に保留位置を適用しない');
+    for (const cb of timers.values()) cb();
+    assert.strictEqual(ui.isDraggingMap, false, '抑止状態は既存の50ms後に解除する');
+});
+
+test('r533 PC地図で10px以内の微小なマウス移動は通常クリックを妨げない', () => {
+    const listeners = new Map();
+    const frames = new Map();
+    const scroll = { offsetLeft: 0, offsetTop: 0, scrollLeft: 200, scrollTop: 100,
+        style: {}, classList: { add() {}, remove() {} },
+        addEventListener(type, fn) { listeners.set(type, fn); } };
+    const ctx = createContext({ UIManager: class UIManager {},
+        document: { getElementById: id => id === 'map-scroll-container' ? scroll : null,
+            body: { classList: { contains: name => name === 'is-pc' } }, addEventListener() {} },
+        addEventListener() {},
+        requestAnimationFrame(cb) { frames.set(1, cb); return 1; },
+        cancelAnimationFrame(id) { frames.delete(id); },
+        performance: { now: () => 100 }, setTimeout: () => 1, clearTimeout() {}
+    });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.initMapDrag();
+    listeners.get('mousedown')({ button: 0, pageX: 100, pageY: 100 });
+    listeners.get('mousemove')({ pageX: 108, pageY: 106, preventDefault() {} });
+    assert.strictEqual(ui.isDraggingMap, false, '10px以内ではクリック判定を維持');
+    listeners.get('mouseup')();
+    assert.strictEqual(ui.isDraggingMap, false);
+    assert.strictEqual(frames.size, 0);
+    assert.strictEqual(scroll.scrollLeft, 200);
+    assert.strictEqual(scroll.scrollTop, 100);
+});
+
+test('r533 PC地図ドラッグは描画待ちの複数mousemoveから最新位置を採用する', () => {
+    const listeners = new Map();
+    const frames = new Map();
+    let nextFrameId = 1;
+    const scroll = { offsetLeft: 0, offsetTop: 0, scrollLeft: 200, scrollTop: 100,
+        style: {}, classList: { add() {}, remove() {} },
+        addEventListener(type, fn) { listeners.set(type, fn); } };
+    const ctx = createContext({ UIManager: class UIManager {},
+        document: { getElementById: id => id === 'map-scroll-container' ? scroll : null,
+            body: { classList: { contains: name => name === 'is-pc' } }, addEventListener() {} },
+        addEventListener() {},
+        requestAnimationFrame(cb) { const id = nextFrameId++; frames.set(id, cb); return id; },
+        cancelAnimationFrame(id) { frames.delete(id); },
+        performance: { now: () => 100 }, setTimeout: () => 1, clearTimeout() {}
+    });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.initMapDrag();
+    listeners.get('mousedown')({ button: 0, pageX: 100, pageY: 100 });
+    listeners.get('mousemove')({ pageX: 115, pageY: 112, preventDefault() {} });
+    listeners.get('mousemove')({ pageX: 150, pageY: 135, preventDefault() {} });
+    assert.strictEqual(frames.size, 1, '描画予約は1フレームに集約する');
+    for (const cb of frames.values()) cb();
+    assert.strictEqual(scroll.scrollLeft, 150, '最初の15pxでなく最新の50px移動を反映');
+    assert.strictEqual(scroll.scrollTop, 65, '縦方向も最新位置を採用');
+});
+
+test('r534 PC結果画面のドラッグ後はCSS由来の非スナップ設定を変更しない', () => {
+    const uiSource = read('js/ui.js');
+    const begin = uiSource.indexOf('let isListMouseDown = false;');
+    const end = uiSource.indexOf('this.dialogQueue = [];', begin);
+    assert.ok(begin >= 0 && end > begin, '実装中の共通リスト操作を検査');
+    const handlers = new Map();
+    const resultBody = {
+        style: { scrollSnapType: '' }, scrollTop: 130,
+        getBoundingClientRect: () => ({ right: 500 }),
+        scrollBy() {}
+    };
+    const target = { closest: selector => selector.includes('.result-body') ? resultBody : null };
+    const context = createContext({
+        document: { body: { classList: { contains: value => value === 'is-pc' }, style: {} },
+            addEventListener(name, fn) { handlers.set(name, fn); } },
+        setTimeout() { return 1; }, clearTimeout() {}
+    });
+    vm.runInContext(uiSource.slice(begin, end), context);
+    handlers.get('mousedown')({ target, clientX: 120, pageY: 100 });
+    handlers.get('mousemove')({ pageY: 140 });
+    assert.strictEqual(resultBody.style.scrollSnapType, 'none', 'ドラッグ中は吸着を無効にする');
+    handlers.get('mouseup')();
+    assert.strictEqual(resultBody.style.scrollSnapType, '', '終了時はCSSに戻し、結果画面へmandatory snapを付けない');
+});
+
+test('r534 PC共通一覧はドラッグ前に設定された個別のsnap値を復元する', () => {
+    const uiSource = read('js/ui.js');
+    const begin = uiSource.indexOf('let isListMouseDown = false;');
+    const end = uiSource.indexOf('this.dialogQueue = [];', begin);
+    const handlers = new Map();
+    const list = {
+        style: { scrollSnapType: 'y proximity' }, scrollTop: 40,
+        getBoundingClientRect: () => ({ right: 500 }),
+        scrollBy() {}
+    };
+    const target = { closest: () => list };
+    const context = createContext({
+        document: { body: { classList: { contains: () => true }, style: {} },
+            addEventListener(name, fn) { handlers.set(name, fn); } },
+        setTimeout() { return 1; }, clearTimeout() {}
+    });
+    vm.runInContext(uiSource.slice(begin, end), context);
+    handlers.get('mousedown')({ target, clientX: 120, pageY: 90 });
+    handlers.get('mousemove')({ pageY: 115 });
+    handlers.get('mouseup')();
+    assert.strictEqual(list.style.scrollSnapType, 'y proximity', '一覧ごとの独自snap設定を上書きしない');
 });
 
 Promise.all(pendingTests).then(() => {
