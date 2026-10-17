@@ -637,7 +637,16 @@ class SaveManager {
 
         this.game.updateClanDisplayNames();
 
-        if (this.game.ui) this.game.ui.updateLoadingProgress(90, '地図を読み込んでいます');
+        // セーブ復元でも新規開始と同じ顔画像・SE準備を必ず通す。
+        // 既に表示したロード幕を共通窓口として使い、別の待機画面は増やさない。
+        if (this.game.ui) this.game.ui.updateLoadingProgress(81, '画像・音声を読み込んでいます');
+        if (typeof this.game.prepareGameAssets === 'function') {
+            await this.game.prepareGameAssets(isRestoreFlowLatest, (fraction, label) => {
+                if (isRestoreFlowLatest() && this.game.ui) this.game.ui.updateLoadingProgress(81 + Math.round(fraction * 13), label);
+            });
+            if (!isRestoreFlowLatest()) return false;
+        }
+        if (this.game.ui) this.game.ui.updateLoadingProgress(95, '地図を読み込んでいます');
         if (this.game.ui && typeof this.game.ui.resetMapViewState === 'function') {
             this.game.ui.resetMapViewState({ initialZoomLevel: 1 });
         } else if (this.game.ui) {
@@ -653,7 +662,7 @@ class SaveManager {
             await this.game.ui.prepareMapBaseImage(this.game.mapWidth, this.game.mapHeight);
             if (!isRestoreFlowLatest()) return false;
         }
-        if (this.game.ui) this.game.ui.updateLoadingProgress(96, '地図を描画しています');
+        if (this.game.ui) this.game.ui.updateLoadingProgress(98, '地図を描画しています');
         this.game.ui.renderMap();
         if (this.game.ui) this.game.ui.updateLoadingProgress(100, '準備完了');
         if (this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') await this.game.ui.waitForNextPaint();

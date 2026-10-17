@@ -250,6 +250,7 @@ class GameManager {
         this.releaseScenarioDataIndexes();
         // PC向け顔画像のアイドル先読みが旧シナリオのまま後続batchを開始しないよう世代を進める。
         this._facePreloadGeneration = Number(this._facePreloadGeneration || 0) + 1;
+        this._facePreloadedImages = null;
         if (this.ui) {
             this.ui.pixelCastleMap = null;
             this.ui.pixelProvinceMap = null;
@@ -536,7 +537,13 @@ class GameManager {
             this.mapWidth = data.mapWidth || 1200;
             this.mapHeight = data.mapHeight || 800;
             
-            this.preloadFaceIcons();
+            // 全顔・短い効果音の初回decodeをゲーム開始後に持ち越さず、
+            // ロード幕内で実行する。実際の進行を終える前に100%にしない。
+            if (this.ui) this.ui.updateLoadingProgress(83, '画像・音声を読み込んでいます');
+            await this.prepareGameAssets(isScenarioLoadLatest, (fraction, label) => {
+                if (isScenarioLoadLatest() && this.ui) this.ui.updateLoadingProgress(83 + Math.round(fraction * 11), label);
+            });
+            if (!isScenarioLoadLatest()) return;
             
 
             // Round27：タイトルから観戦を選んだ場合は、大名選択画面を経由しません。
@@ -547,14 +554,14 @@ class GameManager {
                 this.phase = 'daimyo_select';
             }
 
-            if (this.ui) this.ui.updateLoadingProgress(90, '地図を読み込んでいます');
+            if (this.ui) this.ui.updateLoadingProgress(95, '地図を読み込んでいます');
             // 城/国IDマップだけでなく、実際に画面へ貼るPC/スマホ用の地図画像もdecode完了まで待つ。
             // ゲーム画面を先に出して地図だけ後から現れる状態を作らない。
             if (this.ui && typeof this.ui.prepareMapBaseImage === 'function') {
                 await this.ui.prepareMapBaseImage(this.mapWidth, this.mapHeight);
                 if (!isScenarioLoadLatest()) return;
             }
-            if (this.ui) this.ui.updateLoadingProgress(96, '地図を描画しています');
+            if (this.ui) this.ui.updateLoadingProgress(98, '地図を描画しています');
             // タイトルからの観戦のみ、最初の地図を見せる時点の縮小倍率を保証する。
             // 開始時イベント等がロード幕の裏で一度renderMap()した場合に限り、
             // 既存の地図Viewリセット窓口でその仮初期化を破棄する。通常開始・ロード・途中観戦は触らない。
@@ -607,66 +614,110 @@ class GameManager {
         }
     }
     
-    // ==========================================
-    // ★軽量化：顔画像の大量プリロードを抑制します。
-    // スマホでは一覧に出ていない数千枚まで先読みすると、画像デコードキャッシュだけで
-    // WebView がメモリ不足になりやすいため、必要になった画像を通常の <img> 読み込みに任せます。
-    // PCでも「大名・城主」など最初に見える可能性が高い顔だけ、少量ずつアイドル時に読み込みます。
-    // ==========================================
-    preloadFaceIcons() {
-        const isPc = document.body.classList.contains('is-pc');
-        if (!isPc) return;
+    // ゲーム開始・セーブ復元の共通ロード幕で、画面に先んじて素材を準備する。
+    // 顔画像は common.bin の正本から現行顔と改名・当主化後の顔を列挙し、
+    // 画像の個別ハードコード一覧は持たない。長尺BGMのデコード常駐はAudioManagerへ委譲する。
+    async prepareGameAssets(isCurrent = () => true, onProgress = () => {}) {
+        if (!isCurrent()) return false;
+        onProgress(0, '武将・姫の顔画像を読み込んでいます');
+        await this.preloadFaceIcons(isCurrent, fraction => onProgress(fraction * 0.58, '武将・姫の顔画像を読み込んでいます'));
+        if (!isCurrent()) return false;
+        onProgress(0.60, '城・戦闘アイコンを読み込んでいます');
+        await this._preloadGameUiImages(isCurrent);
+        if (!isCurrent()) return false;
+        onProgress(0.68, '効果音・BGMを準備しています');
+        if (window.AudioManager && typeof window.AudioManager.prepareGameAudio === 'function') {
+            await window.AudioManager.prepareGameAudio(fraction => {
+                if (isCurrent()) onProgress(0.68 + 0.32 * fraction, '効果音・BGMを準備しています');
+            }, isCurrent);
+        }
+        return isCurrent();
+    }
 
-        // 同一GameManagerで再読込された場合、前回のrequestIdleCallback/setTimeout予約は
-        // キャンセルAPIの有無に依存せず世代tokenで無効化する。実行中batchは最大4枚だけで、
-        // 完了後に次batchを予約しないため旧シナリオの先読みが新シナリオと並走し続けない。
+    async _preloadGameUiImages(isCurrent = () => true) {
+        const paths = [
+            'data/images/map/shiro_icon001.webp', 'data/images/map/shiro_icon002.webp',
+            'data/images/map/shiro_icon003.webp', 'data/images/map/shiro_icon004.webp',
+            'data/images/map/various_forces.webp',
+            'data/images/icon/ashigaru.webp', 'data/images/icon/kiba.webp',
+            'data/images/icon/teppo.webp', 'data/images/icon/gear_icon.webp',
+            'data/images/field_war_images/butai_icon.png',
+            'data/images/field_war_images/ship_icon.png'
+        ];
+        for (let i = 0; i < paths.length && isCurrent(); i += 4) {
+            await Promise.all(paths.slice(i, i + 4).map(src => this._loadAssetImage(src)));
+        }
+    }
+
+    _loadAssetImage(src, retain = false) {
+        if (typeof Image === 'undefined') return Promise.resolve(null);
+        return new Promise(resolve => {
+            const img = new Image();
+            img.decoding = 'async';
+            const finish = async ok => {
+                img.onload = null;
+                img.onerror = null;
+                if (ok && typeof img.decode === 'function') {
+                    try { await img.decode(); } catch (_) { /* load済みの場合もそのまま利用可能 */ }
+                }
+                resolve(ok && retain ? img : null);
+            };
+            img.onload = () => finish(true);
+            img.onerror = () => finish(false);
+            img.src = src;
+        });
+    }
+
+    // 全顔画像は大容量の地図とは異なり、現行は約1.3MiB/96枚。
+    // ただしデコード後は約24MiBなので、スマホでは残すImage参照を限定する。
+    // 低メモリ端末もダウンロード・一度のdecodeはロード幕内に行い、
+    // 同時decode枚数を抑え、ブラウザが破棄可能な参照を保持し続けない。
+    async preloadFaceIcons(isCurrent = () => true, onProgress = () => {}) {
         const preloadGeneration = Number(this._facePreloadGeneration || 0) + 1;
         this._facePreloadGeneration = preloadGeneration;
-        const isCurrentGeneration = () => preloadGeneration === Number(this._facePreloadGeneration || 0);
-
-        const faceFiles = new Set();
-        const addFaceByBushoId = (id) => {
-            const b = this.getBusho(id);
-            if (b && b.faceIcon && b.faceIcon !== 'unknown_face.webp') faceFiles.add(b.faceIcon);
+        const isCurrentGeneration = () => preloadGeneration === Number(this._facePreloadGeneration || 0) && isCurrent();
+        this._facePreloadedImages = null;
+        const files = new Set(['unknown_face.webp', 'unknown_princess_face.webp', 'koshou.webp', 'kochou.webp']);
+        const addFace = value => {
+            String(value || '').split('|').forEach(part => {
+                const name = part.trim().split(':').pop().trim();
+                if (/^[a-z0-9_-]+\.webp$/i.test(name)) files.add(name);
+            });
         };
-
-        // 重要人物だけを優先。全武将はプリロードしません。
-        this.clans.forEach(c => addFaceByBushoId(c.leaderId));
-        this.castles.forEach(c => addFaceByBushoId(c.castellanId));
-
-        const urls = Array.from(faceFiles)
-            .slice(0, 96)
-            .map(filename => `./data/images/faceicons/${filename}`);
-        const batchSize = 4;
-
-        const scheduleIdle = (fn) => {
-            const guarded = () => {
-                if (!isCurrentGeneration()) return;
-                fn();
-            };
-            if ('requestIdleCallback' in window && typeof window.requestIdleCallback === 'function') {
-                window.requestIdleCallback(guarded, { timeout: 500 });
-            } else {
-                setTimeout(guarded, 50);
+        const common = typeof DataManager !== 'undefined' && DataManager.commonDataCache;
+        if (common && Array.isArray(common.warriorsMaster)) {
+            common.warriorsMaster.forEach(b => addFace(b.faceIcon));
+            (common.princessMaster || []).forEach(p => addFace(p.faceIcon));
+        } else {
+            (this.bushos || []).forEach(b => { addFace(b.faceIcon); addFace(b.faceChange); });
+            (this.princesses || []).forEach(p => addFace(p.faceIcon));
+        }
+        // ロード元に不正な外部URLがあっても、同梱WebPファイル名だけを受け付ける。
+        const names = Array.from(files);
+        const lowMemory = window.__mobileLowMemoryMode === true;
+        const mobile = !document.body.classList.contains('is-pc');
+        const keepLimit = lowMemory ? 12 : mobile ? 32 : names.length;
+        const retained = new Map();
+        const batchSize = lowMemory ? 2 : mobile ? 4 : 6;
+        for (let i = 0; i < names.length; i += batchSize) {
+            if (!isCurrentGeneration()) return false;
+            const batch = names.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (name, index) => {
+                const image = await this._loadAssetImage(`./data/images/faceicons/${name}`, i + index < keepLimit);
+                if (image && isCurrentGeneration()) retained.set(name, image);
+            }));
+            if (!isCurrentGeneration()) return false;
+            onProgress(Math.min(1, (i + batch.length) / names.length));
+            // 大量のWebPのdecodeを同期連続させず、ロード幕の描画機会を確保。
+            if (typeof DataManager !== 'undefined' && typeof DataManager.yieldToBrowser === 'function') {
+                await DataManager.yieldToBrowser();
             }
-        };
-
-        const loadBatch = async (startIndex) => {
-            if (!isCurrentGeneration() || startIndex >= urls.length) return;
-            const batch = urls.slice(startIndex, startIndex + batchSize);
-            await Promise.all(batch.map(url => new Promise(resolve => {
-                const img = new Image();
-                img.onload = img.onerror = resolve;
-                img.decoding = 'async';
-                img.src = url;
-            })));
-            if (!isCurrentGeneration()) return;
-            scheduleIdle(() => loadBatch(startIndex + batchSize));
-        };
-
-        scheduleIdle(() => loadBatch(0));
+        }
+        if (!isCurrentGeneration()) return false;
+        this._facePreloadedImages = retained;
+        return true;
     }
-    
+
     handleDaimyoSelect(castle) {
         const clan = this.getClan(castle.ownerClan);
         if (!clan) return;

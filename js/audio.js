@@ -6,6 +6,12 @@ class AudioManager {
         this.bgmPlayer = null;
         this.currentBgmName = null; // 今鳴っている曲の名前を入れておく箱
         this.memoBgmName = null;    // 元の曲を覚えておくためのメモ帳
+        // 短いSEは一度だけロード／decodeし、再生ごとにHowlを作り直さない。
+        // 長いBGMは全曲のPCMを常駐させず、ゲーム本編の曲だけdecode保持する。
+        this._preparedSe = new Map();
+        this._preparedGameBgm = null;
+        this._preparedGameAudioPromise = null;
+        this._gameBgmWarmComplete = false;
         this._bgmUsesBakedBaseVolume = false; // mobile AACは基本音量を音源へ焼き込んでいる
         // iOS/iPadOSではゲーム音をambient audio sessionとして明示し、
         // Ring/Silent（マナーモード）に従わせる。HTML5 BGM経路でも同じ方針を使う。
@@ -377,6 +383,134 @@ class AudioManager {
         return compatiblePlayer;
     }
 
+    // ゲーム開始前の共通ロード幕から呼ぶ素材準備窓口。
+    // UI/ゲーム側は音声形式・Howlerインスタンスを管理しない。
+    async prepareGameAudio(onProgress = () => {}, isCurrent = () => true) {
+        // 旧ゲームの準備が失効した場合、後から始まったロードは旧Promiseを
+        // そのまま成功扱いせず、残りを自分の寿命で再試行する。
+        if (this._preparedGameAudioPromise) {
+            await this._preparedGameAudioPromise;
+            if (!isCurrent()) return false;
+        }
+        const task = this._prepareGameAudioOnce(onProgress, isCurrent);
+        this._preparedGameAudioPromise = task;
+        try { return await task; }
+        finally { if (this._preparedGameAudioPromise === task) this._preparedGameAudioPromise = null; }
+    }
+
+    async _prepareGameAudioOnce(onProgress, isCurrent) {
+        try { await this._howlerReadyPromise; }
+        catch (error) { console.warn('効果音の事前読込を実行できません:', error); return false; }
+        if (!isCurrent()) return false;
+        const names = Object.keys(this.seList);
+        // WebAudioで全SEを保持しても素材は1MiB未満。古い端末は同時decodeを2本へ制限。
+        const batchSize = this._isMobileLowMemoryAudioMode() ? 2 : 4;
+        for (let i = 0; i < names.length; i += batchSize) {
+            if (!isCurrent()) return false;
+            await Promise.all(names.slice(i, i + batchSize).map(name => this._prepareSingleSe(name)));
+            if (!isCurrent()) return false;
+            onProgress(0.55 * Math.min(1, (i + batchSize) / names.length));
+        }
+        if (!isCurrent()) return false;
+        // メインBGMは開始後すぐ鳴らすのでここで一度decodeする。
+        // HTML5ストリーミングが必要な端末では従来どおり常駐decodeを行わない。
+        await this._prepareMainBgm();
+        if (!isCurrent()) return false;
+        onProgress(0.72);
+        if (this._shouldUseCompatibleBgmStreaming() || typeof fetch !== 'function') {
+            onProgress(1);
+            return true;
+        }
+        // 戦闘・イベント用BGMは圧縮データだけをブラウザのHTTPキャッシュへ。
+        // 全曲をPCM化して常駐させると数百MiBに達するため禁止。
+        // 保持するArrayBufferは作らず、曲ごとに読み終えて手放す。
+        if (this._gameBgmWarmComplete) { onProgress(1); return true; }
+        const namesToFetch = Object.keys(this.bgmList).filter(name => name !== 'SC_ex_Town2_Fortress.ogg');
+        for (let i = 0; i < namesToFetch.length; i++) {
+            if (!isCurrent()) return false;
+            try {
+                const response = await fetch(`data/music/bgm/${namesToFetch[i]}`, { cache: 'force-cache' });
+                if (!response.ok) throw new Error(String(response.status));
+                await response.arrayBuffer();
+            } catch (error) {
+                console.warn('BGMの先行取得に失敗しました（再生時に再試行します）:', namesToFetch[i], error);
+            }
+            if (!isCurrent()) return false;
+            onProgress(0.72 + 0.28 * (i + 1) / namesToFetch.length);
+        }
+        if (isCurrent()) this._gameBgmWarmComplete = true;
+        return true;
+    }
+
+    _prepareSingleSe(fileName) {
+        if (this._preparedSe.has(fileName)) return Promise.resolve(true);
+        return new Promise(resolve => {
+            const original = `data/music/se/${fileName}`;
+            const compatible = this._getCompatibleSeSource(fileName);
+            const preferOriginal = !compatible || this._isAudioCodecSupported('ogg');
+            const sources = compatible
+                ? (preferOriginal ? [original, compatible] : [compatible, original])
+                : [original];
+            let sound = null;
+            let settled = false;
+            const finish = (success) => {
+                if (settled) return;
+                settled = true;
+                if (success) this._preparedSe.set(fileName, sound);
+                else { try { sound && sound.unload(); } catch (_) {} }
+                resolve(success);
+            };
+            try {
+                sound = new window.Howl({
+                    src: sources, preload: true, volume: 0,
+                    onload: () => finish(true),
+                    onloaderror: () => finish(false)
+                });
+                // Howlerが同期ロード済みのものを返した場合もresolveする。
+                if (sound.state && sound.state() === 'loaded') finish(true);
+            } catch (_) { finish(false); }
+        });
+    }
+
+    _createPreparedMainBgm() {
+        const fileName = 'SC_ex_Town2_Fortress.ogg';
+        const bgm = this.bgmList[fileName];
+        let sound = null;
+        sound = new window.Howl({
+            src: [`data/music/bgm/${fileName}`], preload: true,
+            volume: bgm.baseVolume * this.userBgmVolume, loop: true,
+            onplay: id => {
+                if (this.bgmPlayer !== sound) return;
+                const active = sound._soundById(id);
+                const source = active && active._node && active._node.bufferSource;
+                if (source) { source.loopStart = bgm.start; source.loopEnd = bgm.end; }
+            }
+        });
+        return sound;
+    }
+
+    async _prepareMainBgm() {
+        if (this._shouldUseCompatibleBgmStreaming()) return true;
+        if (this._preparedGameBgm && this._preparedGameBgm.state() === 'loaded') return true;
+        return new Promise(resolve => {
+            let sound;
+            let settled = false;
+            const finish = ok => {
+                if (settled) return;
+                settled = true;
+                if (ok) this._preparedGameBgm = sound;
+                else { try { sound && sound.unload(); } catch (_) {} }
+                resolve(ok);
+            };
+            try {
+                sound = this._createPreparedMainBgm();
+                sound.once('load', () => finish(true));
+                sound.once('loaderror', () => finish(false));
+                if (sound.state() === 'loaded') finish(true);
+            } catch (_) { finish(false); }
+        });
+    }
+
     // BGMを鳴らす魔法
     playBGM(fileName, fallbackStart = 0, fallbackEnd = 0) {
         if (this._retryWhenHowlerReady(() => this.playBGM(fileName, fallbackStart, fallbackEnd))) return;
@@ -401,6 +535,15 @@ class AudioManager {
         // OGG/Vorbisを使える通常端末は従来どおりWeb Audioを使い、
         // サンプル単位のloopStart/loopEndと元音源の品質を維持する。
         this._bgmUsesBakedBaseVolume = false;
+        if (fileName === 'SC_ex_Town2_Fortress.ogg' && this._preparedGameBgm
+            && this._preparedGameBgm.state() === 'loaded') {
+            const ready = this._preparedGameBgm;
+            this._preparedGameBgm = null;
+            ready.volume(finalVolume);
+            this.bgmPlayer = ready;
+            ready.play();
+            return;
+        }
         let oggPlayer = null;
         let compatibilityFallbackStarted = false;
         const fallbackToCompatibleBgm = () => {
@@ -489,6 +632,19 @@ class AudioManager {
         const baseVol = seData && seData.baseVolume !== undefined ? seData.baseVolume : this.fallbackSeVolume;
         const finalVolume = baseVol * this.userSeVolume;
         if (!(finalVolume > 0)) return;
+
+        const prepared = this._preparedSe.get(fileName);
+        if (prepared && typeof prepared.state === 'function' && prepared.state() === 'loaded') {
+            try {
+                prepared.volume(finalVolume);
+                prepared.play();
+                return;
+            } catch (_) {
+                // 端末側のdecode資源が失われた場合だけ通常の再生経路へfallback。
+                try { prepared.unload(); } catch (_) {}
+                this._preparedSe.delete(fileName);
+            }
+        }
 
         const originalSource = `data/music/se/${fileName}`;
         const compatibleSource = this._getCompatibleSeSource(fileName);

@@ -197,7 +197,7 @@ test('r541 タイトル起動後のレイアウト切替では現在の軽量モ
 test('r540 トップ観戦はロード後にだけ平時BGMへ切替し、通常開始とタイトルでは変更しない', () => {
     const game = read('js/game.js');
     const start = game.indexOf('async loadScenario(folder, options = {})');
-    const end = game.indexOf('    preloadFaceIcons() {', start);
+    const end = game.indexOf('    handleDaimyoSelect(castle) {', start);
     const load = game.slice(start, end);
     const onSuccess = load.indexOf('await this.ui.hideLoadingScreen()');
     const bgm = load.indexOf("window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg')");
@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r563');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r564');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6686,14 +6686,14 @@ test('新規開始とロードは実表示用地図Imageの読込・decode完了
     assert.ok(map.includes("await img.decode();"), '表示用Imageは対応ブラウザでdecode完了まで待つ');
     assert.ok((map.includes("window.__mobileLowMemoryMode") && map.includes("japan_map_lowmem.png") && map.includes("japan_map_mobile.png")), '実際の端末種別に応じた表示用Imageを待つ');
 
-    const scenarioStart = game.indexOf("this.ui.updateLoadingProgress(90, '地図を読み込んでいます')");
+    const scenarioStart = game.indexOf("this.ui.updateLoadingProgress(95, '地図を読み込んでいます')");
     const scenarioEnd = game.indexOf('// 観戦開始はロード画面を閉じてから。', scenarioStart);
     const scenarioBlock = game.slice(scenarioStart, scenarioEnd);
     assert.ok(scenarioBlock.includes('await this.ui.prepareMapBaseImage(this.mapWidth, this.mapHeight);'));
     assert.ok(scenarioBlock.indexOf('await this.ui.prepareMapBaseImage') < scenarioBlock.indexOf('this.ui.renderMap();'));
     assert.ok(scenarioBlock.indexOf('this.ui.renderMap();') < scenarioBlock.indexOf('this.ui.hideLoadingScreen();'));
 
-    const restoreStart = save.indexOf("this.game.ui.updateLoadingProgress(90, '地図を読み込んでいます')");
+    const restoreStart = save.indexOf("this.game.ui.updateLoadingProgress(95, '地図を読み込んでいます')");
     const restoreEnd = save.indexOf("window.AudioManager.playBGM", restoreStart);
     const restoreBlock = save.slice(restoreStart, restoreEnd);
     assert.ok(restoreBlock.includes('await this.game.ui.prepareMapBaseImage(this.game.mapWidth, this.game.mapHeight);'));
@@ -7078,7 +7078,7 @@ test('地図初期化は前回座標を破棄しシナリオ既定地点を使�
 test('r509 タイトル観戦は開始直前にも最小ズームを確定し、通常開始へ影響させない', () => {
     const game = read('js/game.js');
     const loadStart = game.indexOf('async loadScenario(folder, options = {})');
-    const scenarioBlock = game.slice(loadStart, game.indexOf('preloadFaceIcons() {', loadStart));
+    const scenarioBlock = game.slice(loadStart, game.indexOf('handleDaimyoSelect(castle) {', loadStart));
     const lastRender = scenarioBlock.indexOf('this.ui.renderMap();');
     const beforeLastRender = scenarioBlock.slice(Math.max(0, lastRender - 650), lastRender);
     assert.ok(beforeLastRender.includes('if (startInWatchMode'), '最終地図描画直前の初期カメラ確定はタイトル観戦だけ');
@@ -11069,18 +11069,36 @@ test('地図拠点DOMは同一シナリオ中に再利用し表示内容だけ�
     assert.ok(ui.includes('this.refreshCastlePresentations();'), '背景停止中の変更は復帰時に差分同期する');
 });
 
-test('顔画像アイドル先読みはシナリオ世代tokenで旧batchを継続しない', () => {
+test('r564 顔画像はゲーム開始前ロードで全候補・改名後・姫・標準顔を処理し、古いロードを止める', () => {
     const game = read('js/game.js');
-    const preloadAt = game.indexOf('\n    preloadFaceIcons() {');
-    const preloadBlock = game.slice(preloadAt, preloadAt + 4200);
+    const preloadAt = game.indexOf('async preloadFaceIcons(isCurrent = () => true');
+    const preloadBlock = game.slice(preloadAt, game.indexOf('handleDaimyoSelect(castle)', preloadAt));
     assert.ok(preloadBlock.includes('const preloadGeneration = Number(this._facePreloadGeneration || 0) + 1;'));
-    assert.ok(preloadBlock.includes('if (!isCurrentGeneration() || startIndex >= urls.length) return;'));
-    assert.ok(preloadBlock.includes('if (!isCurrentGeneration()) return;'));
-    const releaseAt = game.indexOf('releaseScenarioMapResources()');
+    assert.ok(preloadBlock.includes('common.warriorsMaster.forEach(b => addFace(b.faceIcon));'));
+    assert.ok(preloadBlock.includes('(common.princessMaster || []).forEach(p => addFace(p.faceIcon));'));
+    assert.ok(preloadBlock.includes("String(value || '').split('|')"), '年代別・当主化後の顔も漏らさない');
+    assert.ok(preloadBlock.includes('if (!isCurrentGeneration()) return false;'));
+    assert.ok(preloadBlock.includes('await Promise.all(batch.map('), '少数batchで実load・decodeを待つ');
+    assert.ok(preloadBlock.includes('this._facePreloadedImages = retained;'));
+    assert.ok(preloadBlock.includes('const keepLimit = lowMemory ? 12 : mobile ? 32 : names.length;'));
+    const releaseAt = game.indexOf('releaseScenarioMapResources() {');
     const releaseBlock = game.slice(releaseAt, releaseAt + 1200);
     assert.ok(releaseBlock.includes('this._facePreloadGeneration = Number(this._facePreloadGeneration || 0) + 1;'));
+    assert.ok(releaseBlock.includes('this._facePreloadedImages = null;'));
+    assert.ok(game.includes('await this.prepareGameAssets(isScenarioLoadLatest'));
+    assert.ok(read('js/save_manager.js').includes('await this.game.prepareGameAssets(isRestoreFlowLatest'));
 });
 
+test('r564 効果音の共通ロードは再生とセッションを共有し、BGMを全曲PCM常駐させない', () => {
+    const audio = read('js/audio.js');
+    assert.ok(audio.includes('this._preparedSe = new Map();'));
+    assert.ok(audio.includes('this._preparedSe.set(fileName, sound)'));
+    assert.ok(audio.includes('const prepared = this._preparedSe.get(fileName);'));
+    assert.ok(audio.includes('prepared.play();'));
+    assert.ok(audio.includes('this._preparedGameBgm = sound;'));
+    assert.ok(audio.includes("cache: 'force-cache'"), 'イベントBGMは圧縮データだけを先取り');
+    assert.ok(audio.includes('this._shouldUseCompatibleBgmStreaming()'), '軽量音声ストリーミングは維持');
+});
 
 test('地図選択UIはvalidTargetsの同じincludesを全拠点・ラベルで繰り返さずSetを局所共用する', () => {
     const uiMap = read('js/ui_map.js');
@@ -14656,7 +14674,7 @@ test('r430では開始前の非同期遷移もTurnManager世代だけで旧await
     const defsRecheck = startBlock.indexOf('if (!isStartFlowLatest()) return;', defsAwait);
     assert.ok(defsAwait >= 0 && defsRecheck > defsAwait, 'シナリオ一覧await後に旧開始処理を止める');
 
-    const loadEnd = game.indexOf('\n    preloadFaceIcons()', loadAt);
+    const loadEnd = game.indexOf('\n    handleDaimyoSelect(castle)', loadAt);
     const loadBlock = game.slice(loadAt, loadEnd);
     assert.ok(loadBlock.includes('turnManager.abortForScenarioTransition();'), 'シナリオ読込自体を新しい遷移境界にする');
     assert.ok(loadBlock.includes('const scenarioLoadGeneration = turnManager.captureTurnFlowGeneration();'));
@@ -23361,6 +23379,85 @@ test('r563 軍団が占領した拠点は既存どおり軍団委任を初期値
     assert.strictEqual(castle.allowMove, true);
 });
 
+// r564: 見かけ上の進捗ではなく、実際のImage/decodeとSE解決を待つ。
+test('r564 共通マスターの年次差分顔を実際にロード・decodeしてから先へ進む', async () => {
+    const vm = require('vm');
+    const urls = [];
+    let decoded = 0;
+    class MockImage {
+        set src(url) {
+            urls.push(url);
+            Promise.resolve().then(() => { if (this.onload) this.onload(); });
+        }
+        decode() { decoded++; return Promise.resolve(); }
+    }
+    const commonDataCache = {
+        warriorsMaster: [
+            {faceIcon:'oda_nobunaga.webp|1579:oda_nobunaga2.webp'},
+            {faceIcon:'test_icon.webp|daimyo:test_daimyo.webp'},
+            {faceIcon:'https://invalid.example/a.webp'}
+        ],
+        princessMaster: [{faceIcon:'unknown_princess_face.webp'}]
+    };
+    const ctx = createContext({
+        Image: MockImage,
+        document: {body:{classList:{contains:()=>true}}},
+        DataManager: {commonDataCache, yieldToBrowser:()=>Promise.resolve()},
+        addEventListener: () => {}
+    });
+    loadScript(ctx,'js/game.js');
+    const GameManager = vm.runInContext('GameManager',ctx);
+    const game = Object.create(GameManager.prototype);
+    const updates = [];
+    assert.strictEqual(await game.preloadFaceIcons(() => true, ratio => updates.push(ratio)),true);
+    assert.ok(urls.some(url => url.endsWith('oda_nobunaga.webp')));
+    assert.ok(urls.some(url => url.endsWith('oda_nobunaga2.webp')));
+    assert.ok(urls.some(url => url.endsWith('test_daimyo.webp')));
+    assert.ok(urls.some(url => url.endsWith('unknown_face.webp')));
+    assert.ok(!urls.some(url => url.includes('invalid.example')));
+    assert.strictEqual(decoded,urls.length);
+    assert.strictEqual(updates[updates.length-1],1);
+    assert.ok(game._facePreloadedImages.has('oda_nobunaga2.webp'));
+});
+
+test('r564 音声は先行ロードして共有し、SEの初回再生で再生成しない', async () => {
+    let constructions = 0;
+    const requested = [];
+    class MockHowl {
+        constructor(opts) { this.opts = opts; constructions++; this._state = 'loaded'; this.plays=0; }
+        state() { return this._state; }
+        once() { return this; }
+        volume(value) { this.latestVolume=value; return this; }
+        play() { this.plays++; return this.plays; }
+        stop() { return this; }
+        unload() { this._state = 'unloaded'; }
+    }
+    const ctx = createContext({
+        Howl: MockHowl,
+        Howler: {codecs: () => true},
+        navigator: {userAgent: 'desktop',maxTouchPoints:0},
+        document: {},
+        fetch: async url => { requested.push(url); return {ok:true,arrayBuffer:async()=>new ArrayBuffer(4)}; }
+    });
+    loadScript(ctx,'js/audio.js');
+    const audio = ctx.AudioManager;
+    const progress = [];
+    assert.strictEqual(await audio.prepareGameAudio(value=>progress.push(value)), true);
+    assert.strictEqual(audio._preparedSe.size,Object.keys(audio.seList).length);
+    assert.strictEqual(requested.length,Object.keys(audio.bgmList).length-1);
+    assert.strictEqual(progress[progress.length-1],1);
+    const count = constructions;
+    audio.playSE('decision.ogg');
+    audio.playSE('decision.ogg');
+    assert.strictEqual(constructions,count,'毎回新しいHowlを生成していない');
+    assert.strictEqual(audio._preparedSe.get('decision.ogg').plays,2);
+    const main = audio._preparedGameBgm;
+    audio.playBGM('SC_ex_Town2_Fortress.ogg');
+    assert.strictEqual(audio.bgmPlayer,main,'準備済みの本編BGMを再利用する');
+    assert.strictEqual(main.plays,1);
+    assert.strictEqual(constructions,count,'本編BGMの再生直前にもう一度decodeしない');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
@@ -23369,5 +23466,3 @@ Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(1);
 });
-
-
