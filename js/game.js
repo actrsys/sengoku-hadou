@@ -1382,11 +1382,20 @@ class GameManager {
         // 会話待機中にも月替わり・復元が始まり得る。安全地点を予約した元の進行だけに確認を開く。
         const expectedYear = Number(this.year);
         const expectedMonth = Number(this.month);
+        // 帰還確認の安全地点は年月だけでなく、到達したキュー位置と拠点に属する。
+        const expectedQueue = this.turnQueue;
+        const expectedQueueLength = expectedQueue?.length;
+        const expectedIndex = Number(this.currentIndex);
+        const expectedCastle = expectedQueue?.[expectedIndex];
         const turnManager = this.turnManager;
         const flowGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
             ? turnManager.captureTurnFlowGeneration() : null;
         const isSameSafePoint = () => Number(this.year) === expectedYear
             && Number(this.month) === expectedMonth
+            && this.turnQueue === expectedQueue
+            && this.turnQueue?.length === expectedQueueLength
+            && Number(this.currentIndex) === expectedIndex
+            && this.turnQueue?.[expectedIndex] === expectedCastle
             && (flowGeneration === null || (turnManager
                 && typeof turnManager.isTurnFlowGenerationCurrent === 'function'
                 && turnManager.isTurnFlowGenerationCurrent(flowGeneration)));

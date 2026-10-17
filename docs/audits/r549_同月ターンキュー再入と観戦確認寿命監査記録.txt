@@ -1,0 +1,32 @@
+戦国覇道 r549：同月ターンキュー再入と観戦帰還確認の寿命境界監査
+
+【監査の前提と対象】
+・r548完全版のARCHITECTURE.mdを最優先し、r515/r519/r520/r547/r548のターン世代・年月・位置の既存基準と照合。
+・同じ月内に複数の非同期進行が重なった際に、旧キューの月末判定・ターン継続予約・観戦帰還確認が現在のキューを変更しないかを調査。
+・ターン順、AI判断、イベント条件、ロード/セーブ、UI配置、ユーザー管理データは変更対象外。
+
+【修正前に再現した問題】
+1. processTurn()が月末のwaitForDialogs()にいる間、同月のcurrentIndexが別の拠点へ変更されても、旧月末処理からendMonth()を実行できた。
+2. 同じ年月・位置でもturnQueue配列が入れ替わると、古い月末待機からendMonth()を開始できた。
+3. finishTurn()が拠点ターンを終了した後、観戦終了確認の非同期待ち中に別の拠点へ進んでも、旧finishTurnが新しいprocessTurn()予約を発行できた。
+4. tryProcessQueuedWatchReturn()が会話を待っている間に同じ月のcurrentIndexが変化しても、元の安全地点の帰還確認を開けた。
+5. 同月の別ターンへ移った後でも、表示済みの古い観戦帰還確認の［はい／いいえ］から観戦を終了／継続できた。
+・5件の再現テストはr548では全件失敗した。実機での発生頻度は未確認であり、通常UIによる再現頻度を推定しない。
+
+【改修】
+・TurnManager.processTurn()は既存turn-flow世代・年月に加えて呼出時のturnQueue参照、要素数、currentIndexをisCurrentFlow()で確認。通常拠点待機後に行っていたCastle同一性確認は維持。
+・TurnManager.finishTurn()は完了したキューの参照と長さ、およびインデックスを進めた時点の次位置・拠点実体を待機後に照合する。世代カウンタは追加せず、既存scheduleTurnFlowContinuation()に次位置とCastleを渡す。
+・GameManager.tryProcessQueuedWatchReturn()は安全地点のturnQueue参照・要素数・位置・拠点実体を、前版の年月・TurnManager世代チェックと共に再確認。確認選択肢の押下時も同じ判定を用いる。
+・事象を補正するための後段再実行、固定ms待機、重複する独自トークンは設けない。
+
+【回帰検証】
+・上記5件を追加した後、修正前r548では919成功・5失敗。改修後は924成功・0失敗。
+・PC/スマホ表示回帰テスト成功。JavaScript構文検査成功。
+・Excel/BINの共通・1560・1570出力項目の一致検査成功。
+・player_focus_simの4件成功。
+・実機での長期間観戦と同月内の特殊再入の通し検証は未実施。
+
+【変更ファイル】
+追加：docs/audits/r549_同月ターンキュー再入と観戦確認寿命監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/game.js、js/turn_manager.js、tests/run_tests.js
+削除：なし

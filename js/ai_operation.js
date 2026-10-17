@@ -113,6 +113,25 @@ class AIOperationManager {
         );
     }
 
+    // 国内平定の進捗は「攻撃可能な諸勢力」の数を示す。
+    // 出撃元にいる候補だけを数えるので、接続領域はその拠点自身で十分。
+    // 鎮圧可否（商人・壊滅・到達条件）はKunishuSystemを唯一の正本とする。
+    _countPacificationTargets(clanId, castles) {
+        const kunishuSystem = this.game.kunishuSystem;
+        let count = 0;
+        for (const castle of castles) {
+            const connectedCastleIds = new Set([Number(castle.id)]);
+            const candidates = kunishuSystem.getKunishusInCastle(castle.id);
+            for (const kunishu of candidates) {
+                if (kunishu.getRelation(clanId) <= 30
+                    && kunishuSystem.getSubjugationEligibility(kunishu, clanId, castle, connectedCastleIds).eligible) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     // ★追加：特定の大名勢力のすべての軍団に、一括で方針を持たせる一元化ロジックです！
     setGrandObjectiveToAllLegions(clanId, objectiveType, targetId, turnCount) {
         if (!this.grandObjectives) this.grandObjectives = {};
@@ -169,12 +188,8 @@ class AIOperationManager {
             let legionTargetCount = initialTargetCount;
             // 国内平定だけは、自軍団の領内にいる諸勢力の数を数えるので軍団ごとに計算します
             if (objectiveType === '国内平定') {
-                legionTargetCount = 0;
                 const legionCastles = clanCastles.filter(c => c.legionId === legionId);
-                legionCastles.forEach(myC => {
-                    const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clanId) <= 30 && k.ideology !== '商人');
-                    legionTargetCount += kunishusInCastle.length;
-                });
+                legionTargetCount = this._countPacificationTargets(clanId, legionCastles);
             }
 
             this.grandObjectives[clanId][legionId] = {
@@ -419,12 +434,7 @@ class AIOperationManager {
                             }
                         } else if (grandObj.type === '国内平定') {
                             // ★追加：国内平定の場合、自軍団の管轄内（自分の城）にいる敵対諸勢力の数を数えます
-                            const legionCastlesForPacification = myLegionCastles;
-                            legionCastlesForPacification.forEach(myC => {
-                                // ★修正：商人は攻撃対象にならないので、ターゲットから除外します！
-                                const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clan.id) <= 30 && k.ideology !== '商人');
-                                currentTargetCount += kunishusInCastle.length;
-                            });
+                            currentTargetCount = this._countPacificationTargets(clan.id, myLegionCastles);
                         }
 
                         let shouldCancel = false;
@@ -1507,11 +1517,7 @@ class AIOperationManager {
                             } else if (objectiveType === '国内平定') {
                                 // ★追加：初期ターゲット数として、自軍団内の敵対諸勢力の数をカウントします
                                 const myCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
-                                myCastles.forEach(myC => {
-                                    // ★修正：商人は攻撃対象にならないので、ターゲットから除外します！
-                                    const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(myC.id).filter(k => k.getRelation(clanId) <= 30 && k.ideology !== '商人');
-                                    initialTargetCount += kunishusInCastle.length;
-                                });
+                                initialTargetCount = this._countPacificationTargets(clanId, myCastles);
                             }
                             
                             const myCastleCount = this.game.getClanCastles(clanId).length;

@@ -453,9 +453,16 @@ class TurnManager {
         // 通常の月進行ではturn-flow世代を更新しないため、待機後は年月も同じか確認する。
         const expectedYear = Number(game.year);
         const expectedMonth = Number(game.month);
+        // 待機中に同月の別ターンが先行しても、旧processTurnから月末や操作画面を起動しない。
+        const expectedQueue = game.turnQueue;
+        const expectedQueueLength = expectedQueue?.length;
+        const expectedIndex = Number(game.currentIndex);
         const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration)
             && Number(game.year) === expectedYear
-            && Number(game.month) === expectedMonth;
+            && Number(game.month) === expectedMonth
+            && game.turnQueue === expectedQueue
+            && game.turnQueue?.length === expectedQueueLength
+            && Number(game.currentIndex) === expectedIndex;
         if (game.aiTimer) {
             clearTimeout(game.aiTimer);
             game.aiTimer = null;
@@ -625,9 +632,13 @@ class TurnManager {
         // 通常の月進行ではturn-flow世代を更新しないため、待機後は年月も同じか確認する。
         const expectedYear = Number(game.year);
         const expectedMonth = Number(game.month);
+        const expectedQueue = game.turnQueue;
+        const expectedQueueLength = expectedQueue?.length;
         const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration)
             && Number(game.year) === expectedYear
-            && Number(game.month) === expectedMonth;
+            && Number(game.month) === expectedMonth
+            && game.turnQueue === expectedQueue
+            && game.turnQueue?.length === expectedQueueLength;
         this._cancelAllActionsDonePromptTimer();
         if (!isCurrentFlow()) return;
         const wasProcessingAI = game.isProcessingAI;
@@ -668,15 +679,22 @@ class TurnManager {
             if (wasProcessingAI) game.writeAIDiagnostic(castle, 'turn_finished');
         }
     
-        game.currentIndex++; 
+        game.currentIndex++;
+        // 観戦確認などのawait前に、次に進めるべきキュー位置と拠点実体を固定する。
+        const expectedNextIndex = Number(game.currentIndex);
+        const expectedNextCastle = game.turnQueue?.[expectedNextIndex];
     
         // Round26：戦争・外交・turn_endイベントまで含めて「今の拠点1件」が完全終了した地点です。
         // 観戦終了予約があれば次の拠点へ進まず、ここで初めて帰還確認を開きます。
         if (await game.tryProcessQueuedWatchReturn('turn_complete')) return;
-        if (!isCurrentFlow()) return;
+        if (!isCurrentFlow()
+            || Number(game.currentIndex) !== expectedNextIndex
+            || game.turnQueue?.[expectedNextIndex] !== expectedNextCastle) return;
     
         // ★追加：ターンが終わって次に行く時も、スマホがパンクしないように一瞬「息継ぎ」をさせます！
-        this._scheduleTurnFlowContinuation(() => game.processTurn(), 0, { expectedIndex: game.currentIndex });
+        this._scheduleTurnFlowContinuation(() => game.processTurn(), 0, {
+            expectedIndex: expectedNextIndex, expectedCastle: expectedNextCastle
+        });
     }
 
     async endMonth() {
