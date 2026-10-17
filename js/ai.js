@@ -2234,12 +2234,14 @@ class AIEngine {
                         const supportRiceGoal = Math.floor(myOp.requiredForce * 2.5);
 
                         // 届け先が出撃用拠点で、まだ目標（兵士か兵糧）に届いていないなら、メモに追加します！
-                        if (stagingCastle && (stagingCastle.soldiers < stagingSoldierGoal || stagingCastle.rice < stagingRiceGoal)) {
+                        if (stagingCastle && targetCastlesForTransport.some(c => c.id === stagingCastle.id)
+                            && (stagingCastle.soldiers < stagingSoldierGoal || stagingCastle.rice < stagingRiceGoal)) {
                             transportTasks.push({ type: 'staging', targetId: myOp.stagingBase });
                             if (maxTransportScore < 900) maxTransportScore = 900; 
                         } 
                         // 出撃用がもう十分で、届け先が援軍用拠点で、まだ目標に届いていないならメモに追加します！
-                        else if (supportCastle && (supportCastle.soldiers < supportSoldierGoal || supportCastle.rice < supportRiceGoal)) {
+                        else if (supportCastle && targetCastlesForTransport.some(c => c.id === supportCastle.id)
+                            && (supportCastle.soldiers < supportSoldierGoal || supportCastle.rice < supportRiceGoal)) {
                             transportTasks.push({ type: 'support', targetId: myOp.supportBase });
                             if (maxTransportScore < 700) maxTransportScore = 700; 
                         }
@@ -2997,18 +2999,24 @@ class AIEngine {
                 }
                 
                 // 特殊行動群
-                if (action.type === 'buy_gun') {
-                    const amount = EconomyRules.calcBuyGunAmount(500, daimyo, castellan, this.game);
-                    const cost = EconomyRules.calcBuyGunCost(amount, daimyo, castellan, this.game);
+                // 装備購入は500金分の見込みと実際の保有余地の少ない方だけを購入する。
+                // 支払金は確定数量でEconomyRulesに再計算させ、満杯時は次候補を試す。
+                if (action.type === 'buy_gun' || action.type === 'buy_horse') {
+                    const isGun = action.type === 'buy_gun';
+                    const stockKey = isGun ? 'guns' : 'horses';
+                    const budgetAmount = isGun
+                        ? EconomyRules.calcBuyGunAmount(500, daimyo, castellan, this.game)
+                        : EconomyRules.calcBuyHorseAmount(500, daimyo, castellan, this.game);
+                    const remainingCapacity = Math.max(0, 99999 - (castle[stockKey] || 0));
+                    const amount = Math.min(budgetAmount, remainingCapacity);
+                    if (!Number.isSafeInteger(amount) || amount <= 0) continue;
+                    const cost = isGun
+                        ? EconomyRules.calcBuyGunCost(amount, daimyo, castellan, this.game)
+                        : EconomyRules.calcBuyHorseCost(amount, daimyo, castellan, this.game);
+                    if (!Number.isSafeInteger(cost) || cost <= 0 ||
+                        cost > 500 || cost > Math.min(availableGold, castle.gold)) continue;
                     castle.gold -= cost;
-                    castle.guns = Math.min(99999, (castle.guns || 0) + amount);
-                    tradeCount++; step--; actionDoneInThisStep = true; break;
-                }
-                if (action.type === 'buy_horse') {
-                    const amount = EconomyRules.calcBuyHorseAmount(500, daimyo, castellan, this.game);
-                    const cost = EconomyRules.calcBuyHorseCost(amount, daimyo, castellan, this.game);
-                    castle.gold -= cost;
-                    castle.horses = Math.min(99999, (castle.horses || 0) + amount);
+                    castle[stockKey] = (castle[stockKey] || 0) + amount;
                     tradeCount++; step--; actionDoneInThisStep = true; break;
                 }
                 if (action.type === 'sell_rice') {
@@ -3103,17 +3111,25 @@ class AIEngine {
                 
                 // ★お使いリスト（一括輸送）を実行します！
                 if (action.type === 'bulk_transport') {
-                    // リストにあるお使いを順番にこなしていきます
+                    // 計画時には有効でも、実行時の予備金・兵力・兵糧・保有上限で
+                    // すべての輸送が不成立になることがある。実際の資源変更だけを行動成功とする。
+                    let didTransport = false;
                     for (const task of action.tasks) {
                         const targetCastle = this.game.getCastle(task.targetId);
                         if (!targetCastle) continue; // お城がなくなっていたら次へ
+                        // 作戦用の出撃・援軍拠点も通常輸送と同じ自領連結網・積雪制限に従う。
+                        // 計画に残った旧拠点が落城した場合も、別勢力へ物資を渡さない。
+                        if (isSrcHeavySnow || targetCastle.ownerClan !== castle.ownerClan
+                            || targetCastle.id === castle.id
+                            || !targetCastlesForTransport.some(c => c.id === targetCastle.id)) continue;
                         
                         // ① 徴兵用のお金のお使い
                         if (task.type === 'draft_gold') {
-                            // ★変更：実行直前にも、自分の目標額以上の余裕があるか最終チェックします
-                            if (availableGold >= Math.floor(baseSoldiers * 1.5) + 500 && targetCastle.gold + 500 <= 99999) {
+                            // ★変更：先の輸送で金が減っているため、使用可能金を毎回計算し直します
+                            if (EconomyRules.calcAvailableGoldForAI(castle, this.game) >= Math.floor(baseSoldiers * 1.5) + 500 && targetCastle.gold + 500 <= 99999) {
                                 castle.gold -= 500;
                                 targetCastle.gold += 500;
+                                didTransport = true;
                             }
                         } 
                         // ② 前線基地への兵士と兵糧のお使い
@@ -3138,12 +3154,13 @@ class AIEngine {
                                 
                                 targetCastle.soldiers += 300;
                                 targetCastle.rice += 500;
+                                didTransport = true;
                             }
                         }
                         // ③ 普通の金・兵士のお使い
                         else if (task.type === 'normal_gold_soldier') {
-                            // ★変更：実行直前にも、兵士と金の余裕を最終チェックします
-                            if (availableGold >= Math.floor(baseSoldiers * 1.5) + 500 && castle.soldiers >= 2500 && targetCastle.gold + 500 <= 99999 && targetCastle.soldiers + 500 <= 99999) {
+                            // ★変更：先行輸送後の現在金・兵士を再確認し、予備金を超えて輸送しません
+                            if (EconomyRules.calcAvailableGoldForAI(castle, this.game) >= Math.floor(baseSoldiers * 1.5) + 500 && castle.soldiers >= 2500 && targetCastle.gold + 500 <= 99999 && targetCastle.soldiers + 500 <= 99999) {
                                 castle.gold -= 500;
                                 castle.soldiers -= 500;
                                 
@@ -3160,6 +3177,7 @@ class AIEngine {
                                 
                                 targetCastle.gold += 500; 
                                 targetCastle.soldiers += 500;
+                                didTransport = true;
                             }
                         }
                         // ④ 普通の兵糧のお使い
@@ -3168,6 +3186,7 @@ class AIEngine {
                             if (castle.rice >= Math.floor(baseSoldiers * 3.0) + 1000 && targetCastle.rice + 1000 <= 99999) {
                                 castle.rice -= 1000;
                                 targetCastle.rice += 1000;
+                                didTransport = true;
                             }
                         }
                     }
@@ -3176,7 +3195,9 @@ class AIEngine {
                     // AIの輸送コマンドでは、プレイヤーの仕様とは異なり、絶対に武将を移動させてはいけません！
                     // ここに武将の移動処理（handleMoveなど）を追加しないこと。
 
-                    // 全部のお使いが終わったら、行動を1回分消費します
+                    // 実際に1件も運べなければ行動を使わず、次の内政候補を試す。
+                    if (!didTransport) continue;
+                    // 1件以上運べたら従来どおり行動を1回分消費します。
                     doer.isActionDone = true; 
                     actionDoneInThisStep = true; 
                     break;

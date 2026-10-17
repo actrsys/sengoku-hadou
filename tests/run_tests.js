@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r567');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r571');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -23700,6 +23700,200 @@ test('r567 AI購入本体は正規の金額計算を使い旧式の掛け算を�
     assert.ok(source.includes('this._executeRicePurchase(castle, buyAmount, availableGold)'));
     assert.match(source, /EconomyRules\.calcTradeCostAndRate\(\s*'buy_rice'/);
     assert.ok(!source.includes('Math.ceil(buyAmount * rate)'));
+});
+
+
+
+// r568: 一括輸送は計画作成時点の使用可能金を再利用しない。
+// 実際のbulk_transport行動分岐を通して、同じ行動中の連続輸送を確認する。
+function runActualAIBulkTransport(action, castle, baseSoldiers, availableGold, castlesById, expectedCompleted = true, allowedTargetIds = null) {
+    const ai = read('js/ai.js');
+    const start = ai.indexOf("if (action.type === 'bulk_transport') {");
+    const end = ai.indexOf("if (action.type === 'move') {", start);
+    assert.ok(start >= 0 && end > start, '実行本体が存在する');
+    const body = ai.slice(start, end);
+    const doer = {isActionDone:false};
+    const EconomyRules = {calcAvailableGoldForAI: c => Math.max(0, c.gold - 100)};
+    const game = {getCastle: id => castlesById[id] || null};
+    const targetCastlesForTransport = (allowedTargetIds || Object.keys(castlesById).map(Number)).map(id => castlesById[id]).filter(Boolean);
+    const isSrcHeavySnow = false;
+    const run = new Function('candidate','castle','baseSoldiers','availableGold','doer','EconomyRules','targetCastlesForTransport','isSrcHeavySnow',
+        'let actionDoneInThisStep = false; let fallbackReached = false; for (const action of [candidate, {type: "fallback"}]) {'
+        + body + 'if (action.type === "fallback") { fallbackReached = true; break; }}'
+        + 'return {actionDoneInThisStep, fallbackReached};');
+    const result = run.call({game},action,castle,baseSoldiers,availableGold,doer,EconomyRules,targetCastlesForTransport,isSrcHeavySnow);
+    assert.strictEqual(result.actionDoneInThisStep, expectedCompleted);
+    assert.strictEqual(result.fallbackReached, !expectedCompleted, '輸送不成立なら次の候補へ進む');
+    assert.strictEqual(doer.isActionDone, expectedCompleted);
+}
+
+test('r568 一括輸送では先行した金輸送後の利用可能額で次の送金を再判定', () => {
+    const src = {id:1, ownerClan:1, gold:2500, soldiers:3000, rice:10000, horses:100, guns:50,
+        training:80, morale:70};
+    const draft = {id:2,ownerClan:1,gold:100,soldiers:500,rice:1000};
+    const normal = {id:3,ownerClan:1,gold:100,soldiers:300,rice:1000,horses:0,guns:0,training:60,morale:60};
+    runActualAIBulkTransport({type:'bulk_transport',tasks:[
+        {type:'draft_gold',targetId:2},{type:'normal_gold_soldier',targetId:3}
+    ]},src,1000,2400,{2:draft,3:normal});
+    assert.strictEqual(src.gold,2000,'使用可能金を再計算すると2件目の送金は禁止される');
+    assert.strictEqual(draft.gold,600);
+    assert.strictEqual(normal.gold,100,'2件目は金・兵士とも移動しない');
+    assert.strictEqual(src.soldiers,3000);
+    assert.strictEqual(normal.soldiers,300);
+});
+
+test('r568 一括輸送で最新残高に余裕があれば複数指示とも従来どおり実行', () => {
+    const src = {id:1,ownerClan:1,gold:3500,soldiers:3000,rice:10000,horses:100,guns:50,
+        training:80,morale:70};
+    const draft = {id:2,ownerClan:1,gold:100,soldiers:500,rice:1000};
+    const normal = {id:3,ownerClan:1,gold:100,soldiers:300,rice:1000,horses:0,guns:0,training:60,morale:60};
+    runActualAIBulkTransport({type:'bulk_transport',tasks:[
+        {type:'draft_gold',targetId:2},{type:'normal_gold_soldier',targetId:3}
+    ]},src,1000,3400,{2:draft,3:normal});
+    assert.strictEqual(src.gold,2500);
+    assert.strictEqual(draft.gold,600);
+    assert.strictEqual(normal.gold,600);
+    assert.strictEqual(src.soldiers,2500);
+    assert.strictEqual(normal.soldiers,800);
+});
+
+
+// r569: 計画された一括輸送に実行可能な指示がなければ行動を空費しない。
+test('r569 一括輸送が資金予備条件を満たさず1件も実行できない場合は行動未消費', () => {
+    const src = {id:1, ownerClan:1, gold:2000, soldiers:3000, rice:10000, horses:50, guns:20,
+        training:80, morale:70};
+    const draft = {id:2, ownerClan:1, gold:100, soldiers:500, rice:1000};
+    // 計画時は金2000が基準を満たすが、経済ルールで留保した使用可能金1900では輸送不可。
+    runActualAIBulkTransport({type:'bulk_transport',tasks:[{type:'draft_gold',targetId:2}]},
+        src,1000,1900,{2:draft},false);
+    assert.strictEqual(src.gold,2000);
+    assert.strictEqual(draft.gold,100);
+});
+
+test('r569 一括輸送で兵力・兵糧不足なら実際に送らず別の内政候補へ進む', () => {
+    const src = {id:1,ownerClan:1,gold:1000,soldiers:600,rice:1000,horses:30,guns:10,
+        training:75,morale:65};
+    const staging = {id:2,ownerClan:1,gold:200,soldiers:100,rice:200,horses:0,guns:0,
+        training:40,morale:50};
+    runActualAIBulkTransport({type:'bulk_transport',tasks:[{type:'staging',targetId:2}]},
+        src,1000,900,{2:staging},false);
+    assert.strictEqual(src.soldiers,600);
+    assert.strictEqual(staging.soldiers,100);
+});
+
+test('r569 一括輸送に失敗した後続指示があっても1件成功なら行動を消費', () => {
+    const src = {id:1,ownerClan:1,gold:2500,soldiers:3000,rice:10000,horses:50,guns:20,
+        training:80,morale:70};
+    const draft = {id:2,ownerClan:1,gold:100,soldiers:500,rice:1000};
+    const other = {id:3,ownerClan:1,gold:100,soldiers:500,rice:1000,horses:0,guns:0,training:50,morale:50};
+    runActualAIBulkTransport({type:'bulk_transport',tasks:[
+        {type:'draft_gold',targetId:2}, {type:'normal_gold_soldier',targetId:3}
+    ]},src,1000,2400,{2:draft,3:other});
+    assert.strictEqual(draft.gold,600);
+    assert.strictEqual(other.gold,100);
+});
+
+
+
+// r570: 装備購入確定時は、500金分の購入見込みと現在の保有上限を照合する。
+// 実際のAIの購入分岐を抽出し、支払額と購入量の一致を確かめる。
+function runActualAIEquipmentPurchase(actionType, castle, availableGold, prices) {
+    const source=read('js/ai.js');
+    const start=source.indexOf("if (action.type === 'buy_gun' || action.type === 'buy_horse') {") >= 0
+        ? source.indexOf("if (action.type === 'buy_gun' || action.type === 'buy_horse') {")
+        : source.indexOf("if (action.type === 'buy_gun') {");
+    const end=source.indexOf("if (action.type === 'sell_rice') {",start);
+    assert.ok(start>0 && end>start,'装備購入本体を取得');
+    const body=source.slice(start,end);
+    const doer={isActionDone:false};
+    const daemon={clan:1}, castellan={clan:1};
+    const EconomyRules={
+        calcBuyGunAmount:()=>prices.gunAmount ?? 300,
+        calcBuyGunCost:amount=>amount*2,
+        calcBuyHorseAmount:()=>prices.horseAmount ?? 300,
+        calcBuyHorseCost:amount=>amount*2
+    };
+    const runner=new Function('action','castle','availableGold','EconomyRules','daimyo','castellan',
+        'let tradeCount=0,step=0,actionDoneInThisStep=false,fallback=false;'
+        +'for(const current of [action,{type:"fallback"}]) { const action=current;'
+        +body+'if(action.type==="fallback"){fallback=true;break;}}'
+        +'return {tradeCount,step,actionDoneInThisStep,fallback};');
+    return {result: runner.call({game:{}},{type:actionType},castle,availableGold,EconomyRules,daemon,castellan),doer};
+}
+
+test('r570 鉄砲が上限まで残り10なら10だけ買い代金も10丁分に限定',()=>{
+    const castle={gold:2000,guns:99989,horses:0};
+    const {result}=runActualAIEquipmentPurchase('buy_gun',castle,1000,{gunAmount:250});
+    assert.strictEqual(castle.guns,99999);
+    assert.strictEqual(castle.gold,1980,'上限まで10丁、代金20だけを払う');
+    assert.strictEqual(result.tradeCount,1);
+});
+
+test('r570 軍馬が上限まで残り1なら1頭のみ購入',()=>{
+    const castle={gold:1500,horses:99998,guns:0};
+    const {result}=runActualAIEquipmentPurchase('buy_horse',castle,1000,{horseAmount:250});
+    assert.strictEqual(castle.horses,99999);
+    assert.strictEqual(castle.gold,1498);
+    assert.strictEqual(result.tradeCount,1);
+});
+
+test('r570 装備が満杯なら金・取引回数・内政処理を消費しない',()=>{
+    const castle={gold:1500,horses:99999,guns:10};
+    const {result}=runActualAIEquipmentPurchase('buy_horse',castle,1000,{horseAmount:250});
+    assert.strictEqual(castle.gold,1500);
+    assert.strictEqual(castle.horses,99999);
+    assert.strictEqual(result.tradeCount,0);
+    assert.strictEqual(result.actionDoneInThisStep,false);
+    assert.strictEqual(result.fallback,true);
+});
+
+test('r570 装備が十分入る通常購入は旧来の500金見積もりを維持',()=>{
+    const castle={gold:1500,horses:50,guns:10};
+    const {result}=runActualAIEquipmentPurchase('buy_gun',castle,1000,{gunAmount:200});
+    assert.strictEqual(castle.gold,1100);
+    assert.strictEqual(castle.guns,210);
+    assert.strictEqual(result.tradeCount,1);
+});
+// r571: AIの前線補給も、通常輸送と同じ接続・所属候補制約を実行時に守る。
+test('r571 作戦の出撃元が飛び地なら補給物資を空間転送しない', () => {
+    const src = {id:1,ownerClan:1,gold:1000,soldiers:2200,rice:10000,horses:100,guns:60,training:85,morale:80};
+    const staging = {id:3,ownerClan:1,gold:200,soldiers:200,rice:100,horses:0,guns:0,training:60,morale:60};
+    // 作戦拠点として残っていても、現在の輸送連結網にない。
+    runActualAIBulkTransport({type:'bulk_transport',tasks:[{type:'staging',targetId:3}]},
+        src,1000,900,{3:staging},false,[]);
+    assert.strictEqual(src.soldiers,2200);
+    assert.strictEqual(src.rice,10000);
+    assert.strictEqual(staging.soldiers,200);
+    assert.strictEqual(staging.rice,100);
+});
+
+test('r571 旧作戦の援軍拠点が他家所有なら輸送しない', () => {
+    const src = {id:1,ownerClan:1,gold:1000,soldiers:2300,rice:12000,horses:100,guns:60,training:85,morale:80};
+    const captured = {id:3,ownerClan:2,gold:200,soldiers:200,rice:100,horses:0,guns:0,training:60,morale:60};
+    // 到達候補配列に古い拠点参照が残った場合にも、現所有を確かめる。
+    runActualAIBulkTransport({type:'bulk_transport',tasks:[{type:'support',targetId:3}]},
+        src,1000,900,{3:captured},false,[3]);
+    assert.strictEqual(src.soldiers,2300);
+    assert.strictEqual(src.rice,12000);
+    assert.strictEqual(captured.soldiers,200);
+    assert.strictEqual(captured.rice,100);
+});
+
+test('r571 出撃・援軍拠点が連結した自領なら通常どおり補給する', () => {
+    const src = {id:1,ownerClan:1,gold:1000,soldiers:2200,rice:10000,horses:100,guns:60,training:85,morale:80};
+    const staging = {id:3,ownerClan:1,gold:200,soldiers:200,rice:100,horses:0,guns:0,training:60,morale:60};
+    runActualAIBulkTransport({type:'bulk_transport',tasks:[{type:'staging',targetId:3}]},
+        src,1000,900,{3:staging},true,[3]);
+    assert.strictEqual(src.soldiers,1900);
+    assert.strictEqual(src.rice,9500);
+    assert.strictEqual(staging.soldiers,500);
+    assert.strictEqual(staging.rice,600);
+});
+
+test('r571 作戦拠点候補は通常輸送と同じ連結・積雪候補リストを使う', () => {
+    const source = read('js/ai.js');
+    assert.match(source, /if \(stagingCastle && targetCastlesForTransport\.some\(c => c\.id === stagingCastle\.id\)/);
+    assert.match(source, /else if \(supportCastle && targetCastlesForTransport\.some\(c => c\.id === supportCastle\.id\)/);
 });
 
 Promise.all(pendingTests).then(() => {
