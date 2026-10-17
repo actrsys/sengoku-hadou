@@ -2757,6 +2757,10 @@ class UIManager {
         
         if (window.AudioManager) {
             window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg');
+            // タイトル移行で前の本編PCMを確実に解放。SEの共通キャッシュは保持する。
+            if (typeof window.AudioManager.releaseGameAudioCache === 'function') {
+                window.AudioManager.releaseGameAudioCache();
+            }
         }
 
         this.updateLoadingProgress(75, 'セーブデータを確認しています');

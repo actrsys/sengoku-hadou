@@ -517,8 +517,10 @@ class AudioManager {
         // HTML5 Audioを使う互換BGMでも、再生直前にambient方針を再確認する。
         this._applySystemSilentModePolicy();
 
-        this.currentBgmName = fileName;
+        // 前の曲名を保持したまま停止させ、休止する本編BGMを見分ける。
+        // 先に currentBgmName を上書きすると、旧曲のリソース種別が失われる。
         this.stopBGM();
+        this.currentBgmName = fileName;
 
         const bgmData = this.bgmList[fileName];
         const loopStart = bgmData && bgmData.start !== undefined ? bgmData.start : fallbackStart;
@@ -575,24 +577,48 @@ class AudioManager {
     }
 
     stopBGM() {
-        if (this.bgmPlayer) {
-            this.bgmPlayer.stop();
-            this.bgmPlayer.unload();
+        const previous = this.bgmPlayer;
+        if (previous) {
+            // 停止した曲の所有権を先に外して、古いfade等が新しい曲へ干渉しないようにする。
             this.bgmPlayer = null;
+            previous.stop();
+            const wasPreparedMain = this.currentBgmName === 'SC_ex_Town2_Fortress.ogg'
+                && !this._bgmUsesBakedBaseVolume
+                && typeof previous.state === 'function' && previous.state() === 'loaded';
+            if (wasPreparedMain) {
+                // ゲーム開始前にdecode済みの本編曲は、合戦・イベント中だけ休止する。
+                // ここでunloadすると平時復帰のたびに再decodeされてしまう。
+                if (this._preparedGameBgm && this._preparedGameBgm !== previous) {
+                    this._preparedGameBgm.unload();
+                }
+                this._preparedGameBgm = previous;
+            } else {
+                previous.unload();
+            }
         }
         this._bgmUsesBakedBaseVolume = false;
+    }
+
+    // タイトルでは長尺PCMを常駐させない。タイトルへ戻る正規UI窓口だけが呼ぶ。
+    releaseGameAudioCache() {
+        if (!this._preparedGameBgm) return;
+        const cached = this._preparedGameBgm;
+        this._preparedGameBgm = null;
+        cached.stop();
+        cached.unload();
     }
 
     // BGMをゆっくり消す魔法（指定した秒数かけてフェードアウトします）
     fadeOutBgm(durationInSeconds = 1) {
         if (this.bgmPlayer) {
-            const currentVol = this.bgmPlayer.volume();
+            const fadingPlayer = this.bgmPlayer;
+            const currentVol = fadingPlayer.volume();
             // 秒数をミリ秒（1000倍）に直して、今の音量から 0（無音）へフェードアウト
-            this.bgmPlayer.fade(currentVol, 0, durationInSeconds * 1000);
-            
-            // フェードアウトが完全に終わったら、BGMをきっちり停止させます
-            this.bgmPlayer.once('fade', () => {
-                this.stopBGM();
+            fadingPlayer.fade(currentVol, 0, durationInSeconds * 1000);
+
+            // 古いfade完了通知が曲切替後に届いても、新しいBGMを停止しない。
+            fadingPlayer.once('fade', () => {
+                if (this.bgmPlayer === fadingPlayer) this.stopBGM();
             });
         }
     }

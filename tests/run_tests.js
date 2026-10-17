@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r564');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r565');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -23456,6 +23456,74 @@ test('r564 音声は先行ロードして共有し、SEの初回再生で再生�
     assert.strictEqual(audio.bgmPlayer,main,'準備済みの本編BGMを再利用する');
     assert.strictEqual(main.plays,1);
     assert.strictEqual(constructions,count,'本編BGMの再生直前にもう一度decodeしない');
+});
+
+// r565: 音源の先読み成果は、通常のBGM切替・fade終了でも失わない。
+test('r565 本編BGMは合戦曲の往復でもデコード済みHowlを再利用しタイトルで解放する', async () => {
+    let created = 0;
+    const players = [];
+    class MockHowl {
+        constructor(opts) { this.opts = opts; this._state = 'loaded'; this.stops = 0; this.unloads = 0; this.plays = 0; created++; players.push(this); }
+        state() { return this._state; }
+        once() { return this; }
+        volume(value) { if (value !== undefined) this._volume = value; return this._volume ?? 1; }
+        play() { this.plays++; return this.plays; }
+        stop() { this.stops++; return this; }
+        unload() { this.unloads++; this._state = 'unloaded'; }
+    }
+    const ctx = createContext({Howl: MockHowl, Howler: {codecs:()=>true}, navigator:{userAgent:'desktop',maxTouchPoints:0}, document:{}});
+    loadScript(ctx, 'js/audio.js');
+    const audio = ctx.AudioManager;
+    assert.strictEqual(await audio._prepareMainBgm(), true);
+    const main = audio._preparedGameBgm;
+    assert.ok(main);
+    audio.playBGM('SC_ex_Town2_Fortress.ogg');
+    audio.playBGM('SC_ex_Scene1_Duel.ogg');
+    assert.strictEqual(main.unloads, 0, '本編BGMは合戦曲へ遷移しても保持');
+    assert.strictEqual(audio._preparedGameBgm, main, '再生していない間は主曲をキャッシュ');
+    const before = created;
+    audio.playBGM('SC_ex_Town2_Fortress.ogg');
+    assert.strictEqual(audio.bgmPlayer, main, '平時へ戻っても先行デコード済みインスタンスを再利用');
+    assert.strictEqual(created, before, '平時復帰で音源オブジェクトを新規生成しない');
+    audio.playBGM('SC_ex_Town1_Castle.ogg');
+    audio.releaseGameAudioCache();
+    assert.strictEqual(main.unloads, 1, 'タイトル復帰では本編PCMを解放');
+    assert.strictEqual(audio._preparedGameBgm, null);
+});
+
+test('r565 タイトル復帰UIは本編PCMだけ解放する正規窓口を使う', () => {
+    const ui = read('js/ui.js');
+    const start = ui.indexOf('async returnToTitle(options = {})');
+    const part = ui.slice(start, start + 3000);
+    const titleBgm = part.indexOf("window.AudioManager.playBGM('SC_ex_Town1_Castle.ogg')");
+    const clearCache = part.indexOf('window.AudioManager.releaseGameAudioCache();');
+    assert.ok(titleBgm >= 0 && clearCache > titleBgm, 'タイトル曲を開始後に本編キャッシュを解放する');
+    assert.ok(!read('js/audio.js').includes('this._preparedSe.clear();'), '共有SEは再開始時も維持する');
+});
+
+test('r565 古いフェード完了は切替済みの新BGMを停止しない', () => {
+    class MockHowl {
+        constructor(opts) { this.opts=opts; this._state='loaded'; this._volume=0.5; this.plays=0; this.unloads=0; this.events={}; }
+        state() { return this._state; }
+        once(name,cb) { this.events[name]=cb; return this; }
+        volume(v) { if(v !== undefined) this._volume=v; return this._volume; }
+        play() { this.plays++; return this.plays; }
+        stop() { return this; }
+        unload() { this._state='unloaded'; this.unloads++; }
+        fade() { return this; }
+    }
+    const ctx = createContext({Howl:MockHowl,Howler:{codecs:()=>true},navigator:{userAgent:'desktop',maxTouchPoints:0},document:{}});
+    loadScript(ctx,'js/audio.js');
+    const audio=ctx.AudioManager;
+    audio.playBGM('SC_ex_Scene1_Duel.ogg');
+    const old = audio.bgmPlayer;
+    audio.fadeOutBgm(1);
+    audio.playBGM('SC_ex_Town2_Fortress.ogg');
+    const current = audio.bgmPlayer;
+    assert.ok(typeof old.events.fade === 'function');
+    old.events.fade();
+    assert.strictEqual(audio.bgmPlayer, current, '古い音源のfade通知が新BGMを止めない');
+    assert.strictEqual(current.unloads, 0);
 });
 
 Promise.all(pendingTests).then(() => {
