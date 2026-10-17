@@ -330,12 +330,22 @@ class AIOperationManager {
             });
 
             for (const legionId of legionIds) {
+                // await中に軍団が解散・再編されても旧軍団の計画を再開しない。
+                // 既存の軍団実体と国主IDを照合し、独立した世代カウンタは設けない。
+                const planningLegion = legionId === 0 ? null : this.game.getLegionByClanNo(clan.id, legionId);
+                const planningCommanderId = planningLegion ? Number(planningLegion.commanderId || 0) : 0;
+                const isLegionCurrent = () => legionId === 0 || (
+                    this.isActiveLegion(clan.id, legionId)
+                    && this.game.getLegionByClanNo(clan.id, legionId) === planningLegion
+                    && Number(planningLegion.commanderId || 0) === planningCommanderId
+                );
                 processedLegions++;
                 // 古いスマホでは一勢力が複数軍団を持つ時も連続CPU時間を切ります。
                 if (!isPC && processedLegions % 2 === 0) {
                     await new Promise(resolve => setTimeout(resolve, 0));
                     if (!isCurrentFlow()) return;
                 }
+                if (!isLegionCurrent()) continue;
                 // ★追加：プレイヤー大名家で、かつ直轄（ID0）の場合は、勝手に作戦を立てないようにスキップします！
                 if (isPlayerClan && legionId === 0) continue;
 
@@ -568,6 +578,7 @@ class AIOperationManager {
                     await this.updateOperation(clan.id, legionId);
                 }
                 if (!isCurrentFlow()) return;
+                if (!isLegionCurrent()) continue;
                 if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                     this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:legion_${legionId}:operation_done`);
                 }
@@ -578,6 +589,7 @@ class AIOperationManager {
                     await new Promise(resolve => setTimeout(resolve, 0));
                     if (!isCurrentFlow()) return;
                 }
+                if (!isLegionCurrent()) continue;
 
                 // ★追加：作戦とは別に、毎月「徴兵用のお城」を考えて選びます！
                 if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
@@ -838,6 +850,34 @@ class AIOperationManager {
     }
 
     async generateOperation(clanId, legionId) {
+        // スマホ向け分割待機の間にタイトル復帰・セーブ復元・次ターンへ移った場合、
+        // 旧シナリオの判断結果を新しい作戦保存先に確定してはならない。
+        // 保存先の同一性と既存TurnManagerの世代を利用し、独自の世代管理は増やさない。
+        const planningStore = this.operations;
+        // 軍団解散では全体のoperations参照は変わらないが、勢力別の箱だけが削除され得る。
+        const clanPlanningStore = planningStore && planningStore[clanId];
+        const planningLegion = Number(legionId) === 0 ? null : this.game.getLegionByClanNo(clanId, legionId);
+        const planningCommanderId = planningLegion ? Number(planningLegion.commanderId || 0) : 0;
+        const turnManager = this.game && this.game.turnManager;
+        const turnFlowGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration()
+            : null;
+        const isCurrentPlanning = () => {
+            if (this.operations !== planningStore || !clanPlanningStore || this.operations[clanId] !== clanPlanningStore) return false;
+            // 同じ軍団番号への国主再任命も、旧作戦の続行とは扱わない。
+            if (Number(legionId) !== 0 && (
+                !this.isActiveLegion(clanId, legionId)
+                || this.game.getLegionByClanNo(clanId, legionId) !== planningLegion
+                || Number(planningLegion.commanderId || 0) !== planningCommanderId
+            )) return false;
+            if (turnFlowGeneration !== null && turnManager && typeof turnManager.isTurnFlowGenerationCurrent === 'function'
+                && !turnManager.isTurnFlowGenerationCurrent(turnFlowGeneration)) return false;
+            // 観戦中に開始した直轄作戦が、プレイヤーへの復帰後に復活しないようにする。
+            // プレイヤー直轄0を立案しない既存の月次方針と同じ判定にする。
+            if (Number(legionId) === 0 && Number(clanId) === Number(this.game.playerClanId)) return false;
+            return true;
+        };
+
         const myClanCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
         if (myClanCastles.length === 0) return;
 
@@ -905,6 +945,7 @@ class AIOperationManager {
             scannedOperationBases++;
             if (!isPC && scannedOperationBases % 4 === 0) {
                 await new Promise(resolve => setTimeout(resolve, 0));
+                if (!isCurrentPlanning()) return;
             }
             // プレイヤーの委任城で攻撃禁止なら飛ばします
             if (clanId === this.game.playerClanId && myCastle.isDelegated && !myCastle.allowAttack) {
@@ -999,7 +1040,10 @@ class AIOperationManager {
                 visited.forEach(visitedCastleId => {
                     const vCastle = this.game.getCastle(visitedCastleId);
                     if (vCastle) {
-                        const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(vCastle.id).filter(k => k.getRelation(clanId) <= 30);
+                        const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(vCastle.id).filter(k =>
+                            k.getRelation(clanId) <= 30 &&
+                            this.game.kunishuSystem.getSubjugationEligibility(k, clanId, myCastle, visited).eligible
+                        );
                         kunishusInCastle.forEach(k => {
                             validEnemies.push({
                                 isKunishuTarget: true,

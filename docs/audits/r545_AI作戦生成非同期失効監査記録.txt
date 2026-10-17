@@ -1,0 +1,39 @@
+戦国覇道 r545：AI作戦生成の非同期再開／旧シナリオ・旧ターン・観戦復帰整合監査
+
+【基準・設計の確認】
+r544完全版。ARCHITECTURE.mdの最優先ルール、AI Operation Manager、TurnManagerのターン世代、
+GameManagerのシナリオ・観戦移行、save/loadの作戦記録と過去の非同期監査を照合。
+
+【到達条件と既存不具合】
+・古いスマホではgenerateOperation()が4拠点ごとにsetTimeout(0)で描画機会を返す。
+・従来はその待機が解けた後にシナリオ／作戦保存先／ターン世代を再確認しない。
+・タイトル復帰／シナリオ切替・ロードで作戦保存先が初期化された後も、旧計画が新データへ書き込める。
+・観戦中の直轄軍団の準備中にプレイヤー操作へ復帰した場合は、復帰処理が直轄作戦を破棄した後も
+  古い計画生成が継続し、作戦保存先がないと例外、保存先が残るとAI作戦復活が起こり得る。
+・月次呼出元のawait後の世代確認だけでは、generateOperation自身の内部確定を阻止できない。
+
+【修正・責務】
+・AIOperationManager.generateOperation()に限り、現在のoperationsオブジェクト同一性と
+  TurnManagerの既存captureTurnFlowGeneration/isTurnFlowGenerationCurrentを照合する。
+・端末向け分割待機から戻った直後に判定し、失効した場合は計画を確定せず終了する。
+・プレイヤー大名の直轄軍団0へ生成しない既存方針も同じ再開時確認で維持する。
+・別の世代カウンタ／二重タイマーや、ゲームルール・AIスコア・攻撃確率の変更は行わない。
+・管理用Excel／BIN、セーブ形式、描画CSS／HTMLは変更しない。
+
+【テスト】
+・修正前は、旧作戦の待機中にresetAllStateと新シナリオ用の保存先生成が入ると、旧作戦が新保存先へ書き込む。
+・同一保存先でもTurnManagerの世代だけ変えた場合、旧作戦が書き込む。
+・観戦終了で直轄作戦を削除した後、待機中の旧作戦が再開すると保存先不在で例外となる。
+・修正後はそれぞれ旧処理を中止し、新規・現行シナリオでの通常作戦立案は維持する。
+・node tests/run_tests.js：902 passed、0 failed。
+・node tests/run_visual_tests.js：主要固定論理レイアウト、実ブラウザのロード幕・画像decodeテスト通過。
+・node tools/verify_release_sources.js：管理用Excelの配布ソース検査通過。
+・python tools/verify_excel_bin_parity.py：共通・1560・1570全出力項目一致。
+・python tools/simulation/test_player_focus_sim.py：4テスト成功。
+・JS構文検査：本体・テストJavaScript通過。
+・実機の長期観戦→復帰・シナリオ即時切替の連続手操作までは未実施。
+
+【変更ファイル】
+追加：docs/audits/r545_AI作戦生成非同期失効監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/ai_operation.js、js/config.js、tests/run_tests.js
+削除：なし

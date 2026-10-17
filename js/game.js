@@ -1379,11 +1379,24 @@ class GameManager {
         if (this.fieldWarManager && this.fieldWarManager.active) return false;
         if (this.selectionMode != null) return false;
 
+        // 会話待機中にも月替わり・復元が始まり得る。安全地点を予約した元の進行だけに確認を開く。
+        const expectedYear = Number(this.year);
+        const expectedMonth = Number(this.month);
+        const turnManager = this.turnManager;
+        const flowGeneration = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration() : null;
+        const isSameSafePoint = () => Number(this.year) === expectedYear
+            && Number(this.month) === expectedMonth
+            && (flowGeneration === null || (turnManager
+                && typeof turnManager.isTurnFlowGenerationCurrent === 'function'
+                && turnManager.isTurnFlowGenerationCurrent(flowGeneration)));
+
         if (this.ui && typeof this.ui.waitForDialogs === 'function') {
             await this.ui.waitForDialogs();
         }
 
         // wait中に状態が変わった場合は、もう一度条件を確認します。
+        if (!isSameSafePoint()) return false;
         if (!this.isWatchMode || !this._watchReturnRequested || this._watchReturnInProgress) return false;
         if (this.warManager && this.warManager.state && this.warManager.state.active) return false;
         if (this.fieldWarManager && this.fieldWarManager.active) return false;
@@ -1409,8 +1422,10 @@ class GameManager {
 
         // 以前と同じ確認自体は残しますが、「安全地点」に到着してから初めて表示します。
         this.ui.showDialog('観戦をやめますか？', true, () => {
+            if (!isSameSafePoint()) return;
             this.stopWatchMode();
         }, () => {
+            if (!isSameSafePoint()) return;
             this.cancelQueuedWatchReturn();
         }, {
             okText: '観戦をやめる',

@@ -1,0 +1,30 @@
+戦国覇道 r547：AI拠点ターン・TurnManager共通予約の月跨ぎ失効監査
+
+【設計と対象】
+・r546完全版のARCHITECTURE.md優先事項、TurnManagerのturn-flow世代、r292/r441/r545/r546の非同期監査を照合。
+・TurnManagerはシナリオ切替等で世代を進めるが、通常の月進行では世代を進めない。
+・AIEngineはターンキューのCastle実体とcurrentIndexを保持していたが、年月は保持していなかった。
+・ゲームルールやAI判断の専門部署を変更せず、開始時点の非同期寿命条件だけを補強する。
+
+【再現できた不具合】
+1. 旧月のAIがbefore_commandイベントをawait中、現在の月が変わった後でも、turn-flow世代・index・Castle参照が同一なら旧思考を継続し、現在の拠点ターンを終了できた。
+2. 旧月のAI開始予約が未発火の間に月が進んでも、同じCastle・同じindexなら旧AIを起動できた。
+3. 旧月のAI処理が実行開始後にrejectすると、同じCastle・indexの翌月のターンをfinishTurn()できた。
+4. 共通TurnManager.scheduleTurnFlowContinuation()も年月を拘束しておらず、同様の予約で翌月に旧callbackを実行し得た。
+
+【修正方針】
+・AIEngine._captureTurnFlowContext()に年月を記録し、_isTurnFlowContextCurrent()で従来の世代/phase/index/Castle検査と併せて年月を比較する。
+・TurnManager._scheduleAITurn()は予約年月とindexを記録し、同じ判定関数を起動直前・例外発生後の双方に適用する。
+・TurnManager._scheduleTurnFlowContinuation()にも予約年月比較を追加し、汎用予約にも同じ寿命ルールを適用する。
+・独立の世代番号は追加せず、turn-flow世代を毎月進める変更も行わない。UI/CSS、ルール、シナリオ、セーブ形式、Excel/BINは変更しない。
+
+【再現・回帰】
+・r546コードに失敗再現テストを追加すると、新規4件中旧AIイベント待機・旧AI予約・旧AI遅延例外の3件が失敗した。
+・年月を各正規入口で照合するよう修正し、正常な同月AI実行・翌月拒否・共通予約の正常/失効を含む計5件を追加。
+・旧テストの年月未指定モックはゲーム内の正規状態（year/month必須）に合わせて補完し、実動作を通して検証した。
+・改修後の通常回帰：909 passed、0 failed。
+
+【変更ファイル】
+追加：docs/audits/r547_AIターン月跨ぎ非同期予約失効監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/ai.js、js/config.js、js/turn_manager.js、tests/run_tests.js
+削除：なし

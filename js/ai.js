@@ -17,6 +17,8 @@ class AIEngine {
                 ? turnManager.captureTurnFlowGeneration()
                 : null,
             index: Number(this.game && this.game.currentIndex),
+            year: Number(this.game && this.game.year),
+            month: Number(this.game && this.game.month),
             castle: castle || null
         };
     }
@@ -27,6 +29,9 @@ class AIEngine {
         const turnManager = game.turnManager;
         if (context.generation !== null && turnManager && typeof turnManager.isTurnFlowGenerationCurrent === 'function'
             && !turnManager.isTurnFlowGenerationCurrent(context.generation)) return false;
+        // ターン世代はシナリオ切替時に進むが、月次進行では必ずしも変わらない。
+        // 同じ拠点が翌月も同じキュー位置を占めても、前月のAIを再開しない。
+        if (Number(game.year) !== context.year || Number(game.month) !== context.month) return false;
         if (Number(game.currentIndex) !== Number(context.index)) return false;
         if (context.castle && (!game.turnQueue || game.turnQueue[game.currentIndex] !== context.castle)) return false;
         return true;
@@ -36,6 +41,16 @@ class AIEngine {
         if (!this._isTurnFlowContextCurrent(context)) return false;
         this.game.finishTurn();
         return true;
+    }
+
+    // 作戦策定時の兵糧予定は現在在庫と異なることがある。出撃時の在庫を正本にする。
+    _clampDispatchRice(requestedRice, castle) {
+        const requested = Number(requestedRice);
+        const available = Number(castle && castle.rice);
+        return Math.min(
+            Math.max(0, Math.floor(Number.isFinite(requested) ? requested : 0)),
+            Math.max(0, Math.floor(Number.isFinite(available) ? available : 0))
+        );
     }
 
     // ★追加：大名の威信（daimyoPrestige）を取り出す魔法です！
@@ -162,10 +177,11 @@ class AIEngine {
                         } else {
                             // 諸勢力がまだ生きているか、仲良しになっていないか（友好度30以下）をチェックします
                             const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
-                            if (targetKunishu && !targetKunishu.isDestroyed && targetKunishu.getRelation(castle.ownerClan) <= 30) {
+                            if (targetKunishu && targetKunishu.getRelation(castle.ownerClan) <= 30 &&
+                                this.game.kunishuSystem.getSubjugationEligibility(targetKunishu, castle.ownerClan, castle).eligible) {
                                 isStillEnemy = true;
-                                
-                                // ★追加：ターゲットの諸勢力がいるお城のデータを探して、道が繋がっているか確認します！
+
+                                // 鎮圧対象として有効な諸勢力だけ、従来のAI経路判定へ進める。
                                 const targetCastle = this.game.getCastle(targetKunishu.castleId);
                                 if (targetCastle) {
                                     targetProvId = targetCastle.provinceId; // 目的地のお城の国をセットします
@@ -1412,9 +1428,10 @@ class AIEngine {
 
         // 選んだ武将数で実際に率いられる兵数へ正規化する。上限値は共通Serviceだけを見る。
         sendSoldiers = TroopAllocationService.clampArmySoldiers(sendSoldiers, sorted, source.soldiers);
+        sendRice = this._clampDispatchRice(sendRice, source);
         // 作戦策定から実行までに出撃元の兵が援軍などで減る場合がある。
         // 在庫再正規化で0人となった軍勢を開戦準備へ渡さず、AIターンを正常に終了する。
-        if (sendSoldiers <= 0) {
+        if (sendSoldiers <= 0 || sendRice <= 0) {
             this.game.finishTurn();
             return;
         }
@@ -1498,9 +1515,10 @@ class AIEngine {
 
         sorted = sorted.slice(0, 5);
         sendSoldiers = TroopAllocationService.clampArmySoldiers(sendSoldiers, sorted, sourceCastle.soldiers);
+        sendRice = this._clampDispatchRice(sendRice, sourceCastle);
         // 諸勢力鎮圧も通常出陣と同じ出撃時点の兵力上限を使う。
         // 0人軍の鎮圧開始を避け、現在のAIターンをそこで終了する。
-        if (sendSoldiers <= 0) {
+        if (sendSoldiers <= 0 || sendRice <= 0) {
             this.game.finishTurn();
             return;
         }

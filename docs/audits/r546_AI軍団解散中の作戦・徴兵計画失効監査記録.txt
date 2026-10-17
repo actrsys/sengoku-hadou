@@ -1,0 +1,46 @@
+戦国覇道 r546：AI月次の非同期待機中に軍団解散・再編された場合の作戦／徴兵計画寿命監査
+
+【基準と禁則】
+・r545完全版。ARCHITECTURE.mdのAI必須ルール、城所有・軍団解散の正規窓口、作戦保存先、
+  TurnManagerの寿命管理、低メモリ端末向け非同期処理、直近r542～r545監査を照合。
+・旧セーブ互換、管理Excel・BIN、軍団編成判断、AI作戦点数／乱数順、CSS／HTMLには触れない。
+
+【確認した不具合】
+1. AIOperationManager.generateOperation()は4拠点ごとのyield再開で、全体operations参照と
+   TurnManager世代のみを確認していた。軍団解散はターン世代を進めない。
+2. CastleManager.disbandLegion()が軍団計画をクリアして勢力別operationsの箱自体を消した後、
+   旧generateOperation()が継続すると、内政作戦の代入時にTypeErrorとなり得た。
+3. 他軍団の作戦が残っている場合は勢力別の箱が残るため、解散した軍団の作戦が再作成された。
+   同じ軍団Noに別国主が再任命された場合も旧立案が混入し得た。
+4. processMonthlyOperations()がgenerateOperation()を待っている間に軍団が解散した場合、
+   旧軍団に対してselectDraftBase()を呼び、クリア済み徴兵拠点を再選定していた。
+
+【修正・責務】
+・generateOperation()は、全体/勢力別作戦保存先の同一性、既存TurnManager世代に加え、
+  既存isActiveLegion()とgetLegionByClanNo()の軍団実体・国主IDを再開時に照合する。
+・processMonthlyOperations()も軍団単位の処理前とawait後で同じ既存専門窓口を照合し、
+  失効済み軍団の旧作戦結果の通知および徴兵拠点選定を継続しない。
+・作戦/徴兵の削除は従来どおりCastleManager→AIOperationManager.clearLegionPlanning()が担い、
+  新しい独立世代・上書きによる後始末・固定遅延は設けない。
+・直轄軍団0、無関係な別軍団の作戦、存続軍団の通常生成は維持。
+
+【失敗から成功への再現テスト】
+・4拠点目の分割待機中に正規の軍団解散を実行、勢力別箱が消える場合：修正前はTypeError。
+・他軍団の作戦保存先が残る状態で解散し、同じ軍団番号を別国主に再利用：
+  修正前は旧軍団の作戦を再作成、修正後は失効。
+・月次作戦生成を待機させて解散：修正前は旧徴兵拠点を再選定、修正後は実行せず終了。
+・既存テストは902件通過。上記の2テスト追加で904件、失敗0件。
+
+【検証】
+・node tests/run_tests.js：904 passed、0 failed。
+・node tests/run_visual_tests.js：PC/スマホ固定画面・ロード幕/画像decodeの実ブラウザ回帰通過。
+・node tools/verify_release_sources.js：管理用Excel配布ソースと数式数の検査通過。
+・python tools/verify_excel_bin_parity.py：共通・1560・1570の全出力項目一致。
+・python tools/simulation/test_player_focus_sim.py：4件成功。
+・全本体・テスト・ツールJS構文検査：通過。
+・実端末での長期観戦・軍団再編連続操作は未実施。
+
+【変更ファイル】
+追加：docs/audits/r546_AI軍団解散中の作戦・徴兵計画失効監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/ai_operation.js、js/config.js、tests/run_tests.js
+削除：なし

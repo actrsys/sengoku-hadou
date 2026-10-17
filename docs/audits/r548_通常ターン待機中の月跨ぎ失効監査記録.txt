@@ -1,0 +1,35 @@
+戦国覇道 r548：通常拠点ターンの会話・自動保存・観戦確認待機中の月跨ぎ失効監査
+
+【設計と調査範囲】
+・r547のARCHITECTURE.mdとTurnManagerを正本にし、r441/r519/r521/r547の非同期・年月ガードを照合。
+・r547のAI開始予約・AI本体・共通0ms継続予約には年月照合がある。一方、TurnManager.processTurn()とfinishTurn()の内部にはawait後のシナリオ世代照合だけがあり、通常月替わりで変わらない世代では旧月の待機を識別できない箇所があった。
+・ゲームの判断式・AI思考・画面設計へ介入せず、通常ターン処理の再開可否だけを対象とした。
+
+【再現テストで確認した不具合】
+1. 月末のwaitForDialogs()待機後に年月が変わっていても、旧processTurnがendMonth()を再び起動できた。
+2. 直轄拠点のwaitForDialogs()待機後に翌月へ変わっていても、旧月のターン開始会話を表示できた。
+3. 直轄拠点のexecuteAutoSave()待機後に翌月へ変わっていても、旧月のターン開始会話・操作画面を再表示できた。
+4. 直轄拠点開始会話→軍師助言の後続callbackが年月を確認せず、旧月の操作パネルを新月へ表示できた。
+5. finishTurn()の観戦終了予約の非同期確認待機後に翌月へ変わっていても、旧月の次拠点processTurn予約が発行された。
+6. GameManager.tryProcessQueuedWatchReturn()自身も、会話待ち中の月替わりやシナリオ世代変更後に古い帰還確認を表示できた。
+7. 表示済みの古い観戦終了確認［はい／いいえ］も、翌月へ変更された状態で実行できた。
+・1～5の再現テストはr547本体では5件失敗。6の再現テスト2件は修正途中のコードでも失敗した。通常の同月処理は成功した。
+
+【改修】
+・processTurn()とfinishTurn()は入口でyear/monthを記録し、従来のisCurrentFlow()（既存TurnManagerの世代・phase・セーブ復元境界）を同年月判定で拡張した。
+・waitForDialogs()、executeAutoSave()、軍師/イベントcallback、観戦終了確認の既存のisCurrentFlow()が同一の最新判定を使用する。追加世代カウンタや独立したタイマーは設けない。
+・GameManager.tryProcessQueuedWatchReturn()は会話待ち開始時点の年月・既存TurnManager世代を捕捉し、待機後の失効確認および確認選択肢からの操作を抑止する。観戦終了手順や予約フラグは変更しない。
+・endMonth()自身は正規の月送り処理であり、同じ方式で当初の年月へ固定しない。AI判断式・イベント処理順・乱数・セーブ形式・Excel/BIN・HTML/CSSは変更しない。
+
+【回帰】
+・新規テスト10件（通常ターン失効5件＋正常1件、観戦帰還失効3件＋正常1件）を追加。以前のテストのソース文字列検査を新しい判定へ合わせ、ゲーム上常に定義済みのyear/monthを旧モック2か所へ補った。
+・通常回帰919件成功、0失敗。
+・PC/スマホ表示回帰テスト成功、JS構文検査成功。
+・管理用ExcelとBIN出力項目の一致検証：共通・1560・1570すべて一致。
+・player_focus_simテスト：4件成功。
+・実機での長時間観戦、月替わり直前の高負荷操作の通し検証は未実施。
+
+【変更ファイル】
+追加：docs/audits/r548_通常ターン待機中の月跨ぎ失効監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/game.js、js/turn_manager.js、tests/run_tests.js
+削除：なし

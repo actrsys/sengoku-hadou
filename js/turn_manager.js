@@ -132,11 +132,14 @@ class TurnManager {
         if (typeof callback !== 'function') return null;
         const game = this.game;
         const generation = Number(this._turnFlowGeneration || 0);
+        const expectedYear = Number(game.year);
+        const expectedMonth = Number(game.month);
         const expectedIndex = Number.isInteger(options.expectedIndex) ? Number(options.expectedIndex) : null;
         const expectedCastle = options.expectedCastle || null;
         const timerId = setTimeout(() => {
             if (this._turnContinuationTimers) this._turnContinuationTimers.delete(timerId);
             if (!this._isTurnFlowCurrent(generation)) return;
+            if (Number(game.year) !== expectedYear || Number(game.month) !== expectedMonth) return;
             if (expectedIndex !== null && Number(game.currentIndex) !== expectedIndex) return;
             if (expectedCastle && game.turnQueue && game.turnQueue[game.currentIndex] !== expectedCastle) return;
             try {
@@ -401,6 +404,14 @@ class TurnManager {
     _scheduleAITurn(castle) {
         const game = this.game;
         const turnFlowGeneration = Number(this._turnFlowGeneration || 0);
+        const expectedYear = Number(game.year);
+        const expectedMonth = Number(game.month);
+        const expectedIndex = Number(game.currentIndex);
+        // 月が変わって同じ拠点が同じ位置に戻っても、旧AI予約や旧例外は失効させる。
+        const isScheduledTurnCurrent = () => this._isTurnFlowCurrent(turnFlowGeneration)
+            && Number(game.year) === expectedYear && Number(game.month) === expectedMonth
+            && Number(game.currentIndex) === expectedIndex
+            && game.turnQueue?.[expectedIndex] === castle;
         game.isProcessingAI = true;
         if (game.ui && typeof game.ui.clearCommandMenu === 'function') game.ui.clearCommandMenu();
         // AI進行中は操作できないため、スマホでは背面マップの非必須Canvas/フィルタを外して
@@ -423,16 +434,14 @@ class TurnManager {
 
         const delay = 30;
         game.aiTimer = setTimeout(async () => {
-            if (!this._isTurnFlowCurrent(turnFlowGeneration)) return;
+            if (!isScheduledTurnCurrent()) return;
             if (game.warManager.state.active) return;
-            if (game.turnQueue[game.currentIndex] !== castle) return;
             try {
                 await game.aiEngine.execAI(castle);
             } catch (error) {
                 console.error('AI Error caught:', error);
                 // 遷移後に旧AIが遅延rejectしても、新しいターンを進めない。
-                if (!this._isTurnFlowCurrent(turnFlowGeneration)
-                    || game.turnQueue[game.currentIndex] !== castle) return;
+                if (!isScheduledTurnCurrent()) return;
                 game.finishTurn();
             }
         }, delay);
@@ -441,7 +450,12 @@ class TurnManager {
     async processTurn() {  // ★最初に async を付けます！
         const game = this.game;
         const turnFlowGeneration = Number(this._turnFlowGeneration || 0);
-        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);
+        // 通常の月進行ではturn-flow世代を更新しないため、待機後は年月も同じか確認する。
+        const expectedYear = Number(game.year);
+        const expectedMonth = Number(game.month);
+        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration)
+            && Number(game.year) === expectedYear
+            && Number(game.month) === expectedMonth;
         if (game.aiTimer) {
             clearTimeout(game.aiTimer);
             game.aiTimer = null;
@@ -608,7 +622,12 @@ class TurnManager {
     async finishTurn() { 
         const game = this.game;
         const turnFlowGeneration = Number(this._turnFlowGeneration || 0);
-        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);
+        // 通常の月進行ではturn-flow世代を更新しないため、待機後は年月も同じか確認する。
+        const expectedYear = Number(game.year);
+        const expectedMonth = Number(game.month);
+        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration)
+            && Number(game.year) === expectedYear
+            && Number(game.month) === expectedMonth;
         this._cancelAllActionsDonePromptTimer();
         if (!isCurrentFlow()) return;
         const wasProcessingAI = game.isProcessingAI;

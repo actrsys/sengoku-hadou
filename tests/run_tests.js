@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r542');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r548');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -12465,11 +12465,13 @@ test('旧ターンの0ms継続はタイトル・ロード後にturn-flow世代�
     const turn = read('js/turn_manager.js');
     const processAt = turn.indexOf('async processTurn()');
     const processBlock = turn.slice(processAt, processAt + 1100);
-    assert.ok(processBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);'));
+    assert.ok(processBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration)'));
+    assert.ok(processBlock.includes('Number(game.month) === expectedMonth'), '通常ターンも月を固定する');
     assert.ok(processBlock.includes('if (!isCurrentFlow()) return;'));
     const finishAt = turn.indexOf('async finishTurn()');
     const finishBlock = turn.slice(finishAt, finishAt + 800);
-    assert.ok(finishBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);'));
+    assert.ok(finishBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration)'));
+    assert.ok(finishBlock.includes('Number(game.month) === expectedMonth'), '命令終了も月を固定する');
     assert.ok(finishBlock.includes('if (!isCurrentFlow()) return;'));
 });
 
@@ -12696,7 +12698,8 @@ test('通常ターン本体もawait後にTurnManager世代を再確認し旧処�
     const end = turn.indexOf('async finishTurn()', at);
     const block = turn.slice(at, end);
     assert.ok(block.includes('const turnFlowGeneration = Number(this._turnFlowGeneration || 0);'));
-    assert.ok(block.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);'));
+    assert.ok(block.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration)'));
+    assert.ok(block.includes('Number(game.month) === expectedMonth'));
     assert.ok(block.includes('const expectedTurnIndex = Number(game.currentIndex);'));
     assert.ok(block.includes('const castle = game.turnQueue[expectedTurnIndex];'));
     const waitAt = block.indexOf('await game.ui.waitForDialogs();', block.indexOf('const expectedTurnIndex'));
@@ -12728,6 +12731,7 @@ test('旧processTurnは待機中に世代が変われば新シナリオのendMon
     const game = {
         phase: 'game',
         isRestoringSave: false,
+        year: 1570, month: 4,
         aiTimer: null,
         selectionMode: null,
         currentIndex: 0,
@@ -12793,7 +12797,8 @@ test('月初月末とAI予約はシナリオ世代をまたいでロード・タ
     const scheduleAt = turn.indexOf('_scheduleAITurn(castle)');
     const scheduleBlock = turn.slice(scheduleAt, turn.indexOf('async processTurn()', scheduleAt));
     assert.ok(scheduleBlock.includes('const turnFlowGeneration = Number(this._turnFlowGeneration || 0);'));
-    assert.ok(scheduleBlock.includes('if (!this._isTurnFlowCurrent(turnFlowGeneration)) return;'));
+    assert.ok(scheduleBlock.includes('const isScheduledTurnCurrent = () => this._isTurnFlowCurrent(turnFlowGeneration)'));
+    assert.ok(scheduleBlock.includes('if (!isScheduledTurnCurrent()) return;'), 'AI予約はターン世代・年月・拠点位置を一緒に照合する');
     assert.ok(game.includes('turnManager.abortForScenarioTransition();'), '新規開始・シナリオ読込で旧ターン世代を切る');
     assert.ok(save.includes('turnManager.abortForScenarioTransition();'), 'ロード復元開始で旧ターン世代を切る');
     const titleAt = ui.indexOf('async returnToTitle(options = {})');
@@ -14496,6 +14501,7 @@ test('r441 プレイヤーターンのbefore_command待機中に遷移すると�
         let panelCount = 0;
         const game = {
             phase: 'game', isRestoringSave: false, selectionMode: null,
+            year: 1570, month: 4,
             currentIndex: 0, turnQueue: [castle], playerClanId: 1,
             isProcessingAI: false, hasAutoSavedThisMonth: true,
             warManager: { state: { active: false } },
@@ -14541,7 +14547,7 @@ test('r441 AI例外処理も世代中断後には新しいターンを終了さ�
     let failAI = null;
     let finished = 0;
     const game = {
-        phase: 'game', isRestoringSave: false,
+        phase: 'game', isRestoringSave: false, year: 1570, month: 4,
         currentIndex: 0, turnQueue: [castle],
         aiTimer: null, warManager: { state: { active: false } },
         ui: {
@@ -21184,7 +21190,7 @@ test('r542 AI攻撃作戦は出撃直前の兵数0で開戦準備へ進まない
     const orders = [];
     let finished = 0;
     const general = { id: 1, name: '総大将', clan: 1, intelligence: 75, leadership: 75, strength: 75 };
-    const source = {id: 10, ownerClan: 1, soldiers: 0, horses: 0, guns: 0};
+    const source = {id: 10, ownerClan: 1, soldiers: 0, rice: 3000, horses: 0, guns: 0};
     const target = {id: 11, ownerClan: 2};
     const ctx = createContext({
         BushoStatusRules: {isActive: () => true},
@@ -21211,6 +21217,683 @@ test('r542 AI攻撃作戦は出撃直前の兵数0で開戦準備へ進まない
     assert.strictEqual(orders.length, 1, '兵数がある通常の攻撃は従来どおり出撃準備へ進む');
     ai.executeKunishuSubjugateAI(source, {id: 7, castleId: 11}, general, 800, 1600);
     assert.strictEqual(orders.length, 2, '兵数がある通常の鎮圧戦は従来どおり進む');
+});
+
+// r543: 作戦決定後に兵糧が消費されても、AIは城に存在しない兵糧を戦場へ持ち出さない。
+test('r543 AI出陣は実在庫を超える兵糧を戦争準備へ渡さず、0なら中止する', () => {
+    const orders = [];
+    let finished = 0;
+    const general = { id: 1, name: '総大将', clan: 1, intelligence: 75, leadership: 75, strength: 75 };
+    const source = {id: 10, ownerClan: 1, soldiers: 1000, rice: 120, horses: 0, guns: 0};
+    const target = {id: 11, ownerClan: 2};
+    const ctx = createContext({
+        BushoStatusRules: {isActive: () => true},
+        MapGraphService: {isSeaRoute: () => false},
+        TroopAllocationService: {clampArmySoldiers: (requested, people, stock) => Math.max(0, Math.min(Number(requested), Number(stock), people.length * 1000))}
+    });
+    loadScript(ctx, 'js/ai.js');
+    const game = {
+        getCastleBushos: () => [general],
+        getCastle: () => target,
+        warPreparationController: {checkReinforcementAndStartWar: (...args) => orders.push(['daimyo', args])},
+        kunishuSystem: {executeKunishuSubjugate: (...args) => orders.push(['kunishu', args])},
+        finishTurn() {finished++;}
+    };
+    const ai = new (vm.runInContext('AIEngine', ctx))(game);
+    ai.executeAttack(source, target, general, 800, 2000, { type: '攻撃' });
+    assert.strictEqual(orders.length, 1, '実兵糧が残る場合は通常攻撃を継続する');
+    assert.strictEqual(orders[0][1][4], 120, '通常攻撃では現在の実在庫しか持ち出さない');
+    ai.executeKunishuSubjugateAI(source, {id: 7, castleId: 11}, general, 800, 2000);
+    assert.strictEqual(orders.length, 2, '実兵糧が残る場合は鎮圧戦を継続する');
+    assert.strictEqual(orders[1][1][4], 120, '諸勢力鎮圧でも現在の実在庫しか持ち出さない');
+    source.rice = 0;
+    ai.executeAttack(source, target, general, 800, 2000, { type: '攻撃' });
+    ai.executeKunishuSubjugateAI(source, {id: 7, castleId: 11}, general, 800, 2000);
+    assert.strictEqual(orders.length, 2, '0兵糧で新たな開戦を始めない');
+    assert.strictEqual(finished, 2, '0兵糧の場合もAIターンを正常終了する');
+});
+
+
+// r544: AI作戦は商人勢力を鎮圧目標に含めず、実行時もKunishuSystemを正本にする。
+test('r544 AI作戦候補では商人勢力を鎮圧対象に入れない', async () => {
+    const ctx = createContext({
+        document: {body: {classList: {contains: () => true}}},
+        MainParams: {StartYear: 1570, StartMonth: 1}
+    });
+    loadScript(ctx, 'js/ai_operation.js');
+    const castle = {id: 10, ownerClan: 1, legionId: 0, castellanId: 1, provinceId: 1, adjacentCastleIds: []};
+    const general = {id: 1, isActionDone: false};
+    const merchant = {id: 901, ideology: '商人', getRelation: () => 0, getName: () => '京町衆'};
+    const fighters = {id: 902, ideology: '地縁', getRelation: () => 0, getName: () => '国衆'};
+    const halt = new Error('candidate capture completed');
+    let seen = null;
+    const game = {
+        gameStartYear: 1570, gameStartMonth: 1, year: 1570, month: 4,
+        clans: [{id: 1}], provinces: [], playerClanId: 99,
+        getClanCastles: () => [castle], getCastle: () => castle, getBusho: () => general,
+        kunishuSystem: {
+            getKunishusInCastle: () => [merchant, fighters],
+            getSubjugationEligibility: (k, clanId, origin, connected) => ({
+                eligible: k.ideology !== '商人' && clanId === 1 && origin === castle && connected.has(castle.id)
+            })
+        },
+        aiEngine: {decideAttackTarget(origin, leader, enemies) {seen = enemies; throw halt;}}
+    };
+    const manager = new (vm.runInContext('AIOperationManager', ctx))(game);
+    try { await manager.generateOperation(1, 0); } catch (error) { if (error !== halt) throw error; }
+    assert.ok(seen, '到達済み拠点の諸勢力候補を収集できる');
+    assert.deepStrictEqual(Array.from(seen.filter(e => e.isKunishuTarget).map(e => e.kunishu.id)), [902], '商人だけを除外し戦闘対象の諸勢力は残す');
+});
+
+test('r544 AI出陣直前も商人勢力の鎮圧可否を専門部署で再確認する', async () => {
+    const ctx = createContext({
+        BushoStatusRules: {isActive: () => true},
+        MapGraphService: {isReachable: () => true},
+        AIParams: {AI: {Difficulty: 'normal', AbilityBase: 50, AbilitySensitivity: 1}},
+        setTimeout: (fn) => {fn(); return 1;}
+    });
+    loadScript(ctx, 'js/ai.js');
+    const castle = {id: 10, ownerClan: 1, legionId: 0, castellanId: 1, provinceId: 1};
+    const general = {id: 1, name: '城主', clan: 1, isActionDone: false, intelligence: 90};
+    const merchant = {id: 901, castleId: 10, ideology: '商人', isDestroyed: false, getRelation: () => 0};
+    const operations = {1: {0: {type: '攻撃', status: '実行中', stagingBase: 10, isKunishuTarget: true, targetId: 901, requiredForce: 500, requiredRice: 1000}}};
+    let dispatches = 0;
+    let finishes = 0;
+    let newPlans = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 4, currentIndex: 0, turnQueue: [castle], playerClanId: 99,
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: () => true},
+        updateClanPrestige: () => {}, getBusho: () => general, getCastle: () => castle,
+        aiStaffing: {relocateDaimyo: () => false}, affiliationSystem: {appointAIGunshi() {}},
+        aiOperationManager: {operations, async generateOperation() {newPlans++;}},
+        kunishuSystem: {
+            getKunishu: () => merchant,
+            getSubjugationEligibility: (k) => ({eligible: k.ideology !== '商人', targetCastle: castle})
+        },
+        getProvince: () => null,
+        finishTurn() {finishes++;}
+    };
+    const ai = new (vm.runInContext('AIEngine', ctx))(game);
+    ai.executeKunishuSubjugateAI = () => {dispatches++;};
+    ai.execInternalAffairs = async () => {};
+    await ai.execAI(castle);
+    assert.strictEqual(dispatches, 0, '商人勢力を鎮圧へ渡さない');
+    assert.strictEqual(newPlans, 1, '実行前に不適格化した攻撃作戦を再立案する');
+    assert.strictEqual(finishes, 1, '不適格ならその拠点ターンは通常どおり完了する');
+
+    merchant.ideology = '地縁';
+    operations[1][0] = {type: '攻撃', status: '実行中', stagingBase: 10, isKunishuTarget: true, targetId: 901, requiredForce: 500, requiredRice: 1000};
+    await ai.execAI(castle);
+    assert.strictEqual(dispatches, 1, '鎮圧可能な諸勢力への通常攻撃は維持する');
+    assert.strictEqual(newPlans, 1, '有効な攻撃を勝手に再立案しない');
+    assert.strictEqual(finishes, 1, '出陣準備への引き渡し中にAIターンを二重終了しない');
+});
+
+// r545: 旧シナリオで中断されたAI作戦会議は、新しいゲーム/ターンへ結果を書かない。
+test('r545 旧シナリオのAI作戦生成は非同期再開後に新ゲームへ混入しない', async () => {
+    const delayed = [];
+    const ctx = createContext({
+        setTimeout: resolve => { delayed.push(resolve); },
+        document: {body: {classList: {contains: () => false}}},
+        MainParams: {StartYear: 1570, StartMonth: 1}
+    });
+    loadScript(ctx, 'js/ai_operation.js');
+    const castles = Array.from({length: 4}, (_, index) => ({
+        id: index + 10, ownerClan: 1, legionId: 0, castellanId: 1, provinceId: 1,
+        adjacentCastleIds: [], soldiers: 1000
+    }));
+    let generation = 1;
+    const game = {
+        phase: 'game', gameStartYear: 1570, gameStartMonth: 1, year: 1570, month: 4,
+        playerClanId: 99, clans: [{id: 1}], provinces: [],
+        kunishuSystem: {getKunishusInCastle: () => []},
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: value => value === generation
+        },
+        getClanCastles: () => castles,
+        getCastle: id => castles.find(c => c.id === id),
+        getRelation: () => null,
+        getBusho: () => ({id: 1, name: '城主', isActionDone: false}),
+        getClan: () => ({id: 1, name: '大名家'}),
+        getClanDaimyo: () => ({id: 1, name: '当主', intelligence: 75})
+    };
+    const manager = new (vm.runInContext('AIOperationManager', ctx))(game);
+    manager.operations[1] = {};
+    const oldPlanning = manager.generateOperation(1, 0);
+    assert.strictEqual(delayed.length, 1, 'スマホでは4拠点ごとに作戦生成を中断する');
+    manager.resetAllState();
+    manager.operations[1] = {}; // 新シナリオの作戦保存先
+    generation++;
+    delayed.shift()();
+    await oldPlanning;
+    assert.deepStrictEqual(Object.keys(manager.operations[1]), [], '旧ゲームの遅延作戦は新保存先へ書かない');
+
+    const validPlanning = manager.generateOperation(1, 0);
+    assert.strictEqual(delayed.length, 1, '現行シナリオの作戦も同じ非同期経路を使う');
+    delayed.shift()();
+    await validPlanning;
+    assert.strictEqual(manager.operations[1][0]?.type, '内政', '現行作戦は従来どおり正常に生成する');
+});
+
+test('r545 同一作戦保存先でも旧ターン世代の作戦生成は確定しない', async () => {
+    const delayed = [];
+    const ctx = createContext({
+        setTimeout: resolve => { delayed.push(resolve); },
+        document: {body: {classList: {contains: () => false}}},
+        MainParams: {StartYear: 1570, StartMonth: 1}
+    });
+    loadScript(ctx, 'js/ai_operation.js');
+    const castles = Array.from({length: 4}, (_, index) => ({
+        id: index + 1, ownerClan: 1, legionId: 0, castellanId: 1, provinceId: 1,
+        adjacentCastleIds: [], soldiers: 1000
+    }));
+    let generation = 1;
+    const game = {
+        phase: 'game', gameStartYear: 1570, gameStartMonth: 1, year: 1570, month: 4,
+        playerClanId: 99, clans: [{id: 1}], provinces: [],
+        kunishuSystem: {getKunishusInCastle: () => []},
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: value => value === generation
+        },
+        getClanCastles: () => castles,
+        getCastle: id => castles.find(c => c.id === id),
+        getRelation: () => null,
+        getBusho: () => ({id: 1, name: '城主', isActionDone: false}),
+        getClan: () => ({id: 1, name: '大名家'}),
+        getClanDaimyo: () => ({id: 1, name: '当主', intelligence: 75})
+    };
+    const manager = new (vm.runInContext('AIOperationManager', ctx))(game);
+    manager.operations[1] = {};
+    const oldPlanning = manager.generateOperation(1, 0);
+    generation++;
+    delayed.shift()();
+    await oldPlanning;
+    assert.deepStrictEqual(Object.keys(manager.operations[1]), [], 'ターン世代が失効すれば作戦を記録しない');
+});
+
+test('r545 観戦解除後に再開したAI直轄軍団の旧作戦を復活させない', async () => {
+    const delayed = [];
+    const ctx = createContext({
+        setTimeout: resolve => { delayed.push(resolve); },
+        document: {body: {classList: {contains: () => false}}},
+        MainParams: {StartYear: 1570, StartMonth: 1}
+    });
+    loadScript(ctx, 'js/ai_operation.js');
+    const castles = Array.from({length: 4}, (_, index) => ({
+        id: index + 10, ownerClan: 1, legionId: 0, castellanId: 1, provinceId: 1,
+        adjacentCastleIds: [], soldiers: 1000
+    }));
+    const game = {
+        phase: 'game', isWatchMode: true, gameStartYear: 1570, gameStartMonth: 1,
+        year: 1570, month: 4, playerClanId: -100,
+        clans: [{id: 1}], legions: [], provinces: [],
+        getLegionByClanNo: () => null,
+        kunishuSystem: {getKunishusInCastle: () => []},
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: () => true},
+        getClanCastles: () => castles,
+        getCastle: id => castles.find(c => c.id === id),
+        getRelation: () => null,
+        getBusho: () => ({id: 1, name: '城主', isActionDone: false}),
+        getClan: () => ({id: 1, name: '大名家'}),
+        getClanDaimyo: () => ({id: 1, name: '当主', intelligence: 75})
+    };
+    const manager = new (vm.runInContext('AIOperationManager', ctx))(game);
+    manager.operations[1] = {};
+    const oldPlanning = manager.generateOperation(1, 0);
+    assert.strictEqual(delayed.length, 1, '観戦中はAI作戦生成が非同期分割される');
+    game.isWatchMode = false;
+    game.playerClanId = 1;
+    manager.onClanBecamePlayerControlled(1);
+    delayed.shift()();
+    await oldPlanning;
+    assert.ok(!manager.operations[1]?.[0], '観戦解除後のプレイヤー直轄にAI作戦が復活しない');
+});
+
+// r546: 軍団解散ではTurnManagerの世代が変わらない。分割待機中の旧軍団計画を復活させない。
+test('r546 軍団解散後に再開した作戦生成は旧軍団の計画を復活させない', async () => {
+    for (const hasOtherLegionPlan of [false, true]) {
+        const pending = [];
+        const ctx = createContext({
+            setTimeout: resolve => pending.push(resolve),
+            document: {body: {classList: {contains: () => false}}},
+            MainParams: {StartYear: 1570, StartMonth: 1},
+            BushoStatusRules: {isActive: () => true}
+        });
+        loadScript(ctx, 'js/ai_operation.js');
+        loadScript(ctx, 'js/castle_manager.js');
+        const castles = Array.from({length: 4}, (_, i) => ({
+            id: i + 10, ownerClan: 1, legionId: 2, castellanId: 10,
+            provinceId: 1, adjacentCastleIds: [], soldiers: 1000
+        }));
+        const legion = {id: 12, clanId: 1, legionNo: 2, commanderId: 10};
+        const commander = {id: 10, name: '軍団長', clan: 1, isActionDone: false};
+        const replacement = {id: 11, name: '新軍団長', clan: 1, isActionDone: false};
+        const game = {
+            castles, legions: [legion], phase: 'game', playerClanId: 99,
+            gameStartYear: 1570, gameStartMonth: 1, year: 1570, month: 4,
+            clans: [{id: 1}], provinces: [],
+            turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: () => true},
+            getClanCastles: id => castles.filter(c => c.ownerClan === id),
+            getCastle: id => castles.find(c => c.id === id),
+            getBusho: id => id === 10 ? commander : (id === 11 ? replacement : undefined),
+            getLegionByClanNo: (id, no) => id === 1 && no === 2 ? legion : null,
+            getClan: () => ({id: 1, name: '勢力'}),
+            getClanDaimyo: () => ({id: 10, intelligence: 75, name: '当主'}),
+            getRelation: () => null,
+            kunishuSystem: {getKunishusInCastle: () => []}
+        };
+        const Manager = vm.runInContext('AIOperationManager', ctx);
+        const Castle = vm.runInContext('CastleManager', ctx);
+        const manager = new Manager(game);
+        game.aiOperationManager = manager;
+        manager.operations[1] = {2: {type: '内政', maxTurns: 1}};
+        if (hasOtherLegionPlan) manager.operations[1][0] = {type: '内政', maxTurns: 1};
+        const original = manager.generateOperation(1, 2);
+        assert.strictEqual(pending.length, 1, '旧軍団の作戦生成が一度中断する');
+        new Castle(game).disbandLegion(12);
+        if (hasOtherLegionPlan) {
+            // 他軍団の作戦箱を維持したまま、同じ軍団Noへ別国主を再任命する。
+            legion.commanderId = 11;
+            castles.forEach(c => { c.legionId = 2; });
+        }
+        pending.shift()();
+        await original;
+        assert.strictEqual(manager.operations[1]?.[2], undefined,
+            '軍団を解散しても、同じターンで旧軍団の作戦を再作成しない');
+        if (hasOtherLegionPlan) {
+            assert.strictEqual(manager.operations[1][0].type, '内政', '別軍団の作戦は保持する');
+        }
+        if (!hasOtherLegionPlan) {
+            assert.ok(castles.every(c => c.legionId === 0), '拠点の直轄への返還は正規窓口のまま');
+        }
+    }
+});
+
+test('r546 月次作戦生成の待機中に解散した軍団の徴兵拠点は復活させない', async () => {
+    let resumePlanning;
+    const ctx = createContext({
+        setTimeout: resolve => resolve(),
+        document: {body: {classList: {contains: () => true}}},
+        BushoStatusRules: {isActive: () => true},
+        MapGraphService: {getReachableTerritory: (_game, castle) => ({myCastles: [castle], enemyCastles: []})}
+    });
+    loadScript(ctx, 'js/ai_operation.js');
+    loadScript(ctx, 'js/castle_manager.js');
+    const castles = [{id: 21, ownerClan: 1, legionId: 2, castellanId: 10, adjacentCastleIds: []}];
+    const legion = {id: 12, clanId: 1, legionNo: 2, commanderId: 10};
+    const game = {
+        phase: 'game', year: 1570, month: 1, playerClanId: 99,
+        castles, legions: [legion], clans: [{id: 1}],
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: () => true},
+        getClanCastles: id => castles.filter(c => c.ownerClan === id),
+        getBusho: () => ({id: 10, clan: 1, name: '軍団長'}),
+        getLegionByClanNo: () => legion,
+        getClan: () => ({id: 1, name: '勢力'}),
+        getClanDaimyo: () => ({id: 10, intelligence: 70, duty: 50}),
+        getRelation: () => null,
+        aiEngine: {getClanPrestige: () => 100, getAISmartness: () => 0.5}
+    };
+    const manager = new (vm.runInContext('AIOperationManager', ctx))(game);
+    game.aiOperationManager = manager;
+    const draftRequests = [];
+    manager.selectDraftBase = (clanId, legionId) => draftRequests.push([clanId, legionId]);
+    manager.generateOperation = () => new Promise(resolve => { resumePlanning = resolve; });
+    const monthly = manager.processMonthlyOperations();
+    for (let i = 0; i < 5 && !resumePlanning; i++) await Promise.resolve();
+    assert.strictEqual(typeof resumePlanning, 'function', '軍団の作戦生成待機まで到達する');
+    new (vm.runInContext('CastleManager', ctx))(game).disbandLegion(12);
+    resumePlanning();
+    await monthly;
+    assert.deepStrictEqual(draftRequests, [], '解散済み軍団の旧徴兵拠点を選び直さない');
+    assert.ok(!manager.draftBases[1]?.[2], '削除済み徴兵計画を残さない');
+});
+
+// r547: ターン世代が同じでも、前月のAI予約と非同期AI思考を次月へ再開しない。
+test('r547 AIのイベント待機中に月が進んだら同一拠点・同一位置でも旧ターンを完了しない', async () => {
+    const ctx = createContext({setTimeout: resolve => resolve()});
+    loadScript(ctx, 'js/ai.js');
+    const castle = {id: 1, ownerClan: 1, legionId: 0, castellanId: 2};
+    let releaseEvent;
+    let eventStarted = false;
+    let prestigeUpdates = 0;
+    let turnFinishes = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 4,
+        currentIndex: 0, turnQueue: [castle], playerClanId: 99,
+        turnManager: {captureTurnFlowGeneration: () => 5, isTurnFlowGenerationCurrent: n => n === 5},
+        eventManager: {processEvents() {eventStarted = true; return new Promise(resolve => {releaseEvent = resolve;});}},
+        getBusho: () => ({id: 2, isActionDone: true}),
+        updateClanPrestige: () => prestigeUpdates++,
+        finishTurn: () => turnFinishes++
+    };
+    const ai = new (vm.runInContext('AIEngine', ctx))(game);
+    const oldTurn = ai.execAI(castle);
+    for (let i = 0; i < 5 && !eventStarted; i++) await Promise.resolve();
+    assert.strictEqual(eventStarted, true, 'イベント処理のawaitまで到達する');
+    game.month = 5;
+    releaseEvent();
+    await oldTurn;
+    assert.strictEqual(prestigeUpdates, 0, '旧月のAI判断は現在の勢力値を再更新しない');
+    assert.strictEqual(turnFinishes, 0, '旧月のAI判断は現月の拠点ターンを終了しない');
+});
+
+test('r547 同じ年月のAIイベント待機は通常どおりターン完了できる', async () => {
+    const ctx = createContext({setTimeout: resolve => resolve()});
+    loadScript(ctx, 'js/ai.js');
+    const castle = {id: 1, ownerClan: 1, legionId: 0, castellanId: 2};
+    let releaseEvent;
+    let finishes = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 4,
+        currentIndex: 0, turnQueue: [castle], playerClanId: 99,
+        turnManager: {captureTurnFlowGeneration: () => 5, isTurnFlowGenerationCurrent: n => n === 5},
+        eventManager: {processEvents() {return new Promise(resolve => {releaseEvent = resolve;});}},
+        getBusho: () => ({id: 2, isActionDone: true}),
+        updateClanPrestige() {}, finishTurn: () => finishes++
+    };
+    const ai = new (vm.runInContext('AIEngine', ctx))(game);
+    const turn = ai.execAI(castle);
+    for (let i = 0; i < 5 && !releaseEvent; i++) await Promise.resolve();
+    releaseEvent();
+    await turn;
+    assert.strictEqual(finishes, 1, '年月が変わらなければ既存の終了処理を維持する');
+});
+
+test('r547 前月のAI開始予約は同じturnQueue位置と拠点でも現月に実行しない', async () => {
+    const timers = [];
+    const ctx = createContext({setTimeout: fn => {timers.push(fn); return timers.length;}});
+    loadScript(ctx, 'js/turn_manager.js');
+    const castle = {id: 1, ownerClan: 1};
+    let execCount = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 12, currentIndex: 0,
+        turnQueue: [castle], warManager: {state: {active: false}},
+        ui: {aiGuard: null, updateAIProgress() {}},
+        aiEngine: {async execAI() {execCount++;}}
+    };
+    const turn = new (vm.runInContext('TurnManager', ctx))(game);
+    turn._scheduleAITurn(castle);
+    assert.strictEqual(timers.length, 1);
+    game.month = 1;
+    game.year = 1571;
+    await timers[0]();
+    assert.strictEqual(execCount, 0, '旧年のAI予約を新年に転用しない');
+});
+
+test('r547 前月の共通ターン継続予約は同じ拠点・位置の翌月処理へ流入しない', () => {
+    const timers = [];
+    const ctx = createContext({setTimeout: fn => {timers.push(fn); return timers.length;}});
+    loadScript(ctx, 'js/turn_manager.js');
+    const castle = {id: 1};
+    let calls = 0;
+    const game = {phase: 'game', isRestoringSave: false, year: 1570, month: 4,
+        currentIndex: 0, turnQueue: [castle]};
+    const manager = new (vm.runInContext('TurnManager', ctx))(game);
+    manager.scheduleTurnFlowContinuation(() => calls++, 0, {expectedIndex: 0, expectedCastle: castle});
+    assert.strictEqual(timers.length, 1);
+    game.month = 5;
+    timers[0]();
+    assert.strictEqual(calls, 0, '翌月へ同じ拠点・キュー位置が戻っても旧継続を実行しない');
+    manager.scheduleTurnFlowContinuation(() => calls++, 0, {expectedIndex: 0, expectedCastle: castle});
+    timers[1]();
+    assert.strictEqual(calls, 1, '現月で予約された継続は通常どおり実行する');
+});
+
+test('r547 AI実行の遅延例外は同じ拠点でも翌月のターンを終了しない', async () => {
+    const timers = [];
+    const ctx = createContext({
+        setTimeout: fn => {timers.push(fn); return timers.length;},
+        console: {...console, error() {}}
+    });
+    loadScript(ctx, 'js/turn_manager.js');
+    const castle = {id: 1, ownerClan: 1};
+    let rejectAI;
+    let finishes = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 4, currentIndex: 0,
+        turnQueue: [castle], warManager: {state: {active: false}},
+        ui: {aiGuard: null, updateAIProgress() {}},
+        aiEngine: {execAI() {return new Promise((resolve, reject) => {rejectAI = reject;});}},
+        finishTurn() {finishes++;}
+    };
+    const turn = new (vm.runInContext('TurnManager', ctx))(game);
+    turn._scheduleAITurn(castle);
+    const inFlight = timers[0]();
+    game.month = 5;
+    rejectAI(new Error('旧AI側の遅延例外'));
+    await inFlight;
+    assert.strictEqual(finishes, 0, '前月の遅延エラーで翌月のターンを飛ばさない');
+});
+
+
+// r548: 待機中の通常ターンが別月へ流入した場合は旧画面・旧月末を復活させない。
+test('r548 月末の会話待ち中に年月が変わっても旧processTurnから二重に月末処理しない', async () => {
+    const ctx = createContext({setTimeout, clearTimeout, Promise});
+    loadScript(ctx, 'js/turn_manager.js');
+    let releaseDialogs;
+    let endMonthCalls = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 12,
+        currentIndex: 1, turnQueue: [{id: 1}], isProcessingAI: false,
+        selectionMode: null, warManager: {state: {active: false}},
+        ui: {waitForDialogs: () => new Promise(resolve => {releaseDialogs = resolve;})},
+        writeSystemDiagnostic() {},
+        async endMonth() {endMonthCalls++;}
+    };
+    const manager = new ctx.TurnManager(game);
+    const oldTurn = manager.processTurn();
+    game.year = 1571;
+    game.month = 1;
+    releaseDialogs();
+    await oldTurn;
+    assert.strictEqual(endMonthCalls, 0, '旧月末の待機が新月のendMonthを起動しない');
+});
+
+test('r548 直轄拠点の会話待ち中に月が変わっても旧ターン開始画面を出さない', async () => {
+    const ctx = createContext({document: {body: {classList: new FakeClassList(['is-pc'])}}});
+    loadScript(ctx, 'js/turn_manager.js');
+    let releaseDialogs;
+    let dialogs = 0;
+    const castle = {id: 2, ownerClan: 1, isDone: false, isDelegated: false};
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 4,
+        currentIndex: 0, turnQueue: [castle], playerClanId: 1,
+        selectionMode: null, isProcessingAI: false, hasAutoSavedThisMonth: true,
+        warManager: {state: {active: false}},
+        getClan: () => ({id: 1}), writeSystemDiagnostic() {},
+        ui: {
+            waitForDialogs: () => new Promise(resolve => {releaseDialogs = resolve;}),
+            aiGuard: {classList: new FakeClassList()}, renderMap() {}, scrollToActiveCastle() {},
+            showTurnStartDialog() {dialogs++;}
+        }
+    };
+    const manager = new ctx.TurnManager(game);
+    const pending = manager.processTurn();
+    game.month = 5;
+    releaseDialogs();
+    await pending;
+    assert.strictEqual(dialogs, 0, '旧月の待機から直轄拠点の開始会話を出さない');
+});
+
+test('r548 直轄拠点のオートセーブ待ち中に月が変わっても旧UIを再表示しない', async () => {
+    const ctx = createContext({document: {body: {classList: new FakeClassList(['is-pc'])}}});
+    loadScript(ctx, 'js/turn_manager.js');
+    let releaseSave;
+    let dialogs = 0;
+    const castle = {id: 2, ownerClan: 1, isDone: false, isDelegated: false};
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 4,
+        gameStartYear: 1570, gameStartMonth: 1,
+        currentIndex: 0, turnQueue: [castle], playerClanId: 1,
+        selectionMode: null, isProcessingAI: false, hasAutoSavedThisMonth: false,
+        warManager: {state: {active: false}},
+        getClan: () => ({id: 1}), writeSystemDiagnostic() {},
+        executeAutoSave: () => new Promise(resolve => {releaseSave = resolve;}),
+        ui: {
+            waitForDialogs: async () => {},
+            aiGuard: {classList: new FakeClassList()}, renderMap() {}, scrollToActiveCastle() {},
+            showTurnStartDialog() {dialogs++;}
+        }
+    };
+    const manager = new ctx.TurnManager(game);
+    const pending = manager.processTurn();
+    for (let i = 0; i < 4 && !releaseSave; i++) await Promise.resolve();
+    assert.strictEqual(typeof releaseSave, 'function', 'オートセーブのPromiseまで到達');
+    game.month = 5;
+    releaseSave();
+    await pending;
+    assert.strictEqual(dialogs, 0, '旧月から復帰して新月の画面を上書きしない');
+});
+
+test('r548 直轄拠点の開始・軍師コールバックも翌月へ持ち越さない', async () => {
+    const ctx = createContext({document: {body: {classList: new FakeClassList(['is-pc'])}}});
+    loadScript(ctx, 'js/turn_manager.js');
+    let proceed, advice;
+    let panels = 0;
+    const castle = {id: 2, ownerClan: 1, isDone: false, isDelegated: false};
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 4,
+        currentIndex: 0, turnQueue: [castle], playerClanId: 1,
+        selectionMode: null, isProcessingAI: false, hasAutoSavedThisMonth: true,
+        warManager: {state: {active: false}},
+        getClan: () => ({id: 1}), writeSystemDiagnostic() {},
+        ui: {
+            waitForDialogs: async () => {}, aiGuard: {classList: new FakeClassList()},
+            renderMap() {}, scrollToActiveCastle() {},
+            showTurnStartDialog(_c, cb) {proceed = cb;}, showControlPanel() {panels++;}
+        },
+        gunshiSystem: {checkAndShowAdvice(_c, cb) {advice = cb;}}
+    };
+    const manager = new ctx.TurnManager(game);
+    await manager.processTurn();
+    assert.strictEqual(typeof proceed, 'function');
+    proceed();
+    assert.strictEqual(typeof advice, 'function');
+    game.month = 5;
+    await advice();
+    assert.strictEqual(panels, 0, '軍師待機後も旧月の入力を表示しない');
+});
+
+test('r548 観戦終了の非同期確認待ちを翌月のターン継続に使わない', async () => {
+    const timers = [];
+    const ctx = createContext({setTimeout: fn => {timers.push(fn); return timers.length;}, clearTimeout() {}});
+    loadScript(ctx, 'js/turn_manager.js');
+    let releaseReturn;
+    const castle = {id: 1, ownerClan: 1, isDone: false};
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 12,
+        currentIndex: 0, turnQueue: [castle], isProcessingAI: true,
+        selectionMode: null, warManager: {state: {active: false}},
+        getCurrentTurnCastle() {return this.turnQueue[this.currentIndex] || null;},
+        writeAIDiagnostic() {},
+        ui: {aiGuard: {classList: new FakeClassList()}, restoreAIGuardText() {}, clearCommandMenu() {}},
+        tryProcessQueuedWatchReturn: () => new Promise(resolve => {releaseReturn = resolve;})
+    };
+    const manager = new ctx.TurnManager(game);
+    const pending = manager.finishTurn();
+    assert.strictEqual(game.currentIndex, 1, '拠点ターンは待機前に正規終了済み');
+    game.year = 1571;
+    game.month = 1;
+    releaseReturn(false);
+    await pending;
+    assert.strictEqual(timers.length, 0, '前月のfinishTurnから新月のprocessTurnを再予約しない');
+});
+
+test('r548 年月に変更がなければ通常ターン開始と月末進行は保持する', async () => {
+    const ctx = createContext({document: {body: {classList: new FakeClassList(['is-pc'])}}});
+    loadScript(ctx, 'js/turn_manager.js');
+    let opened = 0;
+    let ended = 0;
+    const castle = {id: 10, ownerClan: 1, isDone: false, isDelegated: false};
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 5,
+        currentIndex: 0, turnQueue: [castle], playerClanId: 1,
+        selectionMode: null, isProcessingAI: false, hasAutoSavedThisMonth: true,
+        warManager: {state: {active: false}},
+        getClan: () => ({id: 1}), writeSystemDiagnostic() {},
+        ui: {waitForDialogs: async () => {}, aiGuard: {classList: new FakeClassList()},
+            renderMap() {}, scrollToActiveCastle() {}, showTurnStartDialog() {opened++;}}
+    };
+    const manager = new ctx.TurnManager(game);
+    await manager.processTurn();
+    assert.strictEqual(opened, 1);
+    game.currentIndex = 1;
+    game.endMonth = async () => {ended++;};
+    await manager.processTurn();
+    assert.strictEqual(ended, 1, '正常な月末進行は維持');
+});
+
+
+// r548: 観戦終了の安全地点判定そのものも、会話待機後は元の月とターン寿命だけに適用する。
+function createWatchSafePointFixture() {
+    const source = read('js/game.js');
+    const begin = source.indexOf('    async tryProcessQueuedWatchReturn(reason = ');
+    const end = source.indexOf('    _resetWatchReturnState()', begin);
+    assert.ok(begin > 0 && end > begin);
+    const ctx = createContext({document: {querySelector: () => null, getElementById: () => null}});
+    const SafePoint = vm.runInContext('(class WatchSafePoint {' + source.slice(begin, end) + '})', ctx);
+    const game = new SafePoint();
+    let releaseWait;
+    let showCount = 0;
+    let accepted = null;
+    const turnManager = {generation: 2, captureTurnFlowGeneration() {return this.generation;},
+        isTurnFlowGenerationCurrent(g) {return g === this.generation;}};
+    Object.assign(game, {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 4,
+        isWatchMode: true, _watchReturnRequested: true, _watchReturnInProgress: false,
+        selectionMode: null, turnManager, currentIndex: 5, turnQueue: [{id: 1}],
+        warManager: {state: {active: false}}, fieldWarManager: {active: false},
+        ui: {
+            waitForDialogs: () => new Promise(resolve => {releaseWait = resolve;}),
+            hideWatchReturnReserved() {},
+            showDialog(_message, _question, ok, no) {showCount++; accepted = {ok, no};}
+        },
+        stopWatchMode() {this.stops = (this.stops || 0) + 1;},
+        cancelQueuedWatchReturn() {this.cancels = (this.cancels || 0) + 1;}
+    });
+    return {game, turnManager, getRelease: () => releaseWait, getShowCount: () => showCount, getActions: () => accepted};
+}
+
+test('r548 観戦終了の安全地点会話待ちを旧月から復帰しても確認を出さない', async () => {
+    const f = createWatchSafePointFixture();
+    const pending = f.game.tryProcessQueuedWatchReturn('turn_complete');
+    f.game.month = 5;
+    f.getRelease()();
+    assert.strictEqual(await pending, false);
+    assert.strictEqual(f.getShowCount(), 0, '旧月の安全地点を新月へ流用しない');
+});
+
+test('r548 観戦終了の安全地点会話待ちをシナリオ世代変更後に表示しない', async () => {
+    const f = createWatchSafePointFixture();
+    const pending = f.game.tryProcessQueuedWatchReturn('month_start_complete');
+    f.turnManager.generation++;
+    f.getRelease()();
+    assert.strictEqual(await pending, false);
+    assert.strictEqual(f.getShowCount(), 0, '復元後の別の観戦へ旧確認を出さない');
+});
+
+test('r548 観戦終了の確認を開いた後に月が変わっても旧［はい／いいえ］は無効', async () => {
+    const f = createWatchSafePointFixture();
+    const pending = f.game.tryProcessQueuedWatchReturn('turn_complete');
+    f.getRelease()();
+    assert.strictEqual(await pending, true);
+    f.game.month = 5;
+    f.getActions().ok();
+    f.getActions().no();
+    assert.strictEqual(f.game.stops || 0, 0, '旧確認から新月の観戦を終了しない');
+    assert.strictEqual(f.game.cancels || 0, 0, '旧確認から新月の観戦継続を再予約しない');
+});
+
+test('r548 現月での観戦終了予約は従来の安全地点ダイアログを維持する', async () => {
+    const f = createWatchSafePointFixture();
+    const pending = f.game.tryProcessQueuedWatchReturn('turn_complete');
+    f.getRelease()();
+    assert.strictEqual(await pending, true);
+    assert.strictEqual(f.getShowCount(), 1);
+    f.getActions().ok();
+    assert.strictEqual(f.game.stops, 1);
 });
 
 Promise.all(pendingTests).then(() => {
