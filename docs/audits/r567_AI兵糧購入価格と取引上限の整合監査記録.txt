@@ -1,0 +1,30 @@
+戦国覇道 r567 — AI兵糧購入代金・取引上限の整合監査
+
+【正本と監査範囲】
+r566完全版を正本とし、ARCHITECTURE.mdおよびEconomyRulesの相場規定を確認した。
+AIの内政行動・輸送・資源変更を横断確認し、再現できた価格換算の不整合だけを修正する。
+
+【確認した不具合】
+EconomyRules.getRiceActualRate()のactualRateは「金1で得られる兵糧量」である。
+正規のプレイヤー取引では兵糧1000・相場2.0なら金500を消費する。
+AIのbuy_riceは購入候補量を availableGold×actualRate で求める一方、
+確定時に Math.ceil(buyAmount * rate) と掛け算して金とtradeLimitを引いていた。
+このため相場2.0では金2000を請求するなど、計画と実行が不一致になり、
+城の金や取引枠が過剰に減り、条件次第では負数になる経路があった。
+
+【改修】
+AIEngine._executeRicePurchase()でEconomyRules.calcTradeCostAndRate('buy_rice',...)の
+確定代金を取得し、現在の金・AI利用可能金・取引枠・兵糧上限を再検査して
+原子的に金・兵糧・取引枠を書き換える。
+候補スコア、買い付け目標量、相場の割引・売却処理、輸送、ゲームバランスは維持する。
+
+【再現・検証】
+追加テスト3件は修正前のr566コードで全件失敗した。
+修正後は相場2.0の金500の支出、商人割引時の金450の支出、
+利用可能金・取引枠・兵糧上限による拒否と、通常回帰テストを確認した。
+
+【変更】
+追加：docs/audits/r567_AI兵糧購入価格と取引上限の整合監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/ai.js、js/config.js、tests/run_tests.js
+削除：なし
+管理用Excel、BIN、画像、音声、セーブ形式は変更していない。

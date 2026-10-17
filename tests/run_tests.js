@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r566');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r567');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -23647,6 +23647,59 @@ test('r566 国主居城移転でも委任城の武将移動不可を守り、他
     const ai=fixture(99);
     assert.strictEqual(ai.staffing.relocateDaimyo(ai.from,ai.leader),true,'他家AIの居城移転は設定に拘束されない');
     assert.strictEqual(ai.leader.castleId,2);
+});
+
+
+// r567: AIの兵糧購入もEconomyRulesの「金1=兵糧X」換算を用いる。
+// AI側の取引実行は同じ資源の残高/取引枠を直接変えるので、実額と上限を確認する。
+test('r567 AI兵糧購入は経済ルールの実額で金・取引枠を減らす', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/economy_rules.js');
+    loadScript(ctx, 'js/ai.js');
+    const castle = {ownerClan:1, provinceId:1, gold:2000, rice:1000, tradeLimit:1000};
+    const game = {provinces:[{id:1, marketRate:2.0}],
+        kunishuSystem:{getAliveKunishus(){return [];}}};
+    const engine = new (vm.runInContext('AIEngine', ctx))(game);
+    assert.strictEqual(engine._executeRicePurchase(castle, 1000, 1000), true);
+    assert.strictEqual(castle.gold, 1500, '相場2.0なら兵糧1000の購入代金は金500');
+    assert.strictEqual(castle.tradeLimit, 500, '取引枠も金500だけ消費');
+    assert.strictEqual(castle.rice, 2000);
+});
+
+test('r567 AI兵糧購入は商人割引と利用可能金・取引枠・米上限を守る', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/economy_rules.js');
+    loadScript(ctx, 'js/ai.js');
+    const castle = {ownerClan:1, provinceId:1, gold:1000, rice:3000, tradeLimit:600};
+    const game = {provinces:[{id:1, marketRate:2.0}],
+        kunishuSystem:{getAliveKunishus(){return [
+            {ideology:'商人', getRelation(){return 100;}}
+        ];}}};
+    const engine = new (vm.runInContext('AIEngine', ctx))(game);
+    const cost = ctx.EconomyRules.calcTradeCostAndRate('buy_rice', 1000, castle, null, null, game.provinces, game).cost;
+    assert.strictEqual(cost, 450);
+    assert.strictEqual(engine._executeRicePurchase(castle,1000,449),false,'AIの利用可能金を超える場合は中止');
+    assert.strictEqual(castle.gold,1000);
+    castle.tradeLimit = 449;
+    assert.strictEqual(engine._executeRicePurchase(castle,1000,1000),false,'取引枠を超える場合は中止');
+    castle.tradeLimit = 600;
+    assert.strictEqual(engine._executeRicePurchase(castle,1000,1000),true);
+    assert.strictEqual(castle.gold,550);
+    assert.strictEqual(castle.tradeLimit,150);
+    assert.strictEqual(castle.rice,4000);
+    assert.strictEqual(engine._executeRicePurchase(castle,400,1000),false,'残りの取引枠と購入単価を照合');
+    assert.strictEqual(castle.gold,550);
+    castle.rice=99999;
+    assert.strictEqual(engine._executeRicePurchase(castle,1,1000),false,'保有量上限を超えない');
+});
+
+test('r567 AI購入本体は正規の金額計算を使い旧式の掛け算を残さない', () => {
+    const source=read('js/ai.js');
+    assert.ok(source.includes('this._executeRicePurchase(castle, buyAmount, availableGold)'));
+    assert.match(source, /EconomyRules\.calcTradeCostAndRate\(\s*'buy_rice'/);
+    assert.ok(!source.includes('Math.ceil(buyAmount * rate)'));
 });
 
 Promise.all(pendingTests).then(() => {

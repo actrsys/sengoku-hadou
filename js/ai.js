@@ -53,6 +53,22 @@ class AIEngine {
         );
     }
 
+    // AIの兵糧購入も金1あたりの兵糧量をEconomyRulesで換算し、実支出を一度だけ確定する。
+    // 行動候補の計算は概算でも、資源の変更は現在の残高と取引上限を正本にする。
+    _executeRicePurchase(castle, amount, availableGold) {
+        if (!castle || !Number.isSafeInteger(amount) || amount <= 0 ||
+            !Number.isFinite(Number(castle.rice)) || castle.rice + amount > 99999) return false;
+        const {cost} = EconomyRules.calcTradeCostAndRate(
+            'buy_rice', amount, castle, null, null, this.game.provinces, this.game
+        );
+        if (!Number.isSafeInteger(cost) || cost <= 0 ||
+            cost > Math.min(availableGold, Number(castle.gold), Number(castle.tradeLimit) || 0)) return false;
+        castle.gold -= cost;
+        castle.rice += amount;
+        castle.tradeLimit -= cost;
+        return true;
+    }
+
     // ★追加：大名の威信（daimyoPrestige）を取り出す魔法です！
     getClanPrestige(clanId) {
         const numericClanId = Number(clanId);
@@ -3077,11 +3093,7 @@ class AIEngine {
                     }
 
                     // 買う量が決まったら実行します
-                    if (buyAmount > 0) {
-                        const cost = Math.ceil(buyAmount * rate); // ★変更：端数切り上げ
-                        castle.gold -= cost;
-                        castle.rice += buyAmount;
-                        castle.tradeLimit -= cost; // ★変更：減らすのは米の量ではなく「支払った金額」
+                    if (buyAmount > 0 && this._executeRicePurchase(castle, buyAmount, availableGold)) {
                         tradeCount++; step--; actionDoneInThisStep = true; break;
                     } else {
                         // 買うのをやめたら、別の行動を探します
