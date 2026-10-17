@@ -4,8 +4,16 @@
  */
 
 class AIStaffing {    
+    // プレイヤー委任城の「武将移動 不可」は、通常の配置換えにも国主居城移転にも共通で適用する。
+    // 他家AIの行動や観戦時の扱いは従来のままとする。
+    canMoveFromCastle(castle) {
+        return !!castle && (Number(castle.ownerClan) !== Number(this.game.playerClanId)
+            || !castle.isDelegated || castle.allowMove === true);
+    }
+
     // 大名や国主のお引越し先を考えます（お金や兵士の分配、お供の随伴機能付き！）
     relocateDaimyo(castle, castellan) {
+        if (!this.canMoveFromCastle(castle)) return false;
         const clanId = castle.ownerClan;
         const leader = castellan; // castellanは大名または国主です
         

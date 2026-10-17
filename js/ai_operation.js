@@ -58,6 +58,14 @@ class AIOperationManager {
         clearFrom(this.grandObjectives);
     }
 
+    // 出撃元の操作・委任設定は作戦策定と実行直前で同じ判定を使う。
+    // 他家AIの委任UI設定は判断に用いず、プレイヤーの直轄城はAIの出撃元にしない。
+    canUseAsAttackBase(castle) {
+        if (!castle) return false;
+        if (Number(castle.ownerClan) !== Number(this.game.playerClanId)) return true;
+        return castle.isDelegated === true && castle.allowAttack === true;
+    }
+
     // 評定方針に反する既存の攻撃作戦だけを即時整理します。
     // 方針の意味判定は LegionPolicySystem、作戦データの破棄は作戦専門部署で担当します。
     reconcileLegionPolicy(clanId, legionId) {
@@ -957,10 +965,8 @@ class AIOperationManager {
                 await new Promise(resolve => setTimeout(resolve, 0));
                 if (!isCurrentPlanning()) return;
             }
-            // プレイヤーの委任城で攻撃禁止なら飛ばします
-            if (clanId === this.game.playerClanId && myCastle.isDelegated && !myCastle.allowAttack) {
-                continue;
-            }
+            // 直轄城と攻撃禁止の委任城はAIの出撃元にしない。
+            if (!this.canUseAsAttackBase(myCastle)) continue;
 
             // ★出撃する自分のお城が大雪の時は、出陣できないので重い計算をスパッと飛ばします！
             if (heavySnowProvIds.has(myCastle.provinceId)) {

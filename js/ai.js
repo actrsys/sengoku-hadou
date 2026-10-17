@@ -160,7 +160,8 @@ class AIEngine {
             }
             
             // 自分の大名家に「作戦」があり、それが「攻撃」で、かつ「実行中」の場合
-            if (myOperation && myOperation.type === '攻撃' && myOperation.status === '実行中') {
+            if (myOperation && myOperation.type === '攻撃' && myOperation.status === '実行中' &&
+                this.game.aiOperationManager.canUseAsAttackBase(castle)) {
                 // そして、自分のお城がその「出撃元（stagingBase）」に選ばれている場合だけ出陣します！
                 if (myOperation.stagingBase === castle.id) {
                     if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'operation:reachability:start');
@@ -284,7 +285,8 @@ class AIEngine {
                         }
 
                         // 大雪じゃなければ、予定通り出陣します！
-                        if (!isHeavySnow) {
+                        if (!isHeavySnow && this.game.aiOperationManager.canUseAsAttackBase(castle)) {
+                            // 外交処遇のawait中に委任設定が変更されても、禁止した城から出撃しない。
                             // メモしておいたIDから、お城や諸勢力のデータを復元して出発の魔法を呼びます
                             if (myOperation.isKunishuTarget) {
                                 const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
@@ -3170,8 +3172,8 @@ class AIEngine {
                 
                 if (action.type === 'move') {
                     // ★プレイヤーの城で「武将移動 不可」の場合は、移動を中止して別の行動を探します
-                    if (Number(castle.ownerClan) === Number(this.game.playerClanId) && castle.isDelegated && !castle.allowMove) {
-                        continue; 
+                    if (!this.game.aiStaffing.canMoveFromCastle(castle)) {
+                        continue;
                     }
 
                     // 新しい人事部が選んだ「移動する人リスト（movers）」をそのまま使います！

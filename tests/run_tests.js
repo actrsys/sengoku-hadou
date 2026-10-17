@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r565');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r566');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -21734,7 +21734,7 @@ test('r544 AI出陣直前も商人勢力の鎮圧可否を専門部署で再確�
         turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: () => true},
         updateClanPrestige: () => {}, getBusho: () => general, getCastle: () => castle,
         aiStaffing: {relocateDaimyo: () => false}, affiliationSystem: {appointAIGunshi() {}},
-        aiOperationManager: {operations, async generateOperation() {newPlans++;}},
+        aiOperationManager: {operations, canUseAsAttackBase: () => true, async generateOperation() {newPlans++;}},
         kunishuSystem: {
             getKunishu: () => merchant,
             getSubjugationEligibility: (k) => ({eligible: k.ideology !== '商人', targetCastle: castle})
@@ -23524,6 +23524,129 @@ test('r565 古いフェード完了は切替済みの新BGMを停止しない', 
     old.events.fade();
     assert.strictEqual(audio.bgmPlayer, current, '古い音源のfade通知が新BGMを止めない');
     assert.strictEqual(current.unloads, 0);
+});
+
+// r566: 委任設定は月初立案だけでなく実行直前の戦闘・配置にも効く。
+test('r566 委任城の城攻め禁止は立案・出陣で同じ正規判定になり他家AIに影響しない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ai_operation.js');
+    const game = {playerClanId: 1};
+    const manager = new (vm.runInContext('AIOperationManager', ctx))(game);
+    const mine = {id: 2, ownerClan: 1, isDelegated: true, allowAttack: false};
+    assert.strictEqual(manager.canUseAsAttackBase(mine), false, 'プレイヤー委任城は攻撃禁止を優先');
+    mine.allowAttack = true;
+    assert.strictEqual(manager.canUseAsAttackBase(mine), true, '許可後は出撃元にできる');
+    mine.isDelegated = false;
+    assert.strictEqual(manager.canUseAsAttackBase(mine), false, '直轄城をAI出撃元として扱わない');
+    const enemyAI = {id: 3, ownerClan: 2, isDelegated: false, allowAttack: false};
+    assert.strictEqual(manager.canUseAsAttackBase(enemyAI), true, '他家AIにはプレイヤー委任設定を課さない');
+    assert.ok(read('js/ai_operation.js').includes('if (!this.canUseAsAttackBase(myCastle)) continue;'), '月初策定でも同じ判定を利用');
+});
+
+test('r566 月初の攻撃作戦が残っていても、委任城を城攻め禁止にした後は出撃しない', async () => {
+    const ctx = createContext({
+        MapGraphService: {isReachable: () => true},
+        AIParams: {AI: {Difficulty:'normal',AbilityBase:50,AbilitySensitivity:1}},
+        setTimeout: fn => {fn(); return 1;}
+    });
+    loadScript(ctx, 'js/ai.js');
+    loadScript(ctx, 'js/ai_operation.js');
+    const castle = {id: 10, ownerClan: 1, legionId: 1, castellanId: 101, provinceId: 1,
+        isDelegated: true, allowAttack: false, allowMove: true,
+        maxDefense: 500, defense: 500, peoplesLoyalty: 100, gold: 10000, rice: 2000};
+    const target = {id: 20, ownerClan: 2, provinceId: 1, immunityUntil: 0};
+    const general = {id: 101, clan: 1, isActionDone:false, intelligence:80};
+    const op = {type:'攻撃', status:'実行中', stagingBase:10, targetId:20,
+        isKunishuTarget:false, requiredForce:1000, requiredRice:1000};
+    let dispatches=0, domestic=0, finishes=0;
+    const game = {
+        phase:'game', isRestoringSave:false, year:1570, month:4, currentIndex:0, turnQueue:[castle], playerClanId:1,
+        turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationCurrent:()=>true},
+        updateClanPrestige(){}, getBusho:()=>general, getCastle:id=>Number(id)===10?castle:target,
+        getProvince:()=>null, getCurrentTurnId:()=>123, getRelation:()=>null,
+        aiStaffing:{relocateDaimyo:()=>false}, affiliationSystem:{appointAIGunshi(){}},
+        finishTurn(){finishes++;}
+    };
+    const manager = new (vm.runInContext('AIOperationManager', ctx))(game);
+    manager.operations = {1:{1:op}};
+    game.aiOperationManager = manager;
+    const ai = new (vm.runInContext('AIEngine',ctx))(game);
+    ai.executeAttack = () => {dispatches++;};
+    ai.execInternalAffairs = async () => {domestic++;};
+    await ai.execAI(castle);
+    assert.strictEqual(dispatches,0, '保存済み作戦があっても禁止中は出撃しない');
+    assert.strictEqual(domestic,1, '攻撃を止めたときも通常の内政を進める');
+    assert.strictEqual(finishes,1, 'ターンを放置しない');
+    assert.strictEqual(manager.operations[1][1],op,'許可変更だけで作戦を勝手に破棄しない');
+    castle.allowAttack = true;
+    await ai.execAI(castle);
+    assert.strictEqual(dispatches,1,'再許可で有効な既存作戦を実行する');
+});
+
+test('r566 外交処遇待機中に委任城を攻撃禁止にした場合も出陣直前に停止する', async () => {
+    const ctx=createContext({MapGraphService:{isReachable:()=>true},
+        AIParams:{AI:{Difficulty:'normal',AbilityBase:50,AbilitySensitivity:1}},
+        setTimeout:fn=>{fn();return 1;}});
+    loadScript(ctx,'js/ai.js');loadScript(ctx,'js/ai_operation.js');
+    const castle={id:10,ownerClan:1,legionId:1,castellanId:101,provinceId:1,
+        isDelegated:true,allowAttack:true,maxDefense:500,defense:500,peoplesLoyalty:100,gold:10000,rice:2000};
+    const target={id:20,ownerClan:2,provinceId:1,immunityUntil:0};
+    const general={id:101,clan:1,isActionDone:false,intelligence:80};
+    const operation={type:'攻撃',status:'実行中',stagingBase:10,targetId:20,isKunishuTarget:false,
+        requiredForce:1000,requiredRice:1000};
+    let release,dispatches=0,domestic=0,finishes=0;
+    const game={phase:'game',isRestoringSave:false,year:1570,month:4,currentIndex:0,turnQueue:[castle],playerClanId:1,
+        turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationCurrent:()=>true},
+        updateClanPrestige(){},getBusho:()=>general,getCastle:id=>Number(id)===10?castle:target,
+        getProvince:()=>null,getCurrentTurnId:()=>123,
+        getRelation:()=>({status:'従属',sentiment:0}),getClan:id=>({name:id===1?'我が家':'相手'}),
+        ui:{showDialog(){},log(){}},aiStaffing:{relocateDaimyo:()=>false},
+        affiliationSystem:{appointAIGunshi(){}},finishTurn(){finishes++;},
+        diplomacyManager:{applyBreakAlliancePenalty:()=>({becameHostile:true}),
+            resolveBreakAllianceConsequences:()=>new Promise(resolve=>{release=resolve;})}
+    };
+    const manager=new (vm.runInContext('AIOperationManager',ctx))(game);
+    manager.operations={1:{1:operation}};game.aiOperationManager=manager;
+    const ai=new (vm.runInContext('AIEngine',ctx))(game);
+    ai.executeAttack=()=>{dispatches++;};ai.execInternalAffairs=async()=>{domestic++;};
+    const turn=ai.execAI(castle);
+    for(let i=0;i<20&&!release;i++) await Promise.resolve();
+    assert.strictEqual(typeof release,'function','外交処遇待機まで実際に到達');
+    castle.allowAttack=false;
+    release();
+    await turn;
+    assert.strictEqual(dispatches,0,'待機開始時の許可を使い回さない');
+    assert.strictEqual(domestic,1,'禁止後は内政ターンへ戻す');
+    assert.strictEqual(finishes,1,'待機後も通常どおりターンを完了する');
+});
+
+test('r566 国主居城移転でも委任城の武将移動不可を守り、他家AIは維持する', () => {
+    const ctx = createContext({
+        BushoStatusRules:{isActive:()=>true}, DiplomacyRules:{isAllianceOrVassal:()=>false}
+    });
+    loadScript(ctx,'js/ai_staffing.js');
+    const Staffing=vm.runInContext('AIStaffing',ctx);
+    function fixture(playerId) {
+        const from = {id:1,ownerClan:2,legionId:0,provinceId:1,maxKokudaka:200,maxDefense:200,kokudaka:200,defense:200,population:30000,isDelegated:true,allowMove:false};
+        const to = {id:2,ownerClan:2,legionId:0,provinceId:1,maxKokudaka:2000,maxDefense:2000,kokudaka:2000,defense:2000,population:30000,isDelegated:true,allowMove:true};
+        const leader = {id:99,castleId:1,clan:2,isDaimyo:true,isCommander:false,factionId:0,personality:'balanced'};
+        const clan = {id:2,homeCastleId:1};
+        let moves=0;
+        const game = {playerClanId:playerId,getClan:()=>clan,getProvince:()=>null,getRelation:()=>null,
+            mapGraph:{getAdjacentCastles:c=>c.id===1?[to]:[from]},aiOperationManager:{operations:{}},
+            getCastleBushos:()=>[],affiliationSystem:{moveCastle(b,id){moves++;b.castleId=id;}}};
+        return {from,to,leader,clan,staffing:new Staffing(game),getMoves:()=>moves};
+    }
+    const mine=fixture(2);
+    assert.strictEqual(mine.staffing.relocateDaimyo(mine.from,mine.leader),false,'プレイヤー委任城からの自発的な引越を行わない');
+    assert.strictEqual(mine.leader.castleId,1);
+    assert.strictEqual(mine.getMoves(),0);
+    mine.from.allowMove=true;
+    assert.strictEqual(mine.staffing.relocateDaimyo(mine.from,mine.leader),true,'許可後は従来どおり移転できる');
+    assert.strictEqual(mine.leader.castleId,2);
+    const ai=fixture(99);
+    assert.strictEqual(ai.staffing.relocateDaimyo(ai.from,ai.leader),true,'他家AIの居城移転は設定に拘束されない');
+    assert.strictEqual(ai.leader.castleId,2);
 });
 
 Promise.all(pendingTests).then(() => {
