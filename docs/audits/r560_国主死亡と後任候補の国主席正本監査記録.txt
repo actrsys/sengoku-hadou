@@ -1,0 +1,24 @@
+戦国覇道 r560 — 国主死亡と後任候補の国主席正本監査
+
+【正本と禁則】
+r559の完全版ZIPとARCHITECTURE.mdを正本にした。軍団の在職状態はLegion.commanderId、武将.isCommanderは派生キャッシュ。個別の国主席を複数保持させず、所属・城主移動とAI計画消去は既存専門Systemの窓口を通す。ユーザー管理のExcel・BIN・戦闘・家督仕様は変更しない。
+
+【修正前の再現】
+- 軍団側には国主の席があるがisCommanderがfalseの死亡武将について、executeDeathがhandleCommanderDeathを呼ばず、死亡したIDが現職として残る。
+- 別軍団の現役国主がisCommander=falseの場合、handleCommanderDeathの候補選定で排除されず、一人が複数軍団のcommanderIdに登録される。
+- 当該軍団の後任候補が別軍団の現職者しかいない場合、解散せず二重任命される。
+r559へ追加した3件の実行テストで上記3経路の失敗を確認した。通常プレイにおける発生頻度は未確認。
+
+【改修】
+- LifeSystem._findCommanderLegion()を既存の軍団参照に基づく小さな共通問い合わせ窓口とし、executeDeathとhandleCommanderDeathで利用。該当武将の所属勢力も一致させる。
+- 候補の現職排除は全軍団のcommanderIdをSet化して実施し、active・未登場・浪人/諸勢力候補への既存条件を保つ。
+- 後任不在なら既存のCastleManager.disbandLegion()を使用。後継者が決まった場合の在城・忠誠・城主・軍団番号の既存処理は維持。
+
+【検証】
+- 修正前の再現テスト3件は失敗し、修正後に成功。版番号更新と通常回帰・表示・データ整合性・シミュレーションを確認する。
+- 実機の長時間観戦・全パターンの戦後連鎖検証は未実施。
+
+【変更】
+追加：docs/audits/r560_国主死亡と後任候補の国主席正本監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/life_system.js、tests/run_tests.js
+削除：なし

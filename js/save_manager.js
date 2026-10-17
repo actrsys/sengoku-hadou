@@ -4,7 +4,7 @@
  * GameManager は公開APIの互換窓口だけを持ち、実処理はこの部署へ委譲します。
  */
 
-const SAVE_SCHEMA_VERSION = 2;
+const SAVE_SCHEMA_VERSION = 3;
 
 class SaveManager {
     constructor(game) {
@@ -131,6 +131,12 @@ class SaveManager {
             return ids;
         };
 
+        data.castles.forEach((castle, index) => {
+            if (!(castle._delegatedOverride === null || typeof castle._delegatedOverride === 'boolean')
+                || typeof castle._allowAttack !== 'boolean' || typeof castle._allowMove !== 'boolean') {
+                fail(`castles[${index}] の委任・城攻め・武将移動設定が現行形式ではありません`);
+            }
+        });
         const castleIds = collectIds(data.castles, 'castles');
         const bushoIds = collectIds(data.bushos, 'bushos');
         const clanIds = collectIds(data.clans, 'clans');

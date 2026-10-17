@@ -556,7 +556,7 @@ class DiplomacyManager {
 
         if (playerCapturedRecords.length > 0 && this.game.warManager) {
             const playerCaptured = playerCapturedRecords.map(record => record.busho).filter(Boolean);
-            await new Promise(resolve => {
+            const prisonerResult = await new Promise(resolve => {
                 this.game.warManager.pendingPrisoners = playerCaptured;
                 this.game.warManager.pendingKills = [];
                 this.game.warManager.startPrisonerPhase({
@@ -564,6 +564,7 @@ class DiplomacyManager {
                     onComplete: resolve
                 });
             });
+            if (prisonerResult === false) return;
         }
     }
 

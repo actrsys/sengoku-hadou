@@ -8,6 +8,24 @@ class CastleManager {
     }
 
     /**
+     * 現役国主の在城地を軍団の正式な席から求める。
+     * Busho.isCommander は表示用の補助値なので、任命候補の除外条件には使用しない。
+     * 新設直後など城の軍団番号が未割当でも、現職国主が在城していれば保護する。
+     */
+    getActiveCommanderCastleIds(clanId) {
+        const numericClanId = Number(clanId);
+        const result = new Set();
+        for (const legion of this.game.legions || []) {
+            if (Number(legion.clanId) !== numericClanId || Number(legion.commanderId || 0) <= 0) continue;
+            const commander = this.game.getBusho(legion.commanderId);
+            if (!commander || Number(commander.clan) !== numericClanId) continue;
+            const castle = this.game.getCastle(commander.castleId);
+            if (castle && Number(castle.ownerClan) === numericClanId) result.add(Number(castle.id));
+        }
+        return result;
+    }
+
+    /**
      * 低レベル所有者書換API。通常の落城・譲渡は changeOwner() を使用してください。
      * 特殊なロールバックなど、changeOwner() の副作用を発生させたくない場合だけ使用します。
      * ownerClan の直接代入はこのクラス以外では行いません。
@@ -76,8 +94,13 @@ class CastleManager {
         // 調査状態などをリセットします
         castle.investigatedUntil = 0;
         
-        // ★追加：城の持ち主が変わった時は、おまかせ（委任）を必ず解除します！
-        castle.isDelegated = false;
+        // 落城・譲渡後は旧勢力の手動設定を引き継がず、新軍団番号に応じた初期委任へ戻す。
+        // 従来の実効動作（軍団領は自動委任）を維持し、攻撃・移動許可は所有者変更時だけ初期化する。
+        castle.isDelegated = Number(newLegionId) > 0;
+        if (oldOwnerId !== Number(newOwnerId)) {
+            castle.allowAttack = true;
+            castle.allowMove = true;
+        }
 
         // ★追加：旧軍団の城がゼロになったかチェックして、ゼロなら壊滅させる
         if (oldOwnerId !== 0 && oldLegionId !== 0) {

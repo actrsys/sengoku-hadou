@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r550');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r563');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6967,12 +6967,12 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     loadScript(ctx, 'js/save_manager.js');
     const manager = new ctx.SaveManager({});
     const valid = {
-        saveSchemaVersion: 2,
+        saveSchemaVersion: 3,
         saveTimestamp: 1770000000000,
         saveTime: '2026/08/25 23:30',
         year: 1560, month: 4, gameStartYear: 1560, gameStartMonth: 4,
         scenarioFolder: '1560_okehazama', scenarioName: '1560年 桶狭間の戦い', scenarioNo: 'シナリオ1',
-        castles: [{ id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [10] }],
+        castles: [{ id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [10], _delegatedOverride: null, _allowAttack: true, _allowMove: true }],
         bushos: [{ id: 10, clan: 1, castleId: 1, nemesisList: [] }],
         clans: [{ id: 1, leaderId: 10 }],
         princesses: [{ id: 90001, isDiplomaticMarriageActive: true }], provinces: [{ id: 1 }], legions: [], kunishus: [],
@@ -6980,6 +6980,9 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
         flags: {}, historyEntries: [],
         aiOperations: { operations: {}, draftBases: {}, grandObjectives: {}, historyOwnedCastles: {} }
     };
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ id: 1, samuraiIds: [10] }] }), /委任・城攻め・武将移動設定/, '設定が欠けた保存を拒否');
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ ...valid.castles[0], _allowAttack: 1 }] }), /委任・城攻め・武将移動設定/, '不正な真偽値を拒否');
+    assert.strictEqual(manager.isLoadableSaveData({ ...valid, saveSchemaVersion: 2 }), false, 'r562までの保存は現行形式として誤受理しない');
     assert.strictEqual(manager._validateSaveDataStructure(valid), true);
     assert.strictEqual(manager.isLoadableSaveData(valid), true, '現行schemaかつ厳密構造検査を通る保存だけをロード可能とする');
     assert.strictEqual(manager.isLoadableSaveData({ ...valid, saveSchemaVersion: 1 }), false, '旧schemaはキーが存在してもロード不可');
@@ -6987,7 +6990,7 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: undefined }), /非対応のセーブ形式/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: 0 }), /非対応のセーブ形式/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: 1 }), /非対応のセーブ形式/, '政治婚姻フラグ導入前のschema 1は読み込まない');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001 }] }), /isDiplomaticMarriageActive/, 'schema 2では政治婚姻フラグを明示する');
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001 }] }), /isDiplomaticMarriageActive/, 'schema 3でも政治婚姻フラグを明示する');
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, month: 13 }), /month/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 999, nemesisList: [] }] }), /castleId/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 1, nemesisIds: [] }] }), /nemesisList/);
@@ -7017,9 +7020,9 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
         { id: 10, clan: 1, castleId: 1, nemesisList: [] },
         { id: 11, clan: 2, castleId: 1, nemesisList: [] }
     ], legions: [{ id: 1, clanId: 1, legionNo: 1, commanderId: 11, establishedTurnId: 0 }] }), /所属勢力が一致/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ id: 1, ownerClan: 1, castellanId: 10 }] }), /samuraiIds/, '現行セーブでは在城名簿を明示する');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [10, 10] }] }), /重複/, '同じ城の在城名簿へ同一武将を重複させない');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [999] }] }), /参照先/, '在城名簿の不存在武将を拒否する');
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ id: 1, ownerClan: 1, castellanId: 10, _delegatedOverride: null, _allowAttack: true, _allowMove: true }] }), /samuraiIds/, '現行セーブでは在城名簿を明示する');
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ ...valid.castles[0], samuraiIds: [10, 10] }] }), /重複/, '同じ城の在城名簿へ同一武将を重複させない');
+    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ ...valid.castles[0], samuraiIds: [999] }] }), /参照先/, '在城名簿の不存在武将を拒否する');
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 0, nemesisList: [] }] }), /武将castleId/, '在城名簿と武将castleIdの食い違いを拒否する');
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, kunishus: [{ id: 1, castleId: 999, leaderId: 0, networkTag: '' }] }), /kunishus\[0\]\.castleId/);
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, kunishus: [{ id: 1, castleId: 1, leaderId: 999, networkTag: '' }] }), /leaderId/);
@@ -8863,7 +8866,7 @@ test('断交後にAIがプレイヤー人質を処遇しても元recordを保持
 
 test('不可逆な特殊処遇の処断は最終確認を挟む', () => {
     const war = read('js/war_effort.js');
-    assert.ok(war.includes("onClick: () => this.confirmDaimyoPrisonerKill(prisoner)"));
+    assert.ok(war.includes("onClick: this._guardPrisonerPhaseCallback(() => this.confirmDaimyoPrisonerKill(prisoner))"));
     assert.ok(war.includes('confirmDaimyoPrisonerKill(prisoner)'));
     assert.ok(war.includes('`${prisoner.name}を本当に処断しますか？`'));
     assert.ok(war.includes("okText: '処断する'"));
@@ -10907,9 +10910,8 @@ test('高頻度の候補探索は同値な所有集合を1回だけ共用し、�
     const kyoten = read('js/ui_info_kyoten.js');
     const selectStart = kyoten.indexOf('// ★選択モード（国主任命）');
     const selectBlock = kyoten.slice(selectStart, selectStart + 1800);
-    assert.ok(selectBlock.includes('const commanderCastleIds = new Set();'));
-    assert.ok(selectBlock.includes('this.game.bushos.forEach(b =>'));
-    assert.ok(selectBlock.includes('b.isCommander && b.clan === this.game.playerClanId'));
+    assert.ok(selectBlock.includes('const commanderCastleIds = this.game.castleManager.getActiveCommanderCastleIds(this.game.playerClanId);'));
+    assert.ok(!selectBlock.includes('this.game.bushos.forEach(b =>'), '国主在城地を全武将から独自集計しない');
     assert.ok(!selectBlock.includes('getClanBushos(this.game.playerClanId)'));
 });
 
@@ -12425,11 +12427,270 @@ test('攻城戦の援軍消滅アニメーションは固定カード再利用�
 });
 
 
+test('r555 終戦前イベント待機中の月変更で旧合戦の結果処理を行わない', async () => {
+    const context = createContext({});
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    let release;
+    let guards = 0;
+    const game = {
+        phase: 'game', year: 1560, month: 4, playerClanId: 99,
+        ui: { showMapGuard() { guards++; throw new Error('endWar entered result processing'); } },
+        eventManager: { processEvents: name => name === 'before_war_end' ? new Promise(resolve => { release = resolve; }) : Promise.resolve() }
+    };
+    const war = new WarManagerClass(game);
+    game.warManager = war;
+    war._beginWarLifecycle();
+    war.state = { active: true, attacker: { ownerClan: 1 }, defender: { ownerClan: 2 } };
+    const closed = war.waitForWarClose();
+    const task = war.endWar(true);
+    assert.equal(typeof release, 'function');
+    game.month = 5;
+    release();
+    await task.catch(() => {});
+    assert.equal(guards, 0, '旧月の結果処理へ進まない');
+    assert.equal(war.state.active, true, '旧戦闘の勝敗を新月へ確定しない');
+    assert.strictEqual(await closed, false, '鎮圧戦などの完了待機も失効通知を受ける');
+});
+
+test('r555 戦域点滅から旧シナリオに復帰しても履歴・戦後処理を進めない', async () => {
+    const context = createContext({});
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    let release, records = 0;
+    const game = {
+        phase: 'game', year: 1560, month: 4, playerClanId: 99,
+        ui: { showMapGuard() {}, restoreAIGuardText() {}, hideMapGuard() {}, playBattleBlink: () => new Promise(resolve => { release = resolve; }) },
+        getClan: () => null, finishTurn() {}
+    };
+    const war = new WarManagerClass(game);
+    game.warManager = war;
+    war._beginWarLifecycle();
+    war.canShowNotify = () => true;
+    war.recordNormalWarOutcomeHistory = () => { records++; throw new Error('old history reached'); };
+    war.state = {
+        active: true, attacker: { ownerClan: 1, isKunishu: false, name: '攻め手' },
+        defender: { id: 2, ownerClan: 2, name: '守備拠点' }, sourceCastle: { id: 1 }
+    };
+    const closed = war.waitForWarClose();
+    const task = war.endWar(false);
+    assert.equal(typeof release, 'function');
+    game.warManager = new WarManagerClass(game);
+    release(true);
+    await task;
+    assert.equal(records, 0, '旧シナリオの勝敗履歴を書き込まない');
+    assert.strictEqual(await closed, false, '旧戦争終了待ちは失効通知を受ける');
+});
+
+test('r555 戦後after_warイベントの待機中に月が変わると旧ターン復帰予約を行わない', async () => {
+    const context = createContext({});
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    let release;
+    const ui = {
+        hideMapGuard() {}, restoreAIGuardText() {}, hideAIWarThinking() {},
+        renderMap() {}, restoreAIGuard() {}, updatePanelHeader() {}, renderCommandMenu() {}
+    };
+    const game = {
+        phase: 'game', year: 1560, month: 4, playerClanId: 99, isProcessingAI: false,
+        ui, eventManager: { processEvents: name => new Promise(resolve => { release = resolve; }) },
+        affiliationSystem: { updateCastleLord() {} }
+    };
+    const war = new WarManagerClass(game);
+    game.warManager = war;
+    war._beginWarLifecycle();
+    war.state = { active: false, isPlayerInvolved: false, attacker: { ownerClan: 1 } };
+    let scheduled = 0;
+    war._scheduleWarCallback = () => { scheduled++; };
+    const closed = war.waitForWarClose();
+    const task = war.closeWar();
+    assert.equal(typeof release, 'function');
+    game.month = 5;
+    release();
+    await task;
+    assert.equal(scheduled, 0, '旧戦後から次のターンへ進む予約をしない');
+    assert.strictEqual(await closed, false, '旧戦争完了待ちは失効扱いになる');
+});
+
+test('r555 戦後100ms復帰予約は同戦争番号でも翌月なら威信とターンを動かさない', async () => {
+    let scheduled;
+    const context = createContext({ setTimeout(fn) { scheduled = fn; return 1; } });
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    let finished = 0, prestige = 0;
+    const game = {
+        phase: 'game', year: 1560, month: 4, playerClanId: 99, isProcessingAI: false,
+        ui: {
+            hideMapGuard() {}, restoreAIGuardText() {}, hideAIWarThinking() {},
+            renderMap() {}, restoreAIGuard() {}
+        },
+        updateClanPrestige() { prestige++; }, finishTurn() { finished++; }
+    };
+    const war = new WarManagerClass(game);
+    game.warManager = war;
+    war._beginWarLifecycle();
+    war.state = { active: false, isPlayerInvolved: false, attacker: { ownerClan: 1 } };
+    const closed = war.waitForWarClose();
+    await war.closeWar();
+    assert.equal(typeof scheduled, 'function');
+    game.month = 5;
+    scheduled();
+    assert.equal(prestige, 0, '旧戦争の威信計算を今月へ適用しない');
+    assert.equal(finished, 0, '旧戦争のターン終了予約を起動しない');
+    assert.strictEqual(await closed, false);
+});
+
+test('r555 終戦前イベントの正常復帰は従来の結果処理を開始する', async () => {
+    const context = createContext({});
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    let release, guards = 0;
+    const game = {
+        phase: 'game', year: 1560, month: 4, playerClanId: 99,
+        ui: { showMapGuard() { guards++; throw new Error('reached valid endWar'); } },
+        eventManager: { processEvents: name => name === 'before_war_end' ? new Promise(resolve => { release = resolve; }) : Promise.resolve() }
+    };
+    const war = new WarManagerClass(game);
+    game.warManager = war;
+    war._beginWarLifecycle();
+    war.state = { active: true, attacker: { ownerClan: 1 }, defender: { ownerClan: 2 } };
+    const task = war.endWar(true);
+    release();
+    const error = await task.then(() => null, error => error);
+    assert.equal(error && error.message, 'reached valid endWar');
+    assert.equal(guards, 1, '同じ状態の正常終了は止めない');
+});
+
+test('r554 開戦前イベント待機から旧月の合戦を起動しない', async () => {
+    const context = createContext({
+        TroopAllocationService: { clampArmySoldiers: n => n },
+        document: { getElementById: () => null }
+    });
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    let release;
+    const source = { id: 1, ownerClan: 1, soldiers: 2000 };
+    const target = { id: 2, ownerClan: 2 };
+    const game = {
+        phase: 'game', year: 1560, month: 4,
+        currentIndex: 0, turnQueue: [source],
+        getCastle: id => id === 1 ? source : target,
+        eventManager: { processEvents: () => new Promise(resolve => { release = resolve; }) },
+        ui: {}
+    };
+    const war = new WarManagerClass(game);
+    game.warManager = war;
+    const task = war.startWar(source, target, [{ id: 11 }], 500, 1000);
+    assert.equal(typeof release, 'function', 'before_war待機に入る');
+    game.month = 5;
+    const closed = war.waitForWarClose(war.getCurrentWarGeneration());
+    release();
+    const error = await task.then(() => null, error => error);
+    assert.equal(war.state.active, false, '旧月の合戦は開始されない');
+    if (error) throw error;
+    assert.equal(await closed, false, '旧戦争の完了待ちも失効として解放する');
+});
+
+test('r554 開戦前イベント待機から旧シナリオのWarManagerを復活させない', async () => {
+    const context = createContext({
+        TroopAllocationService: { clampArmySoldiers: n => n },
+        document: { getElementById: () => null }
+    });
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    let release;
+    const source = { id: 1, ownerClan: 1, soldiers: 2000 };
+    const target = { id: 2, ownerClan: 2 };
+    const game = {
+        phase: 'game', year: 1560, month: 4,
+        currentIndex: 0, turnQueue: [source],
+        getCastle: id => id === 1 ? source : target,
+        eventManager: { processEvents: () => new Promise(resolve => { release = resolve; }) },
+        ui: {}
+    };
+    const war = new WarManagerClass(game);
+    game.warManager = war;
+    const task = war.startWar(source, target, [{ id: 11 }], 500, 1000);
+    assert.equal(typeof release, 'function', 'before_war待機に入る');
+    game.warManager = new WarManagerClass(game);
+    const closed = war.waitForWarClose(war.getCurrentWarGeneration());
+    release();
+    const error = await task.then(() => null, error => error);
+    assert.equal(war.state.active, false, '失効したWarManagerに再び開戦状態を立てない');
+    if (error) throw error;
+    assert.equal(game.warManager.state.active, false, '新シナリオの戦争状態は維持');
+});
+
+test('r554 開戦前イベント待機は同月のターン世代失効でも旧戦争を始めない', async () => {
+    const context = createContext({
+        TroopAllocationService: { clampArmySoldiers: n => n },
+        document: { getElementById: () => null }
+    });
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    let release, generation = 8;
+    const source = { id: 1, ownerClan: 1, soldiers: 2000 };
+    const target = { id: 2, ownerClan: 2 };
+    const game = {
+        phase: 'game', year: 1560, month: 4,
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: previous => previous === generation
+        },
+        eventManager: { processEvents: () => new Promise(resolve => { release = resolve; }) },
+        ui: {}
+    };
+    const war = new WarManagerClass(game);
+    game.warManager = war;
+    const task = war.startWar(source, target, [{ id: 11 }], 500, 1000);
+    generation++;
+    const closed = war.waitForWarClose(war.getCurrentWarGeneration());
+    release();
+    const error = await task.then(() => null, error => error);
+    assert.equal(war.state.active, false);
+    assert.equal(await closed, false);
+    if (error) throw error;
+});
+
+test('r554 開戦前イベントが正常完了した場合は開戦状態を従来どおり開始する', async () => {
+    const beginMarker = new Error('reached start war display');
+    const context = createContext({
+        TroopAllocationService: { clampArmySoldiers: n => n },
+        document: { getElementById: () => ({ classList: { remove: () => { throw beginMarker; } } }) }
+    });
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    let release;
+    const source = { id: 1, ownerClan: 1, soldiers: 2000 };
+    const target = { id: 2, ownerClan: 2 };
+    const game = {
+        phase: 'game', year: 1560, month: 4,
+        eventManager: { processEvents: () => new Promise(resolve => { release = resolve; }) },
+        ui: {}
+    };
+    const war = new WarManagerClass(game);
+    game.warManager = war;
+    const task = war.startWar(source, target, [{ id: 11 }], 500, 1000);
+    release();
+    const error = await task.then(() => null, error => error);
+    assert.strictEqual(error, beginMarker, '正常待機後に従来の開戦処理へ到達する');
+    assert.equal(war.state.active, true);
+});
+
 test('攻城戦の進行timerは戦争世代をまたいで次の戦争や次ターンへ触れない', () => {
     const war = read('js/war.js');
     const effort = read('js/war_effort.js');
     assert.ok(war.includes('this._warGeneration = 0;'));
-    assert.ok(war.includes('_scheduleWarCallback(callback, delay = 0, requireActive = true)'));
+    assert.ok(war.includes('_scheduleWarCallback(callback, delay = 0, requireActive = true, onInvalid = null)'));
     assert.ok(war.includes('abortForScenarioTransition()'));
     assert.ok(war.includes('this._scheduleWarCallback(() => this.execWarAI(), 800);'));
     assert.ok(war.includes('this._scheduleWarCallback(() => this.resolveWarAction(action.type, action.extraVal), 0);'));
@@ -12438,7 +12699,7 @@ test('攻城戦の進行timerは戦争世代をまたいで次の戦争や次タ
     assert.ok(effort.includes('const isCurrentWar = () => this._isWarLifecycleCurrent(warGeneration, false);'));
     assert.ok(effort.includes('if (!isCurrentWar()) return;'));
     assert.ok(effort.includes('this._scheduleWarCallback(() => {'));
-    assert.ok(effort.includes('}, 100, false);'), '戦後の威信更新とfinishTurnも旧戦争世代では実行しない');
+    assert.ok(effort.includes('}, 100, false, () => this._resolveWarCloseWaiters(warGeneration, false));'), '失効した戦後予約は完了待ちをfalseで解放する');
     assert.ok(effort.includes('if (!this.state.active || this._warEnding) return;'), '終了処理の多重開始も同期的に防ぐ');
 });
 
@@ -12482,7 +12743,7 @@ test('戦後closeWarは開始時の戦争世代を固定しafter_war後も未定
     const block = effort.slice(at, at + 8000);
     assert.ok(block.includes('const warGeneration = Number(this._warGeneration || 0);'), 'closeWar開始時に戦争世代をローカルへ固定する');
     assert.ok(block.includes("await this.game.eventManager.processEvents('after_war', this.state);"), 'after_war完了を待つ');
-    assert.ok(block.includes('if (!this._isWarLifecycleCurrent(warGeneration, false)) return;'), 'await後は同じ戦争世代か再確認する');
+    assert.ok(block.includes('if (!isCurrentClose()) return;') && block.includes('this._isWarFlowContextCurrent(closeFlowContext)'), 'after_war後は戦争世代と開始年月を共通窓口で照合する');
     assert.ok(block.includes('this._markWarClosed(warGeneration);'), '通常ターン復帰完了後をWarManager自身から通知する');
 });
 
@@ -12491,7 +12752,7 @@ test('戦後endWarはイベント・結果待ち後に旧戦争世代を継続�
     const at = effort.indexOf('async endWar(attackerWon');
     const end = effort.indexOf('processCaptures(defeatedCastle', at);
     const block = effort.slice(at, end);
-    assert.ok(block.includes('const isCurrentWar = () => this._isWarLifecycleCurrent(warGeneration, false);'), 'endWar全体で同じ戦争世代を正本にする');
+    assert.ok(block.includes('const isCurrentWar = () => {') && block.includes('this._isWarLifecycleCurrent(warGeneration, false)') && block.includes('this._isWarFlowContextCurrent(endFlowContext)'), 'endWar全体で戦争世代・年月・ターン世代を照合する');
     assert.ok(block.includes("await this.game.eventManager.processEvents('after_battle_blink', eventContext);\n                if (!isCurrentWar()) return;"), '戦闘直後イベント待ち後に旧戦争を止める');
     assert.ok(block.includes("await this.game.eventManager.processEvents('after_siege_war', s);\n                    if (!isCurrentWar()) return;"), '籠城戦後イベント待ち後に旧戦争を止める');
     assert.ok(block.includes('await this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);\n                        if (!isCurrentWar()) return;'), 'AI捕虜処遇待ち後に旧戦争を止める');
@@ -12788,10 +13049,13 @@ test('月初月末とAI予約はシナリオ世代をまたいでロード・タ
     const endAt = turn.indexOf('async endMonth()');
     const startBlock = turn.slice(startAt, turn.indexOf('/** 委任城', startAt));
     const endBlock = turn.slice(endAt, turn.indexOf('checkAllActionsDone()', endAt));
-    assert.ok(startBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);'));
+    assert.ok(startBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration)'));
+    assert.ok(startBlock.includes('Number(game.year) === expectedYear') && startBlock.includes('Number(game.month) === expectedMonth'), '月初も開始時の年月を照合する');
     assert.ok(startBlock.includes('await game.ui.showCutin'));
     assert.ok(startBlock.includes('if (!isCurrentFlow()) return;'));
-    assert.ok(endBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);'));
+    assert.ok(endBlock.includes('const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration)'));
+    assert.ok(endBlock.includes('Number(game.year) === expectedYear') && endBlock.includes('Number(game.month) === expectedMonth'), '月末の開始時年月を照合する');
+    assert.ok(endBlock.includes('const isAdvancedMonthCurrent = () => this._isTurnFlowCurrent(turnFlowGeneration)'), '自分で翌月へ進めた後は新しい年月を照合する');
     assert.ok(endBlock.includes('if (!isCurrentFlow()) return false;'), '月末ダイアログ待ち後も同じ世代だけ続行する');
     assert.ok(endBlock.includes('return true;'), '重複待機を除いても有効世代だけ次段へ進める');
     const scheduleAt = turn.indexOf('_scheduleAITurn(castle)');
@@ -12878,7 +13142,7 @@ test('地図戦闘演出はシナリオ切替でrAFと固定Canvasを中断し�
     assert.ok(map.includes('if (!isCurrentEffect()) return false;'), 'focus待ち後にも旧演出を開始しない');
     assert.ok(map.includes('const runHalfway = () => {\n                if (halfwayDone || !isCurrentEffect()) return;'), '中断済み制圧演出は所有変更callbackを呼ばない');
     assert.ok(war.includes('if (!isCurrentWar() || openingBlinkCompleted === false) return;'));
-    assert.ok(war.includes('if (resultBlinkCompleted === false) return;'));
+    assert.ok(war.includes('if (!isCurrentWar() || resultBlinkCompleted === false) return;'), '演出後は戦争とターンの有効性も確認する');
     assert.ok((war.match(/if \(captureCompleted === false\) return;/g) || []).length >= 3);
     assert.ok(indep.includes('if (independenceBlinkCompleted === false) {'), '取消時に後続演出を開始しない');
     assert.ok(indep.includes('if (independenceCaptureCompleted === false) {'), '取消時に後続演出を開始しない');
@@ -15067,6 +15331,7 @@ test('r446 国主任命は出陣中の本拠地を拒否し、通常拠点は任
         affiliationSystem: { moveCastle(b, id) { b.castleId = id; }, clearGunshiRole() {} },
         getCurrentTurnId: () => 123, getClan: () => ({ name: '試験家' })
     };
+    game.castleManager = { getActiveCommanderCastleIds: () => new Set() }; // このテストは任命先が空城である前提
     const cmd = new Command(game);
     cmd.finishCommand = () => {};
     cmd.executeAppointLegionLeader(44, 1, home.id);
@@ -15170,6 +15435,81 @@ test('r446 家督相続は出陣先でなく本拠地へ後継者を移す', () 
     assert.strictEqual(heir.castleId, 1, '後継者は出陣中の先代の現在地へ行かない');
     assert.strictEqual(home.castellanId, 11);
     assert.strictEqual(forward.castellanId, 0);
+});
+
+// r559: Legion.commanderId is the authoritative seat, isCommander is a derived badge.
+test('r559 国主の家督継承は補助フラグが欠けても旧軍団を正規解散する', () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active' } },
+        BushoStatusRules: { isRonin: () => false, isActive: () => true }
+    });
+    loadScript(ctx, 'js/castle_manager.js');
+    loadScript(ctx, 'js/life_system.js');
+    const Castle = vm.runInContext('CastleManager', ctx);
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const home = { id: 1, ownerClan: 4, legionId: 0, castellanId: 10, samuraiIds: [10], isDelegated: false };
+    const seatCastle = { id: 2, ownerClan: 4, legionId: 2, castellanId: 11, samuraiIds: [11], isDelegated: true };
+    const seatSecond = { id: 3, ownerClan: 4, legionId: 2, castellanId: 12, samuraiIds: [12], isDelegated: true };
+    const otherCastle = { id: 4, ownerClan: 5, legionId: 2, castellanId: 20, samuraiIds: [20], isDelegated: true };
+    const old = { id: 10, clan: 4, castleId: 1, isDaimyo: true, familyIds: [] };
+    const heir = { id: 11, clan: 4, castleId: 2, isCommander: false, isGunshi: false, familyIds: [], loyalty: 90 };
+    const seat = { id: 600, clanId: 4, legionNo: 2, commanderId: 11, objective: '攻撃', route: [1], status: 'move' };
+    const otherSeat = { id: 601, clanId: 5, legionNo: 2, commanderId: 20, objective: '防御', route: [2], status: 'wait' };
+    const cleared = [];
+    const game = {
+        legions: [seat, otherSeat], castles: [home, seatCastle, seatSecond, otherCastle],
+        getDaimyoHomeCastle: () => home,
+        getCastle: id => game.castles.find(c => c.id === Number(id)),
+        getBusho: id => ({ 10: old, 11: heir })[id] || null,
+        aiOperationManager: { clearLegionPlanning(clanId, no) { cleared.push([clanId, no]); } },
+        affiliationSystem: { leaveCastle(b) { game.getCastle(b.castleId).samuraiIds = []; },
+            setActivityStatusRaw() {}, transferClanRaw() {}, setCastleIdRaw(b, id) { b.castleId = id; },
+            updateCastleLord() {} }, changeLeader() {}
+    };
+    game.castleManager = new Castle(game);
+    const life = new Life(game);
+    life.applyDaimyoNameAndFaceChange = () => {};
+    life.applyDaimyoChangeEffects = () => {};
+    life.setupNewDaimyo(old, heir, [], false);
+    assert.strictEqual(seat.commanderId, 0, '旧国主席を空席にする');
+    assert.strictEqual(seatCastle.legionId, 0, '旧軍団領を直轄に戻す');
+    assert.strictEqual(seatSecond.legionId, 0, '旧軍団の他の城も直轄に戻す');
+    assert.strictEqual(seatSecond.isDelegated, false);
+    assert.strictEqual(otherCastle.legionId, 2, '他家の同番号軍団は変更しない');
+    assert.strictEqual(otherSeat.commanderId, 20);
+    assert.deepStrictEqual(cleared, [[4, 2]], '軍団作戦は正規窓口で一度だけ破棄');
+    assert.strictEqual(heir.isCommander, false);
+    assert.strictEqual(heir.castleId, 1);
+});
+
+test('r559 正常な国主継承・国主でない家督継承は既存の処理を維持する', () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active' } },
+        BushoStatusRules: { isRonin: () => false, isActive: () => true }
+    });
+    loadScript(ctx, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    for (const withSeat of [false, true]) {
+        const castle = { id: 1, castellanId: 10, samuraiIds: [] };
+        const old = { id: 10, clan: 4, castleId: 1, familyIds: [] };
+        const heir = { id: 11, clan: 4, castleId: 1, isCommander: withSeat, isGunshi: false, familyIds: [] };
+        const seat = { id: 20, clanId: 4, legionNo: 3, commanderId: withSeat ? 11 : 0 };
+        let disbanded = 0;
+        const game = {
+            legions: [seat], getDaimyoHomeCastle: () => castle,
+            getBusho: id => ({10: old, 11: heir})[id] || null,
+            affiliationSystem: { leaveCastle() {}, setActivityStatusRaw() {},
+                transferClanRaw() {}, setCastleIdRaw(b, id) { b.castleId = id; }, updateCastleLord() {} },
+            castleManager: { disbandLegion(id) { assert.strictEqual(id, 20); disbanded++; seat.commanderId = 0; heir.isCommander = false; } },
+            changeLeader() {}
+        };
+        const life = new Life(game);
+        life.applyDaimyoNameAndFaceChange = () => {};
+        life.applyDaimyoChangeEffects = () => {};
+        life.setupNewDaimyo(old, heir, [], false);
+        assert.strictEqual(disbanded, withSeat ? 1 : 0);
+        assert.strictEqual(heir.isCommander, false);
+    }
 });
 
 test('r446 城主任命は現在地が離れていても本拠地の城主を置換しない', () => {
@@ -15285,10 +15625,10 @@ test('r447 不正な保存は上書き前に拒否し、正常な保存はスロ
     const game = { hasSaveData: false, ui: { showDialog(message) { messages.push(message); }, renderCommandMenu() {} } };
     const saver = new ctx.SaveManager(game);
     const valid = {
-        saveSchemaVersion: 2, saveTimestamp: 1770000000000, saveTime: '2026/10/11 09:00',
+        saveSchemaVersion: 3, saveTimestamp: 1770000000000, saveTime: '2026/10/11 09:00',
         year: 1570, month: 6, gameStartYear: 1570, gameStartMonth: 6,
         scenarioFolder: '1570_anegawa', scenarioName: '1570年 姉川', scenarioNo: 'シナリオ2',
-        castles: [{id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [10]}],
+        castles: [{id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [10], _delegatedOverride: null, _allowAttack: true, _allowMove: true}],
         bushos: [{id: 10, clan: 1, castleId: 1, nemesisList: []}],
         clans: [{id: 1, leaderId: 10}], princesses: [], provinces: [{id: 1}], legions: [], kunishus: [],
         turnQueueIds: [1], currentIndex: 0, playerClanId: 1, mapWidth: 100, mapHeight: 100,
@@ -15325,7 +15665,7 @@ test('r447 無効なオートセーブは旧スロットと巡回インデック
     const saver = new ctx.SaveManager(game);
     saver.showSaveGuard = () => {};
     saver.hideSaveGuard = () => {};
-    saver._createSaveDataObj = async () => ({saveSchemaVersion: 2, castles: [], bushos: []});
+    saver._createSaveDataObj = async () => ({saveSchemaVersion: 3, castles: [], bushos: []});
     await saver.executeAutoSave();
     assert.strictEqual(saved.get('sengoku_autosave_slot1'), 'original_valid_bytes');
     assert.strictEqual(settings.get('autoSaveIndex'), '1', '失敗時は次のスロットへ進まない');
@@ -15346,10 +15686,10 @@ test('r447 DB書込成功だけでは完了表示せず読み戻しを検証す�
     saver.showSaveGuard = () => {};
     saver.hideSaveGuard = () => {};
     saver._createSaveDataObj = async () => ({
-        saveSchemaVersion:2,saveTimestamp:1770000000000,saveTime:'2026/10/11 09:00',
+        saveSchemaVersion:3,saveTimestamp:1770000000000,saveTime:'2026/10/11 09:00',
         year:1560,month:4,gameStartYear:1560,gameStartMonth:4,scenarioFolder:'1560_okehazama',
         scenarioName:'1560年 桶狭間',scenarioNo:'シナリオ1',
-        castles:[{id:1,ownerClan:1,castellanId:10,samuraiIds:[10]}],
+        castles:[{id:1,ownerClan:1,castellanId:10,samuraiIds:[10],_delegatedOverride:null,_allowAttack:true,_allowMove:true}],
         bushos:[{id:10,clan:1,castleId:1,nemesisList:[]}],clans:[{id:1,leaderId:10}],
         princesses:[],provinces:[{id:1}],legions:[],kunishus:[],turnQueueIds:[1],currentIndex:0,
         playerClanId:1,mapWidth:100,mapHeight:100,
@@ -15634,6 +15974,74 @@ test('r451 下野ダイアログ中のシナリオ切替後は旧月初の派閥
     await pending;
     assert.deepStrictEqual(fled,[1]);
     assert.strictEqual(rebuilt,0,'旧シナリオの派閥再編を実行してはならない');
+});
+
+// r552: 同一シナリオ内の年月変更でも、旧月の下野後続・月末判定を再開しない。
+test('r552 下野会話中に同一世代で翌月になると旧月の下野候補・派閥再編を中止する', async () => {
+    const ctx=createContext({WarParams:{Faction:{RoninLoyaltyThreshold:50,RoninChanceBase:1,RoninChanceMultiplier:1}},
+        BushoStatusRules:{isActive:()=>true}});
+    loadScript(ctx,'js/faction_system.js');
+    const FactionSystem=vm.runInContext('FactionSystem',ctx);
+    let resume, fled=[], rebuilt=0;
+    const bushos=[1,2].map(id=>({id,clan:1,loyalty:0,isDaimyo:false,isCastellan:false}));
+    const game={year:1570,month:6,bushos,getClanDaimyo:()=>null,
+        turnManager:{captureTurnFlowGeneration:()=>3,isTurnFlowGenerationLatest:n=>n===3}};
+    const sys=new FactionSystem(game);
+    sys.executeRonin=b=>{fled.push(b.id);return b.id===1 ? new Promise(resolve=>resume=resolve):Promise.resolve();};
+    sys.updateFactions=()=>rebuilt++;
+    const pending=sys.processStartMonth();
+    assert.deepStrictEqual(fled,[1]);
+    game.month=7;
+    resume();
+    await pending;
+    assert.deepStrictEqual(fled,[1],'旧月の別の候補へ下野判定を進めない');
+    assert.strictEqual(rebuilt,0,'旧月の派閥再編を実行しない');
+});
+
+test('r552 諸勢力の月末献上待機中に同一世代で翌月になると旧月の後続行動を中止する', async () => {
+    const ctx=createContext({Math:Object.assign(Object.create(Math),{random:()=>0})});
+    loadScript(ctx,'js/kunishu_system.js');
+    const KunishuSystem=vm.runInContext('KunishuSystem',ctx);
+    let resume, acted=[];
+    const castle={id:1,ownerClan:1,castellanId:10};
+    const kunishus=[1,2].map(id=>({id,ideology:'商人',castleId:1,daimyoRelations:{1:{sentiment:90}},
+        soldiers:100,maxSoldiers:100,defense:100,maxDefense:100,
+        horses:0,maxHorses:0,guns:0,maxGuns:0,training:50,defaultTraining:50,morale:50,defaultMorale:50}));
+    const game={year:1570,month:6,
+        turnManager:{captureTurnFlowGeneration:()=>3,isTurnFlowGenerationLatest:n=>n===3},
+        getClanDaimyo:()=>({castleId:1}),getCastle:()=>castle,getBusho:()=>null};
+    const sys=new KunishuSystem(game);
+    sys.getAliveKunishus=()=>kunishus;
+    sys.checkDestroyed=async()=>{};
+    sys.applyIkkoNetworkRelationLink=()=>{};
+    sys.executeActionToLord=k=>{acted.push(k.id);return k.id===1 ? new Promise(resolve=>resume=resolve) : Promise.resolve();};
+    const pending=sys.processEndMonth();
+    for (let i=0;i<8 && acted.length===0;i++) await Promise.resolve();
+    assert.deepStrictEqual(acted,[1]);
+    game.month=7;
+    resume();
+    await pending;
+    assert.deepStrictEqual(acted,[1],'旧月の2件目の献上を実行してはならない');
+});
+
+test('r552 独立事件待機中に同一世代で翌月になると旧月の次候補を判定しない', async () => {
+    const ctx=createContext({WarParams:{Independence:{ThresholdBase:80,ThresholdDutyDiv:10,ThresholdAmbitionDiv:10}}});
+    loadScript(ctx,'js/independence_system.js');
+    const IndependenceSystem=vm.runInContext('IndependenceSystem',ctx);
+    let resume; const attempted=[];
+    const castles=[{id:1,ownerClan:1,castellanId:10},{id:2,ownerClan:1,castellanId:11}];
+    const bushos=new Map([10,11].map(id=>[id,{id,clan:1,loyalty:0,duty:50,ambition:50,factionId:0,isDaimyo:false}]));
+    const game={year:1570,month:6,castles,
+        turnManager:{captureTurnFlowGeneration:()=>3,isTurnFlowGenerationLatest:n=>n===3},
+        getBusho:id=>bushos.get(id),getClanDaimyo:()=>({id:20,factionId:0}),getClanCastles:()=>castles};
+    const sys=new IndependenceSystem(game);
+    sys.calculateAndExecute=(castle)=>{attempted.push(castle.id);return castle.id===1 ? new Promise(resolve=>resume=resolve) : Promise.resolve();};
+    const pending=sys.checkIndependence();
+    assert.deepStrictEqual(attempted,[1]);
+    game.month=7;
+    resume();
+    await pending;
+    assert.deepStrictEqual(attempted,[1],'旧月の2件目の独立判定を実行してはならない');
 });
 
 // r451: 四半期人事の端末負荷分散待ち後に、遷移したシナリオのAI配置を変更しない。
@@ -18661,7 +19069,7 @@ test('r504 現在有効なファイル保存失敗だけはエラーを案内す
 
 // r505: 同スロットの保存が完了する前の読込で古い内容を提示しない。
 test('r505 同一スロットの書込待機中は一覧読込を旧版で確定しない', async () => {
-    const stored = new Map([['sengoku_save_slot1', {saveSchemaVersion: 2, saveTimestamp: 1}]]);
+    const stored = new Map([['sengoku_save_slot1', {saveSchemaVersion: 3, saveTimestamp: 1}]]);
     let finishWrite;
     const ctx = createContext();
     loadScript(ctx, 'js/save_manager.js');
@@ -18677,7 +19085,7 @@ test('r505 同一スロットの書込待機中は一覧読込を旧版で確定
     });
     manager.showSaveGuard = () => {};
     manager.hideSaveGuard = () => {};
-    manager._createSaveDataObj = async () => ({saveSchemaVersion: 2, saveTimestamp: 2});
+    manager._createSaveDataObj = async () => ({saveSchemaVersion: 3, saveTimestamp: 2});
     manager._validateSaveDataStructure = () => true;
     manager._encryptData = data => data;
     manager.isLoadableSaveData = () => true;
@@ -18695,7 +19103,7 @@ test('r505 保存失敗後も読込が再開し、他スロットの読込を妨
     const reads = [];
     const ctx = createContext();
     loadScript(ctx, 'js/save_manager.js');
-    ctx.__read = async key => { reads.push(key); return {saveSchemaVersion: 2, saveTimestamp: 10}; };
+    ctx.__read = async key => { reads.push(key); return {saveSchemaVersion: 3, saveTimestamp: 10}; };
     vm.runInContext('loadFromDB = __read;', ctx);
     const manager = new ctx.SaveManager({});
     let rejectWrite;
@@ -18712,7 +19120,7 @@ test('r505 保存失敗後も読込が再開し、他スロットの読込を妨
 });
 
 test('r505 同一スロットの書込待機中は直接ロードも書込完了を待つ', async () => {
-    const stored = new Map([['sengoku_save_slot1', {saveSchemaVersion: 2, saveTimestamp: 1}]]);
+    const stored = new Map([['sengoku_save_slot1', {saveSchemaVersion: 3, saveTimestamp: 1}]]);
     let finishWrite;
     const ctx = createContext();
     loadScript(ctx, 'js/save_manager.js');
@@ -18729,7 +19137,7 @@ test('r505 同一スロットの書込待機中は直接ロードも書込完了
     });
     manager.showSaveGuard = () => {};
     manager.hideSaveGuard = () => {};
-    manager._createSaveDataObj = async () => ({saveSchemaVersion: 2, saveTimestamp: 2});
+    manager._createSaveDataObj = async () => ({saveSchemaVersion: 3, saveTimestamp: 2});
     manager._validateSaveDataStructure = () => true;
     manager._encryptData = data => data;
     manager.isLoadableSaveData = () => true;
@@ -18906,6 +19314,7 @@ test('r510 国主任命済み席次への遅延確定は既存国主を残し、
         affiliationSystem: { moveCastle() { moved++; }, clearGunshiRole() {} },
         getCurrentTurnId: () => 25, getClan: () => ({ name: '試験家' })
     };
+    game.castleManager = { getActiveCommanderCastleIds: () => new Set() }; // このテストは任命先が空城である前提
     const command = new Command(game);
     command.finishCommand = () => result++;
     command.executeAppointLegionLeader(44, 1, 2);
@@ -18937,6 +19346,7 @@ test('r510 他軍団の現役国主・他家武将・失効候補の国主任命
         affiliationSystem: { moveCastle() { moved++; }, clearGunshiRole() {} },
         getCurrentTurnId: () => 25, getClan: () => ({ name: '試験家' })
     };
+    game.castleManager = { getActiveCommanderCastleIds: () => new Set() }; // このテストは任命先が空城である前提
     const command = new Command(game);
     command.finishCommand = () => { throw new Error('任命が実行されてはいけない'); };
     command.executeAppointLegionLeader(44, 1, 2);
@@ -18975,6 +19385,7 @@ test('r510 解任後の空席は同一Legionを再利用して正常任命でき
         affiliationSystem: { moveCastle(b, id) { moved++; b.castleId = id; }, clearGunshiRole() { released++; } },
         getCurrentTurnId: () => 25, getClan: () => ({ name: '試験家' })
     };
+    game.castleManager = { getActiveCommanderCastleIds: () => new Set() }; // このテストは任命先が空城である前提
     const command = new Command(game);
     command.finishCommand = () => results++;
     command.executeAppointLegionLeader(44, 1, 2);
@@ -22059,6 +22470,897 @@ test('r550 国内平定の3集計経路は単一の鎮圧対象数算定窓口�
     assert.ok(!source.includes("k.ideology !== '商人'"), '商人だけを特例除外する古い独自判定を残さない');
 });
 
+
+// r551: 月初の入れ替わりはシナリオ世代が進まない場合も旧処理を止める。
+test('r551 月初カットイン待ちの間に年月が変わると旧月の処理を継続しない', async () => {
+    let resume;
+    const ctx = createContext({ EconomyRules: {updateMonthlyProvinceMarketRates: () => {}} });
+    loadScript(ctx, 'js/turn_manager.js');
+    const TurnManager = vm.runInContext('TurnManager', ctx);
+    const entries = [];
+    const game = {
+        phase:'game', year:1560, month:1, currentIndex:0, getCurrentTurnCastle:()=>null,
+        ui:{showCutin:()=>new Promise(resolve=>resume=resolve),clearCommandMenu:()=>{},log:msg=>entries.push(msg)},
+        factionSystem:{applyStartMonthSameFactionEffects:()=>{}},
+        writeSystemDiagnostic:()=>{}
+    };
+    const tm = new TurnManager(game);
+    game.turnManager = tm;
+    const pending = tm.startMonth();
+    assert.strictEqual(typeof resume, 'function');
+    game.month = 2; // ゲーム遷移世代は同じ月切替/再入を再現
+    resume();
+    await pending;
+    assert.deepStrictEqual(entries, [], '旧月の月初ログ・イベント以降を処理しない');
+});
+
+test('r551 四半期AI人事の描画待ち中に同一世代で月が変われば旧人事を続けない', async () => {
+    let releaseYield;
+    const ctx = createContext({setTimeout:cb=>{releaseYield=cb;return 1;}});
+    loadScript(ctx,'js/ai_staffing.js');
+    const Staffing=vm.runInContext('AIStaffing',ctx);
+    const visited=[];
+    const clans=[1,2,3,4,5].map(id=>({id,isDestroyed:false}));
+    const sys=new Staffing();
+    sys.game={year:1560,month:1,clans,getBusho:()=>null,writeSystemDiagnostic:msg=>visited.push(msg),
+        turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationLatest:n=>n===1}};
+    sys.checkLegionDisband=()=>false;
+    sys.createNewLegionIfNeeded=()=>false;
+    const pending=sys.processQuarterlyStaffing(1,99);
+    assert.ok(visited.some(s=>s.includes('clan_4')));
+    sys.game.month=2;
+    releaseYield();
+    await pending;
+    assert.ok(!visited.some(s=>s.includes('clan_5')), '新しい月で旧四半期の5勢力目を処理しない');
+});
+
+test('r551 年齢再計算の分割待ち中に同一世代で年が変われば旧年齢を計算しない', async () => {
+    const ctx=createContext({GameConstants:{BushoStatus:{UNBORN:'unborn'}}});
+    loadScript(ctx,'js/life_system.js');
+    const LifeSystem=vm.runInContext('LifeSystem',ctx);
+    let resume;
+    const bushos=Array.from({length:129},(_,id)=>({id,birthYear:1500,isNotBorn:false}));
+    const game={year:1560,month:1,bushos,princesses:[],
+        turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationLatest:n=>n===1}};
+    const sys=new LifeSystem(game);
+    sys.recalculateBushoAgeStats=(b,y)=>{b.calcYear=y};
+    sys._yieldToBrowserForLife=()=>new Promise(resolve=>resume=resolve);
+    const pending=sys.updateAllBushosAgeCooperatively();
+    assert.strictEqual(bushos[127].calcYear,1560);
+    assert.strictEqual(bushos[128].calcYear,undefined);
+    game.year=1561;
+    resume();
+    await pending;
+    assert.strictEqual(bushos[128].calcYear,undefined,'旧年の残りを翌年に計算しない');
+});
+
+test('r551 死亡イベント待ち中に同一世代で月が変われば旧月の死亡判定を止める', async () => {
+    const ctx=createContext({
+        LifeStatusRules:{isDead:()=>false,isUnborn:()=>false},
+        Math:Object.assign(Object.create(Math),{random:()=>0})
+    });
+    loadScript(ctx,'js/life_system.js');
+    const LifeSystem=vm.runInContext('LifeSystem',ctx);
+    let resume;
+    const executed=[];
+    const b={id:1,clan:1,endYear:1559,status:'active'};
+    const game={year:1560,month:5,gameStartYear:1550,gameStartMonth:1,bushos:[b],princesses:[],playerClanId:99,
+        turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationLatest:n=>n===1},
+        eventManager:{processEvents:()=>new Promise(resolve=>resume=resolve)}};
+    const sys=new LifeSystem(game);
+    sys.executeDeath=async x=>{executed.push(x.id);};
+    const pending=sys.checkDeath();
+    assert.strictEqual(typeof resume,'function');
+    game.month=6;
+    resume();
+    await pending;
+    assert.deepStrictEqual(executed,[],'先月の死亡イベント結果で新しい月の武将を死亡させない');
+});
+
+
+// r551: 月末は自分で翌月へ進めるため、進める前後で確認すべき年月を区別する。
+test('r551 月末イベント待機中に同一世代で月が変わると旧月末の月送りをしない', async () => {
+    let resume;
+    const ctx=createContext();loadScript(ctx,'js/turn_manager.js');
+    const TurnManager=vm.runInContext('TurnManager',ctx);
+    let starts=0;
+    const game={year:1560,month:5,phase:'game',ui:{},writeSystemDiagnostic:()=>{},
+        eventManager:{processEvents:type=>type==='endMonth_before'?new Promise(resolve=>resume=resolve):Promise.resolve()},
+        updateClanDisplayNames:()=>{},endingSystem:{checkEnding:async()=>false},
+        startMonth:()=>{starts++;}};
+    const tm=new TurnManager(game);game.turnManager=tm;
+    const pending=tm.endMonth();
+    assert.strictEqual(typeof resume,'function');
+    game.month=6;
+    resume();await pending;
+    assert.strictEqual(game.month,6,'旧月末が新月をさらに進めない');
+    assert.strictEqual(starts,0);
+});
+
+test('r551 月末が翌月へ進めた後のエンディング待機中に年月が変わると旧次月を開始しない', async () => {
+    let resume;
+    const ctx=createContext();loadScript(ctx,'js/turn_manager.js');
+    const TurnManager=vm.runInContext('TurnManager',ctx);
+    let starts=0;
+    const game={year:1560,month:12,phase:'game',ui:{},writeSystemDiagnostic:()=>{},
+        updateClanDisplayNames:()=>{},
+        endingSystem:{checkEnding:()=>new Promise(resolve=>resume=resolve)},
+        startMonth:()=>{starts++;}};
+    const tm=new TurnManager(game);game.turnManager=tm;
+    const pending=tm.endMonth();
+    for (let i=0;i<40 && typeof resume !== 'function';i++) await Promise.resolve();
+    assert.strictEqual(typeof resume,'function');
+    assert.strictEqual(game.year,1561);
+    assert.strictEqual(game.month,1);
+    game.month=2;
+    resume(false);await pending;
+    assert.strictEqual(starts,0,'旧月末が一段先の月初処理を再開しない');
+});
+
+// r553: 諸勢力鎮圧の戦闘終了待ちが失効しても旧拠点のコマンドを再表示しない。
+test('r553 鎮圧戦待機中の月替わり・戦争中断では旧コマンドパネルを再表示しない', async () => {
+    const ctx=createContext();loadScript(ctx,'js/kunishu_system.js');
+    const KunishuSystem=vm.runInContext('KunishuSystem',ctx);
+    for (const mode of ['valid','month','scenario','war_abort']) {
+        let generation=3, warGeneration=5, finishWar;
+        let header=0, menu=0;
+        const castle={id:10,ownerClan:1,isDelegated:false};
+        const game={year:1570,month:6,playerClanId:1,
+            turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:g=>g===generation},
+            getBusho:id=>({id}),
+            ui:{updatePanelHeader(){header++;},renderCommandMenu(){menu++;}},
+            warManager:{getCurrentWarGeneration:()=>warGeneration,
+                waitForWarClose:()=>new Promise(resolve=>finishWar=resolve)},
+            warPreparationController:{checkReinforcementAndStartWar(){warGeneration++;}}};
+        const sys=new KunishuSystem(game);
+        sys.applySubjugationHostility=()=>{};
+        const pending=sys.executeKunishuSubjugate(castle,11,[20],100,150,0,0,{id:99,castleId:11});
+        assert.strictEqual(typeof finishWar,'function');
+        if (mode==='month') game.month=7;
+        if (mode==='scenario') generation++;
+        if (mode==='war_abort') warGeneration++;
+        finishWar(mode==='war_abort' ? false : true);
+        await pending;
+        assert.strictEqual(header,mode==='valid'?1:0,mode+' ヘッダー更新');
+        assert.strictEqual(menu,mode==='valid'?1:0,mode+' 命令表示');
+    }
+});
+
+// r553: 寝返り面会の会話選択は旧世代のcallbackから新しい会話を開かない。
+test('r553 寝返り面会の旧確認callbackと会話待ち再開は新ゲームへ干渉しない', async () => {
+    const ctx=createContext();loadScript(ctx,'js/independence_system.js');
+    const IndependenceSystem=vm.runInContext('IndependenceSystem',ctx);
+    for (const mode of ['obsolete_first_choice','obsolete_after_dialog']) {
+        let generation=1, savedChoice, releaseDialog, count=0;
+        const game={year:1570,month:6,playerClanId:2,
+            turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:g=>g===generation},
+            getClan:id=>({id,name:'試験家'}),getClanDaimyo:()=>({castleId:9,fullName:'試験大名'}),
+            getCastle:id=>({id}),getNavigatorInfo:()=>({name:'小姓',faceIcon:'unknown_face.webp'}),
+            ui:{showDialog(msg,confirm,yes,no){savedChoice={yes,no};},
+                showDialogAsync(){count++;return mode==='obsolete_after_dialog' && count===1 ? new Promise(resolve=>releaseDialog=resolve) : Promise.resolve();}}};
+        const sys=new IndependenceSystem(game);
+        const pending=sys.askPlayerForDefection({id:10,name:'試験武将',fullName:'試験武将'},1);
+        assert.strictEqual(typeof savedChoice.yes,'function');
+        if (mode==='obsolete_first_choice') {
+            generation++;
+            await savedChoice.yes();
+            if (count > 0 && savedChoice.no) savedChoice.no();
+            assert.strictEqual(count,0,'古い確認選択は面会会話を開かない');
+        } else {
+            const choicePromise=savedChoice.yes();
+            assert.strictEqual(count,1);
+            game.month=7;
+            releaseDialog();
+            await choicePromise;
+            if (count > 1 && savedChoice.no) savedChoice.no();
+            assert.strictEqual(count,1,'月が変わった旧面会の続きは表示しない');
+        }
+        assert.strictEqual(await pending,false,'失効した面会は採用せず終了する');
+    }
+});
+
+// r553: 独立後の操作勢力選択は古い確認のコールバックから新シナリオへ書き込まない。
+test('r553 独立後の古い操作勢力選択ではプレイヤー勢力を書き換えない', async () => {
+    for (const mode of ['obsolete','valid']) {
+    const ctx=createContext({WarParams:{Independence:{}},
+        Clan:class {constructor(values){Object.assign(this,values);}},
+        setTimeout:fn=>{fn();return 1;},requestAnimationFrame:fn=>fn()});
+    loadScript(ctx,'js/independence_system.js');
+    const IndependenceSystem=vm.runInContext('IndependenceSystem',ctx);
+    let generation=5, currentDialog=null, updates=0;
+    const castle={id:10,name:'試験城',ownerClan:1,castellanId:11,samuraiIds:[11]};
+    const rebel={id:11,clan:1,castleId:10,name:'反乱武将',fullName:'反乱武将',
+        clanNameStr:'反乱家',clanYomiStr:'はんらんけ',factionId:0,isFactionLeader:false,
+        isCastellan:true,achievementTotal:100,loyalty:30};
+    const lord={id:12,clan:1,name:'旧当主',fullName:'旧当主',nemesisList:[],nemesisIds:[]};
+    const game={year:1570,month:6,castles:[castle],clans:[{id:1,name:'旧家',color:'#dddddd'}],playerClanId:1,
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:g=>g===generation},
+        getClan:id=>game.clans.find(c=>c.id===id),getClanDaimyo:()=>lord,
+        getClanBushos:()=>[rebel,lord],getBusho:id=>id===11?rebel:lord,
+        getCastle:id=>castle,updateCastleLord(){},
+        lifeSystem:{applyDaimyoNameAndFaceChange:()=>null},
+        affiliationSystem:{transferClanRaw(b,id){b.clan=id;}},
+        castleManager:{changeOwner(c,id){c.ownerClan=id;}},
+        ui:{log(){},showDialogAsync:async()=>{},playBattleBlink:async()=>true,
+            playCaptureEffect:async(ids,onHalfway)=>{onHalfway();return true;},
+            showMapGuard(){},hideMapGuard(){},renderMap(){},updateClanColors(){},
+            updatePanelHeader(){updates++;},showDialog(msg,confirmation,yes,no,options){
+                currentDialog={msg,confirmation,yes,no,options};}},
+        updateClanPrestige(){},diplomacyManager:{reorganizeRelationsAfterRebellion(){}}};
+    const sys=new IndependenceSystem(game);
+    sys.generateDistinctColor=()=> '#ffffff';
+    sys.resolveSubordinates=()=>[];
+    sys.resolveFactionWideRebellion=()=>{};
+    sys.resolveDistantFactionMembers=()=>{};
+    const pending=sys.executeRebellion(castle,rebel,lord,'indep');
+    for(let i=0;i<50 && (!currentDialog || !currentDialog.options?.choices);i++) await Promise.resolve();
+    assert.ok(currentDialog?.options?.choices,'通常の操作勢力選択まで進む');
+    // 最初の勢力選択は有効。その次の確認中にシナリオを切り替える。
+    currentDialog.options.choices[1].onClick();
+    assert.ok(currentDialog?.confirmation,'新勢力へ切替の確認を表示');
+    const obsoleteYes=currentDialog.yes;
+    if (mode === 'obsolete') generation++;
+    obsoleteYes();
+    assert.strictEqual(game.playerClanId,mode==='valid'?2:1,'古い確認は無効化し、有効な確認は従来どおり選択を確定');
+    assert.strictEqual(updates,mode==='valid'?1:0,'有効な確認だけヘッダーを更新');
+    await pending;
+    }
+});
+
+
+// r553: 有効な面会は従来どおり最終承諾で true を返す。
+test('r553 寝返り面会が有効なときは通常の採用確認を維持する', async () => {
+    const ctx=createContext();loadScript(ctx,'js/independence_system.js');
+    const IndependenceSystem=vm.runInContext('IndependenceSystem',ctx);
+    let choice, count=0;
+    const game={year:1570,month:6,playerClanId:2,
+        turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationLatest:g=>g===1},
+        getClan:()=>({name:'試験家'}),getClanDaimyo:()=>({castleId:9,fullName:'試験大名'}),
+        getCastle:()=>({id:9}),getNavigatorInfo:()=>({name:'小姓'}),
+        ui:{showDialog(msg,confirm,yes,no){choice={yes,no};},showDialogAsync:async()=>{count++;}}};
+    const sys=new IndependenceSystem(game);
+    const pending=sys.askPlayerForDefection({name:'試験武将',fullName:'試験武将'},1);
+    await choice.yes();
+    assert.strictEqual(count,3);
+    await choice.yes();
+    assert.strictEqual(await pending,true,'有効な寝返り承諾は従来どおり true');
+    assert.strictEqual(count,5,'必要な5段階の会話を表示');
+});
+
+
+// r556: 攻城戦の遅延行動は戦争番号だけでなくゲームの寿命にも属する。
+test('r556 同戦争番号でも月が替われば旧攻城戦予約を実行しない', () => {
+    let scheduled, count = 0;
+    const context = createContext({ setTimeout(callback) { scheduled = callback; return 1; } });
+    loadScript(context, 'js/war.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    const game = {phase:'game', year:1560, month:5};
+    const war = new WarManagerClass(game); game.warManager = war;
+    war._beginWarLifecycle(); war.state={active:true};
+    war._scheduleWarCallback(() => count++, 800);
+    game.month = 6;
+    scheduled();
+    assert.equal(count, 0, '旧月の戦闘AI・戦闘行動の予約が実行されない');
+});
+
+test('r556 旧WarManagerで予約された攻城戦AIは別シナリオのManagerへ干渉しない', () => {
+    let scheduled, count = 0;
+    const context = createContext({ setTimeout(callback) { scheduled = callback; return 1; } });
+    loadScript(context, 'js/war.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    const game = {phase:'game', year:1560, month:5};
+    const war = new WarManagerClass(game); game.warManager = war;
+    war._beginWarLifecycle(); war.state={active:true};
+    war._scheduleWarCallback(() => count++, 0);
+    game.warManager = new WarManagerClass(game);
+    scheduled();
+    assert.equal(count, 0, '旧WarManagerの同世代予約を破棄する');
+});
+
+test('r556 戦争番号を維持したターン世代失効とタイトル復帰も旧予約を停止する', () => {
+    for (const mode of ['turn', 'title']) {
+        let scheduled, count = 0, generation = 3;
+        const context = createContext({ setTimeout(callback) { scheduled = callback; return 1; } });
+        loadScript(context, 'js/war.js');
+        const WarManagerClass = vm.runInContext('WarManager', context);
+        const game = {phase:'game', year:1560, month:5,
+            turnManager:{captureTurnFlowGeneration:()=>generation, isTurnFlowGenerationCurrent:g=>g===generation}};
+        const war = new WarManagerClass(game); game.warManager=war;
+        war._beginWarLifecycle(); war.state={active:true};
+        war._scheduleWarCallback(() => count++);
+        if (mode==='turn') generation++;
+        else game.phase='title';
+        scheduled();
+        assert.equal(count,0, `${mode}失効後の予約を実行しない`);
+    }
+});
+
+test('r556 有効な戦闘予約は従来通り一度だけ実行し、新戦争世代の予約は破棄する', () => {
+    let scheduled, count = 0;
+    const context = createContext({ setTimeout(callback) { scheduled = callback; return 1; } });
+    loadScript(context, 'js/war.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    const game = {phase:'game',year:1560,month:5};
+    const war = new WarManagerClass(game); game.warManager=war;
+    war._beginWarLifecycle(); war.state={active:true};
+    war._scheduleWarCallback(() => count++);
+    scheduled();
+    assert.equal(count,1,'通常の有効予約は通す');
+    war._scheduleWarCallback(() => count++);
+    war._beginWarLifecycle();
+    scheduled();
+    assert.equal(count,1,'次戦への旧予約持越しは従来どおり止める');
+});
+
+
+// r557: 捕虜処遇画面で保持された旧ボタンから現ゲームを更新させない。
+function createPrisonerPhaseHarness() {
+    const context = createContext({ LifeStatusRules: { isUnborn: () => false }, GameConstants: { BushoStatus: { ACTIVE: 'active' } } });
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    const WarManagerClass = vm.runInContext('WarManager', context);
+    const dialogs = [];
+    const selectors = [];
+    let generation = 1;
+    const game = {
+        phase: 'game', year: 1560, month: 5, playerClanId: 1,
+        castles: [{id: 10, ownerClan: 2}, {id: 11, ownerClan: 1}],
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: value => value === generation
+        },
+        getClan: () => ({name:'敵家'}),
+        getClanBushos: () => [{id:1,isDaimyo:true,clan:1}],
+        getCastle: id => game.castles.find(c=>c.id===id),
+        getCurrentTurnCastle: () => game.castles[1],
+        getClanCastles: id => game.castles.filter(c=>c.ownerClan===id),
+        ui: {
+            showDialog(msg, confirmation, ok, cancel, opts) { dialogs.push({msg, confirmation, ok, cancel, opts}); },
+            info: { showPrisonerSelector(mode, prisoners, confirm, cancel) { selectors.push({mode, confirm, cancel}); } },
+            log() {}, warModal: {classList:{ add() {} }}, resumeMainMapAfterBattle() {}
+        },
+        affiliationSystem: { joinClan() {}, becomeRonin() {}, moveCastle() {}, setActivityStatusRaw() {} },
+        factionSystem: { handleMove() {} },
+        lifeSystem: { executeDeath: async () => {}, checkClanExtinction: async () => {} },
+        kunishuSystem: { getKunishu:()=>null },
+        finishTurn() {}
+    };
+    const war = new WarManagerClass(game); game.warManager = war;
+    return {war, game, dialogs, selectors, advanceGeneration: () => generation++};
+}
+
+test('r557 捕虜大名の古い登用ボタンから翌月の挑戦回数を更新しない', async () => {
+    const {war, game, dialogs} = createPrisonerPhaseHarness();
+    const prisoner = {id:22,name:'捕縛大名',isDaimyo:true,clan:2,castleId:10};
+    war.pendingPrisoners=[prisoner]; war.startPrisonerPhase();
+    const oldHire = dialogs[0].opts.choices[0].onClick;
+    game.month=6;
+    await oldHire();
+    assert.equal(prisoner.hireChallengeCount || 0, 0);
+    assert.equal(dialogs.length, 1);
+});
+
+test('r557 古い処断確認から別ターンへ処断会話を出さない', async () => {
+    const {war, game, dialogs} = createPrisonerPhaseHarness();
+    const prisoner = {id:23,name:'捕縛大名',isDaimyo:true,clan:2,castleId:10};
+    war.pendingPrisoners=[prisoner]; war.startPrisonerPhase();
+    dialogs[0].opts.choices[1].onClick();
+    const oldConfirm = dialogs[1].ok;
+    game.year = 1561;
+    await oldConfirm();
+    assert.equal(dialogs.length, 2);
+});
+
+test('r557 同月に新しい捕虜処遇が開始されても古い選択画面を使わない', () => {
+    const {war, dialogs, selectors} = createPrisonerPhaseHarness();
+    war.pendingPrisoners=[{id:30,name:'捕虜甲',isDaimyo:false,clan:2}];
+    war.startPrisonerPhase(); dialogs[0].ok();
+    const oldCancel = selectors[0].cancel;
+    war.pendingPrisoners=[{id:31,name:'捕虜乙',isDaimyo:false,clan:2}];
+    war.startPrisonerPhase();
+    const dialogCount=dialogs.length;
+    oldCancel();
+    assert.equal(dialogs.length, dialogCount);
+});
+
+test('r557 捕虜の処断実行待機中に月が変わると旧戦後処理へ進まない', async () => {
+    const {war, game} = createPrisonerPhaseHarness();
+    let releaseDeath, takeover=0, extinction=0, finished=0;
+    game.lifeSystem.executeDeath = () => new Promise(resolve=>{ releaseDeath=resolve; });
+    game.lifeSystem.checkClanExtinction = async () => { extinction++; };
+    game.finishTurn=()=>{ finished++; };
+    war.isTotalTakeoverPending=()=>false;
+    war.checkTotalTakeover=async()=>{ takeover++; };
+    war.registerNemesisForExecuted=()=>{};
+    war.state={active:true, isTotalTakeoverExecuted:false, oldDefClanId:2, attacker:{ownerClan:1}};
+    const prisoner={id:33,name:'捕虜甲',isDaimyo:false,clan:2};
+    war.pendingPrisoners=[prisoner]; war.startPrisonerPhase();
+    war.pendingKills=[prisoner]; war.pendingPrisoners=[];
+    const task=war.finishPrisonerPhase();
+    game.month=6;
+    releaseDeath(); await task;
+    assert.equal(takeover,0); assert.equal(extinction,0); assert.equal(finished,0);
+});
+
+test('r557 シナリオ中断は外交人質の捕虜処遇待機をfalseで解放する', () => {
+    const {war} = createPrisonerPhaseHarness();
+    let result='pending';
+    war.pendingPrisoners=[{id:35,name:'人質',isDaimyo:false,clan:2}];
+    war.startPrisonerPhase({skipWarCleanup:true,onComplete:value=>{result=value;}});
+    war.abortForScenarioTransition();
+    assert.strictEqual(result,false);
+});
+
+test('r557 有効な捕虜大名の解放は既存の所属移動と処遇完了を維持する', async () => {
+    const {war, game, dialogs} = createPrisonerPhaseHarness();
+    let completed=0, moved=0;
+    game.affiliationSystem.moveCastle=()=>{moved++;};
+    const prisoner={id:39,name:'解放大名',isDaimyo:true,clan:2,castleId:10};
+    war.pendingPrisoners=[prisoner];
+    war.startPrisonerPhase({skipWarCleanup:true,onComplete:()=>{completed++;}});
+    dialogs[0].opts.choices[2].onClick();
+    dialogs[1].ok();
+    await dialogs[2].ok();
+    assert.equal(moved,1);
+    assert.equal(completed,1);
+    assert.equal(war.pendingPrisoners.length,0);
+});
+
+test('r557 有効な外交人質処遇は従来通り完了通知を返す', async () => {
+    const {war} = createPrisonerPhaseHarness();
+    let completed=0;
+    war.pendingPrisoners=[];
+    war.startPrisonerPhase({skipWarCleanup:true,onComplete:()=>{completed++;}});
+    await Promise.resolve();
+    assert.equal(completed,1);
+});
+
+
+// r558: 滅亡の所属・軍団整理を終えた後の会話待ちから、旧ゲーム状態へ戻らない。
+function createR558ExtinctionHarness(playerClanId = 2) {
+    let releaseDialog;
+    let generation = 7;
+    let gameOver = 0;
+    const converted = [];
+    const originalClan = { id: 2, name: '旧家', leaderId: 99, princessIds: [] };
+    let leader = { id: 99, clan: 2, isDaimyo: true, status: 'active' };
+    const ctx = createContext({
+        LifeStatusRules: { isDead: b => b.status === 'dead' },
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        setTimeout: cb => { cb(); return 1; }
+    });
+    loadScript(ctx, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const game = {
+        year: 1560, month: 6, playerClanId, princesses: [],
+        getClan: id => id === 2 ? originalClan : null,
+        getClanCastles: () => [], getClanBushos: () => [],
+        getBusho: id => id === 99 ? leader : null,
+        ui: { log() {}, renderMap() {}, showDialogAsync: () => new Promise(resolve => { releaseDialog = resolve; }) },
+        endingSystem: { processGameOver: async () => { gameOver++; } },
+        affiliationSystem: { becomeRonin: b => { converted.push(b); b.clan = 0; } },
+        turnManager: { captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationLatest: g => g === generation }
+    };
+    const life = new Life(game);
+    return {game, life, originalClan, converted, finishDialog: () => releaseDialog(),
+        changeGeneration: () => { generation++; }, replaceLeader: next => { leader = next; },
+        gameOverCount: () => gameOver};
+}
+
+test('r558 滅亡会話中に年月が変われば旧ゲームオーバーを表示しない', async () => {
+    const h = createR558ExtinctionHarness(2);
+    const pending = h.life.checkClanExtinction(2, 'no_castle');
+    assert.strictEqual(h.originalClan.isDestroyed, true, '会話前に滅亡を確定する既存順序を維持');
+    h.game.month = 7;
+    h.finishDialog(); await pending;
+    assert.strictEqual(h.gameOverCount(), 0, '旧月の滅亡から新月のゲームオーバーを起動しない');
+});
+
+test('r558 滅亡会話中にシナリオが切り替われば新シナリオの同名当主を浪人化しない', async () => {
+    const h = createR558ExtinctionHarness(1);
+    const pending = h.life.checkClanExtinction(2, 'no_castle');
+    const newLeader = {id:99, clan:2, isDaimyo:true, status:'active'};
+    h.replaceLeader(newLeader);
+    h.changeGeneration();
+    h.finishDialog(); await pending;
+    assert.strictEqual(newLeader.clan, 2);
+    assert.strictEqual(newLeader.isDaimyo, true);
+    assert.strictEqual(h.converted.length, 0);
+});
+
+test('r558 有効な滅亡会話後は元どおりプレイヤーゲームオーバーを実行する', async () => {
+    const h = createR558ExtinctionHarness(2);
+    const pending = h.life.checkClanExtinction(2, 'no_castle');
+    h.finishDialog(); await pending;
+    assert.strictEqual(h.gameOverCount(), 1);
+});
+
+test('r558 有効な敵勢力滅亡では旧当主の通常浪人化を維持する', async () => {
+    const h = createR558ExtinctionHarness(1);
+    const pending = h.life.checkClanExtinction(2, 'no_castle');
+    h.finishDialog(); await pending;
+    assert.strictEqual(h.converted.length, 1);
+    assert.strictEqual(h.converted[0].isDaimyo, false);
+    assert.strictEqual(h.converted[0].clan, 0);
+});
+
+
+test('r558 滅亡通知後のゲームオーバー遅延中にターン世代が変われば旧終了処理を起動しない', async () => {
+    let releaseDialog, releaseDelay, generation = 10, ended = 0;
+    let notifyDelay;
+    const delayStarted = new Promise(resolve => { notifyDelay = resolve; });
+    const ctx = createContext({
+        LifeStatusRules: { isDead: () => false },
+        BushoStatusRules: { isActive: () => false },
+        setTimeout: cb => { releaseDelay = cb; notifyDelay(); return 1; }
+    });
+    loadScript(ctx, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const clan = {id:2, name:'旧家', leaderId:99};
+    const game = {year:1560, month:6, playerClanId:2, princesses:[],
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation},
+        getClan:id=>id===2?clan:null, getClanCastles:()=>[], getClanBushos:()=>[],
+        ui:{log(){},renderMap(){},showDialogAsync:()=>new Promise(resolve=>releaseDialog=resolve)},
+        endingSystem:{processGameOver:async()=>{ended++;}}
+    };
+    const pending = new Life(game).checkClanExtinction(2);
+    releaseDialog();
+    await delayStarted;
+    assert.equal(typeof releaseDelay,'function');
+    generation++;
+    releaseDelay(); await pending;
+    assert.equal(ended,0);
+});
+
+
+// r560: 国主席の正本はLegion.commanderId。死亡時も後任の二重任命を防ぐ。
+test('r560 国主補助フラグ欠落でも死亡時に現役軍団の後任を選ぶ', async () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { DEAD: 'dead', ACTIVE: 'active' } },
+        LifeStatusRules: { isUnborn: b => b.status === 'unborn' },
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' }
+    });
+    loadScript(ctx, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const former = { id: 11, clan: 4, castleId: 2, fullName: '旧国主', familyIds: [1], status: 'active',
+        isCommander: false, isDaimyo: false, isCastellan: false, wifeIds: [], courtRankIds: [] };
+    const next = { id: 12, clan: 4, castleId: 2, fullName: '後継者', familyIds: [1], status: 'active',
+        isCommander: false, isDaimyo: false, isGunshi: false, leadership: 60, intelligence: 60 };
+    const seat = { id: 200, clanId: 4, legionNo: 2, commanderId: 11 };
+    const castle = { id: 2, ownerClan: 4, legionId: 2, castellanId: 11, samuraiIds: [11, 12] };
+    const game = {
+        year: 1560, legions: [seat], castles: [castle], bushos: [former, next],
+        getCastle: id => Number(id) === 2 ? castle : null,
+        getBusho: id => ({ 11: former, 12: next })[id] || null,
+        getClanBushos: () => [former, next], getClan: () => ({ name: '試験家' }),
+        ui: { showDialogAsync: async () => {}, log() {} },
+        affiliationSystem: {
+            leaveCastle(b) { castle.samuraiIds = castle.samuraiIds.filter(id => id !== b.id); },
+            setActivityStatusRaw(b, v) { b.status = v; },
+            transferClanRaw(b, id) { b.clan = id; },
+            setCastleIdRaw(b, id) { b.castleId = id; },
+            setClanIdRaw(b, id) { b.clan = id; }
+        }
+    };
+    const life = new Life(game);
+    life.cascadeDeathToUnbornChildren = () => {};
+    await life.executeDeath(former);
+    assert.strictEqual(seat.commanderId, 12, '死亡した国主の旧席を放置しない');
+    assert.strictEqual(next.isCommander, true);
+    assert.strictEqual(former.isCommander, false);
+});
+
+test('r560 国主後継者は他の現役軍団の国主を補助フラグ欠落でも除外する', async () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active' } },
+        LifeStatusRules: { isUnborn: b => b.status === 'unborn' },
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' }
+    });
+    loadScript(ctx, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const former = { id: 11, clan: 4, castleId: 2, fullName: '旧国主', familyIds: [1], status: 'dead' };
+    const occupied = { id: 12, clan: 4, castleId: 3, fullName: '別軍団国主', familyIds: [1], status: 'active',
+        isCommander: false, isDaimyo: false, leadership: 99, intelligence: 99 };
+    const available = { id: 13, clan: 4, castleId: 2, fullName: '後任候補', familyIds: [1], status: 'active',
+        isCommander: false, isDaimyo: false, isGunshi: false, leadership: 50, intelligence: 50 };
+    const first = { id: 200, clanId: 4, legionNo: 2, commanderId: 11 };
+    const second = { id: 201, clanId: 4, legionNo: 3, commanderId: 12 };
+    const castles = [
+        { id: 2, ownerClan: 4, legionId: 2, castellanId: 11, samuraiIds: [11, 13] },
+        { id: 3, ownerClan: 4, legionId: 3, castellanId: 12, samuraiIds: [12] }
+    ];
+    const game = {
+        year: 1560, legions: [first, second], castles, bushos: [former, occupied, available],
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getBusho: id => ({ 11: former, 12: occupied, 13: available })[id] || null,
+        getClanBushos: () => [former, occupied, available], getClan: () => ({ name: '試験家' }),
+        ui: { showDialogAsync: async () => {}, log() {} },
+        affiliationSystem: {
+            leaveCastle(b) { const c = game.getCastle(b.castleId); c.samuraiIds = c.samuraiIds.filter(id => id !== b.id); },
+            setActivityStatusRaw(b, v) { b.status = v; },
+            transferClanRaw(b, id) { b.clan = id; },
+            setCastleIdRaw(b, id) { b.castleId = id; }
+        }
+    };
+    const life = new Life(game);
+    await life.handleCommanderDeath(former);
+    assert.strictEqual(first.commanderId, 13, '空いている一門武将が継承する');
+    assert.strictEqual(second.commanderId, 12, '別軍団の国主席を奪わない');
+    assert.strictEqual(occupied.castleId, 3, '別軍団の国主を移動しない');
+});
+
+test('r560 国主後継者が他軍団の国主しかいない場合は元軍団を解散する', async () => {
+    const ctx = createContext({
+        LifeStatusRules: { isUnborn: () => false },
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: () => false }
+    });
+    loadScript(ctx, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const former = { id: 11, clan: 4, castleId: 2, fullName: '旧国主', familyIds: [1], status: 'dead' };
+    const occupied = { id: 12, clan: 4, castleId: 3, fullName: '別軍団国主', familyIds: [1], status: 'active',
+        isCommander: false, isDaimyo: false, leadership: 99, intelligence: 99 };
+    const first = { id: 200, clanId: 4, legionNo: 2, commanderId: 11 };
+    const second = { id: 201, clanId: 4, legionNo: 3, commanderId: 12 };
+    const disbanded = [];
+    const game = {
+        year: 1560, legions: [first, second], bushos: [former, occupied],
+        getClanBushos: () => [former, occupied], getCastle: () => null, getClan: () => ({ name: '試験家' }),
+        ui: { showDialogAsync: async () => {}, log() {} },
+        castleManager: { disbandLegion(id) { disbanded.push(id); first.commanderId = 0; } }
+    };
+    await new Life(game).handleCommanderDeath(former);
+    assert.deepStrictEqual(disbanded, [200], '対象軍団のみ正規解散する');
+    assert.strictEqual(second.commanderId, 12, '別軍団は維持する');
+});
+
+// r561: 軍団席が正本。移動時の補助フラグ欠落や城主再選で旧席を残さない。
+test('r561 国主フラグ欠落でも別軍団へ移動したら正規の軍団解散が走る', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: b => b.status === 'active' }, LifeStatusRules: { isPresent: () => true } });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/castle_manager.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const CastleManager = vm.runInContext('CastleManager', ctx);
+    const leader = { id: 10, clan: 1, castleId: 1, isCommander: false, isCastellan: true, status: 'active' };
+    const castles = [
+        { id: 1, ownerClan: 1, legionId: 2, castellanId: 10, samuraiIds: [10], isDelegated: true },
+        { id: 2, ownerClan: 1, legionId: 2, castellanId: 0, samuraiIds: [], isDelegated: true },
+        { id: 3, ownerClan: 1, legionId: 0, castellanId: 0, samuraiIds: [], isDelegated: false },
+        { id: 4, ownerClan: 2, legionId: 2, castellanId: 0, samuraiIds: [], isDelegated: true }
+    ];
+    const legion = { id: 100, clanId: 1, legionNo: 2, commanderId: 10 };
+    const otherLegion = { id: 200, clanId: 2, legionNo: 2, commanderId: 20 };
+    const cleared = [];
+    const game = {
+        legions: [legion, otherLegion], castles, getCastle: id => castles.find(c => c.id === Number(id)),
+        getBusho: id => Number(id) === 10 ? leader : null,
+        aiOperationManager: { clearLegionPlanning: (clan, no) => cleared.push([clan, no]) }
+    };
+    game.castleManager = new CastleManager(game);
+    const affiliation = new AffiliationSystem(game);
+    affiliation.moveCastle(leader, 3, { deferUI: true, deferCastleLordUpdate: true });
+    assert.strictEqual(legion.commanderId, 0, '旧軍団の国主席を消す');
+    assert.strictEqual(castles[0].legionId, 0);
+    assert.strictEqual(castles[1].legionId, 0);
+    assert.strictEqual(castles[0].isDelegated, false);
+    assert.strictEqual(otherLegion.commanderId, 20, '他家同番号軍団は保つ');
+    assert.strictEqual(castles[3].legionId, 2);
+    assert.deepStrictEqual(cleared, [[1, 2]], 'AI計画も専門System経由で破棄');
+});
+
+test('r561 国主フラグ欠落でも自軍団内の移動は席を維持し補助フラグを同期する', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: () => true }, LifeStatusRules: { isPresent: () => true } });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const leader = { id: 10, clan: 1, castleId: 1, isCommander: false, isCastellan: true };
+    const castles = [{ id: 1, ownerClan: 1, legionId: 2 }, { id: 2, ownerClan: 1, legionId: 2 }];
+    const seat = { id: 100, clanId: 1, legionNo: 2, commanderId: 10 };
+    let disbanded = 0;
+    const game = {
+        legions: [seat], getCastle: id => castles.find(c => c.id === Number(id)),
+        castleManager: { disbandLegion: () => { disbanded++; seat.commanderId = 0; } }
+    };
+    const aff = new AffiliationSystem(game);
+    aff.leaveCastle = () => {};
+    aff.enterCastle = (b, id) => { b.castleId = id; };
+    aff.moveCastle(leader, 2, { deferUI: true });
+    assert.strictEqual(seat.commanderId, 10);
+    assert.strictEqual(disbanded, 0);
+    assert.strictEqual(leader.isCommander, true, '派生フラグを実際の国主席に同期する');
+});
+
+test('r561 城主再選出では国主席を正本に国主を優先する', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: b => b.status === 'active' } });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const leader = { id: 10, clan: 1, castleId: 2, isCommander: false, isCastellan: false, status: 'active' };
+    const lord = { id: 11, clan: 1, castleId: 2, isCommander: false, isCastellan: true, status: 'active' };
+    const castle = { id: 2, ownerClan: 1, legionId: 2, castellanId: 11 };
+    const game = { legions: [{ id: 100, clanId: 1, legionNo: 2, commanderId: 10 }],
+        getCastleBushos: () => [leader, lord], getBusho: id => Number(id) === 11 ? lord : leader };
+    new AffiliationSystem(game).updateCastleLord(castle);
+    assert.strictEqual(castle.castellanId, 10);
+    assert.strictEqual(leader.isCastellan, true);
+    assert.strictEqual(leader.isCommander, true);
+    assert.strictEqual(lord.isCastellan, false);
+});
+
+test('r561 AI軍団新設で席を先行確保した直轄武将は移動中に解散されない', () => {
+    const ctx = createContext({ LifeStatusRules: { isPresent: () => true } });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const newCommander = { id: 10, clan: 1, castleId: 1, isCommander: false, isCastellan: false };
+    const castles = [{ id: 1, ownerClan: 1, legionId: 0 }, { id: 2, ownerClan: 1, legionId: 0 }];
+    const seat = { id: 100, clanId: 1, legionNo: 2, commanderId: 10 };
+    let disbanded = 0;
+    const game = { legions: [seat], getCastle: id => castles.find(c => c.id === Number(id)),
+        castleManager: { disbandLegion: () => { disbanded++; seat.commanderId = 0; } } };
+    const aff = new AffiliationSystem(game);
+    aff.leaveCastle = () => {};
+    aff.enterCastle = (b, id) => { b.castleId = id; };
+    aff.moveCastle(newCommander, 2, { deferUI: true });
+    assert.strictEqual(disbanded, 0, 'AI人事は移動後に城を軍団へ割り当てる');
+    assert.strictEqual(seat.commanderId, 10);
+    assert.strictEqual(newCommander.isCommander, false, '新設側が既存どおり最後に役職を確定する');
+});
+
+test('r561 席を持たない古い国主フラグは城主選定の優先権にならない', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: b => b.status === 'active' } });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const stale = { id: 10, clan: 1, castleId: 2, isCommander: true, isCastellan: false, status: 'active' };
+    const actual = { id: 11, clan: 1, castleId: 2, isCommander: false, isCastellan: true, status: 'active' };
+    const castle = { id: 2, ownerClan: 1, legionId: 2, castellanId: 11 };
+    const game = { legions: [{ id: 100, clanId: 1, legionNo: 2, commanderId: 0 }],
+        getCastleBushos: () => [stale, actual], getBusho: id => Number(id) === 10 ? stale : actual };
+    new AffiliationSystem(game).updateCastleLord(castle);
+    assert.strictEqual(castle.castellanId, 11, '城側の現職城主は維持');
+    assert.strictEqual(actual.isCastellan, true);
+    assert.strictEqual(stale.isCastellan, false);
+});
+
+
+// r562: 任命先の国主在城地は、人物表示フラグでなく軍団正本で守る。
+test('r562 国主の在城地はisCommander欠落でも軍団正本から取得し、他家や空席を含めない', () => {
+    const ctx = createContext(); loadScript(ctx, 'js/castle_manager.js');
+    const CastleManager = vm.runInContext('CastleManager', ctx);
+    const castles = [
+        { id: 1, ownerClan: 4, legionId: 2 }, { id: 2, ownerClan: 4, legionId: 0 },
+        { id: 3, ownerClan: 5, legionId: 2 }, { id: 4, ownerClan: 4, legionId: 0 }
+    ];
+    const leaders = [{ id: 41, clan: 4, castleId: 1, isCommander: false },
+        { id: 42, clan: 4, castleId: 2, isCommander: false }, { id: 51, clan: 5, castleId: 3, isCommander: true }];
+    const game = { legions: [
+        { id: 10, clanId: 4, legionNo: 2, commanderId: 41 },
+        { id: 11, clanId: 4, legionNo: 3, commanderId: 42 },
+        { id: 12, clanId: 4, legionNo: 4, commanderId: 0 },
+        { id: 13, clanId: 5, legionNo: 2, commanderId: 51 } ],
+    getBusho: id => leaders.find(b => b.id === Number(id)),
+    getCastle: id => castles.find(c => c.id === Number(id)) };
+    const ids = new CastleManager(game).getActiveCommanderCastleIds(4);
+    assert.strictEqual([...ids].sort((a,b)=>a-b).join(','), '1,2');
+});
+
+test('r562 国主任命は別軍団国主の在城地を直接確定されても上書きしない', () => {
+    const ctx = createContext({ Legion: class Legion { constructor(data) { Object.assign(this, data); } },
+        BushoStatusRules: { isActive: () => true } });
+    loadScript(ctx, 'js/castle_manager.js'); loadScript(ctx, 'js/command_system.js');
+    const CastleManager = vm.runInContext('CastleManager', ctx);
+    const CommandSystem = vm.runInContext('CommandSystem', ctx);
+    const castles = [{ id: 1, ownerClan: 4, legionId: 0, castellanId: 40 },
+        { id: 2, ownerClan: 4, legionId: 2, castellanId: 41 },
+        { id: 3, ownerClan: 4, legionId: 0, castellanId: 42 }];
+    const leader = { id: 41, clan: 4, isCommander: false, castleId: 2, isCastellan: true };
+    const candidate = { id: 44, clan: 4, isCommander: false, isDaimyo: false, castleId: 3, isCastellan: false };
+    let moved = 0, succeeded = 0;
+    const game = { playerClanId: 4, legions: [{ id: 9, clanId: 4, legionNo: 2, commanderId: 41 }],
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getBusho: id => [leader, candidate].find(b => b.id === Number(id)),
+        getLegionByClanNo: (clan, no) => game.legions.find(l => l.clanId === clan && l.legionNo === no),
+        getDaimyoHomeCastle: () => castles[0], getCurrentTurnId: () => 12,
+        getClan: () => ({ name: '試験家' }),
+        affiliationSystem: { moveCastle() { moved++; }, clearGunshiRole() {} } };
+    game.castleManager = new CastleManager(game);
+    const command = new CommandSystem(game);
+    command.finishCommand = () => succeeded++;
+    command.executeAppointLegionLeader(44, 1, 2);
+    assert.strictEqual(moved, 0);
+    assert.strictEqual(succeeded, 0);
+    assert.strictEqual(game.legions.length, 1);
+    assert.strictEqual(castles[1].legionId, 2);
+    assert.strictEqual(castles[1].castellanId, 41);
+    assert.strictEqual(leader.isCastellan, true);
+    assert.strictEqual(candidate.castleId, 3);
+    command.executeAppointLegionLeader(44, 1, 3);
+    assert.strictEqual(moved, 1, '他の通常拠点への任命は継続して許可');
+    assert.strictEqual(succeeded, 1);
+});
+
+test('r562 国主の在城地選択UIは軍団正本の共通窓口を使用する', () => {
+    const code = read('js/ui_info_kyoten.js');
+    const start = code.indexOf('if (isSelectMode && selectData) {', code.indexOf('_renderKyotenList('));
+    const block = code.slice(start, start + 1050);
+    assert.ok(block.includes('this.game.castleManager.getActiveCommanderCastleIds(this.game.playerClanId)'));
+    assert.ok(!block.includes('b.isCommander'), '旧フラグでの自前探索へ戻さない');
+});
+
+// r563: 委任設定の操作は見た目だけでなく、Castle のゲーム状態へ反映されなければならない。
+test('r563 Castleの委任・攻撃許可・移動許可は実際に切り替わり保存復元される', () => {
+    const ctx = createContext({ WarParams: { Military: { MaxTrainingNormal: 100, MaxMoraleInternal: 100 } } });
+    loadScript(ctx, 'js/models.js');
+    const Castle = vm.runInContext('Castle', ctx);
+    const castle = new Castle({ id: 10, ownerClan: 4, castellanId: 41, legionId: 2 });
+    assert.strictEqual(castle.isDelegated, true, '軍団領は初期状態で委任');
+    assert.strictEqual(castle.allowAttack, true);
+    assert.strictEqual(castle.allowMove, true);
+    castle.isDelegated = false;
+    castle.allowAttack = false;
+    castle.allowMove = false;
+    assert.strictEqual(castle.isDelegated, false);
+    assert.strictEqual(castle.allowAttack, false);
+    assert.strictEqual(castle.allowMove, false);
+    const restored = new Castle(JSON.parse(JSON.stringify(castle)));
+    assert.strictEqual(restored.isDelegated, false);
+    assert.strictEqual(restored.allowAttack, false);
+    assert.strictEqual(restored.allowMove, false);
+    restored.isDelegated = true;
+    restored.allowAttack = true;
+    restored.allowMove = true;
+    assert.strictEqual(restored.isDelegated, true);
+    assert.strictEqual(restored.allowAttack, true);
+    assert.strictEqual(restored.allowMove, true);
+});
+
+test('r563 初期委任は軍団配置を自動反映し、手動切替は拠点が変更されない限り残る', () => {
+    const ctx = createContext({ WarParams: { Military: { MaxTrainingNormal: 100, MaxMoraleInternal: 100 } } });
+    loadScript(ctx, 'js/models.js');
+    const Castle = vm.runInContext('Castle', ctx);
+    const castle = new Castle({ id: 10, ownerClan: 4, castellanId: 41, legionId: 0 });
+    assert.strictEqual(castle.isDelegated, false);
+    castle.legionId = 2; // シナリオ初期化時に軍団が後から割り振られる場合
+    assert.strictEqual(castle.isDelegated, true);
+    castle.isDelegated = false;
+    assert.strictEqual(castle.isDelegated, false, '明示的な操作はモデル上で維持される');
+    const restored = new Castle(JSON.parse(JSON.stringify(castle)));
+    assert.strictEqual(restored.isDelegated, false);
+});
+
+test('r563 所有者が変わると委任・攻撃・移動の旧設定を新勢力へ引き継がない', () => {
+    const ctx = createContext({ WarParams: { Military: { MaxTrainingNormal: 100, MaxMoraleInternal: 100 } } });
+    loadScript(ctx, 'js/models.js');
+    loadScript(ctx, 'js/castle_manager.js');
+    const Castle = vm.runInContext('Castle', ctx);
+    const CastleManager = vm.runInContext('CastleManager', ctx);
+    const castle = new Castle({ id: 10, ownerClan: 1, legionId: 0, castellanId: 0 });
+    castle.isDelegated = true;
+    castle.allowAttack = false;
+    castle.allowMove = false;
+    const game = { castles: [castle], legions: [], clans: [], getClan: () => null };
+    new CastleManager(game).changeOwner(castle, 2, true);
+    assert.strictEqual(castle.ownerClan, 2);
+    assert.strictEqual(castle.isDelegated, false, '直轄化すると委任を解除');
+    assert.strictEqual(castle.allowAttack, true, '旧家の攻撃禁止を持ち込まない');
+    assert.strictEqual(castle.allowMove, true, '旧家の移動禁止を持ち込まない');
+});
+
+test('r563 軍団が占領した拠点は既存どおり軍団委任を初期値とする', () => {
+    const ctx = createContext({ WarParams: { Military: { MaxTrainingNormal: 100, MaxMoraleInternal: 100 } } });
+    loadScript(ctx, 'js/models.js');
+    loadScript(ctx, 'js/castle_manager.js');
+    const Castle = vm.runInContext('Castle', ctx);
+    const CastleManager = vm.runInContext('CastleManager', ctx);
+    const castle = new Castle({ id: 11, ownerClan: 1, legionId: 0, castellanId: 0 });
+    castle.isDelegated = false;
+    castle.allowAttack = false;
+    castle.allowMove = false;
+    const game = { castles: [castle], legions: [], clans: [], getClan: () => null };
+    new CastleManager(game).changeOwner(castle, 2, true, 3);
+    assert.strictEqual(castle.legionId, 3);
+    assert.strictEqual(castle.isDelegated, true, '新たな軍団領は自動委任となる');
+    assert.strictEqual(castle.allowAttack, true);
+    assert.strictEqual(castle.allowMove, true);
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
@@ -22067,4 +23369,5 @@ Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(1);
 });
+
 

@@ -158,7 +158,12 @@ class TurnManager {
     async startMonth() { 
         const game = this.game;
         const turnFlowGeneration = Number(this._turnFlowGeneration || 0);
-        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);
+        // 月替わりではシナリオ世代自体は進まないため、旧月初のawait再開を年月でも失効させる。
+        const expectedYear = Number(game.year);
+        const expectedMonth = Number(game.month);
+        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration)
+            && Number(game.year) === expectedYear
+            && Number(game.month) === expectedMonth;
         if (!isCurrentFlow()) return;
         this._cancelAllActionsDonePromptTimer();
         game.hasAutoSavedThisMonth = false; // ★月が替わったので、オートセーブ済みの印を消します
@@ -700,7 +705,12 @@ class TurnManager {
     async endMonth() {
         const game = this.game;
         const turnFlowGeneration = Number(this._turnFlowGeneration || 0);
-        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration);
+        // 月末自体が月を進めるまでは、元の年月から逸脱した旧処理を再開しない。
+        const expectedYear = Number(game.year);
+        const expectedMonth = Number(game.month);
+        const isCurrentFlow = () => this._isTurnFlowCurrent(turnFlowGeneration)
+            && Number(game.year) === expectedYear
+            && Number(game.month) === expectedMonth;
         if (!isCurrentFlow()) return;
         game.writeSystemDiagnostic('month_end:start');
 
@@ -787,13 +797,19 @@ class TurnManager {
         // すべての月末イベントとメッセージが完全に終わってから、ようやく時間を進めます！
         game.month++;
         if(game.month > 12) { game.month = 1; game.year++; }
+        // この月送りだけは意図した変化。以後のエンディング待機は進めた先の年月を照合する。
+        const advancedYear = Number(game.year);
+        const advancedMonth = Number(game.month);
+        const isAdvancedMonthCurrent = () => this._isTurnFlowCurrent(turnFlowGeneration)
+            && Number(game.year) === advancedYear
+            && Number(game.month) === advancedMonth;
         
         // ★ここから追加：月末のタイミングで大名家の表示名を更新して同名被りを防ぎます！
         game.updateClanDisplayNames();
         
         // ★修正：クリアとゲームオーバーの判定を EndingSystem (エンディング係) に任せます！
         const isEnding = await game.endingSystem.checkEnding();
-        if (!isCurrentFlow()) return;
+        if (!isAdvancedMonthCurrent()) return;
         if (!isEnding) {
             // エンディングでなければ次の月へ進みます
             game.writeSystemDiagnostic('month_end:before_startMonth');

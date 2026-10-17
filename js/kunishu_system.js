@@ -403,10 +403,15 @@ class KunishuSystem {
     // 既存TurnManagerの世代を読取専用で利用する。世代の管理責務は増やさない。
     _captureKunishuFlow() {
         const manager = this.game && this.game.turnManager;
-        if (!manager || typeof manager.captureTurnFlowGeneration !== 'function'
-            || typeof manager.isTurnFlowGenerationLatest !== 'function') return () => true;
-        const generation = manager.captureTurnFlowGeneration();
-        return () => manager.isTurnFlowGenerationLatest(generation);
+        const expectedYear = this.game.year;
+        const expectedMonth = this.game.month;
+        const generation = manager && typeof manager.captureTurnFlowGeneration === 'function'
+            ? manager.captureTurnFlowGeneration() : null;
+        return () => this.game.year === expectedYear
+            && this.game.month === expectedMonth
+            && (generation === null || !manager
+                || typeof manager.isTurnFlowGenerationLatest !== 'function'
+                || manager.isTurnFlowGenerationLatest(generation));
     }
 
     // 月末処理
@@ -1069,6 +1074,7 @@ class KunishuSystem {
     
     // 諸勢力を攻めて壊滅させるための処理
     async executeKunishuSubjugate(atkCastle, targetCastleId, atkBushosIds, sendSoldiers, sendRice, sendHorses, sendGuns, kunishu) {
+        const isCurrentFlow = this._captureKunishuFlow();
         const atkBushos = atkBushosIds.map(id => this.game.getBusho(id));
         // 鎮圧戦の戦場は出撃元ではなく、諸勢力が実際に紐づく拠点を正本にします。
         // 呼び出し側が古いtargetCastleIdを渡しても演出・援軍判定・戦闘対象がずれないようここで正規化します。
@@ -1085,7 +1091,10 @@ class KunishuSystem {
         this.game.warPreparationController.checkReinforcementAndStartWar(atkCastle, actualTargetCastleId, atkBushos, sendSoldiers, sendRice, sendHorses, sendGuns, extraData);
         const subjugationWarGeneration = this.game.warManager.getCurrentWarGeneration();
         if (subjugationWarGeneration !== beforeGeneration) {
-            await this.game.warManager.waitForWarClose(subjugationWarGeneration);
+            const completed = await this.game.warManager.waitForWarClose(subjugationWarGeneration);
+            // 旧戦争の中断完了を新ゲームの通常コマンド画面へ反映しない。
+            if (!isCurrentFlow() || completed === false
+                || this.game.warManager.getCurrentWarGeneration() !== subjugationWarGeneration) return;
         }
         
         // プレイヤー関与時のUI更新

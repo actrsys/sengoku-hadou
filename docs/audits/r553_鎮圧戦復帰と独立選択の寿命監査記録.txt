@@ -1,0 +1,30 @@
+戦国覇道 r553：鎮圧戦復帰と独立・寝返り選択の非同期寿命監査
+
+【監査基準】
+・r552を正本に、同梱ARCHITECTURE.mdとr450・r451・r547～r552の監査記録、および専門System／WarManager／TurnManagerの既存責務を照合。
+・旧月・旧シナリオの待機結果を、現行のプレイヤー操作／会話／パネルに反映しない。個別のセッション世代や後勝ちリセットは追加しない。
+・まずr552相当の実コードで再現テストを失敗させてから実装を修正。
+
+【修正前に再現した問題】
+1. KunishuSystem.executeKunishuSubjugate()：戦争終了Promiseの待機中に年月またはターン世代が変わっても、旧鎮圧処理が新しい操作パネルを更新する。戦争中断によりwaitForWarClose()がfalseを返す場合にも更新へ進む。
+2. IndependenceSystem.askPlayerForDefection()：面会の最初の確認操作を古い画面から実行でき、会話の途中で年月が変わっても後続の面会会話や採用確認を表示できる。
+3. IndependenceSystem.executeRebellion()：独立後の勢力選択画面で、確認の表示後にゲーム世代が失効しても古い［この勢力を操作］コールバックからplayerClanIdと現画面ヘッダーを書き換えられる。
+・追加回帰テストのうち不具合検証3件は、修正前に3件失敗／既存936件成功を確認。正常経路の保持も確認。
+
+【改修】
+・KunishuSystemの既存の _captureKunishuFlow()を鎮圧戦開始時に取得し、waitForWarClose()の戻り値、WarManagerの戦争世代、TurnManager由来の年月・世代を揃えて確認してからUIを更新する。
+・IndependenceSystem.askPlayerForDefection()では既存_captureIndependenceFlow()を、面会開始時の選択、各会話待機後、採用・断り確定に利用。失効時は面会結果falseで終了し、旧画面の会話を進めない。
+・独立後の操作勢力選択では、選択肢からの確認・最終確定・戻るコールバックが同じ既存寿命判定を使う。失効時はプレイヤー勢力を変更しない。
+・戦闘判定／出陣数値／忠誠・寝返り判定／独立処理／ダイアログ表示文章／UIレイアウト／セーブ形式／管理用データは変更なし。
+
+【検証】
+・通常回帰940件すべて成功（4件追加、失敗0）。修正前の不具合再現を確認済み。
+・PC/スマホ/軽量モードの実ブラウザ表示回帰、JavaScript全構文検査通過。
+・共通/1560/1570の管理用ExcelとBINの全出力フィールド一致および主要数式保持検査通過。
+・シミュレーション4件成功。
+・ブラウザ操作での高負荷・長時間観戦、戦闘中に人為的にゲーム切替する実機操作は未検証。
+
+【変更ファイル】
+追加：docs/audits/r553_鎮圧戦復帰と独立選択の寿命監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/kunishu_system.js、js/independence_system.js、tests/run_tests.js
+削除：なし

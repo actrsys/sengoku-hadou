@@ -129,9 +129,13 @@ class FactionSystem {
         const turnManager = this.game && this.game.turnManager;
         const generation = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
             ? turnManager.captureTurnFlowGeneration() : null;
-        const isCurrentFlow = () => generation === null || !turnManager
-            || typeof turnManager.isTurnFlowGenerationLatest !== 'function'
-            || turnManager.isTurnFlowGenerationLatest(generation);
+        const expectedYear = this.game.year;
+        const expectedMonth = this.game.month;
+        const isCurrentFlow = () => this.game.year === expectedYear
+            && this.game.month === expectedMonth
+            && (generation === null || !turnManager
+                || typeof turnManager.isTurnFlowGenerationLatest !== 'function'
+                || turnManager.isTurnFlowGenerationLatest(generation));
         const F = window.WarParams.Faction;
         const roninThreshold = F.RoninLoyaltyThreshold;
         const roninChanceBase = F.RoninChanceBase;

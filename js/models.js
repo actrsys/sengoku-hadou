@@ -233,20 +233,24 @@ class Castle {
         this.investigatedUntil = Number(this.investigatedUntil || 0);
         this.investigatedAccuracy = Number(this.investigatedAccuracy || 0);
         
-        // ★委任されているかどうかを覚える箱（軍団IDが0以外なら自動で委任状態）
+        // 軍団領は初期状態で委任。ただし委任設定からの明示変更は別に保持する。
+        // 軍団Noを唯一の委任フラグにすると、画面上の切替・城攻め/移動許可が無効になる。
+        // 現行セーブでは各値を保存し、新規シナリオだけは未指定なら既定値を使う。
+        this._delegatedOverride = (typeof data._delegatedOverride === 'boolean')
+            ? data._delegatedOverride : null;
+        this._allowAttack = data._allowAttack !== false;
+        this._allowMove = data._allowMove !== false;
         Object.defineProperty(this, 'isDelegated', {
-            get: function() { return this.legionId > 0; },
-            set: function(val) { /* 何もしない（エラー防止用） */ }
+            get: function() { return this._delegatedOverride === null ? this.legionId > 0 : this._delegatedOverride; },
+            set: function(val) { this._delegatedOverride = val === true; }
         });
-
-        // ★委任中の細かい許可設定（移動と城攻めは一旦すべて許可）
         Object.defineProperty(this, 'allowAttack', {
-            get: function() { return true; },
-            set: function(val) { /* 何もしない */ }
+            get: function() { return this._allowAttack; },
+            set: function(val) { this._allowAttack = val === true; }
         });
         Object.defineProperty(this, 'allowMove', {
-            get: function() { return true; },
-            set: function(val) { /* 何もしない */ }
+            get: function() { return this._allowMove; },
+            set: function(val) { this._allowMove = val === true; }
         });
 
         // ★一揆や豪雪などの「状態異常」のシールを複数貼っておくための箱です

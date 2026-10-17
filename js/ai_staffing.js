@@ -1196,9 +1196,15 @@ class AIStaffing {
         const turnManager = this.game && this.game.turnManager;
         const generation = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
             ? turnManager.captureTurnFlowGeneration() : null;
-        const isCurrentFlow = () => generation === null || !turnManager
+        const expectedYear = this.game.year;
+        const expectedMonth = this.game.month;
+        const isCurrentFlow = () => (generation === null || !turnManager
             || typeof turnManager.isTurnFlowGenerationLatest !== 'function'
-            || turnManager.isTurnFlowGenerationLatest(generation);
+            || turnManager.isTurnFlowGenerationLatest(generation))
+            && this.game.year === expectedYear
+            && this.game.month === expectedMonth;
+        // 呼出し元から渡された実施月と実際のゲーム月がずれた古い処理を開始しない。
+        if (!isCurrentFlow() || (expectedMonth !== undefined && Number(expectedMonth) !== Number(month))) return;
         let staffingProcessed = 0;
 
         for (const clan of this.game.clans) {

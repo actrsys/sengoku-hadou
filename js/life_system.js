@@ -159,24 +159,30 @@ class LifeSystem {
         return true;
     }
 
-    // TurnManagerを世代の唯一の正本とし、寿命処理側は読取・比較だけを行います。
-    _captureLifeFlowGeneration() {
+    // シナリオ世代はTurnManagerが唯一の正本。年・月は同じ世代内の旧月次処理の失効に使用する。
+    _captureLifeFlowContext() {
         const tm = this.game && this.game.turnManager;
-        return tm && typeof tm.captureTurnFlowGeneration === 'function'
-            ? tm.captureTurnFlowGeneration() : null;
+        return {
+            generation: tm && typeof tm.captureTurnFlowGeneration === 'function'
+                ? tm.captureTurnFlowGeneration() : null,
+            year: this.game?.year,
+            month: this.game?.month
+        };
     }
 
-    _isLifeFlowCurrent(generation) {
-        const tm = this.game && this.game.turnManager;
-        return generation === null || generation === undefined || !tm
+    _isLifeFlowCurrent(context) {
+        if (!context || !this.game
+            || this.game.year !== context.year || this.game.month !== context.month) return false;
+        const tm = this.game.turnManager;
+        return context.generation === null || context.generation === undefined || !tm
             || typeof tm.isTurnFlowGenerationLatest !== 'function'
-            || tm.isTurnFlowGenerationLatest(generation);
+            || tm.isTurnFlowGenerationLatest(context.generation);
     }
 
     // 毎月の初め（1月）に「新しく登場する武将がいないか」をチェックします
     async processStartMonth() {
-        const generation = this._captureLifeFlowGeneration();
-        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        const flowContext = this._captureLifeFlowContext();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(flowContext);
         if (!isCurrentFlow()) return;
         if (this.game.month === 1) {
             // 4000人超を一気に再計算すると古いWebViewのwatchdog/メモリ回収が追いつかないため、
@@ -257,8 +263,8 @@ class LifeSystem {
     }
 
     async updateAllBushosAgeCooperatively() {
-        const generation = this._captureLifeFlowGeneration();
-        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        const flowContext = this._captureLifeFlowContext();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(flowContext);
         if (!isCurrentFlow()) return false;
         const currentYear = this.game.year;
         const bushos = this.game.bushos || [];
@@ -359,8 +365,8 @@ class LifeSystem {
     
     // ★ 改名のチェック（毎年1月に行います）
     async checkNameChange() {
-        const generation = this._captureLifeFlowGeneration();
-        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        const flowContext = this._captureLifeFlowContext();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(flowContext);
         if (!isCurrentFlow()) return;
         const currentYear = this.game.year;
         let isDaimyoChanged = false; // ★追加：大名家が改名したかどうかをメモする旗
@@ -490,8 +496,8 @@ class LifeSystem {
 
     // ★ 登場のチェック（毎年1月に行います）
     async checkBirth() {
-        const generation = this._captureLifeFlowGeneration();
-        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        const flowContext = this._captureLifeFlowContext();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(flowContext);
         if (!isCurrentFlow()) return;
         const currentYear = this.game.year;
         
@@ -759,8 +765,8 @@ class LifeSystem {
 
     // ★ 寿命のチェック（毎月行います）
     async checkDeath() {
-        const generation = this._captureLifeFlowGeneration();
-        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        const flowContext = this._captureLifeFlowContext();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(flowContext);
         if (!isCurrentFlow()) return;
         const startY = this.game.gameStartYear || window.MainParams.StartYear;
         const startM = this.game.gameStartMonth || window.MainParams.StartMonth;
@@ -923,6 +929,14 @@ class LifeSystem {
             }
         }
         // ★追加ここまで！
+    }
+
+    // 国主席の正本は軍団側の commanderId。人物の isCommander は派生フラグにすぎない。
+    _findCommanderLegion(busho) {
+        if (!busho) return null;
+        return (this.game.legions || []).find(l =>
+            Number(l.clanId) === Number(busho.clan)
+            && Number(l.commanderId) === Number(busho.id)) || null;
     }
 
     // お別れの処理をするところです
@@ -1125,7 +1139,7 @@ class LifeSystem {
         }
 
         // ★もし国主だったら、後任を決めます
-        if (busho.isCommander) {
+        if (busho.isCommander || this._findCommanderLegion(busho)) {
             await this.handleCommanderDeath(busho);
         }
         this.game.affiliationSystem.setClanIdRaw(busho, 0);
@@ -1319,7 +1333,7 @@ class LifeSystem {
     
     // ★国主が亡くなった時の後任選びです
     async handleCommanderDeath(commander) {
-        const legion = this.game.legions ? this.game.legions.find(l => l.commanderId === commander.id) : null;
+        const legion = this._findCommanderLegion(commander);
         if (!legion) {
             commander.isCommander = false;
             return; 
@@ -1328,20 +1342,25 @@ class LifeSystem {
         const messages = []; 
         const currentYear = this.game.year;
         
-        // 1. 今活躍している家臣たちを集めます！（大名と国主は弾きます）
-        const activeBushos = this.game.getClanBushos(commander.clan).filter(b => b.id !== commander.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander);
+        // 現役国主かどうかは武将の補助フラグではなく全軍団の commanderId で判断する。
+        // 他の席を持つ武将を後任に選ぶと、一人が二軍団を指揮する矛盾が生じる。
+        const seatedCommanderIds = new Set((this.game.legions || [])
+            .map(l => Number(l.commanderId || 0)).filter(id => id > 0));
+        const activeBushos = this.game.getClanBushos(commander.clan).filter(b =>
+            b.id !== commander.id && window.BushoStatusRules.isActive(b)
+            && !b.isDaimyo && !seatedCommanderIds.has(Number(b.id)));
         
         // その中で国主の「一門」の武将だけを抽出します！
         const activeFamily = activeBushos.filter(b => commander.familyIds.some(fId => b.familyIds.includes(fId)));
 
         // まだ登場していない一門（※他勢力所属予定の武将を弾くため、自勢力予定か無所属に限定します）
-        const unbornFamily = this.game.bushos.filter(b => window.LifeStatusRules.isUnborn(b) && !b.isNotBorn && (b.clan === commander.clan || b.clan === 0) && commander.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
+        const unbornFamily = this.game.bushos.filter(b => window.LifeStatusRules.isUnborn(b) && !b.isNotBorn && (b.clan === commander.clan || b.clan === 0) && !seatedCommanderIds.has(Number(b.id)) && commander.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
 
         // ★追加：AI国主の場合のみ、浪人や諸勢力に所属している一門武将も探します！
         let externalFamily = [];
         if (Number(commander.clan) !== Number(this.game.playerClanId)) {
             externalFamily = this.game.bushos.filter(b => {
-                if (b.id === commander.id || b.isDaimyo || b.isCommander) return false;
+                if (b.id === commander.id || b.isDaimyo || seatedCommanderIds.has(Number(b.id))) return false;
                 if (!commander.familyIds.some(fId => b.familyIds.includes(fId))) return false;
                 if (window.BushoStatusRules.isRonin(b)) return true;
                 if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
@@ -1606,14 +1625,15 @@ class LifeSystem {
             oldDaimyo.isRetired = true;
         }
 
-        // 2. 新大名がもし国主だった場合、その軍団を解散させます
-        if (successor.isCommander && this.game.castleManager) {
-            const oldLegion = this.game.legions ? this.game.legions.find(l => l.commanderId === successor.id) : null;
-            if (oldLegion) {
-                this.game.castleManager.disbandLegion(oldLegion.id);
-            }
-            successor.isCommander = false;
+        // 2. 新当主が国主の席を占めている場合、その軍団を正規解散する。
+        // isCommander は表示用キャッシュなので、解散要否は Legion.commanderId を正本にする。
+        const oldLegion = (this.game.legions || []).find(l =>
+            Number(l.clanId) === Number(oldDaimyo.clan)
+            && Number(l.commanderId) === Number(successor.id));
+        if (oldLegion && this.game.castleManager) {
+            this.game.castleManager.disbandLegion(oldLegion.id);
         }
+        successor.isCommander = false;
 
         // 3. 家督継承先は先代の一時的な出陣先ではなく、記録された居城。
         // 本拠が失陥していた場合は正本による直轄拠点の再選定に従う。
@@ -1712,6 +1732,10 @@ class LifeSystem {
     // ★大名家の滅亡を処理する魔法です！
     async checkClanExtinction(clanId, reason = 'no_castle', killerClanId = 0) {
         if (!clanId || clanId === 0) return;
+        // 滅亡に伴う所属・拠点処理は会話前に確定するが、会話終了後の
+        // ゲームオーバーや旧当主の処分は同じゲーム状態にだけ適用する。
+        const flowContext = this._captureLifeFlowContext();
+        const playerClanIdAtStart = Number(this.game.playerClanId);
         
         // 大名家のデータを探します
         const clan = this.game.getClan(clanId);
@@ -1830,6 +1854,9 @@ class LifeSystem {
 
             // ★すべての裏処理が終わってから、画面にメッセージを出して待ちます！
             await this.game.ui.showDialogAsync(extMsg, false, 0);
+            if (!this._isLifeFlowCurrent(flowContext)
+                || this.game.getClan(clanId) !== clan
+                || Number(this.game.playerClanId) !== playerClanIdAtStart) return;
             // ==========================================
 
             // もしプレイヤーの大名家が滅亡してしまったら…ゲームオーバーです！
@@ -1837,6 +1864,9 @@ class LifeSystem {
                 // 滅亡状態の印をつけます
                 clan.isDestroyed = true;
                 await new Promise(resolve => setTimeout(resolve, 1000));
+                if (!this._isLifeFlowCurrent(flowContext)
+                    || this.game.getClan(clanId) !== clan
+                    || Number(this.game.playerClanId) !== playerClanIdAtStart) return;
                 // ★修正：ゲームオーバーの処理を EndingSystem に任せます！
                 // async setTimeout callbackにせず、例外は通常のawait経路へ返して待機Promiseを残さない。
                 await this.game.endingSystem.processGameOver("全拠点を失いました。我が大名家は滅亡しました……");
@@ -2094,8 +2124,8 @@ class LifeSystem {
 
     // ③ 毎年1月にランダムで新しい姫を登場させる機能です
     async checkRandomPrincessAppearance() {
-        const generation = this._captureLifeFlowGeneration();
-        const isCurrentFlow = () => this._isLifeFlowCurrent(generation);
+        const flowContext = this._captureLifeFlowContext();
+        const isCurrentFlow = () => this._isLifeFlowCurrent(flowContext);
         if (!isCurrentFlow()) return;
         const currentYear = this.game.year;
         let familyRebuildNeeded = false;

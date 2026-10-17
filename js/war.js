@@ -155,6 +155,8 @@ class WarManager {
         this.game = game;
         this.state = { active: false };
         this.pendingPrisoners = [];
+        this._prisonerPhaseFlow = null;
+        this._prisonerPhaseContext = null;
         this._warGeneration = 0;
         this._warEnding = false;
         this._warCloseWaiters = new Map();
@@ -218,20 +220,51 @@ class WarManager {
         return !requireActive || !!(this.state && this.state.active);
     }
 
-    _scheduleWarCallback(callback, delay = 0, requireActive = true) {
+    // 開戦・終戦イベントのawaitを跨ぐ時は、既存のターン寿命を共有して確認する。
+    // 戦争世代だけではシナリオ更新や年月変更を検知できない。
+    _captureWarFlowContext() {
+        const manager = this.game.turnManager || null;
+        return {
+            year: Number(this.game.year),
+            month: Number(this.game.month),
+            manager,
+            generation: manager && typeof manager.captureTurnFlowGeneration === 'function'
+                ? manager.captureTurnFlowGeneration() : null
+        };
+    }
+
+    _isWarFlowContextCurrent(context) {
+        if (!context || this.game.warManager !== this || this.game.phase !== 'game' || this.game.isRestoringSave) return false;
+        if (Number(this.game.year) !== context.year || Number(this.game.month) !== context.month) return false;
+        if ((this.game.turnManager || null) !== context.manager) return false;
+        return context.generation === null || !!(context.manager
+            && typeof context.manager.isTurnFlowGenerationCurrent === 'function'
+            && context.manager.isTurnFlowGenerationCurrent(context.generation));
+    }
+
+    _scheduleWarCallback(callback, delay = 0, requireActive = true, onInvalid = null) {
         const generation = Number(this._warGeneration || 0);
+        const flowContext = this._captureWarFlowContext();
         return setTimeout(() => {
-            if (!this._isWarLifecycleCurrent(generation, requireActive)) return;
+            // 戦争世代に加え、予約発行時のゲーム・ターン寿命も確認する。
+            // 月替わりやWarManager差し替え後に旧戦闘AI/行動を再開しない。
+            if (!this._isWarLifecycleCurrent(generation, requireActive)
+                || !this._isWarFlowContextCurrent(flowContext)) {
+                if (typeof onInvalid === 'function') onInvalid();
+                return;
+            }
             callback();
         }, Math.max(0, Number(delay) || 0));
     }
 
     abortForScenarioTransition() {
+        if (typeof this._invalidatePrisonerPhase === 'function') this._invalidatePrisonerPhase();
         this._resolveWarCloseWaiters(null, false);
         this._warGeneration = Number(this._warGeneration || 0) + 1;
         this._warEnding = false;
         if (this.state) this.state.active = false;
         this.pendingPrisoners = [];
+        this.pendingKills = [];
         const warModal = this.game && this.game.ui ? this.game.ui.warModal : document.getElementById('war-modal');
         if (warModal) warModal.classList.add('hidden');
         if (this.game && this.game.ui && typeof this.game.ui.resumeMainMapAfterBattle === 'function') {

@@ -1804,6 +1804,8 @@ class CommandSystem {
         // 在城地ではなく直轄本拠地を保護。確認モーダル中の移動や直接呼出しも防ぐ。
         const home = this.game.getDaimyoHomeCastle(clanId);
         if (home && Number(castle.id) === Number(home.id)) return;
+        // 一覧が古い場合でも、別軍団の現職国主の在城地を新任国主の本拠で上書きしない。
+        if (this.game.castleManager.getActiveCommanderCastleIds(clanId).has(Number(castle.id))) return;
 
         this.game.affiliationSystem.moveCastle(busho, castleId);
 
@@ -1835,6 +1837,7 @@ class CommandSystem {
         busho.isCommander = true;
         if (busho.isGunshi) this.game.affiliationSystem.clearGunshiRole(busho);
 
+        if (Number(castle.legionId) !== legionNo) castle.isDelegated = true;
         castle.legionId = legionNo;
 
         const numberNames = ["", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
@@ -2298,6 +2301,7 @@ class CommandSystem {
             if (castleId === ownCommanderCastleId || Number(realCastle.castellanId) === Number(legion.commanderId)) {
                 if (Number(realCastle.legionId) !== legionNo) {
                     realCastle.legionId = legionNo;
+                    realCastle.isDelegated = true;
                     count++;
                 }
                 return;
@@ -2307,11 +2311,13 @@ class CommandSystem {
             if (isSelected) {
                 if (Number(realCastle.legionId) !== Number(legionNo)) {
                     realCastle.legionId = legionNo;
+                    realCastle.isDelegated = true;
                     count++;
                 }
             } else {
                 if (Number(realCastle.legionId) === Number(legionNo)) {
                     realCastle.legionId = 0;
+                    realCastle.isDelegated = false;
                     count++;
                 }
             }

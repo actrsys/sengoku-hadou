@@ -20,6 +20,21 @@ class AffiliationSystem {
         return wasGunshi;
     }
 
+    /** 現役国主席の正本は Legion.commanderId。isCommander は表示用の補助状態。 */
+    _findCommanderLegion(busho) {
+        if (!busho || !Array.isArray(this.game?.legions)) return null;
+        return this.game.legions.find(legion => Number(legion.commanderId) === Number(busho.id)
+            && Number(legion.clanId) === Number(busho.clan)) || null;
+    }
+
+    /** この城の軍団を指揮する国主かどうか。城主再選出にも同じ正本を用いる。 */
+    _isCommanderInCastle(busho, castle) {
+        if (!castle || !busho || Number(castle.ownerClan) !== Number(busho.clan)) return false;
+        const legion = this._findCommanderLegion(busho);
+        return !!legion && Number(castle.legionId) > 0
+            && Number(castle.legionId) === Number(legion.legionNo);
+    }
+
     /**
      * 一勢力一軍師を保証する唯一の任命窓口。
      * 既存軍師が複数いた場合も全員の役職を外してから、指定した一人だけを任命する。
@@ -436,41 +451,30 @@ class AffiliationSystem {
      * @param {number} newCastleId - 移動先のお城のID
      */
     moveCastle(busho, newCastleId, options = {}) {
+        const previousCastleId = busho.castleId;
         // 1. 今のお城から出ます。戦後の一括移動などでは城主再選を最後まで保留できます。
         this.leaveCastle(busho, options);
         
         // 2. 新しいお城に入る前にバッジを外します
         busho.isCastellan = false; 
         
-        // ★修正：国主が自分の担当する軍団「以外」の城に移動する場合のみ、国主バッジを外して軍団を解散させます
-        if (busho.isCommander) {
+        // 国主の在職は軍団データが正本。ただしAI人事の新設中は、先に席だけ確保して
+        // 直轄城から移動し、最後に所領を割り当てる。その暫定席はここで解散しない。
+        const myLegion = this._findCommanderLegion(busho);
+        const oldCastle = this.game.getCastle(previousCastleId);
+        const wasSeatedCommander = !!myLegion && (busho.isCommander === true
+            || (oldCastle && this._isCommanderInCastle(busho, oldCastle)));
+        if (wasSeatedCommander) {
             const newCastle = this.game.getCastle(newCastleId);
-            let keepCommander = false;
-            let myLegion = null;
-
-            // 自分の担当している軍団を探します
-            if (this.game && this.game.legions) {
-                myLegion = this.game.legions.find(l => Number(l.commanderId) === Number(busho.id));
-                // 軍団番号は家ごとに重複するため、移動先が「同じ家の同じ軍団」の城かまで確認します。
-                if (newCastle && myLegion
-                    && Number(myLegion.clanId) === Number(busho.clan)
-                    && Number(newCastle.ownerClan) === Number(busho.clan)
-                    && Number(newCastle.legionId) === Number(myLegion.legionNo)) {
-                    keepCommander = true;
-                }
+            if (newCastle && this._isCommanderInCastle(busho, newCastle)) {
+                busho.isCommander = true; // 正本に合わせて派生フラグを復元する
+            } else if (this.game.castleManager) {
+                this.game.castleManager.disbandLegion(myLegion.id);
             }
-
-            // 国主を維持しない（別の軍団や直轄地への移動）場合は、バッジを外して解散します
-            if (!keepCommander) {
-                if (myLegion && this.game && this.game.castleManager) {
-                    this.game.castleManager.disbandLegion(myLegion.id);
-                } else {
-                    // Legion側に正本がない異常状態だけ、実行時キャッシュを直接掃除します。
-                    busho.isCommander = false;
-                }
-            }
+        } else if (!myLegion && busho.isCommander) {
+            busho.isCommander = false; // 席のない古い表示状態だけ解消
         }
-        
+
         // 3. 新しいお城に入ります
         this.enterCastle(busho, newCastleId, options);
 
@@ -759,8 +763,9 @@ class AffiliationSystem {
             return;
         }
         
-        const commander = bushos.find(b => b.isCommander);
+        const commander = bushos.find(b => this._isCommanderInCastle(b, castle));
         if (commander) {
+            commander.isCommander = true; // 表示用フラグは軍団側の正本から復旧する
             this._clearPreviousCastellanFlag(castle, commander.id);
             bushos.forEach(b => { 
                 b.isCastellan = false; 
@@ -791,7 +796,7 @@ class AffiliationSystem {
     electCastellan(castle, bushos) {
         const previousCastellanId = Number(castle && castle.castellanId) || 0;
         // 国主が存在する城では、城主の再任命ロジックを走らせないようにガードします
-        if (bushos && bushos.some(b => b.isCommander)) return;
+        if (bushos && bushos.some(b => this._isCommanderInCastle(b, castle))) return;
 
         if (castle.ownerClan === this.game.playerClanId) {
             const currentLord = bushos.find(b => b.id === castle.castellanId);

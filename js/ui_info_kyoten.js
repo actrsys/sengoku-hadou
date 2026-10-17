@@ -317,15 +317,9 @@ Object.assign(UIInfoManager.prototype, {
             // ★選択モード（国主任命）の時だけ、選んではいけないお城（大名の居城や、すでに国主がいる城）を隠します！
             if (isSelectMode && selectData) {
                 const daimyoHome = this.game.getDaimyoHomeCastle(this.game.playerClanId);
-                // 旧条件は「自家所属かつisCommander」の所在地だけ。候補城ごとに全国武将をsomeせず、
-                // 同じ所属集合から1回だけ所在地Setを作ります（生死等の条件は旧処理にも無いため加えません）。
-                const commanderCastleIds = new Set();
-                this.game.bushos.forEach(b => {
-                    // 旧実装の厳密一致条件までそのまま維持し、候補城ごとの全武将someだけを除きます。
-                    if (b.isCommander && b.clan === this.game.playerClanId) {
-                        commanderCastleIds.add(Number(b.castleId));
-                    }
-                });
+                // 現職国主の在城地は軍団正本から一度だけ取得する。
+                // 武将の表示用isCommanderが欠けていても任命候補に出さない。
+                const commanderCastleIds = this.game.castleManager.getActiveCommanderCastleIds(this.game.playerClanId);
                 this.kyotenCastles = this.kyotenCastles.filter(c => {
                     if (daimyoHome && Number(c.id) === Number(daimyoHome.id)) return false;
                     if (commanderCastleIds.has(Number(c.id))) return false;

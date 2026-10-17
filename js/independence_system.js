@@ -12,10 +12,15 @@ class IndependenceSystem {
     // 非同期処理がタイトル復帰・ロード後の画面や勢力を操作しないようにする。
     _captureIndependenceFlow() {
         const turnManager = this.game && this.game.turnManager;
-        if (!turnManager || typeof turnManager.captureTurnFlowGeneration !== 'function'
-            || typeof turnManager.isTurnFlowGenerationLatest !== 'function') return () => true;
-        const generation = turnManager.captureTurnFlowGeneration();
-        return () => turnManager.isTurnFlowGenerationLatest(generation);
+        const expectedYear = this.game.year;
+        const expectedMonth = this.game.month;
+        const generation = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
+            ? turnManager.captureTurnFlowGeneration() : null;
+        return () => this.game.year === expectedYear
+            && this.game.month === expectedMonth
+            && (generation === null || !turnManager
+                || typeof turnManager.isTurnFlowGenerationLatest !== 'function'
+                || turnManager.isTurnFlowGenerationLatest(generation));
     }
 
     _logIndependence(text, clanIds) {
@@ -655,6 +660,7 @@ class IndependenceSystem {
                 // ★変更：選んだ大名家のID（番号）を受け取るようにします
                 const chosenClanId = await new Promise(resolve => {
                     const showSelectMenu = () => {
+                        if (!isCurrentFlow()) { resolve(null); return; }
                         this.game.ui.showDialog("操作する勢力を選択してください。", false, null, null, {
                             choices: [
                                 {
@@ -672,8 +678,11 @@ class IndependenceSystem {
                     };
 
                     const confirmSelection = (targetClanName, targetClanId) => {
+                        if (!isCurrentFlow()) { resolve(null); return; }
                         this.game.ui.showDialog(`${targetClanName}を操作します。本当によろしいですか？`, true, 
                             () => {
+                                // 古い確認ボタンは新シナリオの操作勢力を書き換えない。
+                                if (!isCurrentFlow()) { resolve(null); return; }
                                 // ［この勢力を操作］を選んだら担当大名家を決定
                                 this.game.playerClanId = targetClanId;
                                 
@@ -685,6 +694,7 @@ class IndependenceSystem {
                                 resolve(targetClanId);
                             },
                             () => {
+                                if (!isCurrentFlow()) { resolve(null); return; }
                                 // ［戻る］なら最初の勢力選択へ一段戻ります。
                                 showSelectMenu();
                             },
@@ -1710,6 +1720,7 @@ class IndependenceSystem {
      * ★追加：プレイヤー勢力に寝返ろうとした場合の面会処理
      */
     async askPlayerForDefection(rebellionLeader, oldClanId) {
+        const isCurrentFlow = this._captureIndependenceFlow();
         return new Promise((resolve) => {
             const playerClan = this.game.getClan(this.game.playerClanId);
             const myDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
@@ -1738,32 +1749,40 @@ class IndependenceSystem {
             };
 
             const doAcceptFirst = async () => {
+                if (!isCurrentFlow()) { resolve(false); return; }
                 await this.game.ui.showDialogAsync(`「此度はお目通りをお許しいただき、恐悦至極に存じまする」`, false, 0, {
                     leftFace: rebellionLeader.faceIcon, leftName: traitorNameStr, isEvent: true
                 });
 
+                if (!isCurrentFlow()) { resolve(false); return; }
                 await this.game.ui.showDialogAsync(`「うむ……${traitorCallName}。本日は何ゆえ参られたか」`, false, 0, {
                     leftFace: myDaimyo ? myDaimyo.faceIcon : 'unknown_face.webp', leftName: myDaimyoNameStr, isEvent: true
                 });
 
+                if (!isCurrentFlow()) { resolve(false); return; }
                 await this.game.ui.showDialogAsync(`「はっ。${oldClanName}には愛想が尽き申した。拙者を${playerClan.name}の家臣にしてくだされ」`, false, 0, {
                     leftFace: rebellionLeader.faceIcon, leftName: traitorNameStr, isEvent: true
                 });
 
+                if (!isCurrentFlow()) { resolve(false); return; }
                 this.game.ui.showDialog(`「${traitorNameStr}を家臣に加えますか？」`, true,
                     async () => { // 家臣に加える
+                        if (!isCurrentFlow()) { resolve(false); return; }
                         await this.game.ui.showDialogAsync(`「よかろう。今後は当家の一員として働かれるがよい」`, false, 0, {
                             leftFace: myDaimyo ? myDaimyo.faceIcon : 'unknown_face.webp', leftName: myDaimyoNameStr, isEvent: true
                         });
+                        if (!isCurrentFlow()) { resolve(false); return; }
                         await this.game.ui.showDialogAsync(`「ははっ。精一杯働きまする！」`, false, 0, {
                             leftFace: rebellionLeader.faceIcon, leftName: traitorNameStr, isEvent: true
                         });
-                        resolve(true);
+                        resolve(isCurrentFlow());
                     },
                     async () => { // 断る
+                        if (!isCurrentFlow()) { resolve(false); return; }
                         await this.game.ui.showDialogAsync(`「悪いが貴殿のことは信用できぬ。お引き取り願おう」`, false, 0, {
                             leftFace: myDaimyo ? myDaimyo.faceIcon : 'unknown_face.webp', leftName: myDaimyoNameStr, isEvent: true
                         });
+                        if (!isCurrentFlow()) { resolve(false); return; }
                         await this.game.ui.showDialogAsync(`「残念なことですな……後悔なされますぞ」`, false, 0, {
                             leftFace: rebellionLeader.faceIcon, leftName: traitorNameStr, isEvent: true
                         });

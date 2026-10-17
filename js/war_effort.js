@@ -641,11 +641,20 @@ Object.assign(WarManager.prototype, {
         atkSoldierCount = TroopAllocationService.clampArmySoldiers(atkSoldierCount, atkBushos, atkCastle.soldiers);
         const warGeneration = this._beginWarLifecycle();
         const isCurrentWar = () => this._isWarLifecycleCurrent(warGeneration, false);
+        // before_war の会話待機中はまだ本戦の active を立てていない。
+        // 戦争世代だけでなく、既存のターン世代・年月と WarManager 実体を確認し、
+        // 旧シナリオ/旧月の開戦開始を失効させる（世代の新設はしない）。
+        const startFlowContext = this._captureWarFlowContext();
+        const isCurrentStartContext = () => this._isWarFlowContextCurrent(startFlowContext);
         // ★追加：戦争全体の「開始処理前」の合図を出します
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_war', { atkCastle, defCastle, atkBushos, atkSoldierCount, atkRice, atkHorses, atkGuns, reinforcementData, selfReinforcementData });
         }
-        if (!isCurrentWar()) return;
+        if (!isCurrentWar() || !isCurrentStartContext()) {
+            // 鎮圧戦などの waitForWarClose 呼出元も旧開始待ちから解放する。
+            this._resolveWarCloseWaiters(warGeneration, false);
+            return;
+        }
         
         this.state = this.state || {};
         this.state.active = true;
@@ -1566,20 +1575,28 @@ Object.assign(WarManager.prototype, {
         // ★ここを書き足します：既に「終わったよ」の処理中なら、2回目は無視するストッパーです！
         if (!this.state.active || this._warEnding) return;
         const warGeneration = Number(this._warGeneration || 0);
+        const endState = this.state;
+        const endFlowContext = this._captureWarFlowContext();
         this._warEnding = true;
-        const isCurrentWar = () => this._isWarLifecycleCurrent(warGeneration, false);
+        const isCurrentWar = () => {
+            if (this.state === endState && this._isWarLifecycleCurrent(warGeneration, false)
+                && this._isWarFlowContextCurrent(endFlowContext)) return true;
+            // 古い終戦イベントの完了待ちを新しいゲームへ持ち越さない。
+            this._resolveWarCloseWaiters(warGeneration, false);
+            return false;
+        };
 
         // ★追加：戦争全体の「終了処理前」の合図を出します
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_war_end', this.state);
-            if (!this._isWarLifecycleCurrent(warGeneration, false)) return;
+            if (!isCurrentWar()) return;
         }
 
         // ★追加：籠城戦（攻城戦）の「戦闘終了前」の合図を出します
         // ※野戦だけで決着がついた場合も呼ばれますが、イベント側で区別できます！
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_siege_war_end', this.state);
-            if (!this._isWarLifecycleCurrent(warGeneration, false)) return;
+            if (!isCurrentWar()) return;
         }
 
         // ★追加：合戦終了の演出中に触られないようにバリアを張ります！
@@ -1630,7 +1647,7 @@ Object.assign(WarManager.prototype, {
             // 勝敗が決まる前に、戦場となった城の領土を2秒間点滅させる（この間は操作不可）
             if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                 const resultBlinkCompleted = await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
-                if (resultBlinkCompleted === false) return;
+                if (!isCurrentWar() || resultBlinkCompleted === false) return;
             }
             
             // ★追加：点滅が終わったこのタイミングで「戦闘直後」の歴史イベントをチェック・実行します！
@@ -1666,6 +1683,8 @@ Object.assign(WarManager.prototype, {
             
             // ★変更：順番待ちができるように async を付けます
             const finishWarProcess = async () => {
+                // 勝敗ダイアログの古い確定操作が、次の月・シナリオの処理を進めない。
+                if (!isCurrentWar()) return;
                 
                 // ★追加：演出が終わったのでバリアを解除します！
                 if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
@@ -1699,7 +1718,7 @@ Object.assign(WarManager.prototype, {
                         // ★変更：捕らえた人数を報告してから、新しいフェーズ管理の魔法にバトンタッチします！
                         const prisonerCount = this.pendingPrisoners.length;
                         this.game.ui.showDialog(`${prisonerCount}名の武将を捕らえました！`, false, () => {
-                            this.startPrisonerPhase();
+                            if (isCurrentWar()) this.startPrisonerPhase();
                         });
                     
                     } else {
@@ -2457,10 +2476,49 @@ Object.assign(WarManager.prototype, {
     // ==========================================
     // ★ここから新しいフェーズ管理の魔法です！
     // ==========================================
+    // 捕虜処遇の画面・確認ボタンも、戦争/ターン寿命と開始時の操作勢力に属する。
+    // 処遇UIを再び開いた場合は参照の異なるsessionとなり旧ボタンは失効する。
+    _isPrisonerPhaseCurrent(session = this._prisonerPhaseFlow) {
+        return !!(session && this._prisonerPhaseFlow === session
+            && Number(this._warGeneration || 0) === session.warGeneration
+            && Number(this.game.playerClanId) === session.playerClanId
+            && this._isWarFlowContextCurrent(session.flowContext));
+    },
+
+    _guardPrisonerPhaseCallback(callback) {
+        const session = this._prisonerPhaseFlow;
+        return (...args) => {
+            if (!this._isPrisonerPhaseCurrent(session)) {
+                if (session && this._prisonerPhaseFlow === session) this._invalidatePrisonerPhase();
+                return;
+            }
+            if (session.finishing) return;
+            return callback(...args);
+        };
+    },
+
+    _invalidatePrisonerPhase() {
+        const context = this._prisonerPhaseContext;
+        this._prisonerPhaseFlow = null;
+        this._prisonerPhaseContext = null;
+        // 外交断交の人質処遇は呼出元がPromiseで待つため、中断も通知する。
+        if (context?.skipWarCleanup === true && typeof context.onComplete === 'function') {
+            context.onComplete(false);
+        }
+    },
+
     startPrisonerPhase(context = null) {
+        // 前の捕虜画面が生きていれば、前の終了待ちだけ中断通知しておく。
+        if (this._prisonerPhaseFlow) this._invalidatePrisonerPhase();
         // 外交断交など戦後処理以外から捕虜UIを再利用する場合は、完了後の戻り先を保持する。
         // 通常の戦後処理では context を渡さず、従来どおり戦後処理→ターン終了へ進む。
         this._prisonerPhaseContext = context && typeof context === 'object' ? context : null;
+        this._prisonerPhaseFlow = {
+            flowContext: this._captureWarFlowContext(),
+            warGeneration: Number(this._warGeneration || 0),
+            playerClanId: Number(this.game.playerClanId),
+            finishing: false
+        };
         // ①大名処遇フェーズ：まずは大名がいるかチェックします
         const daimyoIndex = this.pendingPrisoners.findIndex(p => p.isDaimyo);
         if (daimyoIndex !== -1) {
@@ -2472,6 +2530,7 @@ Object.assign(WarManager.prototype, {
     },
 
     showDaimyoDialog(prisoner) {
+        if (!this._isPrisonerPhaseCurrent()) return;
         // ★追加：登用のチャレンジ回数を数える箱を用意します。まだなければ0にします。
         prisoner.hireChallengeCount = prisoner.hireChallengeCount || 0;
         // ★追加：3回以上チャレンジしていたら「押せない状態」にするフラグを作ります。
@@ -2489,27 +2548,28 @@ Object.assign(WarManager.prototype, {
                     label: '登用',
                     className: 'btn-primary',
                     disabled: isHireDisabled, // ★追加：ここで押せないボタンにする魔法をかけます！
-                    onClick: () => this.handleDaimyoPrisonerAction(prisoner, 'hire')
+                    onClick: this._guardPrisonerPhaseCallback(() => this.handleDaimyoPrisonerAction(prisoner, 'hire'))
                 },
                 {
                     label: '処断',
                     className: 'btn-danger',
-                    onClick: () => this.confirmDaimyoPrisonerKill(prisoner)
+                    onClick: this._guardPrisonerPhaseCallback(() => this.confirmDaimyoPrisonerKill(prisoner))
                 },
                 {
                     label: '解放',
                     className: 'btn-secondary',
-                    onClick: () => this.handleDaimyoPrisonerAction(prisoner, 'release')
+                    onClick: this._guardPrisonerPhaseCallback(() => this.handleDaimyoPrisonerAction(prisoner, 'release'))
                 }
             ]
         });
     },
 
     confirmDaimyoPrisonerKill(prisoner) {
+        if (!this._isPrisonerPhaseCurrent()) return;
         if (!prisoner) return;
         this.game.ui.showDialog(`${prisoner.name}を本当に処断しますか？`, true,
-            () => this.handleDaimyoPrisonerAction(prisoner, 'kill'),
-            () => this.showDaimyoDialog(prisoner),
+            this._guardPrisonerPhaseCallback(() => this.handleDaimyoPrisonerAction(prisoner, 'kill')),
+            this._guardPrisonerPhaseCallback(() => this.showDaimyoDialog(prisoner)),
             {
                 okText: '処断する',
                 okClass: 'btn-danger',
@@ -2520,6 +2580,8 @@ Object.assign(WarManager.prototype, {
     },
 
     async handleDaimyoPrisonerAction(prisoner, action) {
+        const actionSession = this._prisonerPhaseFlow;
+        if (!this._isPrisonerPhaseCurrent(actionSession)) return;
         const index = this.pendingPrisoners.findIndex(p => p.id === prisoner.id);
         if (index === -1) {
             this.startHirePhaseIntro();
@@ -2530,13 +2592,13 @@ Object.assign(WarManager.prototype, {
         const friendlyCastles = this.game.castles.filter(c => c.ownerClan === originalClanId && originalClanId !== 0);
         const isExtinct = (friendlyCastles.length === 0);
         
-        const stayStep = () => {
+        const stayStep = this._guardPrisonerPhaseCallback(() => {
              this.showDaimyoDialog(prisoner);
-        };
-        const nextStep = async () => {
+        });
+        const nextStep = this._guardPrisonerPhaseCallback(async () => {
              this.pendingPrisoners.splice(index, 1);
              this.startHirePhaseIntro();
-        };
+        });
 
         if (action === 'hire') {
             // ★追加：登用を選んだので、チャレンジ回数を1回増やします！
@@ -2565,9 +2627,9 @@ Object.assign(WarManager.prototype, {
                     if(targetC) { 
                         this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id);
                     }
-                    this.game.ui.showDialog(`「もはや趨勢は決したか……致し方あるまい」`, false, () => {
+                    this.game.ui.showDialog(`「もはや趨勢は決したか……致し方あるまい」`, false, this._guardPrisonerPhaseCallback(() => {
                         this.game.ui.showDialog(`${prisoner.name}は当家に臣従を誓いました！`, false, nextStep);
-                    }, null, {
+                    }), null, {
                         leftFace: prisoner.faceIcon,
                         leftName: prisoner.name
                     });
@@ -2582,7 +2644,7 @@ Object.assign(WarManager.prototype, {
             }
         } else if (action === 'kill') {
             // 処断時
-            this.game.ui.showDialog(`「斯様な所で果てようとは……ぐふっ」`, false, async () => {
+            this.game.ui.showDialog(`「斯様な所で果てようとは……ぐふっ」`, false, this._guardPrisonerPhaseCallback(async () => {
                 this.registerNemesisForExecuted(prisoner, this.game.playerClanId);
                 
                 // ★追加：総取りが発生する場合は家督相続をスキップします
@@ -2590,9 +2652,12 @@ Object.assign(WarManager.prototype, {
                     ? false
                     : this.isTotalTakeoverPending();
                 await this.game.lifeSystem.executeDeath(prisoner, { skipDaimyoSuccession: skipSuccession });
-                
+                if (!this._isPrisonerPhaseCurrent(actionSession)) {
+                    if (this._prisonerPhaseFlow === actionSession) this._invalidatePrisonerPhase();
+                    return;
+                }
                 this.game.ui.showDialog(`${prisoner.name}を処断しました。`, false, nextStep);
-            }, null, {
+            }), null, {
                 leftFace: prisoner.faceIcon,
                 leftName: prisoner.name
             });
@@ -2611,9 +2676,9 @@ Object.assign(WarManager.prototype, {
             } else {
                 this.game.affiliationSystem.becomeRonin(prisoner);
             }
-            this.game.ui.showDialog(`「生きて恥を晒せと申すか……」`, false, () => {
+            this.game.ui.showDialog(`「生きて恥を晒せと申すか……」`, false, this._guardPrisonerPhaseCallback(() => {
                 this.game.ui.showDialog(`${prisoner.name}を解放しました。`, false, nextStep);
-            }, null, {
+            }), null, {
                 leftFace: prisoner.faceIcon,
                 leftName: prisoner.name
             });
@@ -2621,45 +2686,49 @@ Object.assign(WarManager.prototype, {
     },
 
     startHirePhaseIntro() {
+        if (!this._isPrisonerPhaseCurrent()) return;
         // ②登用フェーズ
         if (this.pendingPrisoners.length === 0) {
             this.finishPrisonerPhase();
             return;
         }
-        this.game.ui.showDialog("登用する武将を選択してください。", false, () => {
+        this.game.ui.showDialog("登用する武将を選択してください。", false, this._guardPrisonerPhaseCallback(() => {
             this.openHireSelector();
-        }, null, { closeBeforeOk: true });
+        }), null, { closeBeforeOk: true });
     },
 
     openHireSelector() {
+        if (!this._isPrisonerPhaseCurrent()) return;
         const selectableCount = this.pendingPrisoners.filter(p => !p.hasRefusedHire).length;
         if (selectableCount === 0) {
             // ★変更：0人の時は終了確認をせず、メッセージを出して次の処断フェーズへ進みます
-            this.game.ui.showDialog("登用できる武将がいないため、次の処遇へ進みます。", false, () => {
+            this.game.ui.showDialog("登用できる武将がいないため、次の処遇へ進みます。", false, this._guardPrisonerPhaseCallback(() => {
                 this.startKillPhaseIntro();
-            });
+            }));
             return;
         }
 
         this.game.ui.info.showPrisonerSelector('hire', this.pendingPrisoners, 
-            (selectedIds) => {
+            this._guardPrisonerPhaseCallback((selectedIds) => {
                 this.processHireList(selectedIds);
-            },
-            () => {
+            }),
+            this._guardPrisonerPhaseCallback(() => {
                 this.checkFinishHirePhase();
-            }
+            })
         );
     },
 
     checkFinishHirePhase() {
+        if (!this._isPrisonerPhaseCurrent()) return;
         this.game.ui.showDialog("登用を終了しますか？", true, 
-            () => { this.startKillPhaseIntro(); }, // 終了する：次のフェーズへ
-            () => { this.openHireSelector(); }, // 続ける：リストへ戻る
+            this._guardPrisonerPhaseCallback(() => { this.startKillPhaseIntro(); }), // 終了する：次のフェーズへ
+            this._guardPrisonerPhaseCallback(() => { this.openHireSelector(); }), // 続ける：リストへ戻る
             { okText: '終了する', cancelText: '続ける', closeBeforeOk: true, closeBeforeCancel: true }
         );
     },
 
     async processHireList(selectedIds) {
+        if (!this._isPrisonerPhaseCurrent()) return;
         // 選ばれた武将たちを順番に登用していきます
         const myBushos = this.game.getClanBushos(this.game.playerClanId).filter(b => !window.LifeStatusRules.isUnborn(b)); 
         const recruiter = myBushos.find(b => b.isDaimyo) || myBushos[0];
@@ -2723,12 +2792,13 @@ Object.assign(WarManager.prototype, {
         if (refusedNames.length > 0) msg += `${formatNames(refusedNames)}には登用を断られました。`;
         if (msg === "") msg = "登用処理が完了しました。";
 
-        this.game.ui.showDialog(msg, false, () => {
+        this.game.ui.showDialog(msg, false, this._guardPrisonerPhaseCallback(() => {
             this.openHireSelector();
-        }, null, { closeBeforeOk: true });
+        }), null, { closeBeforeOk: true });
     },
 
     startKillPhaseIntro() {
+        if (!this._isPrisonerPhaseCurrent()) return;
         // ③処断フェーズ
         if (this.pendingPrisoners.length === 0) {
             this.finishPrisonerPhase();
@@ -2736,39 +2806,42 @@ Object.assign(WarManager.prototype, {
         }
         // 処断する予定の人のリストを用意します
         this.pendingKills = [];
-        this.game.ui.showDialog("処断する武将を選択してください。", false, () => {
+        this.game.ui.showDialog("処断する武将を選択してください。", false, this._guardPrisonerPhaseCallback(() => {
             this.openKillSelector();
-        }, null, { closeBeforeOk: true });
+        }), null, { closeBeforeOk: true });
     },
 
     openKillSelector() {
+        if (!this._isPrisonerPhaseCurrent()) return;
         if (this.pendingPrisoners.length === 0) {
             // ★変更：0人の時は終了確認をせず、メッセージを出して捕虜処遇を完了させます
-            this.game.ui.showDialog("処断できる武将がいないため、捕虜の処遇を終了します。", false, () => {
+            this.game.ui.showDialog("処断できる武将がいないため、捕虜の処遇を終了します。", false, this._guardPrisonerPhaseCallback(() => {
                 this.finishPrisonerPhase();
-            });
+            }));
             return;
         }
 
         this.game.ui.info.showPrisonerSelector('kill', this.pendingPrisoners, 
-            (selectedIds) => {
+            this._guardPrisonerPhaseCallback((selectedIds) => {
                 this.processKillSelection(selectedIds);
-            },
-            () => {
+            }),
+            this._guardPrisonerPhaseCallback(() => {
                 this.checkFinishKillPhase();
-            }
+            })
         );
     },
 
     checkFinishKillPhase() {
+        if (!this._isPrisonerPhaseCurrent()) return;
         this.game.ui.showDialog("処断を終了しますか？", true, 
-            () => { this.finishPrisonerPhase(); }, // 終了する：全員の処遇を確定させます
-            () => { this.openKillSelector(); }, // 続ける：リストへ戻る
+            this._guardPrisonerPhaseCallback(() => { this.finishPrisonerPhase(); }), // 終了する：全員の処遇を確定させます
+            this._guardPrisonerPhaseCallback(() => { this.openKillSelector(); }), // 続ける：リストへ戻る
             { okText: '終了する', cancelText: '続ける', closeBeforeOk: true, closeBeforeCancel: true }
         );
     },
 
     processKillSelection(selectedIds) {
+        if (!this._isPrisonerPhaseCurrent()) return;
         let targetNames = [];
 
         // まずは誰を選んだのか、名前だけをメモ帳に書き出します（ここではまだ処断リストには移しません！）
@@ -2798,7 +2871,7 @@ Object.assign(WarManager.prototype, {
         // 確認のメッセージダイアログを出します（true にして、２つの選択肢が出るようにします）
         // オプション機能を使って、ボタンの文字と色を直接指定します
         this.game.ui.showDialog(`${displayName}を本当に処断してよろしいですか？`, true, 
-            () => { 
+            this._guardPrisonerPhaseCallback(() => { 
                 // 「処断する」を選んだ時の処理：ここで初めて処断予定リストに移します
                 for (let id of selectedIds) {
                     const prisoner = this.pendingPrisoners.find(p => p.id === id);
@@ -2808,14 +2881,14 @@ Object.assign(WarManager.prototype, {
                     }
                 }
                 // そして、処断完了のメッセージを出します
-                this.game.ui.showDialog(`${displayName}を処断しました。`, false, () => {
+                this.game.ui.showDialog(`${displayName}を処断しました。`, false, this._guardPrisonerPhaseCallback(() => {
                     this.openKillSelector();
-                }, null, { closeBeforeOk: true });
-            },
-            () => { 
+                }), null, { closeBeforeOk: true });
+            }),
+            this._guardPrisonerPhaseCallback(() => { 
                 // 「戻る」を選んだ時の処理：武将は移さず、そのままリストに戻ります
                 this.openKillSelector();
-            },
+            }),
             {
                 okText: '処断する',
                 okClass: 'btn-danger',
@@ -2827,6 +2900,9 @@ Object.assign(WarManager.prototype, {
     },
 
     async finishPrisonerPhase() {
+        const session = this._prisonerPhaseFlow;
+        if (!this._isPrisonerPhaseCurrent(session) || session.finishing) return;
+        session.finishing = true;
         const prisonerPhaseContext = this._prisonerPhaseContext;
         // 予定通りに処断を実行します
         if (this.pendingKills && this.pendingKills.length > 0) {
@@ -2836,6 +2912,10 @@ Object.assign(WarManager.prototype, {
             for (let p of this.pendingKills) {
                 this.registerNemesisForExecuted(p, this.game.playerClanId);
                 await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: skipSuccession });
+                if (!this._isPrisonerPhaseCurrent(session)) {
+                    if (this._prisonerPhaseFlow === session) this._invalidatePrisonerPhase();
+                    return;
+                }
             }
         }
         
@@ -2881,16 +2961,26 @@ Object.assign(WarManager.prototype, {
 
         // 外交断交などから捕虜処遇だけを借りた場合は、戦後処理やターン終了を実行せず呼出元へ戻す。
         if (prisonerPhaseContext?.skipWarCleanup === true) {
+            if (this._prisonerPhaseFlow === session) this._prisonerPhaseFlow = null;
             if (typeof prisonerPhaseContext.onComplete === 'function') prisonerPhaseContext.onComplete();
             return;
         }
         
         // ★追加：戦後処理が終わったので、総取りシステムが発動するかチェックします！
         await this.checkTotalTakeover(this.state);
+        if (!this._isPrisonerPhaseCurrent(session)) {
+            if (this._prisonerPhaseFlow === session) this._invalidatePrisonerPhase();
+            return;
+        }
 
         // 全て終わったので滅亡チェックをしてターンを終了します
         const extReason = this.state.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
         await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, extReason, extReason === 'no_castle' ? Number(this.state.attacker.ownerClan) || 0 : 0);
+        if (!this._isPrisonerPhaseCurrent(session)) {
+            if (this._prisonerPhaseFlow === session) this._invalidatePrisonerPhase();
+            return;
+        }
+        this._prisonerPhaseFlow = null;
         if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige();
         this.game.finishTurn();
     },
@@ -3022,6 +3112,14 @@ Object.assign(WarManager.prototype, {
         // closeWar() は after_war と、その後の通常ターン復帰までを1つの完了契約として扱う。
         // 旧戦争の非同期継続が次戦へ触れないだけでなく、諸勢力側の完了待ちもこの世代を正本にする。
         const warGeneration = Number(this._warGeneration || 0);
+        const closeState = this.state;
+        const closeFlowContext = this._captureWarFlowContext();
+        const isCurrentClose = () => {
+            if (this.state === closeState && this._isWarLifecycleCurrent(warGeneration, false)
+                && this._isWarFlowContextCurrent(closeFlowContext)) return true;
+            this._resolveWarCloseWaiters(warGeneration, false);
+            return false;
+        };
         let closeCompletionScheduled = false;
         try {
         // ここまでで戦闘演出は完了。以後は通常のターンカメラへ戻れるようロックを解除します。
@@ -3084,9 +3182,9 @@ Object.assign(WarManager.prototype, {
         // ★追加：戦争全体の「終了処理後」の合図を出します
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('after_war', this.state);
-            if (!this._isWarLifecycleCurrent(warGeneration, false)) return;
+            if (!isCurrentClose()) return;
         }
-        
+
         // setTimeout中に別処理が state を触っても対象がぶれないよう、ここで必要なIDだけ退避します。
         const prestigeDiagnosticCastle = this.state.defender || this.state.sourceCastle || null;
         const prestigeClanIds = new Set([
@@ -3098,6 +3196,8 @@ Object.assign(WarManager.prototype, {
         prestigeClanIds.delete(0);
 
         this._scheduleWarCallback(() => {
+            // 世代が同じまま月/シナリオが変更された場合も旧戦後を再開しない。
+            if (!isCurrentClose()) return;
             // ★Round10：1回の戦争で変化し得る勢力だけ威信を更新します。
             // 全国再計算を毎戦争ごとに行う必要はありません。
             if (typeof this.game.writeSystemDiagnostic === 'function') {
@@ -3129,13 +3229,13 @@ Object.assign(WarManager.prototype, {
                 if (this._isWarLifecycleCurrent(warGeneration, false)) this._markWarClosed(warGeneration);
                 else this._resolveWarCloseWaiters(warGeneration, false);
             });
-        }, 100, false);
+        }, 100, false, () => this._resolveWarCloseWaiters(warGeneration, false));
         closeCompletionScheduled = true;
         } finally {
             // after_war以前の例外や、100ms復帰予約へ到達する前のシナリオ切替では待機Promiseを残さない。
             // 正常系はfinishTurn()完了側が唯一のclosed通知地点になる。
             if (!closeCompletionScheduled) {
-                if (this._isWarLifecycleCurrent(warGeneration, false)) this._markWarClosed(warGeneration);
+                if (isCurrentClose()) this._markWarClosed(warGeneration);
                 else this._resolveWarCloseWaiters(warGeneration, false);
             }
         }

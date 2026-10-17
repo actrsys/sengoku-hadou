@@ -1,0 +1,29 @@
+戦国覇道 r554 — 開戦前イベント待機のゲーム寿命監査
+
+【正本・方針】
+・r553完全版ZIPとARCHITECTURE.md、およびr452～r553の非同期寿命・戦争世代・所属変更の監査記録を参照した。
+・戦争開始前の非同期境界で、古い状態を別シナリオや翌月へ反映しない。
+・戦闘の成否・兵数・武将移動・軍団規則・外交効果などの仕様変更は行わない。
+
+【不具合の再現】
+・WarManager.startWar() はbefore_warイベントの終了待機後、_warGenerationの一致だけで再開していた。
+・同じWarManagerのまま年月が変わると、前月の合戦開始がその後も続行可能だった。
+・シナリオ切替時にWarManager実体が置換された場合も、旧Manager側の戦争番号が一致するだけで旧戦争のactiveが立ち得た。
+・r553の実コードに追加した2件の再現テストは、既存940件成功・新規2件失敗。
+
+【修正】
+・WarManager.startWarのbefore_war直後に、同一WarManager実体、プレイ中/非復元状態、開始年月、既存TurnManagerの実体/turn-flow世代の同一性を確認。
+・失効時は開戦しない。WarManagerの既存 `_resolveWarCloseWaiters()`で当該戦争世代をfalse完了させ、諸勢力鎮圧などの戦争終了待機も閉じる。
+・独立したカウンタ、固定ms待機、UI例外処理の追加なし。開戦後は既存のWarManager戦争世代監視を継続使用する。
+
+【回帰】
+・旧月への復帰、旧WarManagerへの復帰、同月内のTurnManager世代失効、および有効な開始処理の正常進行を実際のstartWarを使って検査（新規4件）。
+・通常回帰944件成功・失敗0件。
+・PC/スマホ/軽量モード実ブラウザ表示回帰、JavaScript構文検査、共通・1560・1570のExcel/BIN全フィールド照合および主要数式保全は通過。
+・シミュレーション4件成功、通常テスト944件すべて成功。配布ZIPは別途再展開・比較で検査する。
+・長期間の実機観戦および複数イベントが重なる全プレイ操作は未実施。
+
+【変更ファイル】
+追加：docs/audits/r554_開戦前イベント待機のゲーム寿命監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/war_effort.js、tests/run_tests.js
+削除：なし
