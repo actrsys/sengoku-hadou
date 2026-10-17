@@ -1412,6 +1412,12 @@ class AIEngine {
 
         // 選んだ武将数で実際に率いられる兵数へ正規化する。上限値は共通Serviceだけを見る。
         sendSoldiers = TroopAllocationService.clampArmySoldiers(sendSoldiers, sorted, source.soldiers);
+        // 作戦策定から実行までに出撃元の兵が援軍などで減る場合がある。
+        // 在庫再正規化で0人となった軍勢を開戦準備へ渡さず、AIターンを正常に終了する。
+        if (sendSoldiers <= 0) {
+            this.game.finishTurn();
+            return;
+        }
 
         // 援軍を探す処理へバトンタッチします
         const sendHorses = (source.horses || 0) < sendSoldiers * 0.2 ? 0 : (source.horses || 0);
@@ -1492,6 +1498,12 @@ class AIEngine {
 
         sorted = sorted.slice(0, 5);
         sendSoldiers = TroopAllocationService.clampArmySoldiers(sendSoldiers, sorted, sourceCastle.soldiers);
+        // 諸勢力鎮圧も通常出陣と同じ出撃時点の兵力上限を使う。
+        // 0人軍の鎮圧開始を避け、現在のAIターンをそこで終了する。
+        if (sendSoldiers <= 0) {
+            this.game.finishTurn();
+            return;
+        }
 
         const sendHorses = (sourceCastle.horses || 0) < sendSoldiers * 0.2 ? 0 : (sourceCastle.horses || 0);
         const sendGuns = (sourceCastle.guns || 0) < sendSoldiers * 0.2 ? 0 : (sourceCastle.guns || 0);

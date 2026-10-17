@@ -140,6 +140,60 @@ test('r540 タイトルは同じ2書体のsubsetを先に読み、ゲーム本�
     assert.ok(!boot.includes('FONT_TIMEOUT_MS = 6000'), '大容量フォントをトップの白画面待機対象にしない');
 });
 
+test('r541 タイトル起動後のレイアウト切替では現在の軽量モードを正本として本体フォントを準備する', async () => {
+    function makeBootstrap({ portrait }) {
+        const calls = [];
+        const rootClasses = new FakeClassList(['fonts-loading']);
+        const document = {
+            documentElement: { classList: rootClasses },
+            head: { appendChild() {} },
+            createElement() { return { rel: '', href: '', as: '', type: '', crossOrigin: '' }; },
+            fonts: {
+                load: async (descriptor, text) => {
+                    calls.push({ descriptor, text });
+                    return [{ family: descriptor }];
+                },
+                ready: Promise.resolve(true)
+            }
+        };
+        const context = createContext({
+            document,
+            navigator: { userAgent: 'iPad', maxTouchPoints: 5 },
+            screen: { width: portrait ? 800 : 1280, height: portrait ? 1100 : 800 },
+            innerWidth: portrait ? 800 : 1280,
+            innerHeight: portrait ? 1100 : 800,
+            UserSettings: { displayMode: 'light' },
+            setTimeout, clearTimeout
+        });
+        context.addEventListener = () => {};
+        loadScript(context, 'js/app_bootstrap.js');
+        return { context, calls };
+    }
+    // 実際のタブレットでは初回縦向き（軽量）から横向きPCレイアウトへ切り替えられる。
+    // 起動時の判定を固定すると、ロード幕でも完全書体を読み込まず文字が後から差し替わる。
+    const fromMobile = makeBootstrap({ portrait: true });
+    assert.strictEqual(fromMobile.context.__mobileLowMemoryMode, true);
+    assert.strictEqual(await fromMobile.context.__ensureGameFontsReady(), true);
+    assert.strictEqual(fromMobile.calls.length, 0, '軽量表示中は本体フォントを読み込まない');
+    fromMobile.context.__mobileLowMemoryMode = false; // resizeGameScreenの通常表示への切替後
+    assert.strictEqual(await fromMobile.context.__ensureGameFontsReady(), true);
+    assert.strictEqual(fromMobile.calls.filter(item => /abashiri-mincho|FudeGoshirae/.test(item.descriptor)).length, 4,
+        '横向きPC表示へ変更した際はロード幕内で完全書体を準備する');
+    await fromMobile.context.__ensureGameFontsReady();
+    assert.strictEqual(fromMobile.calls.length, 4, '既に完了した本体書体を再読込しない');
+
+    // 逆方向でも軽量表示中は約20MBのWebフォントを取りに行かない。
+    const fromPc = makeBootstrap({ portrait: false });
+    await fromPc.context.__titleFontLoadPromise;
+    const before = fromPc.calls.length;
+    fromPc.context.__mobileLowMemoryMode = true;
+    assert.strictEqual(await fromPc.context.__ensureGameFontsReady(), true);
+    assert.strictEqual(fromPc.calls.length, before, '現在軽量表示なら完全書体を追加読込しない');
+    fromPc.context.__mobileLowMemoryMode = false;
+    assert.strictEqual(await fromPc.context.__ensureGameFontsReady(), true);
+    assert.strictEqual(fromPc.calls.length, before + 4, '通常表示への復帰後に初めて本体書体を準備する');
+});
+
 test('r540 トップ観戦はロード後にだけ平時BGMへ切替し、通常開始とタイトルでは変更しない', () => {
     const game = read('js/game.js');
     const start = game.indexOf('async loadScenario(folder, options = {})');
@@ -160,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r540');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r542');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -361,7 +415,7 @@ test('旧端末安全モードは小型iPhoneをOS世代に関係なく判定し
     assert.ok(bootstrap.includes('shortEdge <= 390 && longEdge <= 700'));
     assert.ok(!bootstrap.includes('iosMajor > 0 && iosMajor <= 16'));
     assert.ok(bootstrap.includes("document.documentElement.classList.add('mobile-low-memory')"));
-    assert.ok(bootstrap.includes('if (earlyMobileLowMemoryMode) return Promise.resolve(true)'));
+    assert.ok(bootstrap.includes('if (window.__mobileLowMemoryMode) return Promise.resolve(true)'), '回転後の現在の軽量判定で本体フォントを省く');
     assert.ok(css.includes("html.mobile-low-memory"));
     assert.ok(bootstrap.includes('軽量モードは既存どおりOS標準書体を使用します'));
     assert.ok(css.includes('html.mobile-low-memory body,'));
@@ -21122,6 +21176,41 @@ test('r538 PC右クリックは入力欄を保護し、それ以外のゲーム�
     assert.strictEqual(prevented, 1, 'ゲームの非編集領域では従来通りブラウザメニューを抑止する');
     assert.ok(!read('js/game.js').includes("document.addEventListener('contextmenu'"),
         'GameManagerに別のdocument共通抑止を重複させずUIを唯一の窓口にする');
+});
+
+// r542: 攻撃作戦を立てた後、援軍等で出撃元の兵数が変わることがある。
+// AIは出撃時点の在庫を共通Serviceで再正規化し、0人軍を戦争準備へ渡さない。
+test('r542 AI攻撃作戦は出撃直前の兵数0で開戦準備へ進まない', () => {
+    const orders = [];
+    let finished = 0;
+    const general = { id: 1, name: '総大将', clan: 1, intelligence: 75, leadership: 75, strength: 75 };
+    const source = {id: 10, ownerClan: 1, soldiers: 0, horses: 0, guns: 0};
+    const target = {id: 11, ownerClan: 2};
+    const ctx = createContext({
+        BushoStatusRules: {isActive: () => true},
+        MapGraphService: {isSeaRoute: () => false},
+        TroopAllocationService: {clampArmySoldiers: (requested, people, stock) => Math.max(0, Math.min(Number(requested), Number(stock), people.length * 1000))}
+    });
+    loadScript(ctx, 'js/ai.js');
+    const game = {
+        getCastleBushos: () => [general],
+        getCastle: () => target,
+        warPreparationController: {checkReinforcementAndStartWar: (...args) => orders.push(args)},
+        kunishuSystem: {executeKunishuSubjugate: (...args) => orders.push(args)},
+        finishTurn() {finished++;}
+    };
+    const ai = new (vm.runInContext("AIEngine", ctx))(game);
+    ai.executeAttack(source, target, general, 800, 1600, { type: '攻撃' });
+    assert.strictEqual(orders.length, 0, '正規化後0人の通常攻撃を準備しない');
+    assert.strictEqual(finished, 1, '不成立の攻撃はターンを終了し、AI進行を止めない');
+    ai.executeKunishuSubjugateAI(source, {id: 7, castleId: 11}, general, 800, 1600);
+    assert.strictEqual(orders.length, 0, '正規化後0人の鎮圧戦を準備しない');
+    assert.strictEqual(finished, 2, '不成立の鎮圧戦もターンを終了する');
+    source.soldiers = 900;
+    ai.executeAttack(source, target, general, 800, 1600, { type: '攻撃' });
+    assert.strictEqual(orders.length, 1, '兵数がある通常の攻撃は従来どおり出撃準備へ進む');
+    ai.executeKunishuSubjugateAI(source, {id: 7, castleId: 11}, general, 800, 1600);
+    assert.strictEqual(orders.length, 2, '兵数がある通常の鎮圧戦は従来どおり進む');
 });
 
 Promise.all(pendingTests).then(() => {

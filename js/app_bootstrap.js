@@ -188,7 +188,10 @@
     // 初回タップ後に必要な時だけ呼び出す。ロード終了時点では元の全字形が揃う。
     let gameFontsPromise = null;
     function ensureGameFontsReady() {
-        if (earlyMobileLowMemoryMode) return Promise.resolve(true); // 従来どおりOS標準明朝
+        // 起動時の向きではなく、その時点の表示モードを正本にする。
+        // タイトル表示後にタブレットを回転させた場合も、PC表示なら完全書体を
+        // ロード幕内で用意し、軽量表示なら大きな書体の取得を開始しない。
+        if (window.__mobileLowMemoryMode) return Promise.resolve(true);
         if (gameFontsPromise) return gameFontsPromise;
         if (!document.fonts || typeof document.fonts.load !== 'function') return Promise.resolve(false);
         const requests = [
