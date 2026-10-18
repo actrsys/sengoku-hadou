@@ -1419,7 +1419,41 @@ class CommandSystem {
         });
     }
 
+    // 「移動」と「輸送」の確定時の共通検証。いずれも同じ地図候補・
+    // 武将選択から開始するため、通行・所属・活動の判定を別々に持たない。
+    // 変更可能な状態はイベント待機後に再取得し、誰も移動させる前に全員を検証する。
+    _validateTravelOrder(type, bushoIds, targetId) {
+        const origin = this.game.getCurrentTurnCastle();
+        const destination = this.game.getCastle(targetId);
+        const clanId = Number(this.game.playerClanId);
+        const validTargets = origin && destination ? this.getValidTargets(type) : [];
+        if (!origin || !destination || Number(origin.ownerClan) !== clanId
+            || Number(destination.ownerClan) !== clanId
+            || !validTargets.some(id => Number(id) === Number(destination.id))) {
+            this.game.ui.showDialog(type === 'transport'
+                ? '輸送先が現在の輸送条件を満たしていません。'
+                : '移動先が現在の通行・所属条件を満たしていません。', false);
+            return false;
+        }
+        if (!Array.isArray(bushoIds) || bushoIds.length === 0
+            || new Set(bushoIds.map(id => Number(id))).size !== bushoIds.length
+            || bushoIds.some(id => {
+                const officer = this.game.getBusho(id);
+                return !officer || Number(officer.castleId) !== Number(origin.id)
+                    || Number(officer.clan) !== clanId
+                    || !window.BushoStatusRules.isActive(officer) || officer.isActionDone;
+            })) {
+            this.game.ui.showDialog(type === 'transport'
+                ? '輸送を担当する武将が現在の拠点で行動できません。'
+                : '移動する武将が現在の拠点で行動できません。', false);
+            return false;
+        }
+        return true;
+    }
+
     executeCommand(type, bushoIds, targetId) {
+        // 確定前のイベント中に落城・積雪・武将異動があっても、移動を部分実行しない。
+        if (type === 'move_deploy' && !this._validateTravelOrder('move', bushoIds, targetId)) return;
         const castle = this.game.getCurrentTurnCastle(); 
         let totalVal = 0, cost = 0, count = 0, actionName = "";
         const spec = COMMAND_SPECS[type]; 
@@ -1739,6 +1773,9 @@ class CommandSystem {
             return;
         }
         
+        // 輸送元・到着城・担当武将の検証は、同じ地図候補を使う「移動」と共用する。
+        if (!this._validateTravelOrder('transport', bushoIds, targetId)) return;
+
         // ★ここから追加：輸送先が上限を超えないか事前にチェックして、超えるならお断りします！
         if (t.gold + vals.gold > 99999) { this.game.ui.showDialog("輸送先の「金」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
         if (t.rice + vals.rice > 99999) { this.game.ui.showDialog("輸送先の「兵糧」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
@@ -1873,7 +1910,12 @@ class CommandSystem {
             castle.gold -= costOrGain; castle.rice += amount; 
             castle.tradeLimit -= costOrGain;
             msg = `兵糧${amount}を購入しました\n(金-${costOrGain})`; 
-        } else if (type === 'sell_rice') { 
+        } else if (type === 'sell_rice') {
+            // 金1未満の端数は売却利益0になる。兵糧だけ失わせず、取引確定前に中止する。
+            if (!Number.isSafeInteger(costOrGain) || costOrGain <= 0) {
+                this.game.ui.showDialog('この数量では売却代金が金1に満たないため、取引できません。', false);
+                return;
+            }
             // ★変更：売却なのでお金が足りるかのチェックはなし
             if(!this.checkResource(castle, 0, amount)) return;
             // ★追加: 売ると金が上限を超えるならストップ

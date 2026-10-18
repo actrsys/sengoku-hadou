@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r572');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r575');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -16242,14 +16242,14 @@ test('r453 数量空欄の徴兵は人口・兵数・金を破壊しない', () 
 });
 
 test('r453 輸送量が不正または保有超過なら元・先拠点の物資を変えない', () => {
-    const ctx=createContext();loadScript(ctx,'js/command_system.js');
+    const ctx=createContext({BushoStatusRules:{isActive:()=>true}});loadScript(ctx,'js/command_system.js');
     const Command=vm.runInContext('CommandSystem',ctx);
     const source={id:1,ownerClan:1,gold:200,rice:200,soldiers:100,horses:10,guns:10,training:50,morale:50};
     const target={id:2,ownerClan:1,gold:0,rice:0,soldiers:0,horses:0,guns:0,training:0,morale:0};
-    const busho={id:7,name:'仮武将',isActionDone:false};
-    const game={getCurrentTurnCastle:()=>source,getCastle:id=>id===2?target:source,getBusho:()=>busho,ui:{showDialog(){}},
+    const busho={id:7,name:'仮武将',clan:1,castleId:1,isActionDone:false};
+    const game={playerClanId:1,getCurrentTurnCastle:()=>source,getCastle:id=>id===2?target:source,getBusho:()=>busho,ui:{showDialog(){}},
         factionSystem:{handleMove(){}},affiliationSystem:{moveCastle(){}}};
-    const command=new Command(game);command.finishCommand=()=>{};
+    const command=new Command(game);command.finishCommand=()=>{};command.getValidTargets=()=>[2];
     command.executeTransport([7],2,{gold:NaN,rice:0,soldiers:0,horses:0,guns:0});
     command.executeTransport([7],2,{gold:0,rice:0,soldiers:0,horses:11,guns:0});
     assert.strictEqual(source.gold,200);assert.strictEqual(target.gold,0);
@@ -23952,6 +23952,238 @@ test('r572 AI広域徴兵で一部城の人口が不足しても残る城へ配�
     assert.ok(result.castles.every(c=>c.population>=0));
 });
 
+// r573: 米売却の確定数量が金1に満たない場合は、兵糧を失わせず実行を中止する。
+// プレイヤーコマンドとAI共通の単価正本を使い、端数が無価値な取引になるのを防ぐ。
+test('r573 プレイヤー米売却は利益0金の数量を確定しない', () => {
+    const ctx = createContext({MainParams:{Economy:{TradeRateBase:2}}});
+    loadScript(ctx, 'js/economy_rules.js');
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem',ctx);
+    const castle = {id:1,ownerClan:1,rice:100, gold:20,tradeLimit:100};
+    const dialogs=[];let finished=0;
+    const game={getCurrentTurnCastle:()=>castle,getClanDaimyo:()=>null,getBusho:()=>null,
+        provinces:[],ui:{showDialog:s=>dialogs.push(s)}};
+    const command=new Command(game);
+    command.finishCommand=()=>finished++;
+    command.checkResource=()=>true;
+    command.executeTrade('sell_rice',1);
+    assert.strictEqual(castle.rice,100,'金0のために兵糧を減らさない');
+    assert.strictEqual(castle.gold,20);
+    assert.strictEqual(castle.tradeLimit,100);
+    assert.strictEqual(finished,0,'無利益の取引を確定しない');
+    assert.strictEqual(dialogs.length,1,'プレイヤーへ理由を案内する');
+    command.executeTrade('sell_rice',2);
+    assert.strictEqual(castle.rice,98,'利益が正なら従来どおり売れる');
+    assert.strictEqual(castle.gold,21);
+    assert.strictEqual(castle.tradeLimit,99);
+    assert.strictEqual(finished,1);
+});
+
+
+
+// AI側も実行候補が変化して金0になるときは、兵糧と取引回数を消費しない。
+function runActualAISellRice(castle, baseSoldiers = 2000, sellActualRate = 2) {
+    const source = read('js/ai.js');
+    const start = source.indexOf("if (action.type === 'sell_rice') {");
+    const end = source.indexOf("if (action.type === 'buy_rice') {", start);
+    assert.ok(start > 0 && end > start);
+    const branch = source.slice(start,end);
+    const execute = new Function('castle','baseSoldiers','sellActualRate',
+        'let actionDoneInThisStep=false, tradeCount=0, step=0, fallbackReached=false;'
+        + 'for (const action of [{type:"sell_rice"},{type:"fallback"}]) {'
+        + branch + 'if(action.type==="fallback"){fallbackReached=true;break;}}'
+        + 'return {actionDoneInThisStep,tradeCount,fallbackReached};');
+    return execute(castle,baseSoldiers,sellActualRate);
+}
+
+test('r573 AI米売却は利益0金の場合に兵糧・取引枠・行動を消費しない',()=>{
+    const castle={gold:100,rice:5001, soldiers:0, tradeLimit:1000};
+    const before={...castle};
+    const result=runActualAISellRice(castle);
+    assert.deepStrictEqual(castle,before);
+    assert.strictEqual(result.actionDoneInThisStep,false);
+    assert.strictEqual(result.tradeCount,0);
+    assert.strictEqual(result.fallbackReached,true);
+});
+
+test('r573 AI米売却は受取金が正の場合は従来どおり売却する',()=>{
+    const castle={gold:100,rice:6000,soldiers:0,tradeLimit:1000};
+    const result=runActualAISellRice(castle);
+    assert.strictEqual(castle.rice,5000);
+    assert.strictEqual(castle.gold,600);
+    assert.strictEqual(castle.tradeLimit,500);
+    assert.strictEqual(result.actionDoneInThisStep,true);
+    assert.strictEqual(result.tradeCount,1);
+    assert.strictEqual(result.fallbackReached,false);
+});
+
+// r574: 輸送確定前には現在の輸送先と選択武将を再検証する。
+function createR574TransportCase() {
+    const ctx = createContext({COMMAND_SPECS:{transport:{targetType:'ally_other'}},
+        BushoStatusRules:{isActive:b=>b.status==='active'}});
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const source = {id:1,ownerClan:1,gold:200,rice:200,soldiers:100,horses:10,guns:10,training:50,morale:50};
+    const target = {id:2,ownerClan:1,provinceId:9,gold:0,rice:0,soldiers:0,horses:0,guns:0,training:0,morale:0};
+    const officer = {id:7,name:'試験武将',clan:1,castleId:1,status:'active',isActionDone:false};
+    const dialogs = [];
+    let moves = 0;
+    let finishes = 0;
+    let connectedTargets = [1,2];
+    const province = {statusEffects:[]};
+    const game = {playerClanId:1,getCurrentTurnCastle:()=>source,getCastle:id=>id===1?source:id===2?target:null,
+        getClanCastles:clanId=>[source,target].filter(c=>c.ownerClan===clanId),
+        getProvince:()=>province,
+        mapGraph:{getConnectedOwnIdsForMove:()=>new Set(connectedTargets)},
+        getBusho:id=>id===7?officer:null,ui:{showDialog:s=>dialogs.push(s)},
+        factionSystem:{handleMove(){}},affiliationSystem:{moveCastle(){moves++;}}};
+    const command = new Command(game);
+    command.finishCommand = () => {finishes++;};
+    const vals = {gold:10,rice:20,soldiers:30,horses:4,guns:2};
+    return {source,target,officer,province,dialogs,command,vals,
+        setValidTargets:ids=>{connectedTargets=ids;},getMoves:()=>moves,getFinishes:()=>finishes};
+}
+
+test('r574 輸送先が選択後に他家領となったら物資・武将を動かさない',()=>{
+    const s=createR574TransportCase();
+    s.target.ownerClan=2; s.setValidTargets([]);
+    s.command.executeTransport([7],2,s.vals);
+    assert.deepStrictEqual([s.source.gold,s.target.gold,s.source.rice,s.target.rice],[200,0,200,0]);
+    assert.strictEqual(s.officer.isActionDone,false); assert.strictEqual(s.getMoves(),0); assert.strictEqual(s.getFinishes(),0);
+});
+
+test('r574 選択後に積雪・連絡路が変わった輸送先を拒否する',()=>{
+    const s=createR574TransportCase();
+    s.province.statusEffects.push('heavySnow');
+    s.command.executeTransport([7],2,s.vals);
+    assert.strictEqual(s.source.gold,200); assert.strictEqual(s.target.gold,0);
+    assert.strictEqual(s.getMoves(),0);
+});
+
+test('r574 選択した武将が他城へ移動済みなら物資だけ送らない',()=>{
+    const s=createR574TransportCase();
+    s.officer.castleId=2;
+    s.command.executeTransport([7],2,s.vals);
+    assert.strictEqual(s.source.gold,200); assert.strictEqual(s.target.gold,0);
+    assert.strictEqual(s.officer.isActionDone,false); assert.strictEqual(s.getMoves(),0);
+});
+
+test('r574 選択した武将が行動済みになったら再利用しない',()=>{
+    const s=createR574TransportCase();
+    s.officer.isActionDone=true;
+    s.command.executeTransport([7],2,s.vals);
+    assert.strictEqual(s.source.gold,200); assert.strictEqual(s.target.gold,0);
+    assert.strictEqual(s.getMoves(),0);
+});
+
+test('r574 選択武将が死亡・浪人化した場合も輸送を拒否する',()=>{
+    const s=createR574TransportCase();
+    s.officer.status='ronin';
+    s.command.executeTransport([7],2,s.vals);
+    assert.strictEqual(s.source.gold,200); assert.strictEqual(s.target.gold,0);
+    assert.strictEqual(s.getFinishes(),0);
+});
+
+test('r574 選択武将が存在しなくなっても輸送前に拒否して例外を出さない',()=>{
+    const s=createR574TransportCase();
+    s.command.executeTransport([88],2,s.vals);
+    assert.strictEqual(s.source.gold,200); assert.strictEqual(s.target.gold,0);
+    assert.strictEqual(s.getFinishes(),0);
+});
+
+test('r574 有効な輸送先と未行動の在城武将なら従来どおり輸送する',()=>{
+    const s=createR574TransportCase();
+    s.command.executeTransport([7],2,s.vals);
+    assert.deepStrictEqual([s.source.gold,s.source.rice,s.source.soldiers,s.target.gold,s.target.rice,s.target.soldiers],
+        [190,180,70,10,20,30]);
+    assert.strictEqual(s.officer.isActionDone,true);
+    assert.strictEqual(s.getMoves(),1); assert.strictEqual(s.getFinishes(),1);
+});
+
+
+function createR575MoveCase() {
+    const ctx = createContext({
+        COMMAND_SPECS: {move:{targetType:'ally_other'}, move_deploy:{}},
+        DomesticRules: {calcFactionBonusRate:()=>1},
+        BushoStatusRules:{isActive:b=>b.status==='active'}
+    });
+    loadScript(ctx,'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem',ctx);
+    const source={id:1,name:'出発城',ownerClan:1,provinceId:1,gold:50};
+    const target={id:2,name:'到着城',ownerClan:1,provinceId:2,gold:30};
+    const a={id:7,name:'甲',castleId:1,clan:1,status:'active',isActionDone:false};
+    const b={id:8,name:'乙',castleId:1,clan:1,status:'active',isActionDone:false};
+    const bushoMap=new Map([[7,a],[8,b]]);
+    const dialogs=[]; const moved=[]; let finished=0;
+    let connected=[1,2];
+    const prov={statusEffects:[]};
+    const game={playerClanId:1,getCurrentTurnCastle:()=>source,
+        getCastle:id=>id===1?source:id===2?target:null,
+        getClanCastles:clanId=>[source,target].filter(c=>c.ownerClan===clanId),
+        getProvince:()=>prov,
+        mapGraph:{getConnectedOwnIdsForMove:()=>new Set(connected)},
+        getBusho:id=>bushoMap.get(id),ui:{showDialog:s=>dialogs.push(s)},
+        factionSystem:{handleMove(){}},
+        affiliationSystem:{moveCastle:(officer,id)=>{moved.push(officer.id);officer.castleId=id;}}
+    };
+    const command=new Command(game);
+    command.finishCommand=()=>{finished++;};
+    return {command,game,source,target,a,b,bushoMap,dialogs,moved,prov,
+        setConnected:arr=>{connected=arr;},finished:()=>finished};
+}
+
+test('r575 移動先が選択後に他家領となったら誰も移動しない',()=>{
+    const s=createR575MoveCase(); s.target.ownerClan=2;
+    s.command.executeCommand('move_deploy',[7],2);
+    assert.strictEqual(s.a.castleId,1); assert.strictEqual(s.a.isActionDone,false);
+    assert.strictEqual(s.moved.length,0); assert.strictEqual(s.finished(),0);
+});
+
+test('r575 移動先の連結・積雪条件が変われば古い候補を拒否する',()=>{
+    const s=createR575MoveCase(); s.prov.statusEffects.push('heavySnow');
+    s.command.executeCommand('move_deploy',[7],2);
+    assert.strictEqual(s.a.castleId,1); assert.strictEqual(s.moved.length,0);
+});
+
+test('r575 移動元から別城へ移った武将・行動済み武将を拒否する',()=>{
+    const s=createR575MoveCase(); s.b.castleId=2;
+    s.command.executeCommand('move_deploy',[7,8],2);
+    assert.strictEqual(s.a.castleId,1); assert.strictEqual(s.moved.length,0);
+    s.b.castleId=1; s.b.isActionDone=true;
+    s.command.executeCommand('move_deploy',[7,8],2);
+    assert.strictEqual(s.a.castleId,1); assert.strictEqual(s.moved.length,0);
+});
+
+test('r575 移動対象の欠損・重複・浪人化は部分実行しない',()=>{
+    const s=createR575MoveCase();
+    s.command.executeCommand('move_deploy',[7,123],2);
+    s.command.executeCommand('move_deploy',[7,7],2);
+    s.b.status='ronin';
+    s.command.executeCommand('move_deploy',[7,8],2);
+    assert.strictEqual(s.a.castleId,1); assert.strictEqual(s.moved.length,0);
+    assert.strictEqual(s.finished(),0);
+});
+
+test('r575 before_commandイベント中の落城後は選択済み武将を移動しない',async()=>{
+    const s=createR575MoveCase();
+    s.game.eventManager={processEvents:async type=>{
+        if (type==='before_command') {await Promise.resolve(); s.target.ownerClan=2;}
+    }};
+    await s.command.executeWithEvent('move',()=>s.command.executeCommand('move_deploy',[7],2));
+    assert.strictEqual(s.a.castleId,1);
+    assert.strictEqual(s.a.isActionDone,false);
+    assert.strictEqual(s.moved.length,0);
+});
+
+test('r575 移動可能な自領と未行動武将は従来どおり一括移動する',()=>{
+    const s=createR575MoveCase();
+    s.command.executeCommand('move_deploy',[7,8],2);
+    assert.deepStrictEqual(s.moved,[7,8]);
+    assert.deepStrictEqual([s.a.castleId,s.b.castleId],[2,2]);
+    assert.strictEqual(s.a.isActionDone,true); assert.strictEqual(s.b.isActionDone,true);
+    assert.strictEqual(s.finished(),1);
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
@@ -23960,3 +24192,5 @@ Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(1);
 });
+
+

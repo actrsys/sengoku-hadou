@@ -3025,7 +3025,9 @@ class AIEngine {
                     }
                     
                     if (sellAmount > 0) {
+                        // 端数で金0になる売却は無意味。兵糧だけ失う前に次の候補へ進む。
                         const gain = Math.floor(sellAmount / rate);
+                        if (gain <= 0) continue;
                         
                         if (castle.gold + gain <= 99999) {
                             castle.rice -= sellAmount;
@@ -3040,6 +3042,7 @@ class AIEngine {
 
                             if (sellAmount > 0) {
                                 const actualGain = Math.floor(sellAmount / rate);
+                                if (actualGain <= 0) continue;
                                 castle.rice -= sellAmount;
                                 castle.gold += actualGain;
                                 castle.tradeLimit -= actualGain; // ★変更：減らすのは「得た金額」

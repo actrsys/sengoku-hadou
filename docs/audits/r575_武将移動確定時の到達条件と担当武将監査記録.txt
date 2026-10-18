@@ -1,0 +1,21 @@
+戦国覇道 r575 — 武将移動の実行直前再検証と輸送共通化
+
+【対象・正本】
+r574 完全版の ARCHITECTURE.md、CommandCatalog、CommandSystem、MapGraphService、r574輸送監査記録を確認。候補判定は COMMAND_SPECS の move / transport 共通 targetType=ally_other と getValidTargets を正本とする。
+
+【再現した不具合】
+移動先を地図から選択後、before_command を経た executeCommand('move_deploy') は選択時点の targetId と bushoIds をそのまま使用していた。落城して他家領となった移動先、積雪・連結条件で到達不可となった拠点へ移動できた。武将が別城へ移った・行動済み・浪人化・欠損・重複した場合も、先頭人物だけ先に移動させた後で失敗/二重処理する可能性があった。
+
+【改修】
+CommandSystem._validateTravelOrder() を移動と輸送の共通確定検証として導入。最新の出発拠点と到着城の所属、getValidTargets(type) の現在候補、選択武将の所在・所属・活動状態・未行動・非重複を、最初の moveCastle / 資源変更より前に一括確認する。失効した指示は何も変更せず理由を通知する。既存の輸送数量・上限・訓練と士気の計算、移動時のFaction/Affiliation処理、行動消費、AI判断は変更しない。
+
+【修正前の再現試験】
+新規移動テスト5件中、旧移動先・積雪・武将異動/行動済み・人物欠損/重複/浪人化の4系列が修正前のコードで失敗した。修正後は正常移動と before_command 中に落城する非同期試験を含む計6件が成功。r453の旧輸送試験fixtureには実際の操作勢力IDが欠けていたため、実際のゲームに合わせて playerClanId=1 を補った（期待する輸送数量は変更していない）。
+
+【検証】
+通常回帰1027件成功・失敗0件。表示・管理データ・シミュレーションの結果は配布前最終検証ログによる。実機での長時間プレイ・発生頻度は未確認。
+
+【変更】
+追加: docs/audits/r575_武将移動確定時の到達条件と担当武将監査記録.txt
+更新: ARCHITECTURE.md, docs/audits/README.md, js/command_system.js, js/config.js, tests/run_tests.js
+削除: なし
