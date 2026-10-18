@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r581');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r584');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -24195,12 +24195,12 @@ function createR576DomesticCase() {
     const ctx = createContext({
         BushoStatusRules: {isActive:b=>b?.status === 'active'},
         COMMAND_SPECS: {
-            farm:{costGold:20,costRice:0},
-            commerce:{costGold:20,costRice:0},
-            repair:{costGold:20,costRice:0},
-            training:{costGold:20,costRice:10},
-            soldier_charity:{costGold:20,costRice:10},
-            charity:{costGold:0,costRice:20},
+            farm:{costGold:20,costRice:0,canExecute:(game,castle)=>castle.kokudaka < castle.maxKokudaka},
+            commerce:{costGold:20,costRice:0,canExecute:(game,castle)=>castle.commerce < castle.maxCommerce},
+            repair:{costGold:20,costRice:0,canExecute:(game,castle)=>castle.defense < castle.maxDefense},
+            training:{costGold:20,costRice:10,canExecute:(game,castle)=>castle.training < 100 && castle.soldiers > 0},
+            soldier_charity:{costGold:20,costRice:10,canExecute:(game,castle)=>castle.morale < 100 && castle.soldiers > 0},
+            charity:{costGold:0,costRice:20,canExecute:(game,castle)=>castle.peoplesLoyalty < 100},
             appoint:{}
         },
         DomesticRules: {
@@ -24873,6 +24873,90 @@ test('r580 AIから提示された和睦条件も確定前に人質資格を確�
     assert.strictEqual(s.statusChanges, 0);
     assert.strictEqual(s.conditionChanges, 0);
     assert(result.includes('和睦は成立しませんでした'));
+});
+
+
+// r583: プレイヤーが選択した全武将は、内政上限に途中で到達しても
+// 費用・行動・経験値相当の実行を維持し、功績も得る。AIの候補選別は別経路。
+// r584: 開始時点で上限ならメニュー/確定とも不可。ただし開始時に未達なら
+// 一括処理の途中で上限到達しても、残りの選択済みプレイヤー武将は行動する。
+test('r584 上限で開始する6種の内政はメニューと直接確定の両方で実行不可', () => {
+    const cases = [
+        ['farm','kokudaka','maxKokudaka'],
+        ['commerce','commerce','maxCommerce'],
+        ['repair','defense','maxDefense'],
+        ['training','training',null],
+        ['soldier_charity','morale',null],
+        ['charity','peoplesLoyalty',null]
+    ];
+    for (const [type, field, maxField] of cases) {
+        const s = createR576DomesticCase();
+        s.castle[field] = maxField ? s.castle[maxField] : 100;
+        const before = {gold:s.castle.gold,rice:s.castle.rice,
+            loyalty:s.castle.peoplesLoyalty,achievementA:s.a.achievementTotal,achievementB:s.b.achievementTotal};
+        s.game.getCastleBushos = () => [s.a, s.b];
+        assert.strictEqual(s.command.canExecuteCommand(type), false, type+': 上限なら選べない');
+        if (type === 'charity') s.command.executeCharity([7,8]);
+        else s.command.executeCommand(type,[7,8]);
+        assert.strictEqual(s.castle[field], maxField ? s.castle[maxField] : 100, type+': 値は上限');
+        assert.deepStrictEqual({gold:s.castle.gold,rice:s.castle.rice,
+            loyalty:s.castle.peoplesLoyalty,achievementA:s.a.achievementTotal,achievementB:s.b.achievementTotal}, before,
+            type+': 最初から上限なら資源・功績変更なし');
+        assert.strictEqual(s.a.isActionDone, false, type+': 先行武将も未行動');
+        assert.strictEqual(s.b.isActionDone, false, type+': 後続武将も未行動');
+        assert.strictEqual(s.finished(), 0, type+': 命令完了なし');
+    }
+});
+
+test('r583 プレイヤー一括内政は上限到達後も全員の費用・行動・功績を消費・付与する', () => {
+    const commands = [
+        ['farm', 'kokudaka', 'maxKokudaka'],
+        ['commerce', 'commerce', 'maxCommerce'],
+        ['repair', 'defense', 'maxDefense'],
+        ['training', 'training', null],
+        ['soldier_charity', 'morale', null]
+    ];
+    for (const [type, field, maxField] of commands) {
+        const s = createR576DomesticCase();
+        s.castle.gold = 100;
+        s.castle[field] = 98;
+        if (maxField) s.castle[maxField] = 100;
+        s.command.executeCommand(type, [7, 8]);
+        assert.strictEqual(s.castle[field], 100, type + ': 上限で切止め');
+        assert.strictEqual(s.castle.gold, 60, type + ': 選択2人分の金');
+        assert.strictEqual(s.castle.rice, type === 'training' || type === 'soldier_charity' ? 80 : 100,
+            type + ': 選択2人分の兵糧');
+        assert.strictEqual(s.a.isActionDone, true, type + ': 先行武将は行動済み');
+        assert.strictEqual(s.b.isActionDone, true, type + ': 上限到達後も行動済み');
+        assert(s.a.achievementTotal > 0, type + ': 先行武将の功績');
+        assert(s.b.achievementTotal > 0, type + ': 上限到達後の武将の功績');
+        assert.strictEqual(s.finished(), 1, type + ': 一括命令1件として完了');
+    }
+});
+
+test('r583 プレイヤー民施しは上限到達後も選択全員が施し・功績獲得する', () => {
+    const s = createR576DomesticCase();
+    s.castle.peoplesLoyalty = 98;
+    s.command.executeCharity([7, 8]);
+    assert.strictEqual(s.castle.peoplesLoyalty, 100);
+    assert.strictEqual(s.castle.rice, 60);
+    assert.strictEqual(s.a.isActionDone, true);
+    assert.strictEqual(s.b.isActionDone, true);
+    assert(s.a.achievementTotal > 0);
+    assert(s.b.achievementTotal > 0);
+    assert.strictEqual(s.finished(), 1);
+});
+
+test('r583 プレイヤー内政は上限到達後も資源不足の武将まで無条件に実行しない', () => {
+    const s = createR576DomesticCase();
+    s.castle.kokudaka = 98;
+    s.castle.gold = 20;
+    s.command.executeCommand('farm', [7, 8]);
+    assert.strictEqual(s.castle.kokudaka, 100);
+    assert.strictEqual(s.castle.gold, 0);
+    assert.strictEqual(s.a.isActionDone, true);
+    assert.strictEqual(s.b.isActionDone, false);
+    assert.strictEqual(s.finished(), 1);
 });
 
 Promise.all(pendingTests).then(() => {

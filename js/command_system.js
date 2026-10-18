@@ -1492,6 +1492,13 @@ class CommandSystem {
         return true;
     }
 
+    // プレイヤーが選択した内政行動は、実際の能力上昇が0でも功績を得る。
+    // 通常の上昇時は従来の実増分基準を維持する。
+    _calcPlayerDomesticMerit(actualVal, calculatedVal) {
+        if (actualVal > 0) return Math.floor(actualVal * 0.5);
+        return Math.max(1, Math.floor(calculatedVal * 0.5));
+    }
+
     executeCommand(type, bushoIds, targetId) {
         // 確定前のイベント中に落城・積雪・武将異動があっても、移動を部分実行しない。
         if (type === 'move_deploy' && !this._validateTravelOrder('move', bushoIds, targetId)) return;
@@ -1502,6 +1509,14 @@ class CommandSystem {
         const castle = this.game.getCurrentTurnCastle(); 
         let totalVal = 0, cost = 0, count = 0, actionName = "";
         const spec = COMMAND_SPECS[type]; 
+
+        // 開始時点ですでに上限なら実行不可。メニューと同じ正規条件を用い、
+        // 一括実行中には再判定しない（途中で上限到達しても選択済み武将は実行する）。
+        if (['farm', 'commerce', 'repair', 'training', 'soldier_charity'].includes(type)
+            && typeof spec.canExecute === 'function' && !spec.canExecute(this.game, castle)) {
+            this.game.ui.showDialog('現在の拠点ではこの命令を実行できません。', false);
+            return;
+        }
 
         // ★追加：参加武将をリストアップして派閥ボーナスの倍率を出します
         const execBushos = bushoIds.map(id => this.game.getBusho(id)).filter(b => b);
@@ -1570,7 +1585,7 @@ class CommandSystem {
                     castle.kokudaka = Math.min(castle.maxKokudaka, castle.kokudaka + val); 
                     const actualVal = castle.kokudaka - oldVal;
                     totalVal += actualVal; count++; actionName = "石高開発";
-                    busho.achievementTotal += Math.floor(actualVal * 0.5); 
+                    busho.achievementTotal += this._calcPlayerDomesticMerit(actualVal, val); 
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
             }
@@ -1581,7 +1596,7 @@ class CommandSystem {
                     castle.commerce = Math.min(castle.maxCommerce, castle.commerce + val); 
                     const actualVal = castle.commerce - oldVal;
                     totalVal += actualVal; count++; actionName = "鉱山開発";
-                    busho.achievementTotal += Math.floor(actualVal * 0.5);
+                    busho.achievementTotal += this._calcPlayerDomesticMerit(actualVal, val);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
             }
@@ -1592,7 +1607,7 @@ class CommandSystem {
                     castle.defense = Math.min(castle.maxDefense, castle.defense + val); 
                     const actualVal = castle.defense - oldVal;
                     totalVal += actualVal; count++; actionName = "城壁修復";
-                    busho.achievementTotal += Math.floor(actualVal * 0.5);
+                    busho.achievementTotal += this._calcPlayerDomesticMerit(actualVal, val);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
             }
@@ -1608,7 +1623,7 @@ class CommandSystem {
                     castle.training = oldVal >= maxTraining ? oldVal : Math.min(maxTraining, oldVal + val); 
                     const actualVal = castle.training - oldVal;
                     totalVal += actualVal; count++; actionName = "訓練";
-                    busho.achievementTotal += Math.floor(actualVal * 0.5);
+                    busho.achievementTotal += this._calcPlayerDomesticMerit(actualVal, val);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
             }
@@ -1624,7 +1639,7 @@ class CommandSystem {
                     castle.morale = oldVal >= maxMorale ? oldVal : Math.min(maxMorale, oldVal + val); 
                     const actualVal = castle.morale - oldVal;
                     totalVal += actualVal; count++; actionName = "兵施し";
-                    busho.achievementTotal += Math.floor(actualVal * 0.5);
+                    busho.achievementTotal += this._calcPlayerDomesticMerit(actualVal, val);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
             }
@@ -2058,15 +2073,21 @@ class CommandSystem {
     executeCharity(bushoIds) { 
         if (!this._validateLocalCommandActors(bushoIds)) return;
         const castle = this.game.getCurrentTurnCastle(); 
-        const spec = COMMAND_SPECS['charity']; 
-        
+        const spec = COMMAND_SPECS['charity'];
+        // 民施しも、最初から上限なら命令不可。一括の途中での上限到達とは区別する。
+        if (typeof spec.canExecute === 'function' && !spec.canExecute(this.game, castle)) {
+            this.game.ui.showDialog('現在の拠点ではこの命令を実行できません。', false);
+            return;
+        }
+
         const totalCostRice = spec.costRice * bushoIds.length;
         
         // ★変更：共通魔法でチェックします
         if (!this.checkResource(castle, 0, totalCostRice)) return;
         
+        // 一括で選んだ全武将の施しを実行するため、先に全員分を確保する。
         castle.rice -= totalCostRice;
-       
+
         let totalVal = 0;
         let count = 0;
 
@@ -2074,21 +2095,20 @@ class CommandSystem {
         const execBushos = bushoIds.map(id => this.game.getBusho(id)).filter(b => b);
         const bonusRate = DomesticRules.calcFactionBonusRate(execBushos);
 
+        const maxLoyalty = window.MainParams.Economy.MaxLoyalty;
         bushoIds.forEach(bid => {
             const busho = this.game.getBusho(bid);
             if (!busho) return;
 
-            const val = DomesticRules.calcCharity(busho, bonusRate, true); 
-
+            const val = DomesticRules.calcCharity(busho, bonusRate, true);
             totalVal += val;
             count++;
 
             busho.achievementTotal += Math.floor(val * 0.5);
             this.game.factionSystem.updateRecognition(busho, 15);
-            busho.isActionDone = true; 
+            busho.isActionDone = true;
         });
 
-        const maxLoyalty = window.MainParams.Economy.MaxLoyalty;
         const oldLoyalty = castle.peoplesLoyalty;
         castle.peoplesLoyalty = Math.min(maxLoyalty, castle.peoplesLoyalty + totalVal); 
         const actualIncrease = castle.peoplesLoyalty - oldLoyalty;
