@@ -183,6 +183,40 @@ class DomesticRules {
         return Math.ceil(soldiers / efficiency); 
     }
 
+    // 広域徴兵の人口負担。自城を1.5倍とする既存比率を保ちつつ、
+    // 端数や上限で割り当て損ねた人数は、まだ人口の残る城へ戻す。
+    // 徴兵総数に対する人口減少を一致させるため、計算だけをここで行う。
+    static allocateDraftPopulation(castles, sourceCastleId, soldiers) {
+        const entries = (castles || []).filter(c => c && c.population > 0).map(c => ({
+            castle: c,
+            capacity: Math.floor(c.population),
+            weight: Math.floor(c.population * (c.id === sourceCastleId ? 1.5 : 1.0)),
+            amount: 0
+        }));
+        const totalPopulation = entries.reduce((sum, entry) => sum + entry.capacity, 0);
+        const totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
+        const target = Math.min(totalPopulation, Math.max(0, Math.floor(soldiers)));
+        if (!target || !totalWeight) return [];
+
+        let remaining = target;
+        for (let i = 0; i < entries.length; i++) {
+            const entry = entries[i];
+            const quota = i === entries.length - 1
+                ? remaining : Math.floor(target * entry.weight / totalWeight);
+            entry.amount = Math.min(entry.capacity, quota);
+            remaining -= entry.amount;
+        }
+        // 途中で容量上限に達した城の割当不足を、他城の残人口で補う。
+        for (let i = entries.length - 1; i >= 0 && remaining > 0; i--) {
+            const entry = entries[i];
+            const additional = Math.min(remaining, entry.capacity - entry.amount);
+            entry.amount += additional;
+            remaining -= additional;
+        }
+        return entries.filter(entry => entry.amount > 0)
+            .map(entry => ({ castle: entry.castle, soldiers: entry.amount }));
+    }
+
     static applyDraftPenalty(castle, soldiers) {
         // 人口が0以下の時は何もしないように安全対策をします
         if (castle.population <= 0) return 0;

@@ -2864,13 +2864,7 @@ class AIEngine {
                     const draftableCastles = reachableMyCastles.filter(c => c.population >= 3000);
                     if (draftableCastles.length === 0) continue;
 
-                    let totalWeightedPop = 0;
-                    let actualTotalPop = 0;
-                    draftableCastles.forEach(c => {
-                        actualTotalPop += c.population;
-                        let weight = (c.id === castle.id) ? 1.5 : 1.0;
-                        totalWeightedPop += Math.floor(c.population * weight);
-                    });
+                    const actualTotalPop = draftableCastles.reduce((sum, c) => sum + c.population, 0);
 
                     let draftCost = action.cost;
                     // ★修正：実行時にもお城の人口を渡して、正しい兵士数を計算します
@@ -2898,33 +2892,20 @@ class AIEngine {
                         draftCost = DomesticRules.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
                     }
 
-                    if (soldiers > 0 && draftCost > 0) {
-                        // ★修正：経験値を入れるための最終実行の際にも人口を渡します（trueの前に差し込みます）
+                    // 人口負担は内政Rulesで確定する。最後の城に端数が集中して
+                    // 人口を超えてしまう場合も、残人口のある城へ再配分する。
+                    const draftDistribution = DomesticRules.allocateDraftPopulation(draftableCastles, castle.id, soldiers);
+                    const actualDraft = draftDistribution.reduce((sum, entry) => sum + entry.soldiers, 0);
+                    if (actualDraft !== soldiers) {
+                        soldiers = actualDraft;
+                        draftCost = DomesticRules.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
+                    }
+                    if (soldiers > 0 && draftCost > 0 && draftCost <= availableGold && draftCost <= castle.gold) {
+                        // 経験値・人口ペナルティ・支払いは実際に成立した徴兵数にだけ適用する。
                         DomesticRules.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population, true);
-
-                        // ★大改善：集めた兵士数を、負担の重さ（ウェイト）に合わせて振り分けます！
-                        let remainingDraft = soldiers;
-                        draftableCastles.forEach((c, index) => {
-                            if (c.population > 0 && totalWeightedPop > 0) {
-                                let popDecrease = 0;
-                                // 最後の1つのお城は、計算のズレ（端数）をすべて引き受けます
-                                if (index === draftableCastles.length - 1) {
-                                    popDecrease = remainingDraft;
-                                } else {
-                                    // 負担の割合（実行拠点は1.5倍）に合わせて人数を決めます
-                                    let weight = (c.id === castle.id) ? 1.5 : 1.0;
-                                    let weightedPop = Math.floor(c.population * weight);
-                                    const ratio = weightedPop / totalWeightedPop;
-                                    popDecrease = Math.floor(soldiers * ratio);
-                                    popDecrease = Math.min(popDecrease, c.population); 
-                                }
-                                
-                                // ★ 徴兵による民忠と人口の減少処理を、GameSystemの専門の魔法にお任せします！
-                                const loyaltyPenalty = DomesticRules.applyDraftPenalty(c, popDecrease);
-                                
-                                remainingDraft -= popDecrease;
-                            }
-                        });
+                        for (const entry of draftDistribution) {
+                            DomesticRules.applyDraftPenalty(entry.castle, entry.soldiers);
+                        }
 
                         // お城の貯金箱から使った分を減らします
                         castle.gold -= draftCost;

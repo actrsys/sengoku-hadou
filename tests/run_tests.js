@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r571');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r572');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -23894,6 +23894,62 @@ test('r571 作戦拠点候補は通常輸送と同じ連結・積雪候補リス
     const source = read('js/ai.js');
     assert.match(source, /if \(stagingCastle && targetCastlesForTransport\.some\(c => c\.id === stagingCastle\.id\)/);
     assert.match(source, /else if \(supportCastle && targetCastlesForTransport\.some\(c => c\.id === supportCastle\.id\)/);
+});
+
+
+// r572: AIの広域徴兵で、重量配分の切り捨て超過分を別城の残人口へ再配分する。
+// 実際の徴兵分岐を実行し、兵士増分と全城の人口減少が一致することを検査する。
+function runActualAIDraftPopulation(soldiers, populations) {
+    const source = read('js/ai.js');
+    const start = source.indexOf("if (action.type === 'draft' && availableGold >= action.cost) {");
+    const end = source.indexOf("if (action.type === 'training') {", start);
+    assert.ok(start >= 0 && end > start);
+    const body = source.slice(start, end);
+    const castles = populations.map((population, i) => ({
+        id:i+1, population, gold:50000, rice:99999, soldiers:0,
+        peoplesLoyalty:100, training:70, morale:70
+    }));
+    const castle = castles[0];
+    const doer = {isActionDone:false, achievementTotal:0};
+    const ctx = createContext();
+    loadScript(ctx, 'js/domestic_rules.js');
+    const DomesticRules = {
+        allocateDraftPopulation: (...args) => ctx.DomesticRules.allocateDraftPopulation(...args),
+        calcDraftFromGold:cost=>cost,
+        calcDraftCost:amount=>amount,
+        applyDraftPenalty(c, amount) {
+            c.population = Math.max(0, c.population - amount);
+        }
+    };
+    const run = new Function('candidate','availableGold','castle','reachableMyCastles','doer','DomesticRules',
+        'let actionDoneInThisStep=false; for (const action of [candidate]) {'+body+'}\n'
+        +'return actionDoneInThisStep;');
+    const done = run.call({game:{factionSystem:null}},
+        {type:'draft',cost:soldiers},50000,castle,castles,doer,DomesticRules);
+    assert.strictEqual(done,true);
+    assert.strictEqual(doer.isActionDone,true);
+    return {castles, gained:castle.soldiers, populationDecrease:populations.reduce((sum,n,i)=>sum+n-castles[i].population,0)};
+}
+
+test('r572 AI広域徴兵で最後の城の人口を超えて徴兵数だけ増やさない',()=>{
+    const result = runActualAIDraftPopulation(9000,[3000,3000,3000]);
+    assert.strictEqual(result.gained,9000);
+    assert.strictEqual(result.populationDecrease,9000,'徴兵した兵士数と実際の全城人口減少は一致');
+    assert.deepStrictEqual(result.castles.map(c=>c.population),[0,0,0]);
+});
+
+test('r572 AI広域徴兵の通常配分は本拠1.5倍の従来比率を維持する',()=>{
+    const result = runActualAIDraftPopulation(2000,[3000,3000,3000]);
+    assert.strictEqual(result.gained,2000);
+    assert.strictEqual(result.populationDecrease,2000);
+    assert.deepStrictEqual(result.castles.map(c=>c.population),[2143,2429,2428]);
+});
+
+test('r572 AI広域徴兵で一部城の人口が不足しても残る城へ配分して一致させる',()=>{
+    const result = runActualAIDraftPopulation(8500,[3000,3000,3000]);
+    assert.strictEqual(result.gained,8500);
+    assert.strictEqual(result.populationDecrease,8500);
+    assert.ok(result.castles.every(c=>c.population>=0));
 });
 
 Promise.all(pendingTests).then(() => {
