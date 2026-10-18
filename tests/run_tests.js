@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r577');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r578');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -24444,6 +24444,119 @@ test('r577 通常の自領浪人登用は従来どおり成立',()=>{
     const s=createR577PersonnelCase();s.command.executeEmploy(11,13);
     assert.strictEqual(s.target.clan,1);assert.strictEqual(s.target.status,'active');
     assert.strictEqual(s.a.isActionDone,true);assert.strictEqual(s.finished(),1);
+});
+
+// r578: 外交・調略の選択から軍師助言／事前イベント後までの再検証。
+function createR578StrategyCase() {
+    const ctx = createContext({ BushoStatusRules: { isActive: b => b.status === 'active' } });
+    loadScript(ctx, 'js/strategy_system.js');
+    const Strategy = vm.runInContext('StrategySystem', ctx);
+    const castles = [
+        { id: 10, name: '自城', ownerClan: 1, gold: 500, defense: 80 },
+        { id: 20, name: '敵城', ownerClan: 2, defense: 90, peoplesLoyalty: 70 },
+        { id: 30, name: '別敵城', ownerClan: 3, defense: 80, peoplesLoyalty: 65 }
+    ];
+    const actor = { id: 1, name: '工作担当', castleId: 10, clan: 1, status: 'active', isActionDone: false };
+    const target = { id: 2, name: '敵家臣', castleId: 20, clan: 2, status: 'active', isDaimyo: false, loyalty: 65 };
+    const dialogs = [], completed = [];
+    const game = {
+        playerClanId: 1, castles,
+        getCurrentTurnCastle: () => castles[0],
+        getBusho: id => Number(id) === 1 ? actor : Number(id) === 2 ? target : null,
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getClan: id => ({ id, name: `大名家${id}` }),
+        ui: { showDialog: msg => dialogs.push(msg) },
+        commandSystem: {
+            _validateLocalCommandActors(ids) {
+                return ids.length === 1 && ids[0] === 1 && actor.castleId === 10
+                    && actor.clan === 1 && actor.status === 'active' && !actor.isActionDone;
+            },
+            getValidTargets() { return castles.filter(c => c.ownerClan !== 1 && c.ownerClan > 0).map(c => c.id); },
+            finishCommand: msg => completed.push(msg)
+        }
+    };
+    const strategy = new Strategy(game);
+    let rolls = 0;
+    strategy.calcSabotage = () => { rolls++; return { success: true, val: 5 }; };
+    strategy.calcRumor = () => { rolls++; return { success: true, val: 5 }; };
+    strategy.calcHeadhunt = () => { rolls++; return false; };
+    strategy.calcAssassinate = () => { rolls++; return false; };
+    strategy.calcKuko = () => { rolls++; return {success:false,val:0}; };
+    strategy.handleCovertAction = () => ({ message: '', isDiscovered:false });
+    strategy.applyStrategyEffect = (type, doer, obj) => {
+        if (type === 'sabotage') obj.defense -= 5;
+        if (type === 'rumor') obj.loyalty -= 5;
+    };
+    strategy.applyHeadhuntEffect = () => [];
+    strategy.recordStrategyHistory = () => {};
+    return { strategy, actor, target, castles, game, dialogs, completed, rolls: () => rolls };
+}
+
+test('r578 破壊工作の対象城が自家領へ変われば実行前に中止', () => {
+    const s = createR578StrategyCase();
+    s.castles[1].ownerClan = 1;
+    s.strategy.executeSabotage(1, 20);
+    assert.strictEqual(s.rolls(), 0);
+    assert.strictEqual(s.castles[1].defense, 90);
+    assert.strictEqual(s.actor.isActionDone, false);
+});
+
+test('r578 破壊工作の担当武将が別城へ移動・行動済みなら実行しない', () => {
+    for (const change of [s => { s.actor.castleId = 30; }, s => { s.actor.isActionDone = true; }]) {
+        const s = createR578StrategyCase();
+        change(s);
+        s.strategy.executeSabotage(1, 20);
+        assert.strictEqual(s.rolls(), 0);
+        assert.strictEqual(s.castles[1].defense, 90);
+        assert.strictEqual(s.completed.length, 0);
+    }
+});
+
+test('r578 離間計は選択後に武将が別敵城に移っても旧対象城へは実行しない', () => {
+    const s = createR578StrategyCase();
+    s.target.castleId = 30;
+    s.target.clan = 3;
+    s.strategy.executeRumor(1, 20, 2);
+    assert.strictEqual(s.rolls(), 0);
+    assert.strictEqual(s.target.loyalty, 65);
+    assert.strictEqual(s.actor.isActionDone, false);
+});
+
+test('r578 引抜の対象が自家臣に変われば資金を消費しない', () => {
+    const s = createR578StrategyCase();
+    s.target.clan = 1;
+    s.target.castleId = 10;
+    s.strategy.executeHeadhunt(1, 2, 100);
+    assert.strictEqual(s.rolls(), 0);
+    assert.strictEqual(s.castles[0].gold, 500);
+    assert.strictEqual(s.actor.isActionDone, false);
+});
+
+test('r578 暗殺の担当が行動済みなら確率判定も行わない', () => {
+    const s = createR578StrategyCase();
+    s.actor.isActionDone = true;
+    s.strategy.executeAssassinate(1, 2);
+    assert.strictEqual(s.rolls(), 0);
+    assert.strictEqual(s.actor.isActionDone, true);
+});
+
+test('r578 駆虎呑狼の対象が同一勢力となれば処理しない', () => {
+    const s = createR578StrategyCase();
+    s.strategy.executeKuko(1, 2, 2);
+    assert.strictEqual(s.rolls(), 0);
+});
+
+test('r578 正常な破壊工作と離間計は従来どおり成立', () => {
+    const s = createR578StrategyCase();
+    s.strategy.executeSabotage(1, 20);
+    assert.strictEqual(s.castles[1].defense, 85);
+    assert.strictEqual(s.rolls(), 1);
+    assert.strictEqual(s.actor.isActionDone, true);
+    const t = createR578StrategyCase();
+    t.strategy.executeRumor(1, 20, 2);
+    assert.strictEqual(t.target.loyalty, 60);
+    assert.strictEqual(t.rolls(), 1);
+    assert.strictEqual(t.actor.isActionDone, true);
 });
 
 Promise.all(pendingTests).then(() => {

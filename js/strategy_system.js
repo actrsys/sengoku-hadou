@@ -30,6 +30,36 @@ class StrategySystem {
         return true;
     }
 
+    // プレイヤーの調略は地図候補・参加武将を選んだ後もイベント／軍師助言を待つ。
+    // 効果発生前に CommandSystem の既存の現在条件を再利用し、古い選択から自家領を攻撃しない。
+    _validatePlayerStrategyActor(doerId) {
+        const commands = this.game.commandSystem;
+        return !!(commands && typeof commands._validateLocalCommandActors === 'function'
+            && commands._validateLocalCommandActors([doerId]));
+    }
+
+    _validatePlayerStrategyOrder(actionType, doerId, targetCastleId, targetBushoId = null) {
+        if (!this._validatePlayerStrategyActor(doerId)) return false;
+        const commands = this.game.commandSystem;
+        const targetCastle = this.game.getCastle(targetCastleId);
+        const validTargetIds = commands && typeof commands.getValidTargets === 'function'
+            ? commands.getValidTargets(actionType) : [];
+        if (!targetCastle || !Array.isArray(validTargetIds)
+            || !validTargetIds.some(id => Number(id) === Number(targetCastle.id))) {
+            this.game.ui.showDialog('対象拠点が現在の調略条件を満たしていません。', false);
+            return false;
+        }
+        if (targetBushoId !== null) {
+            const target = this.game.getBusho(targetBushoId);
+            if (!this.isRegularClanStrategyTarget(target, targetCastle.ownerClan)
+                || Number(target.castleId) !== Number(targetCastle.id)) {
+                this.game.ui.showDialog('対象武将が選択した敵城に在城していません。', false);
+                return false;
+            }
+        }
+        return true;
+    }
+
     _getStrategyHistoryMode(actionName, doer, success, clanIds = [], covertOutcome = null) {
         if (!doer) return null;
         const playerClanId = Number(this.game.playerClanId);
@@ -757,6 +787,7 @@ class StrategySystem {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getBusho(targetBushoId);
         if (this._rejectInvalidRegularStrategyTarget(target)) return;
+        if (!this._validatePlayerStrategyOrder('headhunt', doerId, target.castleId, targetBushoId)) return;
         const targetClanIdForHistory = Number(target.clan) || 0;
         const castle = this.game.getCurrentTurnCastle();
         if (castle.gold < gold) { this.game.ui.showDialog("資金が足りません", false); return; }
@@ -800,6 +831,7 @@ class StrategySystem {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getBusho(targetBushoId);
         if (this._rejectInvalidRegularStrategyTarget(target)) return;
+        if (!this._validatePlayerStrategyOrder('assassinate', doerId, target.castleId, targetBushoId)) return;
         const targetClanIdForHistory = Number(target.clan) || 0;
         
         // メモを残す魔法
@@ -832,11 +864,14 @@ class StrategySystem {
     }
 
     // ★統合: 破壊工作・扇動・離間計の実行処理
-    executeBasicStrategy(actionType, doerId, targetId) {
+    executeBasicStrategy(actionType, doerId, targetId, selectedCastleId = null) {
         const doer = this.game.getBusho(doerId);
         const isTargetBusho = (actionType === 'rumor');
         const targetObj = isTargetBusho ? this.game.getBusho(targetId) : this.game.getCastle(targetId);
         if (isTargetBusho && this._rejectInvalidRegularStrategyTarget(targetObj)) return;
+        const targetCastleId = isTargetBusho ? selectedCastleId : targetId;
+        if (!this._validatePlayerStrategyOrder(actionType, doerId, targetCastleId,
+            isTargetBusho ? targetId : null)) return;
         
         if (isTargetBusho) targetObj.lastApproachedClanId = doer.clan;
 
@@ -845,7 +880,6 @@ class StrategySystem {
         else if (actionType === 'incite') result = this.calcIncite(doerId, targetId, true);
         else if (actionType === 'rumor') result = this.calcRumor(doerId, targetId, true);
 
-        const targetCastleId = isTargetBusho ? targetObj.castleId : targetId;
         const targetCastleForHistory = this.game.getCastle(targetCastleId);
         const targetClanIdForHistory = isTargetBusho ? Number(targetObj.clan) || 0 : Number(targetCastleForHistory?.ownerClan) || 0;
         const covertOutcome = this.handleCovertAction(doerId, targetCastleId, result.success, actionType, false, isTargetBusho ? targetId : null);
@@ -886,7 +920,7 @@ class StrategySystem {
     executeIncite(doerId, targetId) { this.executeBasicStrategy('incite', doerId, targetId); }
     
     // 離間計を実行する魔法
-    executeRumor(doerId, castleId, targetBushoId) { this.executeBasicStrategy('rumor', doerId, targetBushoId); }
+    executeRumor(doerId, castleId, targetBushoId) { this.executeBasicStrategy('rumor', doerId, targetBushoId, castleId); }
     
     // 破壊工作を実行する魔法
     executeSabotage(doerId, targetId) { this.executeBasicStrategy('sabotage', doerId, targetId); }
@@ -896,7 +930,16 @@ class StrategySystem {
         const doer = this.game.getBusho(doerId);
         const clanA = this.game.getClan(clanAId);
         const clanB = this.game.getClan(clanBId);
-        
+        // 両勢力は候補選択後にも現在の別々の敵大名家である必要がある。
+        if (!this._validatePlayerStrategyActor(doerId)) return;
+        const validCastles = this.game.commandSystem.getValidTargets('kuko');
+        const validClans = new Set(validCastles.map(id => Number(this.game.getCastle(id)?.ownerClan)));
+        if (!clanA || !clanB || Number(clanAId) === Number(clanBId)
+            || !validClans.has(Number(clanAId)) || !validClans.has(Number(clanBId))) {
+            this.game.ui.showDialog('対象となる大名家が現在の調略条件を満たしていません。', false);
+            return;
+        }
+
         const result = this.calcKuko(doerId, clanAId, clanBId, true);
         
         // ターゲットAの居城で隠密判定を行います
