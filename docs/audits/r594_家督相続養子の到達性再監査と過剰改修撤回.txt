@@ -1,0 +1,26 @@
+戦国覇道 r594　家督相続・養子の到達性再監査と過剰改修撤回
+
+【経緯】
+r593では「家督相続/養子の `before_command` の待機中に、候補が死亡・他家に移籍する」と想定し、候補資格を最終確定で再確認する防御処理、資格Rulesの新設、人工的な状態変更テストを追加した。利用者の指摘を受けて通常ゲームでの発生経路を改めて確認した。
+
+【検証】
+・`EventManager` のイベント登録は `window.GameEvents` に格納された通常・史実・災害イベントを正本としており、`before_command` / `after_command` の受付配列はあるが、この2つに登録する現行イベント定義はない。動的な別イベント追加のコード経路も見つからない。
+・r593の「再現テスト」は `eventManager.processEvents()` をテスト用偽物に差し替え、実際のゲームイベントでは行わない `candidate.clan = ...` / `candidate.status = ...` を直接実行していた。これは通常プレイでの到達性を立証しない。
+・`executeSuccessionCommand` が非同期ダイアログを待つにもかかわらず `executeWithEvent` が同Promiseを待たない順序上の差はある。ただし現在の `after_command` には処理が登録されず、順序差による具体的な実害は未確認。
+・イベント待機中のロード・タイトル復帰等で旧コマンドを再開させない、既存 `CommandSystem._isCommandTurnCurrent()` の制御は引き続き維持している。
+
+【変更】
+・r593で追加した `PersonnelRules.canSucceedDaimyo` / `canAdoptAsHeir` と対応するメニュー/候補/確定の変更、不要な3件のテストを撤回し、r592時点のロジックへ戻した。
+・家督相続のPromise返却追加も、現行イベントに具体的な影響がないため撤回した。
+・r593監査記録を削除せず撤回済みと明示。ARCHITECTURE・監査索引を更新。
+・r592以前の通常プレイに根拠がある修正、セキュリティ上の信頼境界の検証、マスターデータ、保存形式は変更しない。
+
+【今後の監査基準】
+・「フックがある」「awaitを使う」「人工的に状態を書き換えれば破綻する」だけでは改修しない。
+・通常イベントに実登録があるか、ユーザー操作で競合を起こせるか、月次/戦闘フローで自然到達するかを確認し、影響を実証した場合だけ変更する。
+・将来 `before_command` / `after_command` に処理を追加する場合は、具体的な効果を前提として改めて必要性を調べる。
+
+【変更ファイル】
+更新：ARCHITECTURE.md、docs/audits/README.md、docs/audits/r593_家督相続養子の候補資格再確認監査記録.txt、js/personnel_rules.js、js/command_catalog.js、js/command_system.js、js/config.js、tests/run_tests.js
+追加：docs/audits/r594_家督相続養子の到達性再監査と過剰改修撤回.txt
+削除：なし

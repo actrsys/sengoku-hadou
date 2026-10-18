@@ -45,6 +45,14 @@ class PersonnelRules {
         return !!castle && Number(castle.ownerClan) === Number(game.playerClanId);
     }
 
+    // 追放は通常家臣のみ。候補一覧・コマンド可否・実行確定で同じ条件を使う。
+    static canBanish(game, target) {
+        return !!game && !!target
+            && Number(target.clan) === Number(game.playerClanId)
+            && window.BushoStatusRules.isActive(target)
+            && !target.isDaimyo && !target.isCastellan;
+    }
+
     static getEmployProb(recruiter, target, recruiterClanPower, targetClanPower, game) {
         // ★追加：諸勢力に所属している武将（頭領など）は引き抜けないようにガードします！
         if ((target.belongKunishuId || 0) > 0) return 0;

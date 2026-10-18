@@ -269,7 +269,11 @@ class EconomyRules {
             const ricePerGold = rateInfo.ricePerGold;
             const maxGain = Math.min(99999 - castle.gold, castle.tradeLimit || 0);
             const maxSellByGold = Math.floor(maxGain * ricePerGold);
-            return Math.min(castle.rice, maxSellByGold);
+            const maxSell = Math.min(castle.rice, maxSellByGold);
+            // 利益0の数量は確定処理でも不成立。数量選択とメニューでも
+            // 同じ売却計算を参照し、取引が成立しない時は候補0件とする。
+            return maxSell > 0 && this.calcTradeCostAndRate('sell_rice', maxSell, castle, daimyo, castellan, provinces, game).cost > 0
+                ? maxSell : 0;
         }
         else if (type === 'buy_ammo') {
             const price = parseInt(window.MainParams.Economy.PriceAmmo, 10);

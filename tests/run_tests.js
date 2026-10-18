@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r588');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r595');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4773,14 +4773,50 @@ test('指南書は合戦を野戦・攻城戦・兵科へ分け、内部倍率�
     assert.ok(!guide.includes('1.5倍') && !guide.includes('0.7倍'), '指南書へ内部戦闘倍率を露出しない');
 });
 
-test('馬・鉄砲の購入可否は受け取ったゲーム状態を価格計算へ渡す', () => {
-    let horseGame = null;
-    let gunGame = null;
+test('取引メニューは実際に成立する購入・売却数量がある場合だけ有効にする', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/economy_rules.js');
+    loadScript(ctx, 'js/command_catalog.js');
+    const rules = vm.runInContext('CAN_EXECUTE_RULES', ctx);
+    const castle = { ownerClan: 1, castellanId: 0, provinceId: 1,
+        gold: 500, rice: 1000, horses: 100, guns: 100, tradeLimit: 500 };
+    const game = { year: 1570, month: 5, provinces: [{ id: 1, marketRate: 2 }],
+        getClanDaimyo() { return null; }, getBusho() { return null; } };
+    assert.strictEqual(rules.canBuyRice(game, castle), true);
+    assert.strictEqual(rules.canSellRice(game, castle), true);
+    assert.strictEqual(rules.canBuyHorses(game, castle), true);
+    assert.strictEqual(rules.canBuyGuns(game, castle), true);
+
+    castle.rice = 99999;
+    assert.strictEqual(rules.canBuyRice(game, castle), false, '米の収納上限では購入できない');
+    castle.rice = 1000;
+    castle.gold = 99999;
+    assert.strictEqual(rules.canSellRice(game, castle), false, '金の収納上限では売却できない');
+    castle.gold = 500;
+    castle.horses = 99999;
+    assert.strictEqual(rules.canBuyHorses(game, castle), false, '軍馬の収納上限では購入できない');
+    castle.horses = 100;
+    castle.guns = 99999;
+    assert.strictEqual(rules.canBuyGuns(game, castle), false, '鉄砲の収納上限では購入できない');
+    castle.guns = 100;
+    castle.rice = 1;
+    assert.strictEqual(rules.canSellRice(game, castle), false, '売却利益が0になる少量の米は取引できない');
+    castle.rice = 1000;
+    castle.tradeLimit = 0;
+    assert.strictEqual(rules.canBuyRice(game, castle), false);
+    assert.strictEqual(rules.canSellRice(game, castle), false);
+});
+
+test('馬・鉄砲の購入可否はゲーム状態を共通の最大取引数量計算へ渡す', () => {
+    const calls = [];
     const ctx = createContext({
         MainParams: { CommandCost: { Farm:1, Commerce:1, Repair:1, Charity:1, SoldierCharity:1, Reward:1, RewardAll:1 } },
         EconomyRules: {
-            calcBuyHorseCost: (_amount, _daimyo, _castellan, game) => { horseGame = game; return 1; },
-            calcBuyGunCost: (_amount, _daimyo, _castellan, game) => { gunGame = game; return 1; }
+            calcMaxTradeAmount: (type, castle, daimyo, castellan, provinces, game) => {
+                calls.push({ type, castle, daimyo, castellan, provinces, game });
+                return 1;
+            }
         }
     });
     ctx.window.MainParams = ctx.MainParams;
@@ -4789,15 +4825,21 @@ test('馬・鉄砲の購入可否は受け取ったゲーム状態を価格計�
     const daimyo = { id: 1, clan: 1, isDaimyo: true };
     const castellan = { id: 2, clan: 1, isCastellan: true };
     const game = {
-        year: 1560, bushos: [daimyo, castellan],
+        year: 1560, bushos: [daimyo, castellan], provinces: [],
         getBusho: id => Number(id) === 2 ? castellan : null,
         getClanDaimyo: id => Number(id) === 1 ? daimyo : null
     };
     const castle = { ownerClan: 1, castellanId: 2, gold: 10 };
     assert.strictEqual(rules.canBuyHorses(game, castle), true);
     assert.strictEqual(rules.canBuyGuns(game, castle), true);
-    assert.strictEqual(horseGame, game);
-    assert.strictEqual(gunGame, game);
+    assert.deepStrictEqual(calls.map(c => c.type), ['buy_horses', 'buy_guns']);
+    for (const call of calls) {
+        assert.strictEqual(call.game, game);
+        assert.strictEqual(call.castle, castle);
+        assert.strictEqual(call.daimyo, daimyo);
+        assert.strictEqual(call.castellan, castellan);
+        assert.strictEqual(call.provinces, game.provinces);
+    }
 });
 
 test('指南書のコマンド解説は command_catalog の階層を使い、全表示コマンドを個別説明できる', () => {
@@ -6986,6 +7028,64 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ ...valid.castles[0], _allowAttack: 1 }] }), /委任・城攻め・武将移動設定/, '不正な真偽値を拒否');
     assert.strictEqual(manager.isLoadableSaveData({ ...valid, saveSchemaVersion: 2 }), false, 'r562までの保存は現行形式として誤受理しない');
     assert.strictEqual(manager._validateSaveDataStructure(valid), true);
+    // r589: AI作戦辞書もロード後の通常の落城処理へそのまま渡される。
+    // 外側のoperationsがobjectというだけでは、内側がnullの作戦を受理してしまう。
+    loadScript(ctx, 'js/castle_manager.js');
+    const CastleManagerForSave = vm.runInContext('CastleManager', ctx);
+    const damagedGame = {
+        castles: [{ id: 1, ownerClan: 1, legionId: 0, castellanId: 0 }], legions: [], clans: [],
+        getClan() { return null; },
+        aiOperationManager: { operations: { 1: { 0: null } } }
+    };
+    assert.throws(() => new CastleManagerForSave(damagedGame).changeOwner(damagedGame.castles[0], 2, true),
+        '不正な作戦記録が残ると、通常の城所有者変更でnull.typeを参照して失敗する');
+    const invalidOperations = { ...valid, aiOperations: {
+        ...valid.aiOperations, operations: { 1: { 0: null } }
+    } };
+    assert.throws(() => manager._validateSaveDataStructure(invalidOperations), /aiOperations\.operations/,
+        '不正作戦をロード前に拒否して通常の落城経路へ持ち込ませない');
+    const invalidHistory = { ...valid, aiOperations: {
+        ...valid.aiOperations, historyOwnedCastles: { 1: {} }
+    } };
+    assert.throws(() => manager._validateSaveDataStructure(invalidHistory), /aiOperations\.historyOwnedCastles/,
+        '配列以外の旧所領履歴を受理せず、月初unshiftの例外を防ぐ');
+    // r590: 進捗履歴の配列は月初に直接pushされる。辞書自体がobjectでも
+    // 文字列などを履歴として持ち込むと、通常の月次AI作戦更新で例外になる。
+    const invalidObjectiveHistory = { ...valid, aiOperations: {
+        ...valid.aiOperations, grandObjectives: { 1: { 0: {
+            type: '国内平定', turnCount: 24, prevMyCastleCount: 1, historyTargetCount: 'broken'
+        } } }
+    } };
+    assert.throws(() => manager._validateSaveDataStructure(invalidObjectiveHistory), /aiOperations\.grandObjectives/,
+        '不正な進捗履歴を外部セーブの復元前に拒否する');
+    const currentPlanning = { ...valid, aiOperations: {
+        operations: { 1: { 0: { type: '内政', status: '準備中', maxTurns: 2, turnsRemaining: 1 } } },
+        draftBases: { 1: { 0: null } },
+        grandObjectives: { 1: { 0: { type: '国攻略', targetProvId: 1, turnCount: 24, prevMyCastleCount: 1, historyTargetCount: [1] } } },
+        historyOwnedCastles: { 1: [[1]] }
+    } };
+    assert.strictEqual(manager._validateSaveDataStructure(currentPlanning), true,
+        '現行仕様に従う作戦・徴兵拠点・大方針・所領履歴は受理する');
+    // r595: 外部セーブに紛れ込んだ壊れた外交関係は、通常の月末処理で参照される。
+    // モデルの最上位行だけでなく、外交関係の記録も復元前に検証する。
+    loadScript(ctx, 'js/diplomacy.js');
+    ctx.DiplomacyRules = { isVassalRelation: () => false };
+    ctx.GameConstants = { DiplomacyStatus: { TRUCE: '和睦' } };
+    const diplomacyGame = { clans: [{ id: 1, diplomacyValue: { 2: null } }] };
+    const DiplomacyManagerForSave = vm.runInContext('DiplomacyManager', ctx);
+    assert.throws(() => new DiplomacyManagerForSave(diplomacyGame).processEndMonth(), /status/,
+        '不正な外交関係があると、通常の月末処理でnull.statusが例外になる');
+    const corruptedDiplomacy = { ...valid, clans: [{ ...valid.clans[0], diplomacyValue: { 2: null } }] };
+    assert.throws(() => manager._validateSaveDataStructure(corruptedDiplomacy), /clans\[0\]\.diplomacyValue/,
+        '外部セーブ内のnull外交関係を復元前に拒否する');
+    const corruptedHostages = { ...valid, clans: [{ ...valid.clans[0], diplomacyValue: { 2: { status: '友好', hostageIds: {} } } }] };
+    assert.throws(() => manager._validateSaveDataStructure(corruptedHostages), /hostageIds/,
+        '正常な外交処理が配列と想定する人質名簿の型を確認する');
+    const currentDiplomacy = { ...valid, clans: [{ ...valid.clans[0], diplomacyValue: {
+        2: { status: '友好', sentiment: 70, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [], subordinateMonths: 0 }
+    } }] };
+    assert.strictEqual(manager._validateSaveDataStructure(currentDiplomacy), true,
+        '通常の大名家外交関係を持つ保存は引き続き受理する');
     // 外部.savのJSONに含まれた__proto__をモデルのObject.assignへ通さない。
     // 普通のオブジェクトリテラルは特殊キーをown propertyにしないためJSON.parseで再現する。
     const poisonedCastle = JSON.parse(JSON.stringify(valid.castles[0]).replace(/}$/, ',"__proto__":{"getConnectedCastles":null}}'));
@@ -24362,6 +24462,8 @@ function createR577PersonnelCase() {
         COMMAND_SPECS: { reward: {costGold: 30} },
         DomesticRules: { calcFactionBonusRate: () => 1 },
         PersonnelRules: {
+            canBanish: (game, b) => !!b && Number(b.clan) === Number(game.playerClanId)
+                && b.status === 'active' && !b.isDaimyo && !b.isCastellan,
             applyRewardEffect: b => { b.loyalty += 10; },
             calcRewardEffect: () => 10,
             calcEmploymentSuccess: () => true,
@@ -25053,6 +25155,42 @@ test('r586 飢饉で兵士0になった拠点をAIは訓練・兵施し候補に
     castle.soldiers = 1000;
     assert.deepStrictEqual(Array.from(plan.call({ game }, castle)), ['training', 'soldier_charity'],
         '兵士が存在する通常拠点では両行動の候補を従来どおり残す');
+});
+
+
+// r591: 追放の表示候補・メニュー・確定資格は同じPersonnelRulesを参照する。
+test('r591 追放は現職城主を候補に出さず、家臣がいない場合は命令を開始できない', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        StatPresenter: { getPerceivedStatValue: b => Number(b.loyalty || 0) },
+        MainParams: { CommandCost: { Farm: 10, Commerce: 10, Repair: 10, Charity: 10,
+            SoldierCharity: 10, Reward: 10, RewardAll: 10 } }
+    });
+    loadScript(ctx, 'js/personnel_rules.js');
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/command_system.js');
+    const Rules = vm.runInContext('CAN_EXECUTE_RULES', ctx);
+    const Specs = vm.runInContext('COMMAND_SPECS', ctx);
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const daimyo = { id: 1, name: '当主', clan: 1, status: 'active', isDaimyo: true, isCastellan: true };
+    const lord = { id: 2, name: '城主', clan: 1, status: 'active', isDaimyo: false, isCastellan: true };
+    const retainer = { id: 3, name: '家臣', clan: 1, status: 'active', isDaimyo: false, isCastellan: false };
+    const roster = [daimyo, lord];
+    const castle = { id: 10, ownerClan: 1, castellanId: 2 };
+    const game = {
+        playerClanId: 1, getClanBushos: () => roster,
+        getClanGunshi: () => null, getClanDaimyo: () => daimyo,
+        getCastleBushos: () => roster, getBusho: id => roster.find(b => b.id === id),
+        getCastle: () => castle
+    };
+    const command = new Command(game);
+    assert.strictEqual(Specs.banish.canExecute(game, castle), false, '城主と当主だけでは追放コマンドを開けない');
+    assert.deepStrictEqual(Array.from(command.getBushoSelectorData('banish', null, null, castle).bushos), [], '城主は候補にならない');
+    roster.push(retainer);
+    assert.strictEqual(Specs.banish.canExecute(game, castle), true, '通常の家臣がいれば開始できる');
+    assert.deepStrictEqual(Array.from(command.getBushoSelectorData('banish', null, null, castle).bushos).map(b => b.id), [3], '通常の家臣だけ候補になる');
+    retainer.status = 'dead';
+    assert.strictEqual(Rules.hasBanishableBusho(game), false, '家臣が死亡した場合は候補なし');
 });
 
 Promise.all(pendingTests).then(() => {

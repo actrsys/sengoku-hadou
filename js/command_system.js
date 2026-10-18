@@ -241,9 +241,8 @@ class CommandSystem {
             infoHtml = "<div>褒美を与える武将を選択してください</div>"; 
         }
         else if (actionType === 'banish') {
-            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => 
-                window.BushoStatusRules.isActive(b) && 
-                !b.isDaimyo                          
+            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b =>
+                PersonnelRules.canBanish(this.game, b)
             );
             infoHtml = "<div>追放する武将を選択してください</div>"; 
         }
@@ -1484,7 +1483,7 @@ class CommandSystem {
                 const person = this.game.getBusho(id);
                 return !person || Number(person.clan) !== clanId
                     || !window.BushoStatusRules.isActive(person) || person.isDaimyo
-                    || (excludeCastellan && person.isCastellan);
+                    || (excludeCastellan && !PersonnelRules.canBanish(this.game, person));
             })) {
             this.game.ui.showDialog('選択した武将は現在この人事命令の対象にできません。', false);
             return false;

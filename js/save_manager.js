@@ -130,6 +130,9 @@ class SaveManager {
             legions: typeof Legion === 'function' ? Legion : null,
             kunishus: typeof Kunishu === 'function' ? Kunishu : null
         };
+        // モデル側の補助辞書とAI作戦辞書で、同じレコード判定を使う。
+        const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+        const isClanKey = key => /^[1-9]\d*$/.test(key);
         const collectIds = (rows, label) => {
             const ids = new Set();
             const modelType = modelTypes[label];
@@ -265,6 +268,20 @@ class SaveManager {
         });
 
         data.clans.forEach((clan, index) => {
+            // 外部セーブの外交辞書はモデル行の中の別オブジェクトであり、
+            // 現行の月末外交更新や相手家への関係コピーが構造を前提に参照する。
+            // ゲーム側で例外吸収せず、復元前に現在の保存形式と照合する。
+            if (Object.prototype.hasOwnProperty.call(clan, 'diplomacyValue')) {
+                if (!isRecord(clan.diplomacyValue)) fail(`clans[${index}].diplomacyValue が不正です`);
+                Object.entries(clan.diplomacyValue).forEach(([targetId, relation]) => {
+                    if (!isClanKey(targetId) || !isRecord(relation) || typeof relation.status !== 'string') {
+                        fail(`clans[${index}].diplomacyValue[${targetId}] が不正です`);
+                    }
+                    if (Object.prototype.hasOwnProperty.call(relation, 'hostageIds') && !Array.isArray(relation.hostageIds)) {
+                        fail(`clans[${index}].diplomacyValue[${targetId}].hostageIds が不正です`);
+                    }
+                });
+            }
             const leaderId = Number(clan.leaderId || 0);
             if (leaderId !== 0 && !bushoIds.has(leaderId)) fail(`clans[${index}].leaderId の参照先がありません`);
         });
@@ -296,6 +313,39 @@ class SaveManager {
         ['operations', 'draftBases', 'grandObjectives', 'historyOwnedCastles'].forEach(key => {
             const value = data.aiOperations[key];
             if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`aiOperations.${key} が不正です`);
+        });
+        // AI作戦を復元した後は、落城時の作戦整理や月初の所領履歴更新が
+        // これらの辞書を直接参照する。外側だけobjectであっても、内側のnullや
+        // 非配列を許すと通常の所有者変更でop.type、月初にunshiftが例外になる。
+        // 保存形式を変更せず、現在のAI作戦が書き出す入れ子構造だけを確認する。
+        const isLegionKey = key => /^(?:0|[1-8])$/.test(key);
+        ['operations', 'draftBases', 'grandObjectives'].forEach(storeName => {
+            Object.entries(data.aiOperations[storeName]).forEach(([clanKey, legionEntries]) => {
+                if (!isClanKey(clanKey) || !isRecord(legionEntries)) {
+                    fail(`aiOperations.${storeName}[${clanKey}] が不正です`);
+                }
+                Object.entries(legionEntries).forEach(([legionKey, entry]) => {
+                    if (!isLegionKey(legionKey)) fail(`aiOperations.${storeName}[${clanKey}][${legionKey}] が不正です`);
+                    if (storeName === 'draftBases') {
+                        if (entry !== null && (!Number.isSafeInteger(entry) || entry < 0)) {
+                            fail(`aiOperations.${storeName}[${clanKey}][${legionKey}] が不正です`);
+                        }
+                    } else if (!isRecord(entry)) {
+                        fail(`aiOperations.${storeName}[${clanKey}][${legionKey}] が不正です`);
+                    } else if (storeName === 'grandObjectives'
+                        && Object.prototype.hasOwnProperty.call(entry, 'historyTargetCount')
+                        && !Array.isArray(entry.historyTargetCount)) {
+                        // 大方針の進捗履歴は月次AIがpush/shiftする配列。
+                        // 保存値の型だけを受け入れ境界で照合し、AI本体に個別ガードを増やさない。
+                        fail(`aiOperations.${storeName}[${clanKey}][${legionKey}].historyTargetCount が不正です`);
+                    }
+                });
+            });
+        });
+        Object.entries(data.aiOperations.historyOwnedCastles).forEach(([clanKey, months]) => {
+            if (!isClanKey(clanKey) || !Array.isArray(months) || !months.every(Array.isArray)) {
+                fail(`aiOperations.historyOwnedCastles[${clanKey}] が不正です`);
+            }
         });
 
         return true;

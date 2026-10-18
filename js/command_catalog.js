@@ -76,6 +76,9 @@ const CAN_EXECUTE_RULES = {
     hasActiveBushoExceptDaimyo: (game) => {
         return game.getClanBushos(game.playerClanId).some(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo);
     },
+    hasBanishableBusho: (game) => {
+        return game.getClanBushos(game.playerClanId).some(b => PersonnelRules.canBanish(game, b));
+    },
     hasActiveBushoExceptDaimyoAndCastellan: (game) => {
         return game.getClanBushos(game.playerClanId).some(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander && !b.isCastellan);
     },
@@ -230,28 +233,18 @@ const CAN_EXECUTE_RULES = {
         return true;
     },
     // --- 軍事取引 ---
-    canBuyRice: (game, castle) => {
-        // ★一元化されたため、単価の事前計算は削除し、シンプルに金1以上かつ取引枠があるかで判定します
-        return castle.gold >= 1 && (castle.tradeLimit || 0) > 0;
-    },
-    canSellRice: (game, castle) => {
-        return castle.rice >= 1 && (castle.tradeLimit || 0) > 0;
-    },
-    canBuyHorses: (game, castle) => {
+    // 数量選択画面と同じ経済Rulesから取引可能な最大数量を取得する。
+    // 在庫・資金・取引上限が尽きた時に実行不能な取引を有効表示しない。
+    hasTradeableAmount: (game, castle, type) => {
         const daimyo = game.getClanDaimyo(castle.ownerClan);
         const castellan = game.getBusho(castle.castellanId);
-        const cost = EconomyRules.calcBuyHorseCost(1, daimyo, castellan, game);
-        return castle.gold >= cost;
+        return EconomyRules.calcMaxTradeAmount(type, castle, daimyo, castellan, game.provinces, game) > 0;
     },
-    canBuyGuns: (game, castle) => {
-        // ★追加：1542年以前は鉄砲伝来前なので買えません！
-        if (game.year <= 1542) return false;
-        
-        const daimyo = game.getClanDaimyo(castle.ownerClan);
-        const castellan = game.getBusho(castle.castellanId);
-        const cost = EconomyRules.calcBuyGunCost(1, daimyo, castellan, game);
-        return castle.gold >= cost;
-    },
+    canBuyRice: (game, castle) => CAN_EXECUTE_RULES.hasTradeableAmount(game, castle, 'buy_rice'),
+    canSellRice: (game, castle) => CAN_EXECUTE_RULES.hasTradeableAmount(game, castle, 'sell_rice'),
+    canBuyHorses: (game, castle) => CAN_EXECUTE_RULES.hasTradeableAmount(game, castle, 'buy_horses'),
+    canBuyGuns: (game, castle) => game.year > 1542
+        && CAN_EXECUTE_RULES.hasTradeableAmount(game, castle, 'buy_guns'),
     // --- 臣従願のルール追加 ---
     canVassalage: (game) => {
         // 条件①：生き残っている大名家が3つ以上あるかチェックします（自分を含めて2つ以下ならダメです）
@@ -455,7 +448,7 @@ const COMMAND_SPECS = {
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'loyalty',
         msg: "武将を追放します",
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasActiveBushoExceptDaimyo(game)
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasBanishableBusho(game)
     },
     'succession': { 
         label: "家督相続", category: 'PERSONNEL', 
