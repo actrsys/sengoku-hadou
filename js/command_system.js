@@ -1419,6 +1419,28 @@ class CommandSystem {
         });
     }
 
+    // 通常の拠点内命令で選択した武将を、状態変更より前にまとめて再確認する。
+    // 選択時のUIを通過していても、before_command 等の待機中に異動・行動済み・
+    // 所属変更があり得るため、参加者の一部だけを実行しない。
+    _validateLocalCommandActors(bushoIds, { allowDone = false } = {}) {
+        const castle = this.game.getCurrentTurnCastle();
+        const clanId = Number(this.game.playerClanId);
+        if (!castle || Number(castle.ownerClan) !== clanId
+            || !Array.isArray(bushoIds) || bushoIds.length === 0
+            || new Set(bushoIds.map(id => Number(id))).size !== bushoIds.length
+            || bushoIds.some(id => {
+                const officer = this.game.getBusho(id);
+                return !officer || Number(officer.castleId) !== Number(castle.id)
+                    || Number(officer.clan) !== clanId
+                    || !window.BushoStatusRules.isActive(officer)
+                    || (!allowDone && officer.isActionDone);
+            })) {
+            this.game.ui.showDialog('参加する武将が現在の拠点で命令を実行できません。', false);
+            return false;
+        }
+        return true;
+    }
+
     // 「移動」と「輸送」の確定時の共通検証。いずれも同じ地図候補・
     // 武将選択から開始するため、通行・所属・活動の判定を別々に持たない。
     // 変更可能な状態はイベント待機後に再取得し、誰も移動させる前に全員を検証する。
@@ -1454,6 +1476,10 @@ class CommandSystem {
     executeCommand(type, bushoIds, targetId) {
         // 確定前のイベント中に落城・積雪・武将異動があっても、移動を部分実行しない。
         if (type === 'move_deploy' && !this._validateTravelOrder('move', bushoIds, targetId)) return;
+        // 移動は専用の通行・参加者判定を使う。通常内政と城主任命は
+        // 現在の拠点にいる適格な武将を資源/役職更新前に確認する。
+        if (['farm', 'commerce', 'repair', 'training', 'soldier_charity', 'appoint'].includes(type)
+            && !this._validateLocalCommandActors(bushoIds, { allowDone: type === 'appoint' })) return;
         const castle = this.game.getCurrentTurnCastle(); 
         let totalVal = 0, cost = 0, count = 0, actionName = "";
         const spec = COMMAND_SPECS[type]; 
@@ -1515,6 +1541,7 @@ class CommandSystem {
 
         bushoIds.forEach(bid => {
             const busho = this.game.getBusho(bid); if (!busho) return;
+            const previousCount = count;
             
             if (type === 'farm') { 
                 if (castle.gold >= spec.costGold) { 
@@ -1588,9 +1615,15 @@ class CommandSystem {
 
                 count++; actionName = "移動"; 
             }
-            busho.isActionDone = true;
+            // 資源不足でどの分岐も成立しなかった武将の行動は消費しない。
+            if (count > previousCount) busho.isActionDone = true;
         });
-        
+
+        if (count === 0 && ['farm', 'commerce', 'repair', 'training', 'soldier_charity'].includes(type)) {
+            this.game.ui.showDialog('実行に必要な資源が不足しています。', false);
+            return;
+        }
+
         let resultMsg = null;
         let logMsg = null;
         if (count > 0 && actionName !== "移動") { 
@@ -1945,6 +1978,9 @@ class CommandSystem {
     }
 
     executeDraft(bushoIds, soldiers) {
+        // 徴兵は担当武将1名の命令。選択後の異動・死亡・行動済みを先に確認する。
+        if (!Array.isArray(bushoIds) || bushoIds.length !== 1
+            || !this._validateLocalCommandActors(bushoIds)) return;
         // UIの入力途中の空欄を、兵数・人口・金への NaN 書込みに変えない。
         if (!Number.isSafeInteger(soldiers) || soldiers <= 0) {
             this.game.ui.showDialog('徴兵数を確認してください。', false);
@@ -1999,6 +2035,7 @@ class CommandSystem {
     }
     
     executeCharity(bushoIds) { 
+        if (!this._validateLocalCommandActors(bushoIds)) return;
         const castle = this.game.getCurrentTurnCastle(); 
         const spec = COMMAND_SPECS['charity']; 
         

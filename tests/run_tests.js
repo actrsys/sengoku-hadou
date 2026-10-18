@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r575');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r576');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -15533,17 +15533,18 @@ test('r559 正常な国主継承・国主でない家督継承は既存の処理
 test('r446 城主任命は現在地が離れていても本拠地の城主を置換しない', () => {
     const ctx = createContext({
         COMMAND_SPECS: { appoint: {} },
-        DomesticRules: { calcFactionBonusRate: () => 1 }
+        DomesticRules: { calcFactionBonusRate: () => 1 },
+        BushoStatusRules: { isActive: b => b.status === 'active' }
     });
     loadScript(ctx, 'js/command_system.js');
     const Command = vm.runInContext('CommandSystem', ctx);
     const home = { id: 1, ownerClan: 4, castellanId: 40 };
     const target = { id: 2, ownerClan: 4, castellanId: 0 };
-    const candidate = { id: 44, isCastellan: false, name: '家臣' };
+    const candidate = { id: 44, castleId: 2, clan: 4, status: 'active', isCastellan: false, name: '家臣' };
     const game = {
         playerClanId: 4, getDaimyoHomeCastle: () => home,
         getCurrentTurnCastle: () => home, getBusho: id => id === 44 ? candidate : null,
-        getClan: () => ({ name: '試験家' })
+        getClan: () => ({ name: '試験家' }), ui: { showDialog() {} }
     };
     const cmd = new Command(game);
     cmd.finishCommand = () => {};
@@ -16198,13 +16199,14 @@ test('r453 数量画面は入力欄の不正値を確定前に検査する', () 
 test('r453 正常な数量の売買・徴兵は従来の資源計算を維持する', () => {
     const ctx=createContext({
         EconomyRules:{calcTradeCostAndRate:(_type,amount)=>({cost:amount*5})},
-        DomesticRules:{calcDraftCost:(_amount)=>50,applyDraftPenalty:(castle,n)=>{castle.population-=n;return 2;}}
+        DomesticRules:{calcDraftCost:(_amount)=>50,applyDraftPenalty:(castle,n)=>{castle.population-=n;return 2;}},
+        BushoStatusRules: { isActive: b => b.status === 'active' }
     });
     loadScript(ctx,'js/command_system.js');
     const Command=vm.runInContext('CommandSystem',ctx);
-    const castle={id:1,gold:500,rice:300,tradeLimit:500,soldiers:100,population:500,training:50,morale:50,peoplesLoyalty:50};
-    const busho={id:7,name:'仮武将',isActionDone:false,achievementTotal:0};
-    const game={provinces:[],getCurrentTurnCastle:()=>castle,getClanDaimyo:()=>({}),getBusho:()=>busho,
+    const castle={id:1,ownerClan:1,gold:500,rice:300,tradeLimit:500,soldiers:100,population:500,training:50,morale:50,peoplesLoyalty:50};
+    const busho={id:7,name:'仮武将',castleId:1,clan:1,status:'active',isActionDone:false,achievementTotal:0};
+    const game={playerClanId:1,provinces:[],getCurrentTurnCastle:()=>castle,getClanDaimyo:()=>({}),getBusho:()=>busho,
         ui:{showDialog(){}},factionSystem:{updateRecognition(){}}};
     const command=new Command(game);command.finishCommand=()=>{};
     command.executeTrade('buy_rice',10);
@@ -24182,6 +24184,149 @@ test('r575 移動可能な自領と未行動武将は従来どおり一括移動
     assert.deepStrictEqual([s.a.castleId,s.b.castleId],[2,2]);
     assert.strictEqual(s.a.isActionDone,true); assert.strictEqual(s.b.isActionDone,true);
     assert.strictEqual(s.finished(),1);
+});
+
+
+// r576: 内政・徴兵・施しは、候補選択後のイベント待機を経た確定時に
+// 同じ拠点の現役・未行動の参加武将を一括で確認する。
+function createR576DomesticCase() {
+    const ctx = createContext({
+        BushoStatusRules: {isActive:b=>b?.status === 'active'},
+        COMMAND_SPECS: {
+            farm:{costGold:20,costRice:0},
+            commerce:{costGold:20,costRice:0},
+            repair:{costGold:20,costRice:0},
+            training:{costGold:20,costRice:10},
+            soldier_charity:{costGold:20,costRice:10},
+            charity:{costGold:0,costRice:20},
+            appoint:{}
+        },
+        DomesticRules: {
+            calcFactionBonusRate:()=>1,
+            calcDevelopment:()=>5,
+            calcRepair:()=>5,
+            calcTraining:()=>5,
+            calcSoldierCharity:()=>5,
+            calcCharity:()=>5,
+            calcDraftCost:()=>30,
+            applyDraftPenalty:(castle,soldiers)=>{castle.population-=soldiers;castle.peoplesLoyalty-=2;return 2;}
+        },
+        MainParams:{Economy:{MaxLoyalty:100}},
+        WarParams:{Military:{MaxTrainingNormal:100,MaxMoraleNormal:100,MaxTrainingGauge:100,MaxMoraleGauge:100}}
+    });
+    loadScript(ctx,'js/command_system.js');
+    const Command=vm.runInContext('CommandSystem',ctx);
+    const castle={id:1,name:'拠点',ownerClan:1,gold:60,rice:100,population:3000,peoplesLoyalty:60,
+        soldiers:100,training:50,morale:50,kokudaka:10,maxKokudaka:100,commerce:10,maxCommerce:100,
+        defense:10,maxDefense:100,castellanId:7};
+    const a={id:7,name:'甲',clan:1,castleId:1,status:'active',isActionDone:false,achievementTotal:0};
+    const b={id:8,name:'乙',clan:1,castleId:1,status:'active',isActionDone:false,achievementTotal:0};
+    const bushoMap=new Map([[7,a],[8,b]]);
+    const dialogs=[];let finished=0;
+    const game={playerClanId:1,getCurrentTurnCastle:()=>castle,getBusho:id=>bushoMap.get(id),
+        getDaimyoHomeCastle:()=>null,getClan:()=>({name:'試験家'}),
+        ui:{showDialog:s=>dialogs.push(s)},factionSystem:{updateRecognition:()=>{}}};
+    const command=new Command(game);
+    command.finishCommand=()=>finished++;
+    return {command,game,castle,a,b,bushoMap,dialogs,finished:()=>finished};
+}
+
+test('r576 内政はイベント中に選択武将が移動した場合、全員の資源・行動を変更しない',async()=>{
+    const s=createR576DomesticCase();
+    s.game.eventManager={processEvents:async type=>{if(type==='before_command'){await Promise.resolve();s.b.castleId=2;}}};
+    await s.command.executeWithEvent('farm',()=>s.command.executeCommand('farm',[7,8]));
+    assert.strictEqual(s.castle.gold,60);
+    assert.strictEqual(s.castle.kokudaka,10);
+    assert.strictEqual(s.a.isActionDone,false);
+    assert.strictEqual(s.finished(),0);
+});
+
+test('r576 内政で参加者が行動済み・浪人・重複なら部分実行しない',()=>{
+    for(const mutate of [s=>s.b.isActionDone=true,s=>s.b.status='ronin',s=>s.b.clan=2]){
+        const s=createR576DomesticCase();mutate(s);
+        s.command.executeCommand('farm',[7,8]);
+        assert.strictEqual(s.castle.gold,60);
+        assert.strictEqual(s.a.isActionDone,false);
+        assert.strictEqual(s.finished(),0);
+    }
+    const s=createR576DomesticCase();
+    s.command.executeCommand('farm',[7,7]);
+    assert.strictEqual(s.castle.gold,60);
+    assert.strictEqual(s.finished(),0);
+});
+
+test('r576 内政で費用不足なら何もせず未行動を保つ',()=>{
+    const s=createR576DomesticCase();s.castle.gold=0;
+    s.command.executeCommand('farm',[7,8]);
+    assert.strictEqual(s.castle.kokudaka,10);
+    assert.strictEqual(s.a.isActionDone,false);
+    assert.strictEqual(s.b.isActionDone,false);
+    assert.strictEqual(s.finished(),0);
+});
+
+test('r576 内政で1名分だけ資源があれば実行した武将だけ行動済み',()=>{
+    const s=createR576DomesticCase();s.castle.gold=20;
+    s.command.executeCommand('farm',[7,8]);
+    assert.strictEqual(s.castle.kokudaka,15);
+    assert.strictEqual(s.castle.gold,0);
+    assert.strictEqual(s.a.isActionDone,true);
+    assert.strictEqual(s.b.isActionDone,false);
+    assert.strictEqual(s.finished(),1);
+});
+
+test('r576 施しは参加者が別城へ移動していたら兵糧・民忠を変更しない',()=>{
+    const s=createR576DomesticCase();s.b.castleId=2;
+    s.command.executeCharity([7,8]);
+    assert.strictEqual(s.castle.rice,100);
+    assert.strictEqual(s.castle.peoplesLoyalty,60);
+    assert.strictEqual(s.a.isActionDone,false);
+    assert.strictEqual(s.finished(),0);
+});
+
+test('r576 徴兵は選択した武将が不在・行動済みなら安全に中止',()=>{
+    for(const mutate of [s=>s.bushoMap.delete(7),s=>s.a.isActionDone=true,s=>s.a.castleId=2]){
+        const s=createR576DomesticCase();mutate(s);
+        s.command.executeDraft([7],100);
+        assert.strictEqual(s.castle.gold,60);
+        assert.strictEqual(s.castle.population,3000);
+        assert.strictEqual(s.castle.soldiers,100);
+        assert.strictEqual(s.finished(),0);
+    }
+});
+
+test('r576 通常の内政・徴兵・施しは従来どおり成功する',()=>{
+    let s=createR576DomesticCase();s.command.executeCommand('farm',[7,8]);
+    assert.strictEqual(s.castle.kokudaka,20);assert.strictEqual(s.castle.gold,20);
+    assert.strictEqual(s.a.isActionDone,true);assert.strictEqual(s.b.isActionDone,true);
+    s=createR576DomesticCase();s.command.executeDraft([7],100);
+    assert.strictEqual(s.castle.gold,30);assert.strictEqual(s.castle.population,2900);
+    assert.strictEqual(s.castle.soldiers,200);assert.strictEqual(s.a.isActionDone,true);
+    s=createR576DomesticCase();s.command.executeCharity([7,8]);
+    assert.strictEqual(s.castle.rice,60);assert.strictEqual(s.castle.peoplesLoyalty,70);
+    assert.strictEqual(s.a.isActionDone,true);assert.strictEqual(s.b.isActionDone,true);
+});
+
+test('r576 城主任命は旧候補の所属変化を拒否し、正常な行動済み候補は任命できる',()=>{
+    const s=createR576DomesticCase();
+    s.a.status='ronin';
+    s.command.executeCommand('appoint',[7]);
+    assert.strictEqual(s.castle.castellanId,7);
+    assert.strictEqual(s.finished(),0);
+    s.a.status='active';s.a.castleId=2;
+    s.command.executeCommand('appoint',[7]);
+    assert.strictEqual(s.finished(),0);
+    s.a.castleId=1;s.a.isActionDone=true;
+    s.command.executeCommand('appoint',[8]);
+    assert.strictEqual(s.castle.castellanId,8);
+    assert.strictEqual(s.finished(),1);
+});
+
+test('r576 訓練でも資源が一人分のみなら残りの武将を行動済みにしない',()=>{
+    const s=createR576DomesticCase();s.castle.gold=20;s.castle.rice=10;
+    s.command.executeCommand('training',[7,8]);
+    assert.strictEqual(s.castle.gold,0);assert.strictEqual(s.castle.rice,0);
+    assert.strictEqual(s.castle.training,55);
+    assert.strictEqual(s.a.isActionDone,true);assert.strictEqual(s.b.isActionDone,false);
 });
 
 Promise.all(pendingTests).then(() => {
