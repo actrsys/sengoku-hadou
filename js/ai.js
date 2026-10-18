@@ -1966,15 +1966,15 @@ class AIEngine {
                 }
             }
 
-            // 4. 訓練
-            if (perceivedTraining < targetMaxTraining) {
+            // 4. 訓練（兵士不在などの実行可否はプレイヤーと同じコマンド定義を使う）
+            if (perceivedTraining < targetMaxTraining && COMMAND_SPECS.training.canExecute(this.game, castle)) {
                 // ★修正：固定の100ではなく、目標値からどれだけ足りないかでスコアを出します
                 let score = targetMaxTraining - perceivedTraining;
                 actions.push({ type: 'training', stat: 'leadership', score: score, cost: 0 }); 
             }
 
             // 5. 兵施し（士気）
-            if (perceivedMorale < targetMaxMorale) {
+            if (perceivedMorale < targetMaxMorale && COMMAND_SPECS.soldier_charity.canExecute(this.game, castle)) {
                 // ★修正：固定の100ではなく、目標値からどれだけ足りないかでスコアを出します
                 let score = targetMaxMorale - perceivedMorale;
                 actions.push({ type: 'soldier_charity', stat: 'leadership', score: score, cost: window.MainParams.CommandCost.SoldierCharity }); 
@@ -2350,7 +2350,8 @@ class AIEngine {
             // ★選ばれた人の中で「一番低い忠誠度」を覚えておく箱です！
             let minLoyaltyForReward = 100;
             
-            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b));
+            // 褒美は家臣への人事行動。大名本人を候補に含めると居城の城主優先で自己褒美が成立する。
+            const castleBushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && !b.isDaimyo && window.BushoStatusRules.isActive(b));
             
             for (let b of castleBushos) {
                 // ★修正：今月すでに褒美をもらっているかチェックし、忠誠度が低い場合は2回目も許容します！

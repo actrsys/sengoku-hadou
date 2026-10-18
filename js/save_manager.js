@@ -119,10 +119,37 @@ class SaveManager {
         if (data.bushos.length === 0) fail('bushos が空です');
         if (data.clans.length === 0) fail('clans が空です');
 
+        // モデルの継承メソッドやgetterを保存値で上書きさせない。
+        // 判定対象名は各モデル自身のprototypeから得て、メソッド一覧をここに複製しない。
+        const modelTypes = {
+            castles: typeof Castle === 'function' ? Castle : null,
+            bushos: typeof Busho === 'function' ? Busho : null,
+            clans: typeof Clan === 'function' ? Clan : null,
+            princesses: typeof Princess === 'function' ? Princess : null,
+            provinces: typeof Province === 'function' ? Province : null,
+            legions: typeof Legion === 'function' ? Legion : null,
+            kunishus: typeof Kunishu === 'function' ? Kunishu : null
+        };
         const collectIds = (rows, label) => {
             const ids = new Set();
+            const modelType = modelTypes[label];
+            // モデル固有のAPIに加え、Object.prototype由来の基本APIも守る。
+            // Object.assignで復元するため、toString/valueOfなどのown propertyを
+            // 許すとモデルの通常のオブジェクト操作が壊れる。禁止名は継承鎖から導出する。
+            const reservedNames = modelType ? new Set() : null;
+            if (reservedNames) {
+                for (let proto = modelType.prototype; proto; proto = Object.getPrototypeOf(proto)) {
+                    Object.getOwnPropertyNames(proto).forEach(name => reservedNames.add(name));
+                }
+            }
             rows.forEach((row, index) => {
                 if (!row || typeof row !== 'object' || Array.isArray(row)) fail(`${label}[${index}] が不正です`);
+                // 外部セーブの特殊キーやメソッド名を Object.assign(this, row) へ渡すと
+                // インスタンスのprototype／正規メソッドが壊れる。復元前に拒否する。
+                if (Object.prototype.hasOwnProperty.call(row, '__proto__')
+                    || (reservedNames && Object.keys(row).some(key => reservedNames.has(key)))) {
+                    fail(`${label}[${index}] に使用できない項目があります`);
+                }
                 const id = Number(row.id);
                 if (!Number.isInteger(id) || id <= 0) fail(`${label}[${index}].id が不正です`);
                 if (ids.has(id)) fail(`${label} のID ${id} が重複しています`);

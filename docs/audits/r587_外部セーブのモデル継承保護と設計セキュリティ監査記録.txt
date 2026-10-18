@@ -1,0 +1,35 @@
+戦国覇道 r587　外部セーブのモデル継承保護と設計・セキュリティ監査
+
+【監査方針】
+・r586を正本として、通常プレイの不具合だけでなく、静的コードの責務分離・モデル正本・外部入力の信頼境界・ブラウザCSP・セーブ復元構造を確認した。
+・外部.sav／IndexedDB保存はゲーム外部の入力であり、通常プレイで自然発生しない不正入力でも、安全性の実害が具体的な場合は対処する（ARCHITECTURE.mdの監査基準の例外）。
+
+【確認した問題：外部セーブからモデルの継承関係を破壊できる】
+・既存の SaveManager._validateSaveDataStructure は現行schema・主要ID・在城名簿を検証する一方、モデルの任意の追加キーを許容していた。
+・JSON.parse で得られる城の行に own property の「__proto__」を混入させたデータは、修正前の isLoadableSaveData が true を返した。
+・実際の Castle コンストラクタの Object.assign(this, data) を通すと、生成したインスタンスのprototypeが変更され、getConnectedCastles など本来のメソッドを失うことを再現した。
+・さらに、getConnectedCastles のような既存メソッド名を保存データのown propertyとして渡すと、継承メソッドをシャドーできる。セーブ復元の破綻やゲーム進行不能につながる。
+・これは外部セーブを選択して読み込ませた場合の問題であり、通常のExcel/BIN由来のシナリオや、遠隔から任意のスクリプト実行が可能であることを示すものではない。
+
+【最小改修】
+・js/save_manager.js の既存 collectIds を、ゲーム本体への状態反映より前の共通入口として利用する。
+・各モデル行にJSON由来のown「__proto__」がある場合、または対応モデルのprototypeで定義されているメソッド・getter・constructor名をown propertyとして含む場合、現行形式の保存として受け付けない。
+・モデル側のメソッド名を保存マネージャに手書き複製せず、Castle/Busho/Clan/Princess/Province/Legion/Kunishu自身のprototypeから取得する。
+・セーブスキーマ、XOR表現、通常セーブ生成、モデルのObject.assign、マスターExcel/BIN、既存の正常なゲームルールやUIは変更しない。
+・テストは正規保存の許可と、拠点・武将の特殊キー、拠点メソッドの上書き拒否を同じ現行スキーマテスト内で確認した。
+
+【監査したが改修しなかった事項】
+・HTMLのCSPは自己オリジンのJSのみを許可し、インラインイベント・evalを禁止している。CSPが存在するだけで全innerHTMLが安全だとはみなさず、主要なセーブ・一覧・シナリオ・戦闘画面の入力表示境界を静的点検した。
+・セーブ表示UIはゲーム生成画像のdata URLを制限し、シナリオ選択はtextContentで表示している。今回は別の確定した入力注入問題を確認できなかった。
+・セーブのXOR処理は暗号学的な秘匿ではない。既存仕様どおりであり、安全な暗号だと解釈しない。
+・管理用Excelや検証ツールを完全版ZIPへ含める仕様は維持する。公開Webホスティングではこれらを公開ルートに置かない、frame-ancestors等をHTTP応答ヘッダーで設定する等の配信管理が必要（このZIPだけではホスティング設定を制御できない）。
+・長期観戦、攻城戦全分岐、任意に細工されたあらゆる保存値、実サーバーの設定までの網羅試験は実施していない。
+
+【検証】
+・改修前：形式検査成功 → new Castle でprototype喪失・getConnectedCastlesがundefinedになる再現をNode VMで確認。
+・改修後：ロジックテスト1074件成功・0失敗、PC/スマホ実ブラウザ画面回帰成功、シミュレーション4件成功、管理用Excel/BINの完全一致、配布ソース検査成功。
+
+【変更ファイル】
+追加：docs/audits/r587_外部セーブのモデル継承保護と設計セキュリティ監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/save_manager.js、tests/run_tests.js
+削除：なし

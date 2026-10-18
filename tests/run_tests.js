@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r584');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r588');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -6962,7 +6962,9 @@ test('セーブ復元は城主フラグをCastle.castellanIdから再構築す�
 
 test('SaveManager は現行スキーマだけを復元前に受理し、旧形式を移行しない', () => {
     const ctx = createContext({
-        SCENARIOS: [{ folder: '1560_okehazama' }]
+        SCENARIOS: [{ folder: '1560_okehazama' }],
+        Castle: class { getConnectedCastles() {} },
+        Busho: class {}
     });
     loadScript(ctx, 'js/save_manager.js');
     const manager = new ctx.SaveManager({});
@@ -6984,6 +6986,26 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ ...valid.castles[0], _allowAttack: 1 }] }), /委任・城攻め・武将移動設定/, '不正な真偽値を拒否');
     assert.strictEqual(manager.isLoadableSaveData({ ...valid, saveSchemaVersion: 2 }), false, 'r562までの保存は現行形式として誤受理しない');
     assert.strictEqual(manager._validateSaveDataStructure(valid), true);
+    // 外部.savのJSONに含まれた__proto__をモデルのObject.assignへ通さない。
+    // 普通のオブジェクトリテラルは特殊キーをown propertyにしないためJSON.parseで再現する。
+    const poisonedCastle = JSON.parse(JSON.stringify(valid.castles[0]).replace(/}$/, ',"__proto__":{"getConnectedCastles":null}}'));
+    assert.strictEqual(manager.isLoadableSaveData({ ...valid, castles: [poisonedCastle] }), false,
+        '特殊キーを含む外部セーブをモデル復元前に拒否する');
+    assert.strictEqual(manager.isLoadableSaveData({ ...valid, castles: [{ ...valid.castles[0], getConnectedCastles: null }] }), false,
+        'モデルの正規メソッド名を持つ外部セーブもロード前に拒否する');
+    const poisonedBusho = JSON.parse(JSON.stringify(valid.bushos[0]).replace(/}$/, ',"__proto__":{"_calculateStat":null}}'));
+    assert.strictEqual(manager.isLoadableSaveData({ ...valid, bushos: [poisonedBusho] }), false,
+        '武将オブジェクトのprototype差替えも拒否する');
+    // 組込みObject.prototypeから継承する基本メソッドも、JSONのown propertyで
+    // シャドーされる。両変換メソッドを壊した城は文字列化時にTypeErrorを起こす。
+    const shadowedObjectMethods = { ...valid.castles[0], toString: null, valueOf: null };
+    const castledPrototype = ctx.Castle.prototype;
+    const restoredInvalidCastle = Object.assign(Object.create(castledPrototype), shadowedObjectMethods);
+    assert.throws(() => String(restoredInvalidCastle), TypeError, '組込みオブジェクトの基本変換メソッドが破壊されることを再現');
+    assert.strictEqual(manager.isLoadableSaveData({ ...valid, castles: [shadowedObjectMethods] }), false,
+        '外部セーブに含まれるObject.prototype共通メソッド名を復元前に拒否する');
+    assert.strictEqual(manager.isLoadableSaveData({ ...valid, bushos: [{ ...valid.bushos[0], hasOwnProperty: null }] }), false,
+        '武将の共通メソッドを上書きする保存も拒否する');
     assert.strictEqual(manager.isLoadableSaveData(valid), true, '現行schemaかつ厳密構造検査を通る保存だけをロード可能とする');
     assert.strictEqual(manager.isLoadableSaveData({ ...valid, saveSchemaVersion: 1 }), false, '旧schemaはキーが存在してもロード不可');
     assert.strictEqual(manager.isLoadableSaveData({ ...valid, month: 13 }), false, '現行schemaでも構造不正ならロード不可');
@@ -24957,6 +24979,80 @@ test('r583 プレイヤー内政は上限到達後も資源不足の武将まで
     assert.strictEqual(s.a.isActionDone, true);
     assert.strictEqual(s.b.isActionDone, false);
     assert.strictEqual(s.finished(), 1);
+});
+
+// r585: AI褒美の候補は家臣に限る。実シナリオの当主が自分に褒美を出さない。
+test('r585 1560年のAI褒美候補に大名本人を含めず、通常の家臣は残す', () => {
+    const data = getRuntimeData('1560_okehazama');
+    const clan = data.scenario.clansState.find(c => Number(c.id) === 8);
+    const castle = data.scenario.castlesState.find(c => Number(c.id) === 17);
+    assert.strictEqual(Number(castle.castellanId), Number(clan.leaderId), '実シナリオの当主は居城の城主');
+    const rows = mergeRuntimeRows(data.common.warriorsMaster, data.scenario.warriorsState);
+    const members = rows.filter(b => Number(b.clan) === Number(clan.id) && Number(b.castleId) === Number(castle.id))
+        .map(b => ({ ...b, status: 'active', isDaimyo: Number(b.id) === Number(clan.leaderId), recognitionNeed: 0 }));
+    const daimyo = members.find(b => b.isDaimyo);
+    assert.strictEqual(Number(daimyo.loyalty), 95, '実マスターの当主忠誠は95');
+    assert.ok(members.some(b => !b.isDaimyo && Number(b.loyalty) <= 85), '居城に低忠誠の家臣もいる');
+
+    // AIの候補生成部分そのものを実行する。乱数0は通常の判定で取り得る当選側の値。
+    const source = read('js/ai.js');
+    const start = source.indexOf('let rewardTargets = [];');
+    const end = source.indexOf('if (rewardTargets.length > 0 && availableGold', start);
+    assert.ok(start >= 0 && end > start, '候補生成の正本に到達できる');
+    const section = source.slice(start, end);
+    const zeroRandomMath = Object.assign(Object.create(Math), { random: () => 0 });
+    const ctx = createContext({
+        Math: zeroRandomMath,
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        PersonnelRules: { calcAffinityDiff: (a, b) => Math.min(Math.abs(Number(a) - Number(b)), 100 - Math.abs(Number(a) - Number(b))) }
+    });
+    const buildCandidates = vm.runInContext(`(function(castle, daimyo) { ${section} return rewardTargets; })`, ctx);
+    const game = {
+        getCastleBushos: id => Number(id) === Number(castle.id) ? members : [],
+        getCurrentTurnId: () => 1
+    };
+    const targets = buildCandidates.call({ game }, castle, daimyo);
+    assert.ok(targets.some(b => !b.isDaimyo && Number(b.loyalty) <= 85), '家臣への褒美は従来どおり候補');
+    assert.ok(!targets.some(b => b.isDaimyo), '大名自身は候補にならず、自己褒美で金を失わない');
+});
+
+// r586: 飢饉イベントの通常の兵士減少から兵士0へ到達する。
+// プレイヤーのメニューが拒否する訓練・兵施しをAIだけが実行してはならない。
+test('r586 飢饉で兵士0になった拠点をAIは訓練・兵施し候補に入れない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/command_catalog.js');
+    ctx.GameEvents = [];
+    ctx.playProvinceMapEffect = async () => {}; // 表示演出のみ省略し、飢饉本体は実行する。
+    loadScript(ctx, 'js/event/common_events.js');
+    const famine = ctx.GameEvents.find(event => event.id === 'famine_event_october');
+    assert.ok(famine, '既存の10月飢饉イベントを使用する');
+    const castle = { ownerClan: 7, provinceId: 1, soldiers: 1, population: 100,
+        peoplesLoyalty: 50, training: 0, morale: 0, rice: 1000 };
+    const game = { month: 10, castles: [castle],
+        provinces: [{ id: 1, statusEffects: ['famine'] }] };
+    assert.strictEqual(famine.checkCondition(game), true);
+    await famine.execute(game);
+    assert.strictEqual(castle.soldiers, 0, '飢饉イベント本体で実際に兵数0へ到達する');
+    const specs = vm.runInContext('COMMAND_SPECS', ctx);
+    assert.strictEqual(specs.training.canExecute(null, castle), false, 'プレイヤー共通条件は訓練を拒否');
+    assert.strictEqual(specs.soldier_charity.canExecute(null, castle), false, 'プレイヤー共通条件は兵施しを拒否');
+
+    const source = read('js/ai.js');
+    const start = source.indexOf('// 4. 訓練');
+    const end = source.indexOf('// 6. 石高開発', start);
+    assert.ok(start >= 0 && end > start, 'AI候補生成の実コードが存在');
+    const section = source.slice(start, end);
+    const plan = vm.runInContext(`(function(castle) { const actions = [];
+        const perceivedTraining = castle.training, perceivedMorale = castle.morale;
+        const targetMaxTraining = 80, targetMaxMorale = 80;
+        ${section}
+        return actions.map(a => a.type);
+    })`, ctx);
+    assert.deepStrictEqual(Array.from(plan.call({ game }, castle)), [], '兵士0ならどちらの行動も候補化しない');
+    castle.soldiers = 1000;
+    assert.deepStrictEqual(Array.from(plan.call({ game }, castle)), ['training', 'soldier_charity'],
+        '兵士が存在する通常拠点では両行動の候補を従来どおり残す');
 });
 
 Promise.all(pendingTests).then(() => {
