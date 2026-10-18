@@ -99,7 +99,7 @@ class CommandSystem {
             // 自領の samuraiIds 正本から候補を集めます。
             for (const ownedCastle of this.game.getClanCastles(this.game.playerClanId)) {
                 for (const b of this.game.getCastleBushos(ownedCastle.id)) {
-                    if (window.BushoStatusRules.isRonin(b) && Number(b.belongKunishuId || 0) === 0) bushos.push(b);
+                    if (PersonnelRules.canEmployRonin(this.game, b)) bushos.push(b);
                 }
             }
             infoHtml = "<div>登用する浪人を選択してください</div>"; 
@@ -1473,6 +1473,25 @@ class CommandSystem {
         return true;
     }
 
+    // 全領対象の人事命令は在城を要求しないが、本人の所属・現役・役職を
+    // 候補一覧の後にも一括確認し、古い選択から他家臣へ処遇を実行しない。
+    _validateClanPersonnelTargets(bushoIds, { single = false, excludeCastellan = false } = {}) {
+        const clanId = Number(this.game.playerClanId);
+        if (!Array.isArray(bushoIds) || bushoIds.length === 0
+            || (single && bushoIds.length !== 1)
+            || new Set(bushoIds.map(id => Number(id))).size !== bushoIds.length
+            || bushoIds.some(id => {
+                const person = this.game.getBusho(id);
+                return !person || Number(person.clan) !== clanId
+                    || !window.BushoStatusRules.isActive(person) || person.isDaimyo
+                    || (excludeCastellan && person.isCastellan);
+            })) {
+            this.game.ui.showDialog('選択した武将は現在この人事命令の対象にできません。', false);
+            return false;
+        }
+        return true;
+    }
+
     executeCommand(type, bushoIds, targetId) {
         // 確定前のイベント中に落城・積雪・武将異動があっても、移動を部分実行しない。
         if (type === 'move_deploy' && !this._validateTravelOrder('move', bushoIds, targetId)) return;
@@ -1508,6 +1527,7 @@ class CommandSystem {
         }
 
         if (type === 'banish') {
+            if (!this._validateClanPersonnelTargets(bushoIds, { single: true, excludeCastellan: true })) return;
             const busho = this.game.getBusho(bushoIds[0]);
             if (!busho) return;
 
@@ -1679,15 +1699,15 @@ class CommandSystem {
         this.finishCommand(msg, true);
     }
 
-    executeEmploy(doerId, targetId) { 
-        const doer = this.game.getBusho(doerId); 
-        const target = this.game.getBusho(targetId); 
-        
-        // ★追加: もし諸勢力の武将だったら登用はできません（引抜を使いましょう）
-        if (target.belongKunishuId > 0) {
-            this.game.ui.showDialog(`${target.name}は諸勢力に所属しているため登用できません。`, false);
+    executeEmploy(doerId, targetId) {
+        // 担当武将は当月の自拠点で未行動、対象は現在も自領内の浪人であること。
+        if (!this._validateLocalCommandActors([doerId])) return;
+        const target = this.game.getBusho(targetId);
+        if (!PersonnelRules.canEmployRonin(this.game, target)) {
+            this.game.ui.showDialog('登用対象が自領内の浪人ではなくなりました。', false);
             return;
         }
+        const doer = this.game.getBusho(doerId);
 
         const myPower = this.game.getClanTotalSoldiers(this.game.playerClanId); 
         const targetClanId = target.clan; 
@@ -1717,6 +1737,7 @@ class CommandSystem {
     }
     
     executeReward(bushoIds) {
+        if (!this._validateClanPersonnelTargets(bushoIds)) return;
         const castle = this.game.getCurrentTurnCastle();
         const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
         const spec = COMMAND_SPECS['reward'];

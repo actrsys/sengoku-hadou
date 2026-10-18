@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r576');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r577');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10786,7 +10786,9 @@ test('登用候補は全国武将走査ではなく自領拠点の在城者だ�
     assert.ok(at >= 0);
     assert.ok(block.includes('this.game.getClanCastles(this.game.playerClanId)'));
     assert.ok(block.includes('this.game.getCastleBushos(ownedCastle.id)'));
-    assert.ok(block.includes('BushoStatusRules.isRonin(b)'));
+    assert.ok(block.includes('PersonnelRules.canEmployRonin(this.game, b)'));
+    assert.ok(read('js/personnel_rules.js').includes('window.BushoStatusRules.isRonin(target)'));
+    assert.ok(read('js/command_catalog.js').includes('PersonnelRules.canEmployRonin(game, b)'));
     assert.ok(!block.includes('this.game.bushos.filter'));
 });
 
@@ -24327,6 +24329,121 @@ test('r576 訓練でも資源が一人分のみなら残りの武将を行動済
     assert.strictEqual(s.castle.gold,0);assert.strictEqual(s.castle.rice,0);
     assert.strictEqual(s.castle.training,55);
     assert.strictEqual(s.a.isActionDone,true);assert.strictEqual(s.b.isActionDone,false);
+});
+
+
+
+// r577: 人事の候補選択と確定の間に所属・生死が変わった場合の回帰。
+function createR577PersonnelCase() {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active', isRonin: b => b?.status === 'ronin' },
+        COMMAND_SPECS: { reward: {costGold: 30} },
+        DomesticRules: { calcFactionBonusRate: () => 1 },
+        PersonnelRules: {
+            applyRewardEffect: b => { b.loyalty += 10; },
+            calcRewardEffect: () => 10,
+            calcEmploymentSuccess: () => true,
+            canEmployRonin: (game, target) => !!target && target.status === 'ronin'
+                && Number(target.clan) === 0 && !target.belongKunishuId
+                && Number(game.getCastle(target.castleId)?.ownerClan) === Number(game.playerClanId)
+        }
+    });
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const castle = {id:1,name:'本城',ownerClan:1,gold:100};
+    const otherCastle = {id:2,name:'別城',ownerClan:2,gold:100};
+    const a = {id:11,name:'甲',fullName:'甲',clan:1,castleId:1,status:'active',isDaimyo:false,isCastellan:false,loyalty:30,isActionDone:false,achievementTotal:0};
+    const b = {id:12,name:'乙',fullName:'乙',clan:1,castleId:1,status:'active',isDaimyo:false,isCastellan:false,loyalty:35,isActionDone:false,achievementTotal:0};
+    const target = {id:13,name:'浪人',fullName:'浪人',clan:0,castleId:1,status:'ronin',isDaimyo:false,belongKunishuId:0,loyalty:30,strength:50,intelligence:50,leadership:50,charm:50,diplomacy:50};
+    const map = new Map([[11,a],[12,b],[13,target]]);
+    const dialog=[];
+    const changes=[];
+    let finished=0;
+    const game = {
+        playerClanId:1, getBusho:id=>map.get(Number(id)), getCastle:id=>Number(id)===1?castle:otherCastle,
+        getCurrentTurnCastle:()=>castle, getClan:()=>({name:'試験家'}), getClanDaimyo:()=>({id:100}),
+        getClanBushos:id=>Array.from(map.values()).filter(x=>Number(x.clan)===Number(id)),
+        getClanTotalSoldiers:()=>1000,
+        ui:{showDialog:msg=>dialog.push(msg)},
+        factionSystem:{updateRecognition:(person,score)=>changes.push([person.id,score])},
+        affiliationSystem:{becomeRonin:person=>{person.clan=0;person.status='ronin';},joinClan:(person,clan,id)=>{person.clan=clan;person.castleId=id;person.status='active';}}
+    };
+    const command = new Command(game);
+    command.finishCommand=()=>finished++;
+    return {command,game,castle,otherCastle,a,b,target,map,dialog,changes,finished:()=>finished};
+}
+
+test('r577 褒美は候補選択後に他家臣となった武将へ金を使わない',()=>{
+    const s=createR577PersonnelCase();s.b.clan=2;
+    s.command.executeReward([11,12]);
+    assert.strictEqual(s.castle.gold,100);assert.strictEqual(s.a.loyalty,30);
+    assert.strictEqual(s.b.loyalty,35);assert.strictEqual(s.finished(),0);
+});
+test('r577 褒美は死亡者・重複選択で部分支払をしない',()=>{
+    for (const invalid of [s=>s.b.status='dead',s=>{}]) {
+        const s=createR577PersonnelCase(); invalid(s);
+        s.command.executeReward(s.b.status==='dead'?[11,12]:[11,11]);
+        assert.strictEqual(s.castle.gold,100);assert.strictEqual(s.a.loyalty,30);
+        assert.strictEqual(s.finished(),0);
+    }
+});
+test('r577 褒美の通常複数対象と金不足時の部分実行は維持',()=>{
+    const s=createR577PersonnelCase();s.castle.gold=40;
+    s.command.executeReward([11,12]);
+    assert.strictEqual(s.castle.gold,10);assert.strictEqual(s.a.loyalty,40);
+    assert.strictEqual(s.b.loyalty,35);assert.strictEqual(s.finished(),1);
+});
+test('r577 追放は離反済み・死亡済み対象へ作用しない',()=>{
+    for (const update of [s=>s.a.clan=2,s=>s.a.status='dead',s=>s.a.isDaimyo=true,s=>s.a.isCastellan=true]) {
+        const s=createR577PersonnelCase();update(s);
+        s.command.executeCommand('banish',[11]);
+        assert.notStrictEqual(s.a.status,'ronin');assert.strictEqual(s.changes.length,0);
+        assert.strictEqual(s.finished(),0);
+    }
+});
+test('r577 正常な家臣追放は従来どおり浪人化する',()=>{
+    const s=createR577PersonnelCase();
+    s.command.executeCommand('banish',[11]);
+    assert.strictEqual(s.a.status,'ronin');assert.strictEqual(s.a.clan,0);
+    assert.strictEqual(s.finished(),1);
+});
+test('r577 登用は候補が別家臣へ変わったら引き抜きにならない',()=>{
+    const s=createR577PersonnelCase();s.target.clan=2;s.target.status='active';
+    s.command.executeEmploy(11,13);
+    assert.strictEqual(s.target.clan,2);assert.strictEqual(s.a.isActionDone,false);
+    assert.strictEqual(s.finished(),0);
+});
+test('r577 登用は担当武将の異動・行動済みと対象消失で安全に中止',()=>{
+    for(const update of [s=>s.a.castleId=2,s=>s.a.isActionDone=true,s=>s.map.delete(13)]){
+        const s=createR577PersonnelCase();update(s);
+        assert.doesNotThrow(()=>s.command.executeEmploy(11,13));
+        assert.strictEqual(s.a.isActionDone,update.toString().includes('isActionDone')?true:false);
+        assert.strictEqual(s.finished(),0);
+    }
+});
+test('r577 登用候補の資格は専門Rulesで自領浪人のみと判定',()=>{
+    const ctx=createContext({BushoStatusRules:{isRonin:b=>b?.status==='ronin'}});
+    loadScript(ctx,'js/personnel_rules.js');
+    const rule=ctx.PersonnelRules;
+    const castles=new Map([[1,{id:1,ownerClan:1}],[2,{id:2,ownerClan:2}]]);
+    const game={playerClanId:1,getCastle:id=>castles.get(Number(id))};
+    const person={id:55,clan:0,castleId:1,status:'ronin',belongKunishuId:0};
+    assert.strictEqual(rule.canEmployRonin(game,person),true);
+    for (const patch of [{clan:2},{status:'active'},{castleId:2},{belongKunishuId:3}]) {
+        assert.strictEqual(rule.canEmployRonin(game,{...person,...patch}),false);
+    }
+});
+test('r577 登用のbefore_command待機中に担当が行動済みになれば不成立',async()=>{
+    const s=createR577PersonnelCase();
+    s.game.eventManager={processEvents:async type=>{if(type==='before_command'){await Promise.resolve();s.a.isActionDone=true;}}};
+    await s.command.executeWithEvent('employ',()=>s.command.executeEmploy(11,13));
+    assert.strictEqual(s.target.status,'ronin');assert.strictEqual(s.target.clan,0);
+    assert.strictEqual(s.finished(),0);
+});
+test('r577 通常の自領浪人登用は従来どおり成立',()=>{
+    const s=createR577PersonnelCase();s.command.executeEmploy(11,13);
+    assert.strictEqual(s.target.clan,1);assert.strictEqual(s.target.status,'active');
+    assert.strictEqual(s.a.isActionDone,true);assert.strictEqual(s.finished(),1);
 });
 
 Promise.all(pendingTests).then(() => {

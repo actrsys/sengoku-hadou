@@ -81,9 +81,7 @@ const CAN_EXECUTE_RULES = {
     },
     hasEmployableRonin: (game) => {
         return game.bushos.some(b => {
-            if (!window.BushoStatusRules.isRonin(b) || b.belongKunishuId > 0) return false;
-            const targetCastle = game.getCastle(b.castleId);
-            return targetCastle && targetCastle.ownerClan === game.playerClanId;
+            return PersonnelRules.canEmployRonin(game, b);
         });
     },
     canManageLegion: (game, legionNumber) => {

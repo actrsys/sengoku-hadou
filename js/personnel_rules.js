@@ -37,6 +37,14 @@ class PersonnelRules {
         return (totalStr - 30) / window.MainParams.Strategy.InvestigateDifficulty;
     }
 
+    // 登用は自領内の浪人だけ。候補一覧と確定処理で同じ人物条件を用いる。
+    static canEmployRonin(game, target) {
+        if (!game || !target || !window.BushoStatusRules.isRonin(target)
+            || Number(target.clan) !== 0 || Number(target.belongKunishuId || 0) > 0) return false;
+        const castle = game.getCastle(target.castleId);
+        return !!castle && Number(castle.ownerClan) === Number(game.playerClanId);
+    }
+
     static getEmployProb(recruiter, target, recruiterClanPower, targetClanPower, game) {
         // ★追加：諸勢力に所属している武将（頭領など）は引き抜けないようにガードします！
         if ((target.belongKunishuId || 0) > 0) return 0;
