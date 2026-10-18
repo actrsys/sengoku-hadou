@@ -110,6 +110,30 @@ function fakeElement(id) {
     };
 }
 
+// 月次ターン順はマスター行の初期位置に依存しない一様なシャッフルを使用する。
+// 通常のstartMonthから対象部分を取り出し、実際のゲーム配列への作用を確認する。
+test('月次ターン順はFisher–Yatesで拠点を重複なく並べ替える', () => {
+    const source = read('js/turn_manager.js');
+    const start = source.indexOf('const allCastles = [...game.castles];');
+    const end = source.indexOf('game.updateAllClanPrestige();', start);
+    assert.ok(start >= 0 && end > start, '月次ターン順の生成箇所');
+    const block = source.slice(start, end);
+    assert.ok(!block.includes('.sort('), '比較関数へ乱数を渡す非推移的なソートを使わない');
+    const makeQueue = new Function('game', 'Math', `${block} return game.turnQueue;`);
+    const originals = [1, 2, 3, 4].map(id => ({ id }));
+    const game = { castles: originals };
+    const values = [0, 0, 0];
+    const output = makeQueue(game, { floor: Math.floor, random: () => {
+        assert.ok(values.length > 0, '乱数は要素数-1回');
+        return values.shift();
+    }});
+    assert.strictEqual(values.length, 0);
+    assert.deepStrictEqual(output.map(c => c.id), [2, 3, 4, 1]);
+    assert.deepStrictEqual(game.castles.map(c => c.id), [1, 2, 3, 4], 'マスター配列は書き換えない');
+    assert.notStrictEqual(output, game.castles);
+    assert.strictEqual(new Set(output).size, originals.length);
+});
+
 // ---------------------------------------------------------------------------
 // 設定・定数
 // ---------------------------------------------------------------------------
@@ -214,7 +238,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r595');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r597');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7049,6 +7073,34 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     } };
     assert.throws(() => manager._validateSaveDataStructure(invalidHistory), /aiOperations\.historyOwnedCastles/,
         '配列以外の旧所領履歴を受理せず、月初unshiftの例外を防ぐ');
+    // r596: 作戦本体が辞書でも、目標リストが不正なら通常落城処理の
+    // .some() / .filter() や月次AIの .shift() で例外になる。
+    const badAttackOperation = { type: '攻撃', attackTargets: [null] };
+    const attackGame = {
+        castles: [{ id: 1, ownerClan: 1, legionId: 0, castellanId: 0 }], legions: [], clans: [],
+        getClan() { return null; },
+        aiOperationManager: { operations: { 1: { 0: badAttackOperation } } }
+    };
+    assert.throws(() => new CastleManagerForSave(attackGame).changeOwner(attackGame.castles[0], 2, true),
+        '配列にnullがある攻撃作戦では通常の落城整理で例外になる');
+    const invalidAttackTargets = { ...valid, aiOperations: {
+        ...valid.aiOperations, operations: { 1: { 0: badAttackOperation } }
+    } };
+    assert.throws(() => manager._validateSaveDataStructure(invalidAttackTargets), /attackTargets/,
+        '外部セーブ内のnull攻撃目標はロード前に拒否する');
+    const invalidSabotageTargets = { ...valid, aiOperations: {
+        ...valid.aiOperations, operations: { 1: { 0: { type: '内政', sabotageTargets: { 0: { castleId: 1 }, length: 1 } } } }
+    } };
+    assert.throws(() => manager._validateSaveDataStructure(invalidSabotageTargets), /sabotageTargets/,
+        '配列ではない調略目標もロード前に拒否する');
+    const normalTargetLists = { ...valid, aiOperations: {
+        ...valid.aiOperations, operations: { 1: { 0: {
+            type: '攻撃', attackTargets: [{ targetId: 2, isKunishuTarget: false, stagingBase: 1 }],
+            sabotageTargets: [{ castleId: 2, clanId: 2 }]
+        } } }
+    } };
+    assert.strictEqual(manager._validateSaveDataStructure(normalTargetLists), true,
+        '現在のAIが生成する攻撃・調略リストの構造は従来どおり受理する');
     // r590: 進捗履歴の配列は月初に直接pushされる。辞書自体がobjectでも
     // 文字列などを履歴として持ち込むと、通常の月次AI作戦更新で例外になる。
     const invalidObjectiveHistory = { ...valid, aiOperations: {

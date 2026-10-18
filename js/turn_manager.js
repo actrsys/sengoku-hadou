@@ -301,8 +301,13 @@ class TurnManager {
 
         // ★ここを書き換え！：空っぽの城（中立）も仲間はずれにせず、一緒に混ぜて順番リストに入れます！
         const allCastles = [...game.castles];
-        allCastles.sort(() => Math.random() - 0.5); 
-        game.turnQueue = [...allCastles];
+        // 毎月の順番は全拠点を等確率で並べ替える。
+        // 乱数をsortの比較関数へ渡すと元の配列順に偏りが生じるため、Fisher–Yatesを使う。
+        for (let i = allCastles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allCastles[i], allCastles[j]] = [allCastles[j], allCastles[i]];
+        }
+        game.turnQueue = allCastles;
     
         // ★毎月の初めに、最新の威信を計算し直します！
         game.updateAllClanPrestige();

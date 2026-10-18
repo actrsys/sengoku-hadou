@@ -332,6 +332,16 @@ class SaveManager {
                         }
                     } else if (!isRecord(entry)) {
                         fail(`aiOperations.${storeName}[${clanKey}][${legionKey}] が不正です`);
+                    } else if (storeName === 'operations') {
+                        // AIの攻撃・調略目標は通常の落城整理や月次処理で配列操作する。
+                        // 本体だけが辞書でも要素にnullがあれば参照時例外となるため、
+                        // 実際に生成される保存形（辞書の配列）を復元前に確認する。
+                        for (const listName of ['attackTargets', 'sabotageTargets']) {
+                            if (Object.prototype.hasOwnProperty.call(entry, listName)
+                                && (!Array.isArray(entry[listName]) || !entry[listName].every(isRecord))) {
+                                fail(`aiOperations.${storeName}[${clanKey}][${legionKey}].${listName} が不正です`);
+                            }
+                        }
                     } else if (storeName === 'grandObjectives'
                         && Object.prototype.hasOwnProperty.call(entry, 'historyTargetCount')
                         && !Array.isArray(entry.historyTargetCount)) {
