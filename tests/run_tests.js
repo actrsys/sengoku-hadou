@@ -214,7 +214,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r578');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r581');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -24557,6 +24557,322 @@ test('r578 正常な破壊工作と離間計は従来どおり成立', () => {
     assert.strictEqual(t.target.loyalty, 60);
     assert.strictEqual(t.rolls(), 1);
     assert.strictEqual(t.actor.isActionDone, true);
+});
+
+
+// r579: 外交は会話・条件交渉を挟んだ後も、同じ担当者/対象/ターンであることを確かめる。
+function createR579DiplomacyCase() {
+    const ctx = createContext({ MainParams: { Diplomacy: { FailureSentiment: { Alliance: -5, Dominate: -5 } } }, BushoStatusRules: { isActive: b => b?.status === 'active' }, MapGraphService: { isAdjacent: (a, b) => a?.id !== b?.id } });
+    ctx.Math = Object.assign(Object.create(Math), { random: () => 0.15 });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    const Diplomacy = vm.runInContext('DiplomacyManager', ctx);
+    const doer = { id: 10, clan: 1, castleId: 1, name: '使者', diplomacy: 80, achievementTotal: 0, isActionDone: false };
+    const husband = { id: 40, clan: 2, name: '当主', isDaimyo: true, female: false, familyIds: [40], status: 'active' };
+    const princess = { id: 30, name: '姫', status: 'unmarried' };
+    const home = { id: 1, ownerClan: 1, gold: 800 };
+    const target = { id: 20, ownerClan: 2 };
+    const clans = [{ id: 1, name: '甲家', princessIds: [30] }, { id: 2, name: '乙家', leaderId: 40 }];
+    const game = {
+        year: 1570, month: 4, phase: 'game', playerClanId: 1,
+        isWatchMode: false, isProcessingAI: false,
+        getBusho: id => Number(id) === 10 ? doer : Number(id) === 40 ? husband : null,
+        getPrincess: id => Number(id) === 30 ? princess : null,
+        getCastle: id => Number(id) === 1 ? home : Number(id) === 20 ? target : null,
+        getClan: id => clans.find(c => c.id === Number(id)) || null,
+        getClanDaimyo: id => Number(id) === 2 ? husband : null,
+        getClanTotalSoldiers: () => 1000,
+        getRelation: () => ({ status: '普通' }),
+        factionSystem: { updateRecognition: () => {} },
+        legions: [], castles: [home, target]
+    };
+    let generation = 1;
+    game.turnManager = {
+        captureTurnFlowGeneration: () => generation,
+        isTurnFlowGenerationCurrent: token => token === generation && game.phase === 'game',
+        changeGeneration: () => generation++
+    };
+    game.commandSystem = {
+        _captureCommandTurnContext: () => ({ year: game.year, month: game.month }),
+        _isCommandTurnCurrent: context => context.year === game.year && context.month === game.month,
+        _validateLocalCommandActors: ids => ids.length === 1 && ids[0] === doer.id
+            && doer.clan === 1 && doer.castleId === home.id && !doer.isActionDone,
+        getValidTargets: () => [target.id]
+    };
+    const diplomacy = new Diplomacy(game);
+    game.diplomacyManager = diplomacy;
+    diplomacy.calcDiplomacyExp = () => {};
+    diplomacy.checkDiplomacySuccess = () => true;
+    diplomacy._recordDiplomacyHistory = () => {};
+    diplomacy.showDiplomacyResult = () => {};
+    let resolveConversation;
+    diplomacy.playDiplomacyConversation = () => new Promise(resolve => { resolveConversation = resolve; });
+    return { game, diplomacy, doer, husband, princess, target, home, get resolveConversation() { return resolveConversation; } };
+}
+
+test('r579 外交会話中の月替わり・担当者失効・相手落城で旧同盟を確定しない', async () => {
+    for (const change of [
+        s => { s.game.month++; },
+        s => { s.doer.isActionDone = true; },
+        s => { s.target.ownerClan = 1; },
+        s => { s.game.turnManager.changeGeneration(); }
+    ]) {
+        const s = createR579DiplomacyCase();
+        let applied = 0;
+        s.diplomacy.applyAllianceData = () => applied++;
+        const task = s.diplomacy.executeDiplomacy(10, 20, 'alliance');
+        assert.strictEqual(typeof s.resolveConversation, 'function');
+        change(s);
+        s.resolveConversation();
+        await task;
+        assert.strictEqual(applied, 0, '失効した外交は相互関係を書き換えない');
+        assert.strictEqual(s.doer.achievementTotal, 0);
+    }
+});
+
+test('r579 会話後も有効な同盟は従来どおり確定する', async () => {
+    const s = createR579DiplomacyCase();
+    let applied = 0;
+    s.diplomacy.applyAllianceData = () => applied++;
+    const task = s.diplomacy.executeDiplomacy(10, 20, 'alliance');
+    s.resolveConversation();
+    await task;
+    assert.strictEqual(applied, 1);
+    assert.strictEqual(s.doer.isActionDone, true);
+});
+
+test('r579 婚姻会話中に姫・婿候補が不適格となったら婚姻させない', async () => {
+    for (const change of [
+        s => { s.princess.status = 'married'; },
+        s => { s.husband.clan = 1; },
+        s => { s.game.getClan(1).princessIds = []; },
+        s => { s.game.month++; }
+    ]) {
+        const s = createR579DiplomacyCase();
+        let applied = 0;
+        s.diplomacy.applyMarriageData = () => applied++;
+        const task = s.diplomacy.executeMarriage(10, 20, 30, 40);
+        change(s);
+        s.resolveConversation();
+        await task;
+        assert.strictEqual(applied, 0);
+        assert.strictEqual(s.doer.isActionDone, false);
+    }
+});
+
+test('r579 有効な婚姻会話の結果は維持する', async () => {
+    const s = createR579DiplomacyCase();
+    let applied = 0;
+    s.diplomacy.applyMarriageData = () => applied++;
+    const task = s.diplomacy.executeMarriage(10, 20, 30, 40);
+    s.resolveConversation();
+    await task;
+    assert.strictEqual(applied, 1);
+    assert.strictEqual(s.doer.isActionDone, true);
+});
+
+test('r579 臣従の外交会話中に相手が落城したら旧領地移管を実行しない', async () => {
+    const s = createR579DiplomacyCase();
+    let transfers = 0;
+    s.game.castleManager = { disbandLegion: () => transfers++, changeOwner: () => transfers++ };
+    s.game.getClanCastles = id => id === 1 ? [s.home] : [s.target];
+    const task = s.diplomacy.executeVassalage(10, 20);
+    s.target.ownerClan = 1;
+    s.resolveConversation();
+    await task;
+    assert.strictEqual(transfers, 0);
+    assert.strictEqual(s.game.playerClanId, 1);
+});
+
+test('r579 和睦の条件交渉で古い確定ボタンは外交状態を更新しない', async () => {
+    const s = createR579DiplomacyCase();
+    s.diplomacy.getDiplomacyProb = () => 0;
+    let pendingSuccess;
+    s.diplomacy.negotiateTruceConditions = (_a, _b, onSuccess) => { pendingSuccess = onSuccess; };
+    let changes = 0;
+    s.diplomacy.changeStatus = () => changes++;
+    // 交渉経路を選ぶ確率: dice=15, success確率0, 交渉範囲30。
+    const task = s.diplomacy.executeDiplomacy(10, 20, 'truce');
+    s.resolveConversation();
+    await task;
+    assert.strictEqual(typeof pendingSuccess, 'function');
+    s.game.month++;
+    pendingSuccess('none', null);
+    assert.strictEqual(changes, 0);
+});
+
+
+// r580: 条件交渉を表示してから確定する間の姫・人質・城の資格を再確認する。
+function createR580DiplomacyConditionCase() {
+    const s = createR579DiplomacyCase();
+    const secondHome = { id: 2, ownerClan: 1, name: '境城', castellanId: 0, legionId: 0 };
+    const kinsman = { id: 41, clan: 1, name: '一門', isDaimyo: false, status: 'active', familyIds: [42] };
+    const sourceLeader = { id: 42, clan: 1, name: '甲当主', isDaimyo: true, status: 'active', familyIds: [41], castleId: 1 };
+    const originalGetBusho = s.game.getBusho;
+    s.game.getBusho = id => Number(id) === 41 ? kinsman : Number(id) === 42 ? sourceLeader : originalGetBusho(id);
+    s.game.getClanDaimyo = id => Number(id) === 1 ? sourceLeader : s.husband;
+    s.game.getClanBushos = id => Number(id) === 1 ? [sourceLeader, kinsman] : [s.husband];
+    s.game.getClanCastles = id => Number(id) === 1 ? [s.home, secondHome].filter(c => c.ownerClan === 1) : [s.target].filter(c => c.ownerClan === 2);
+    s.game.getCastle = (original => id => Number(id) === 2 ? secondHome : original(id))(s.game.getCastle);
+    s.game.ui = { showDialog: () => {} };
+    const relations = [{ sentiment: 20 }, { sentiment: 20 }];
+    s.diplomacy.getDiplomacyData = (a, b) => Number(a) === 1 ? relations[0] : relations[1];
+    s.diplomacy.getDiplomacyProb = () => 0;
+    let statusChanges = 0, dominationChanges = 0, conditionChanges = 0;
+    s.diplomacy.changeStatus = () => statusChanges++;
+    s.diplomacy.applyDominationData = () => dominationChanges++;
+    s.diplomacy._applyTruceConditionData = () => { conditionChanges++; return ''; };
+    s.diplomacy._applyMarriageLinkData = () => { conditionChanges++; return true; };
+    s.diplomacy.applyHostageData = () => { conditionChanges++; };
+    s.diplomacy.applyCastleCessionData = () => { conditionChanges++; };
+    Object.assign(s, { kinsman, sourceLeader, secondHome, relations });
+    Object.defineProperties(s, {
+        statusChanges: { get: () => statusChanges },
+        dominationChanges: { get: () => dominationChanges },
+        conditionChanges: { get: () => conditionChanges }
+    });
+    return s;
+}
+
+test('r580 和睦条件の姫が婚約中に既婚となれば外交関係を変更しない', async () => {
+    const s = createR580DiplomacyConditionCase();
+    let success;
+    s.diplomacy.negotiateTruceConditions = (_a, _b, onSuccess) => { success = onSuccess; };
+    const task = s.diplomacy.executeDiplomacy(10, 20, 'truce');
+    s.resolveConversation(); await task;
+    s.princess.status = 'married';
+    success('marriage', { type: 'marriage', princess: s.princess, busho: s.husband });
+    assert.strictEqual(s.statusChanges, 0);
+    assert.strictEqual(s.conditionChanges, 0);
+    assert.strictEqual(s.doer.isActionDone, false);
+});
+
+test('r580 和睦条件の人質が別家臣となれば外交関係を変更しない', async () => {
+    const s = createR580DiplomacyConditionCase();
+    let success;
+    s.diplomacy.negotiateTruceConditions = (_a, _b, onSuccess) => { success = onSuccess; };
+    const task = s.diplomacy.executeDiplomacy(10, 20, 'truce');
+    s.resolveConversation(); await task;
+    s.kinsman.clan = 2;
+    success('hostage', { type: 'hostage', busho: s.kinsman });
+    assert.strictEqual(s.statusChanges, 0);
+    assert.strictEqual(s.conditionChanges, 0);
+});
+
+test('r580 和睦条件の割譲城が他家領となれば外交関係を変更しない', async () => {
+    const s = createR580DiplomacyConditionCase();
+    let success;
+    s.diplomacy.negotiateTruceConditions = (_a, _b, onSuccess) => { success = onSuccess; };
+    const task = s.diplomacy.executeDiplomacy(10, 20, 'truce');
+    s.resolveConversation(); await task;
+    s.secondHome.ownerClan = 2;
+    success('castle', { type: 'castle', castle: s.secondHome });
+    assert.strictEqual(s.statusChanges, 0);
+    assert.strictEqual(s.conditionChanges, 0);
+});
+
+test('r580 従属交渉の人質が行動不能となれば従属関係を成立させない', async () => {
+    const s = createR580DiplomacyConditionCase();
+    let success;
+    s.diplomacy.negotiateSubordinationConditions = (_a, _b, onSuccess) => { success = onSuccess; };
+    const task = s.diplomacy.executeDiplomacy(10, 20, 'subordinate');
+    s.resolveConversation(); await task;
+    s.kinsman.status = 'dead';
+    success('hostage', { type: 'hostage', busho: s.kinsman });
+    assert.strictEqual(s.dominationChanges, 0);
+    assert.strictEqual(s.conditionChanges, 0);
+    assert.strictEqual(s.doer.isActionDone, false);
+});
+
+test('r580 条件を満たす人質による和睦は従来どおり成立', async () => {
+    const s = createR580DiplomacyConditionCase();
+    let success;
+    s.diplomacy.negotiateTruceConditions = (_a, _b, onSuccess) => { success = onSuccess; };
+    const task = s.diplomacy.executeDiplomacy(10, 20, 'truce');
+    s.resolveConversation(); await task;
+    assert.strictEqual(s.diplomacy._isNegotiatedConditionCurrent('hostage', { type: 'hostage', busho: s.kinsman }, 1, 2), true, '有効な一門人質');
+    success('hostage', { type: 'hostage', busho: s.kinsman });
+    assert.strictEqual(s.statusChanges, 1);
+    assert.strictEqual(s.conditionChanges, 1);
+    assert.strictEqual(s.doer.isActionDone, true);
+});
+
+
+test('r580 和睦条件の割譲城が当主居城に変わった場合は成立しない', async () => {
+    const s = createR580DiplomacyConditionCase();
+    let success;
+    s.diplomacy.negotiateTruceConditions = (_a, _b, onSuccess) => { success = onSuccess; };
+    const task = s.diplomacy.executeDiplomacy(10, 20, 'truce');
+    s.resolveConversation(); await task;
+    s.sourceLeader.castleId = s.secondHome.id;
+    success('castle', { type: 'castle', castle: s.secondHome });
+    assert.strictEqual(s.statusChanges, 0);
+    assert.strictEqual(s.conditionChanges, 0);
+});
+
+test('r580 正常な城割譲を伴う和睦は条件変更なく成立する', async () => {
+    const s = createR580DiplomacyConditionCase();
+    let success;
+    s.diplomacy.negotiateTruceConditions = (_a, _b, onSuccess) => { success = onSuccess; };
+    const task = s.diplomacy.executeDiplomacy(10, 20, 'truce');
+    s.resolveConversation(); await task;
+    success('castle', { type: 'castle', castle: s.secondHome });
+    assert.strictEqual(s.statusChanges, 1);
+    assert.strictEqual(s.conditionChanges, 1);
+});
+
+test('r580 交渉候補と確定は同じ条件資格判定を使用する', () => {
+    const s = createR580DiplomacyConditionCase();
+    s.game.bushos = [s.husband, s.sourceLeader, s.kinsman];
+    const options = s.diplomacy._buildTruceConditionOptions(1, 2);
+    assert(options.some(option => option.type === 'marriage'));
+    assert(options.some(option => option.type === 'hostage'));
+    assert(options.some(option => option.type === 'castle'));
+    for (const option of options) {
+        assert.strictEqual(s.diplomacy._isNegotiatedConditionCurrent(option.type, option, 1, 2), true);
+    }
+    s.princess.status = 'married';
+    s.secondHome.ownerClan = 2;
+    s.kinsman.status = 'dead';
+    const after = s.diplomacy._buildTruceConditionOptions(1, 2);
+    assert.strictEqual(after.length, 0, '失効した3種類は候補からも消える');
+});
+
+
+test('r580 AIから提示された和睦条件も確定前に人質資格を確認する', () => {
+    const s = createR580DiplomacyConditionCase();
+    s.game.playerClanId = 2;
+    s.husband.castleId = 20;
+    s.game.getNavigatorInfo = () => ({ name: '小姓', faceIcon: 'face.webp' });
+    s.game.getRelation = () => ({ status: '敵対' });
+    s.diplomacy._getThirdPartyDaimyoReference = () => '甲当主';
+    s.diplomacy.getCallName = () => '使者';
+    s.diplomacy.buildDiplomacyGreeting = () => ({ greetMsg1: '挨拶', greetMsg2: '返答', context: {} });
+    s.diplomacy.getDiplomacyMessages = () => ({ demandMsg: '和睦', acceptMsg: '', replyAcceptMsg: '' });
+    s.diplomacy._styleDiplomacyTextForSpeaker = text => text;
+    s.diplomacy._getTruceConditionOfferText = () => '一門を人質に差し出す';
+    s.diplomacy._buildTruceConditionOptions = () => [{ type: 'hostage', busho: s.kinsman }];
+    s.diplomacy._selectTruceConditionOption = options => options[0];
+    let choices = [], result = '';
+    s.game.ui = {
+        showDialog(_text, _a, onClose, _b, options) {
+            if (options?.choices) choices = options.choices;
+            else if (onClose) onClose();
+        },
+        showResultModal(text) { result = text; },
+        log() {}
+    };
+    s.diplomacy.proposeDiplomacyToPlayer(s.doer, 2, 'truce', 0, () => {}, 100);
+    const negotiation = choices.find(choice => choice.label === '条件を示させる');
+    assert(negotiation);
+    negotiation.onClick();
+    const accept = choices.find(choice => choice.label === 'その条件で和睦');
+    assert(accept);
+    s.kinsman.clan = 2;
+    accept.onClick();
+    assert.strictEqual(s.statusChanges, 0);
+    assert.strictEqual(s.conditionChanges, 0);
+    assert(result.includes('和睦は成立しませんでした'));
 });
 
 Promise.all(pendingTests).then(() => {
