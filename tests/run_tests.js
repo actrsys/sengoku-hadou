@@ -134,6 +134,25 @@ test('月次ターン順はFisher–Yatesで拠点を重複なく並べ替える
     assert.strictEqual(new Set(output).size, originals.length);
 });
 
+// 実際の野戦で使う川生成は、左・中央・右の候補を均等に抽選する。
+// 乱数0,0のFisher–Yatesは [左, 中, 右] -> [中, 右, 左] となり、
+// 比較器に乱数を渡すsortでは [右, 中, 左] になって失敗する。
+test('野戦の川の開始地域は非推移的な乱数ソートを使わない', () => {
+    const context = createContext({ Math: { floor: Math.floor, random: () => 0 } });
+    loadScript(context, 'js/map_generator.js');
+    const generator = vm.runInContext('new HexMapGenerator()', context);
+    const starts = [2, 10, 18];
+    generator.rand = () => starts.length ? starts.shift() : 0;
+    const grid = Array.from({ length: 2 }, (_, y) =>
+        Array.from({ length: 24 }, (_, x) => ({ x, y, terrain: 'plain' })));
+    generator._generateRivers(grid, 24, 2, 1);
+    assert.strictEqual(starts.length, 0, '左・中央・右の3候補を使用する');
+    assert.strictEqual(grid[0].findIndex(cell => cell.terrain === 'river'), 10,
+        '固定乱数0,0では中央地域が最初の候補となる');
+    assert.strictEqual(grid.flat().filter(cell => cell.terrain === 'river').length, 1,
+        '川の生成量は従来と変わらない');
+});
+
 // ---------------------------------------------------------------------------
 // 設定・定数
 // ---------------------------------------------------------------------------
@@ -238,7 +257,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r597');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r604');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7052,6 +7071,20 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ ...valid.castles[0], _allowAttack: 1 }] }), /委任・城攻め・武将移動設定/, '不正な真偽値を拒否');
     assert.strictEqual(manager.isLoadableSaveData({ ...valid, saveSchemaVersion: 2 }), false, 'r562までの保存は現行形式として誤受理しない');
     assert.strictEqual(manager._validateSaveDataStructure(valid), true);
+    // r599: 現行の三好寿命常駐イベントは__residentEventStatesへ状態を書き戻す。
+    // 外部セーブから真偽値や文字列の状態帳を受理すると、onEnter適用後に書込が失敗し、
+    // 翌月以降の適用/解除状態を保持できなくなる。状態帳の外側だけを復元前に確認する。
+    assert.throws(() => manager._validateSaveDataStructure({
+        ...valid, flags: { __residentEventStates: 'broken' }
+    }), /__residentEventStates/, '書込みできない常駐イベント状態帳を拒否する');
+    assert.throws(() => manager._validateSaveDataStructure({
+        ...valid, flags: { __residentEventStates: [] }
+    }), /__residentEventStates/, 'JSON保存時に文字列キーの記録が消失する配列も拒否する');
+    assert.strictEqual(manager._validateSaveDataStructure({
+        ...valid, flags: { __residentEventStates: {
+            historical_miyoshi_nagayoshi_yoshioki_lifespan: { active: true }
+        } }
+    }), true, 'ゲームが生成する常駐イベント状態帳は受理する');
     // r589: AI作戦辞書もロード後の通常の落城処理へそのまま渡される。
     // 外側のoperationsがobjectというだけでは、内側がnullの作戦を受理してしまう。
     loadScript(ctx, 'js/castle_manager.js');
@@ -8801,9 +8834,20 @@ test('結果画面との引き渡しは結果を先に表示し背景復帰も�
     const closeBlock = ui.slice(closeStart, closeEnd > closeStart ? closeEnd : closeStart + 2800);
     assert.ok(closeBlock.includes('this.closeCoveredViewAfterRecovery(this.resultModal'), '結果画面自身を背景復帰中のcoverとして保持する');
     assert.ok(closeBlock.includes('recoverUnderCover: () => this.resumeBackgroundUpdates()'), '結果画面の下で背景復帰を開始する');
-    assert.ok(closeBlock.includes('afterHide: () => {'), '実paint後にだけ結果画面終了後処理へ進む');
+    assert.ok(closeBlock.includes('afterHide: finishClose'), '通常の結果終了は実paint後にだけ後処理へ進む');
+    assert.ok(closeBlock.includes('this.beginVisualHandoff(() => {'), '断交の後続会話へだけ結果画面をhandoffできる');
 });
 
+
+test('r604 断交後の人質・姫の即時会話だけ結果画面を引き継ぎ、他の外交は従来のpaint復帰を維持', () => {
+    const dip = read('js/diplomacy.js');
+    const ui = read('js/ui.js');
+    assert.ok(dip.includes('result.escapedHostageRecords.some(record =>'), '実際の脱走人質レコードから後続会話の有無を判定');
+    assert.ok(dip.includes('firstPrincess && Number(firstPrincess.currentClanId) === playerId'), '直ちにプレイヤーへ処遇選択を出す姫だけ該当');
+    assert.ok(dip.includes('{ handoffToNextDialog: !!(escapedFollowup || princessFollowup) }'), '断交結果以外へhandoffを広げない');
+    assert.ok(ui.includes('this.resultFollowupDialogHandoff = options.handoffToNextDialog === true'), '共通結果画面は明示された場合だけ引継ぎ');
+    assert.ok(ui.includes('recoverUnderCover: () => this.resumeBackgroundUpdates()'), '通常の終了時は従来どおり地図復帰paint待ち');
+});
 
 test('背景復帰を伴う全画面UIはcoverをpaintまで保持し再表示で旧closeを無効化する', () => {
     const ui = read('js/ui.js');
@@ -8858,7 +8902,7 @@ test('会話・コマンド・評定から結果へ進む時は重い背景更�
     const dipEnd = diplomacy.indexOf('\n    /**', dipStart + 1);
     const dipBlock = diplomacy.slice(dipStart, dipEnd);
     assert.ok(dipBlock.includes('const refreshBehindResult ='));
-    assert.ok(dipBlock.includes('showResultModal(msg, onClose, null, refreshBehindResult)'));
+    assert.ok(dipBlock.includes('showResultModal(msg, onClose, null, refreshBehindResult, options)'));
     assert.ok(!/if \(doerClanId === this\.game\.playerClanId\)[\s\S]*?renderMap\(\);[\s\S]*?showResultModal\(msg/.test(dipBlock), '外交は結果表示前に地図を再描画しない');
 
     const finishStart = command.indexOf('finishCommand(msg');
@@ -9823,6 +9867,62 @@ test('野戦終了時は通常地図復帰より先に重い戦場DOMを解放�
     assert.ok(releaseBlock.includes('mapEl.replaceChildren();'));
     assert.ok(releaseBlock.includes('this.hexElements = null;'));
     assert.ok(releaseBlock.includes('this._fwUnitElementCache = new Map();'));
+});
+
+// 実際の20×12野戦盤面に対して、改修前に記録した到達経路・A*探索結果を固定する。
+// コストキャッシュは探索中だけ有効で、次のターンに地形が変わった場合は再計算する。
+test('野戦AIの経路探索軽量化は移動範囲・同点経路・地形更新を変えない', () => {
+    const ctx = createContext({ addEventListener() {}, SkillManager: {
+        calcTerrainMoveCost(unit, terrain) { return terrain === 'mountain' ? 3 : terrain === 'river' ? 2 : 1; },
+        getDisengageMoveCost() { return 4; }
+    }});
+    loadScript(ctx, 'js/field_war.js');
+    const manager = new ctx.FieldWarManager({});
+    manager.grid = Array.from({ length: 12 }, (_, r) =>
+        Array.from({ length: 20 }, (_, x) => ({
+            terrain: (x * 17 + r * 11) % 13 === 0 ? 'mountain'
+                : (x * 23 + r * 3) % 9 === 0 ? 'river' : 'plain',
+            isSea: false
+        })));
+    manager.units = [
+        { id: 1, x: 2, y: 4, isAttacker: true, troopType: 'ashigaru' },
+        { id: 2, x: 3, y: 7, isAttacker: true, troopType: 'ashigaru' },
+        { id: 3, x: 4, y: 12, isAttacker: true, troopType: 'kiba' },
+        { id: 4, x: 5, y: 17, isAttacker: true, troopType: 'teppo' },
+        { id: 5, x: 16, y: 4, isAttacker: false, troopType: 'ashigaru' },
+        { id: 6, x: 15, y: 7, isAttacker: false, troopType: 'teppo' },
+        { id: 7, x: 16, y: 12, isAttacker: false, troopType: 'kiba' },
+        { id: 8, x: 14, y: 17, isAttacker: false, troopType: 'ashigaru' }
+    ];
+    const unit = manager.units[0];
+    const originalGetCost = manager.getCost.bind(manager);
+    let computations = 0;
+    manager.getCost = (...args) => { computations++; return originalGetCost(...args); };
+    const range = manager.findPaths(unit, 5);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(range['5,3'])), {
+        cost: 3, path: [{ x: 3, y: 5 }, { x: 4, y: 4 }, { x: 5, y: 3 }]
+    }, '修正前と同じ同点経路を採用する');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(range['4,8'])), {
+        cost: 3, path: [{ x: 3, y: 5 }, { x: 4, y: 6 }, { x: 4, y: 8 }]
+    }, '川・山を含む到達経路は変わらない');
+    assert.ok(computations <= manager.cols * manager.rows * 2,
+        '探索中に同じマスの移動コストを初手/通常それぞれ二重計算しない');
+    const aStar = manager.findAStarPath(unit, 16, 4);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(aStar.slice(0, 3))), [
+        {x: 3, y: 5, cost: 1}, {x: 4, y: 4, cost: 1}, {x: 5, y: 3, cost: 1}
+    ], 'A*も旧版と同じ先頭経路を選ぶ');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(aStar.slice(-2))), [
+        {x: 14, y: 2, cost: 2}, {x: 15, y: 3, cost: 2}
+    ], 'A*の最終経路も維持する');
+    const neighbors = manager.getNeighbors(2, 4);
+    assert.strictEqual(manager.getNeighbors(2, 4), neighbors, '固定盤面の隣接座標を再利用');
+    manager.grid[2][3].terrain = 'mountain';
+    assert.strictEqual(manager.findPaths(unit, 5)['3,5'].cost, 3,
+        '別の探索では変更後の地形を反映し、古い移動コストを持ち越さない');
+    manager.cols = 3;
+    manager.rows = 2;
+    assert.notStrictEqual(manager.getNeighbors(2, 4), neighbors,
+        '盤面寸法が変われば隣接座標キャッシュを更新');
 });
 
 test('野戦AIは交戦支援をターゲット・移動・攻撃で共通評価する', () => {
@@ -25243,6 +25343,70 @@ test('r591 追放は現職城主を候補に出さず、家臣がいない場合
     assert.deepStrictEqual(Array.from(command.getBushoSelectorData('banish', null, null, castle).bushos).map(b => b.id), [3], '通常の家臣だけ候補になる');
     retainer.status = 'dead';
     assert.strictEqual(Rules.hasBanishableBusho(game), false, '家臣が死亡した場合は候補なし');
+});
+
+
+test('r603 親善の金額確定後は次の会話・助言が描画されるまで数量画面を保持する', async () => {
+    // 実際の数量確定ハンドラを評価し、DOM操作と描画handoffの境界を確認する。
+    // このテストはr602の「数量画面を先に閉じる」実装では失敗する。
+    const source = read('js/ui_slider.js');
+    const start = source.indexOf('this.ui.quantityConfirmBtn.onclick = async () => {');
+    const end = source.indexOf('\n        const cancelBtn = this.ui.quantityModal.querySelector', start);
+    assert.ok(start >= 0 && end > start);
+    const handlerSource = source.slice(start, end);
+
+    const perform = async (type, extraData, parentSelectorSuspended) => {
+        const events = [];
+        const quantityModal = { hidden: false, classList: {
+            add(name) { if (name === 'hidden') quantityModal.hidden = true; },
+            remove(name) { if (name === 'hidden') quantityModal.hidden = false; }
+        } };
+        const ui = {
+            quantityModal,
+            quantityConfirmBtn: { disabled: false, style: {} },
+            info: { closeCommonModal() { events.push('close-parent'); } },
+            beginVisualHandoff(fn) { events.push('begin-handoff'); this.closeHandoff = fn; },
+            completeVisualHandoff() { if (this.closeHandoff) { const fn = this.closeHandoff; this.closeHandoff = null; fn(); } },
+            cancelCoveredClose() {},
+            closeCoveredViewAfterRecovery(_modal, options) {
+                events.push('cover-recovery');
+                if (options && options.afterHide) options.afterHide();
+                return Promise.resolve(true);
+            },
+            restoreAIGuard() { events.push('restore-guard'); }
+        };
+        const game = { commandSystem: { handleQuantitySelection() { events.push('execute'); } } };
+        const self = { ui, game };
+        const deps = {
+            type, extraData, selectionExtraData: extraData,
+            parentSelectorSuspended, quantityOwnsAIGuardHide: !parentSelectorSuspended,
+            inputs: { gold: { num: { value: '500' } } }, targetId: 2, data: [1],
+            checkValidQuantity() {}, cancelQuantityUIUpdate() {},
+            finishQuantityModalClose() { quantityModal.hidden = true; },
+            closeQuantityModal() { quantityModal.hidden = true; }
+        };
+        const buildHandler = new Function('deps', `const {type,extraData,selectionExtraData,parentSelectorSuspended,quantityOwnsAIGuardHide,inputs,targetId,data,checkValidQuantity,cancelQuantityUIUpdate,finishQuantityModalClose,closeQuantityModal}=deps; ${handlerSource}\nreturn this.ui.quantityConfirmBtn.onclick;`);
+        const onConfirm = buildHandler.call(self, deps);
+        await onConfirm();
+        return { ui, quantityModal, events };
+    };
+
+    const goodwill = await perform('goodwill', { returnToParentSelector: true }, true);
+    assert.ok(goodwill.events.includes('close-parent'));
+    assert.ok(goodwill.events.includes('execute'));
+    assert.ok(goodwill.events.includes('begin-handoff'));
+    assert.strictEqual(goodwill.quantityModal.hidden, false, '顔画像decodeを待つ間も金額画面を保持');
+    goodwill.ui.completeVisualHandoff();
+    assert.strictEqual(goodwill.quantityModal.hidden, true, '次の会話が可視になって初めて金額画面を閉じる');
+    assert.strictEqual(goodwill.ui.closeHandoff, null, 'handoffの予約は残さない');
+
+    const normalTrade = await perform('buy_rice', {returnToParentSelector:true}, true);
+    assert.strictEqual(normalTrade.quantityModal.hidden, true, '通常の取引は従来の復帰paint後に閉じる');
+    assert.ok(!normalTrade.events.includes('begin-handoff'), '一般取引には外交handoffを追加しない');
+
+    const kunishu = await perform('goodwill', {isKunishu:true}, false);
+    assert.strictEqual(kunishu.quantityModal.hidden, true, '諸勢力親善の遷移は変更しない');
+    assert.ok(!kunishu.events.includes('begin-handoff'));
 });
 
 Promise.all(pendingTests).then(() => {

@@ -2081,7 +2081,7 @@ class DiplomacyManager {
         this.game.historySystem.record(text, { clanIds, category: 'diplomacy', inferCurrentTurn: false });
     }
 
-    showDiplomacyResult(doerClanId, isPlayerInvolved, msg, logMsg = "", aiMsg = "", onClose = null, relatedClanIds = null) {
+    showDiplomacyResult(doerClanId, isPlayerInvolved, msg, logMsg = "", aiMsg = "", onClose = null, relatedClanIds = null, options = {}) {
         const historyClanIds = Array.isArray(relatedClanIds) && relatedClanIds.length > 0 ? relatedClanIds : [doerClanId];
         const historyText = logMsg || aiMsg;
         if (historyText) this._recordDiplomacyHistory(historyText, historyClanIds);
@@ -2096,7 +2096,7 @@ class DiplomacyManager {
                 : null;
             // 最後の外交会話を閉じる前に結果画面を成立させ、その覆いの下で地図等を更新する。
             // 大きなCanvas再合成を会話の最終フレームへ重ねず、会話→結果を一枚でhandoffする。
-            this.game.ui.showResultModal(msg, onClose, null, refreshBehindResult);
+            this.game.ui.showResultModal(msg, onClose, null, refreshBehindResult, options);
         } else if (aiMsg !== "") {
             this.game.ui.showDialog(aiMsg, false, onClose);
         } else {
@@ -2299,9 +2299,17 @@ class DiplomacyManager {
             if (result.isBreakDomination) msg += `\n家臣団の中でも動揺が広がっているようです……`;
             
             doer.isActionDone = true;
+            // 敵対化した断交で、最初の処遇画面が同期的に表示開始される場合だけ
+            // 結果画面を次の会話まで保持する。AI側の処遇待ちなど表示開始が保証されない経路では使わない。
+            const playerId = Number(this.game.playerClanId);
+            const escapedFollowup = result.becameHostile && result.escapedHostageRecords.some(record =>
+                record?.busho && (Number(record.originClanId) === playerId || Number(record.captorClanId) === playerId));
+            const firstPrincess = result.atMercyPrincesses?.[0];
+            const princessFollowup = result.becameHostile && !escapedFollowup
+                && firstPrincess && Number(firstPrincess.currentClanId) === playerId;
             this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, "", () => {
                 this.resolveBreakAllianceConsequences(result).catch(e => console.error('断交後処遇の実行に失敗しました:', e));
-            }, [doer.clan, targetClanId]);
+            }, [doer.clan, targetClanId], { handoffToNextDialog: !!(escapedFollowup || princessFollowup) });
             return;
             
         } else if (type === 'subordinate') {

@@ -1313,12 +1313,19 @@ class UIManager {
             let hasContent = false;
             if (faceEl) {
                 if (faceIcon && preparedImg) {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'sp-face-wrapper dialog-face-wrapper';
-                    preparedImg.className = 'dialog-face-img';
-                    wrapper.appendChild(preparedImg);
-                    // ★Round 11：空にしてから append する2段階更新をやめ、1回のDOM更新で旧顔→新顔へ交換します。
-                    faceEl.replaceChildren(wrapper);
+                    // 同じ顔の連続台詞では、既に画面に描画されている画像を再生成しない。
+                    // decode済みの別Imageへ毎回差し替えると、特にスマホの合成レイヤーで
+                    // 顔が一瞬消えたように見えることがある。話者/顔が変わる時だけ入れ替える。
+                    const previousImg = faceEl.querySelector('.dialog-face-img');
+                    const previousSrc = previousImg && previousImg.getAttribute('src');
+                    const nextSrc = preparedImg.getAttribute('src');
+                    if (!previousImg || previousSrc !== nextSrc || !previousImg.complete || previousImg.naturalWidth <= 0) {
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'sp-face-wrapper dialog-face-wrapper';
+                        preparedImg.className = 'dialog-face-img';
+                        wrapper.appendChild(preparedImg);
+                        faceEl.replaceChildren(wrapper);
+                    }
                     hasContent = true;
                 } else {
                     faceEl.replaceChildren();
@@ -2516,7 +2523,7 @@ class UIManager {
         this.info.showFactionList(clanId, isDirect);
     }
 
-    showResultModal(msg, onClose = null, customFooterHtml = null, updateBehindCover = null) { 
+    showResultModal(msg, onClose = null, customFooterHtml = null, updateBehindCover = null, options = {}) { 
         this.hideAIGuardTemporarily(); 
         
         if (this.resultBody) {
@@ -2555,37 +2562,57 @@ class UIManager {
         // 背景停止に伴うモバイル向けリソース整理も、結果画面で覆ってから行います。
         this.pauseBackgroundUpdates();
         this.onResultModalClose = onClose;
+        // 断交結果の直後に人質などの会話が続く場合だけ、次の顔画像が可視になるまで結果画面を保持する。
+        this.resultFollowupDialogHandoff = options.handoffToNextDialog === true;
     }
     
-    closeResultModal() { 
+    closeResultModal() {
         if (!this.resultModal || this.resultModal.classList.contains('hidden')) return;
 
-        // 結果画面自身をcoverとして残したまま背景地図を復旧し、その状態を実際に1回paintしてから
-        // result-modalを外す。同じJSタスク内の resume→display:none ではcompositorが追いつかず、
-        // 低速端末で全画面フラッシュとして見えることがある。
         const cb = this.onResultModalClose;
         this.onResultModalClose = null;
-        this.closeCoveredViewAfterRecovery(this.resultModal, {
-            recoverUnderCover: () => this.resumeBackgroundUpdates(),
-            afterHide: () => {
-                this.restoreAIGuard();
+        const handoffToNextDialog = this.resultFollowupDialogHandoff === true && typeof cb === 'function';
+        this.resultFollowupDialogHandoff = false;
 
-                // 外交用BGMは、結果画面が実際に閉じた時点で平時へ戻します。
-                if (window.AudioManager && window.AudioManager.currentBgmName === 'SC_ex_Scene3_Odyssey.ogg') {
-                    window.AudioManager.restoreMemorizedBgm();
-                }
-
-                // 次回表示へ動的footerを持ち越さない。
-                const footer = document.getElementById('result-footer');
-                if (footer) {
-                    footer.innerHTML = `<button class="btn-secondary result-close-dynamic">閉じる</button>`;
-                    const closeBtn = footer.querySelector('.result-close-dynamic');
-                    if (closeBtn) closeBtn.addEventListener('click', () => this.closeResultModal());
-                }
-
+        const finishClose = () => {
+            this.restoreAIGuard();
+            // 外交BGMは次の会話または背景が可視になってから平時へ戻す。
+            if (window.AudioManager && window.AudioManager.currentBgmName === 'SC_ex_Scene3_Odyssey.ogg') {
+                window.AudioManager.restoreMemorizedBgm();
+            }
+            const footer = document.getElementById('result-footer');
+            if (footer) {
+                footer.innerHTML = `<button class="btn-secondary result-close-dynamic">閉じる</button>`;
+                const closeBtn = footer.querySelector('.result-close-dynamic');
+                if (closeBtn) closeBtn.addEventListener('click', () => this.closeResultModal());
+            }
+            if (!handoffToNextDialog) {
                 if (cb) cb();
                 else if (this.game) this.game.checkAllActionsDone();
             }
+        };
+
+        if (handoffToNextDialog) {
+            // この分岐は、呼出元がこの同期コールバック内で次の会話を必ず開始する場合に限る。
+            // 背景の復旧を結果画面の下で行い、次の会話を先に表示した後に結果画面を閉じる。
+            this.resumeBackgroundUpdates();
+            this.beginVisualHandoff(() => {
+                this.resultModal.classList.add('hidden');
+                finishClose();
+            });
+            try {
+                cb();
+            } catch (error) {
+                this.completeVisualHandoff();
+                throw error;
+            }
+            return;
+        }
+
+        // 通常は背景を復旧・paintしてから結果画面を閉じる既存処理を維持する。
+        this.closeCoveredViewAfterRecovery(this.resultModal, {
+            recoverUnderCover: () => this.resumeBackgroundUpdates(),
+            afterHide: finishClose
         });
     }
     

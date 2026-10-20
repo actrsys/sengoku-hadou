@@ -1,0 +1,19 @@
+r599 — 外部セーブ常駐イベント状態帳の型検証と設計セキュリティ継続監査
+
+【対象】
+基準r598。外部セーブの flags.__residentEventStates と EventManager.processResidentEvents を照合。
+
+【到達性】
+同梱の historical_miyoshi_nagayoshi_yoshioki_lifespan は常駐イベントとして startMonth_before / endMonth_before に登録される。セーブロードは flags をそのまま復元し、復元前検査は flags 外側のオブジェクト型までしか確認していなかった。外部から細工した現行形式のセーブに flags.__residentEventStates = "broken" を含めると、検証を通過する。月初・月末の実際の EventManager 処理で、onEnter を実行した後、文字列への状態書込みが TypeError となり、状態を記録できず、次のタイミングでも再実行した。イベント管理の通常経路を使用した再現では、月初・月末に2回 onEnter が実行された。
+
+【修正】
+SaveManager._validateSaveDataStructure の flags 外側チェックの直後に、flags.__residentEventStates が存在する場合は既存の isRecord 判定を要求。保存データ内の常駐イベント状態帳を読む場合のみ適用し、イベント個別の判定を増やさない。正しい辞書型、未生成の状態帳は従来どおり許可。各イベントの状態値やゲームルールの変更はしない。
+
+【除外した懸念】
+保存された mapWidth / mapHeight はロード時に実際の地図画像の自然寸法へ更新される。細工した保存値だけで巨大Canvasが確保されるとは立証できなかったため無改修。AI軍師の同点乱数ソートも、実データ上の選定偏りを引き続き立証できず無改修。
+
+【検証】
+修正前の新規再現テストは1077成功1失敗、修正後のロジックテストは追加チェックを含めてすべて成功。PC・スマホ表示・実データ整合・シミュレーション検証を別途実施。
+
+【変更範囲】
+js/save_manager.js / js/config.js / tests/run_tests.js / ARCHITECTURE.md / docs/audits/README.md、本記録。セーブ形式、シナリオ・共通マスター、AI判断、イベント効果は不変。

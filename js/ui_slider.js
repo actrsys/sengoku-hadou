@@ -617,21 +617,36 @@ class UISliderManager {
                 this.ui.quantityConfirmBtn.style.opacity = 0.5;
             }
 
+            // 親善の数量決定後は、軍師助言または外交会話の顔画像decodeが終わるまで
+            // 金額画面を最後のcoverとして維持する。通常の数量コマンドは従来どおり閉じる。
+            // 引渡し完了と処理中止時の解放はUIManagerの共通handoffを正本とする。
+            const handoffToDiplomacy = type === 'goodwill'
+                && !(extraData && (extraData.isKunishu || extraData.onConfirm))
+                && typeof this.ui.beginVisualHandoff === 'function';
+            if (handoffToDiplomacy) {
+                this.ui.beginVisualHandoff(() => {
+                    cancelQuantityUIUpdate();
+                    finishQuantityModalClose();
+                });
+            }
+
             if (parentSelectorSuspended && this.ui.info && typeof this.ui.info.closeCommonModal === 'function') {
                 this.ui.info.closeCommonModal();
-                if (typeof this.ui.closeCoveredViewAfterRecovery === 'function') {
-                    const closed = await this.ui.closeCoveredViewAfterRecovery(this.ui.quantityModal, {
-                        // closeCommonModal()が既に背景復帰を同期開始しているので、ここではcoverを
-                        // その復帰paintまで保持するだけでよい。
-                        waitForPaint: true,
-                        afterHide: finishQuantityModalClose
-                    });
-                    if (!closed) return;
-                } else {
-                    await (typeof this.ui.waitForNextPaint === 'function' ? this.ui.waitForNextPaint() : Promise.resolve());
-                    finishQuantityModalClose();
+                // 親善は次画面が表示できるまで金額画面を保持し、背景復帰もその下で進める。
+                // その他の数量コマンドは従来どおり復帰paint後に閉じる。
+                if (!handoffToDiplomacy) {
+                    if (typeof this.ui.closeCoveredViewAfterRecovery === 'function') {
+                        const closed = await this.ui.closeCoveredViewAfterRecovery(this.ui.quantityModal, {
+                            waitForPaint: true,
+                            afterHide: finishQuantityModalClose
+                        });
+                        if (!closed) return;
+                    } else {
+                        await (typeof this.ui.waitForNextPaint === 'function' ? this.ui.waitForNextPaint() : Promise.resolve());
+                        finishQuantityModalClose();
+                    }
                 }
-            } else {
+            } else if (!handoffToDiplomacy) {
                 closeQuantityModal();
             }
 

@@ -309,6 +309,12 @@ class SaveManager {
             fail('地図サイズが不正です');
         }
         if (!data.flags || typeof data.flags !== 'object' || Array.isArray(data.flags)) fail('flags が不正です');
+        // 現行の常駐イベントはflags内の状態帳へイベントIDをキーとして状態を書き戻す。
+        // 外部セーブに文字列・配列を許すと、イベント効果を適用しても状態を保存できない。
+        if (Object.prototype.hasOwnProperty.call(data.flags, '__residentEventStates')
+            && !isRecord(data.flags.__residentEventStates)) {
+            fail('flags.__residentEventStates が不正です');
+        }
         if (!data.aiOperations || typeof data.aiOperations !== 'object' || Array.isArray(data.aiOperations)) fail('aiOperations が不正です');
         ['operations', 'draftBases', 'grandObjectives', 'historyOwnedCastles'].forEach(key => {
             const value = data.aiOperations[key];

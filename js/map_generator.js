@@ -207,7 +207,12 @@ class HexMapGenerator {
             this.rand(Math.floor(cols / 3), Math.floor(cols * 2 / 3)),   // 真ん中
             this.rand(Math.floor(cols * 2 / 3), cols - 2)                // 右側
         ];
-        startXCandidates.sort(() => Math.random() - 0.5); // 順番をランダムに！
+        // 川の本数が目標マス数で途中終了する場合もあるため、
+        // 元の「左・中・右」の並びに有利不利が出ない一様な順列を使う。
+        for (let i = startXCandidates.length - 1; i > 0; i--) {
+            const j = this.rand(0, i);
+            [startXCandidates[i], startXCandidates[j]] = [startXCandidates[j], startXCandidates[i]];
+        }
 
         for (let i = 0; i < maxRivers; i++) {
             if (currentCount >= targetCount) break;

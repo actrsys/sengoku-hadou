@@ -1,5 +1,11 @@
 console.log("【確認】field_war.js の読み込みを開始しました！");
 
+// 野戦の経路探索・向き計算で共用する固定HEX方向。毎回の配列生成を避ける。
+const FIELD_WAR_HEX_DIRECTIONS = [
+    {dx: 0, dy: -2, dir: 0}, {dx: 1, dy: -1, dir: 1}, {dx: 1, dy: 1, dir: 2},
+    {dx: 0, dy: 2, dir: 3}, {dx: -1, dy: 1, dir: 4}, {dx: -1, dy: -1, dir: 5}
+];
+
 /**
  * field_war.js
  * HEX式 野戦システム
@@ -1931,26 +1937,30 @@ class FieldWarManager {
     }
 
     getNeighbors(x, y) {
-        const list = [];
-        const dirs = [
-            {dx: 0, dy: -2}, {dx: 1, dy: -1}, {dx: 1, dy: 1},
-            {dx: 0, dy: 2}, {dx: -1, dy: 1}, {dx: -1, dy: -1}
-        ];
-        for (const d of dirs) {
+        // マップ寸法が同じ間は隣接座標は不変。AI探索から何度呼ばれても再生成しない。
+        // 呼び出し元は隣接座標を読むだけで変更しない。
+        if (!this._fwNeighborCache || this._fwNeighborCols !== this.cols || this._fwNeighborRows !== this.rows) {
+            this._fwNeighborCache = new Map();
+            this._fwNeighborCols = this.cols;
+            this._fwNeighborRows = this.rows;
+        }
+        const key = `${x},${y}`;
+        let list = this._fwNeighborCache.get(key);
+        if (list) return list;
+        list = [];
+        for (const d of FIELD_WAR_HEX_DIRECTIONS) {
             const nx = x + d.dx;
             const ny = y + d.dy;
             if (nx >= 0 && nx < this.cols && ny >= 0 && ny < this.rows * 2) {
                 list.push({x: nx, y: ny});
             }
         }
+        this._fwNeighborCache.set(key, list);
         return list;
     }
 
     getDirection(fromX, fromY, toX, toY) {
-        const dirs = [
-            {dx: 0, dy: -2, dir: 0}, {dx: 1, dy: -1, dir: 1}, {dx: 1, dy: 1, dir: 2},
-            {dx: 0, dy: 2, dir: 3}, {dx: -1, dy: 1, dir: 4}, {dx: -1, dy: -1, dir: 5}
-        ];
+        const dirs = FIELD_WAR_HEX_DIRECTIONS;
         for(let d of dirs) {
             if (toX - fromX === d.dx && toY - fromY === d.dy) return d.dir;
         }
@@ -2032,7 +2042,9 @@ class FieldWarManager {
         let queue = [{x: unit.x, y: unit.y, cost: 0, path: [], steps: 0}];
         let visited = {};
         visited[`${unit.x},${unit.y}`] = { cost: 0, path: [] };
-        
+        // 同じ探索中の地形・敵味方配置は変化しない。初手の離脱コストだけ別キャッシュ。
+        const moveCostCache = [new Map(), new Map()];
+
         const enemies = this.units.filter(u => u.isAttacker !== unit.isAttacker);
         const allies = this.units.filter(u => u.isAttacker === unit.isAttacker && u.id !== unit.id);
         
@@ -2043,17 +2055,26 @@ class FieldWarManager {
         });
         
         while(queue.length > 0) {
-            queue.sort((a,b) => a.cost - b.cost);
-            let cur = queue.shift();
+            // 毎回の配列全体sortを避け、最小コストだけ取り出す。同点は挿入順を維持。
+            let minIndex = 0;
+            for (let i = 1; i < queue.length; i++) {
+                if (queue[i].cost < queue[minIndex].cost) minIndex = i;
+            }
+            let cur = queue.splice(minIndex, 1)[0];
 
             let neighbors = this.getNeighbors(cur.x, cur.y);
             for(let n of neighbors) {
                 let isFirstStep = (cur.steps === 0);
-                let c = this.getCost(n.x, n.y, enemies, allies, isFirstStep, minStartDist, unit);
+                let key = `${n.x},${n.y}`;
+                const costCache = moveCostCache[isFirstStep ? 1 : 0];
+                let c = costCache.get(key);
+                if (c === undefined) {
+                    c = this.getCost(n.x, n.y, enemies, allies, isFirstStep, minStartDist, unit);
+                    costCache.set(key, c);
+                }
                 let nextCost = cur.cost + c;
-                
+
                 if (nextCost <= maxAP) {
-                    let key = `${n.x},${n.y}`;
                     if (!visited[key] || visited[key].cost > nextCost) {
                         let newPath = [...cur.path, {x: n.x, y: n.y}];
                         visited[key] = { cost: nextCost, path: newPath };
@@ -2074,16 +2095,24 @@ class FieldWarManager {
 
         let openList = [startNode];
         let closedList = {};
-        
+        // 閉鎖ノードは再投入されないため、毎回Object.keysで全件数え直さない。
+        let closedCount = 0;
+        const terrainCostCache = new Map();
+
         const enemies = this.units.filter(u => u.isAttacker !== unit.isAttacker);
         const allies = this.units.filter(u => u.isAttacker === unit.isAttacker && u.id !== unit.id);
 
         while (openList.length > 0) {
-            openList.sort((a, b) => a.f - b.f);
-            let currentNode = openList.shift();
+            // A*も同点時の投入順を維持したまま、全体ソートの反復を省く。
+            let minIndex = 0;
+            for (let i = 1; i < openList.length; i++) {
+                if (openList[i].f < openList[minIndex].f) minIndex = i;
+            }
+            let currentNode = openList.splice(minIndex, 1)[0];
             let currentKey = `${currentNode.x},${currentNode.y}`;
             
             closedList[currentKey] = true;
+            closedCount++;
 
             // 目的地（敵のいるマス）に着いたら、ルート完成！
             if (currentNode.x === targetX && currentNode.y === targetY) {
@@ -2103,9 +2132,13 @@ class FieldWarManager {
 
                 let c = 1;
                 if (n.x !== targetX || n.y !== targetY) {
-                    // ★修正: unit を渡します
-                    c = this.getCost(n.x, n.y, enemies, allies, false, 999, unit);
-                    if (c >= 999) continue; 
+                    c = terrainCostCache.get(neighborKey);
+                    if (c === undefined) {
+                        // 同一探索中は敵味方・地形が不変なので、移動コストの重複計算を避ける。
+                        c = this.getCost(n.x, n.y, enemies, allies, false, 999, unit);
+                        terrainCostCache.set(neighborKey, c);
+                    }
+                    if (c >= 999) continue;
                 } else {
                     let row = Math.floor(n.y / 2);
                     let terrain = (this.grid && this.grid[row] && this.grid[row][n.x]) ? this.grid[row][n.x].terrain : 'plain';
@@ -2140,7 +2173,7 @@ class FieldWarManager {
                 }
             }
             // 探索が長引きすぎたら諦める（フリーズ防止）
-            if(Object.keys(closedList).length > 400) return null;
+            if(closedCount > 400) return null;
         }
         return null; // 道が見つからなかった
     }

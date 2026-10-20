@@ -1854,6 +1854,202 @@ async function validateDomImageDecode(cdp) {
     console.log('✓ r493 PC/スマホ 通常imgのdecode完了後にロード幕解除 (実ブラウザ)');
 }
 
+
+// r602: 連続台詞で同じ顔画像を張り替えない。スマホWebViewでの画像の再合成を避ける。
+// 共通会話・面談の両方を実ブラウザDOMの要素同一性で検証する。
+async function validateDialogPortraitReuse(cdp) {
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const interviewSource = fs.readFileSync(path.join(ROOT, 'js', 'interview_view.js'), 'utf8');
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css.replace(/<\/style/gi, '<\\/style')}</style></head><body>
+        <div id="dialog-modal" class="modal hidden"><div class="modal-content modal-small"><div class="dialog-body-container">
+        <div class="dialog-face-column"><div id="dialog-left-name" class="dialog-name-label hidden"></div><div id="dialog-left-face" class="dialog-face-space"></div></div>
+        <div id="dialog-message" class="message-area"></div>
+        <div class="dialog-face-column"><div id="dialog-right-name" class="dialog-name-label hidden"></div><div id="dialog-right-face" class="dialog-face-space"></div></div>
+        </div><div class="modal-footer"><button id="dialog-btn-ok">進む</button></div></div></div>
+        <div id="interview-face-test"><div id="interview-name"></div><div id="interview-face"></div></div>
+        </body></html>`;
+    for (const [width, height, pc] of [[1280, 720, true], [390, 844, false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !pc });
+        await cdp.call('Runtime.evaluate', {
+            expression: `document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc', ${pc});
+                ${uiSource}\n${interviewSource}\ntrue`, returnByValue: true
+        });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(async () => {
+                const portrait=(color)=>'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="85" height="85"><rect width="85" height="85" fill="'+color+'"/></svg>');
+                const img1=document.createElement('img');img1.src=portrait('red');
+                const img2=document.createElement('img');img2.src=portrait('blue');await new Promise(r=>setTimeout(r,120));
+                const ui=Object.create(UIManager.prototype);
+                ui.game={isWatchMode:false};ui.dialogQueue=[];ui.isDialogShowing=false;
+                ui._dialogGeneration=0;ui._dialogGuardHeld=false;
+                ui.hideAIGuardTemporarily=()=>{};ui.restoreAIGuard=()=>{};ui.completeVisualHandoff=()=>{};
+                ui._prepareDialogFaces=()=>Promise.resolve({leftImg:(ui._testFace || img1).cloneNode(false),rightImg:null});
+                const opts={isEvent:true,leftName:'武将甲',leftFace:'portrait'};
+                const yieldQueue=()=>new Promise(r=>setTimeout(r,35));
+                ui.showDialog('最初の文章',false,()=>{},null,opts);await yieldQueue();
+                const modal=document.getElementById('dialog-modal');
+                const faceRoot=document.getElementById('dialog-left-face');
+                const start=faceRoot.querySelector('img');
+                const changes=[];const mo=new MutationObserver(list=>{for(const x of list){if(x.type==='childList')changes.push([x.addedNodes.length,x.removedNodes.length]);}});
+                mo.observe(faceRoot,{childList:true});
+                modal.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+                ui.showDialog('続く文章',false,()=>{},null,opts);
+                await yieldQueue();
+                const sameFace=start===faceRoot.querySelector('img');
+                const sameText=document.getElementById('dialog-message').textContent;
+                const sameVisibility=!modal.classList.contains('hidden');
+                const changesOnSame=changes.length;
+                ui._testFace=img2;
+                modal.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+                ui.showDialog('別の話者',false,()=>{},null,{...opts,leftName:'武将乙',leftFace:'different'});
+                await yieldQueue();
+                const changedFace=start!==faceRoot.querySelector('img');
+                const changedSrc=faceRoot.querySelector('img')?.getAttribute('src');
+                mo.disconnect();
+                const interview=Object.create(InterviewView.prototype);
+                interview.dialogFace=document.getElementById('interview-face');
+                interview.dialogName=document.getElementById('interview-name');
+                interview.dialogName.classList.add('hidden');
+                window.StatPresenter={safeFaceIconPath:v=>v};
+                const b={name:'武将甲',faceIcon:portrait('red')};
+                interview._renderConversationFace(b);
+                const first=interview.dialogFace.querySelector('img');
+                let mutations=0;
+                const im=new MutationObserver(list=>{mutations+=list.length});
+                im.observe(interview.dialogFace,{childList:true});
+                interview._renderConversationFace(b);
+                const interviewSame=interview.dialogFace.querySelector('img')===first;
+                await Promise.resolve();
+                const mutationsSame=mutations;
+                interview._renderConversationFace({name:'武将乙',faceIcon:portrait('blue')});
+                const interviewChanged=interview.dialogFace.querySelector('img')!==first;
+                interview._renderConversationFace(null,true);
+                const interviewCleared=interview.dialogFace.querySelector('img')===null;
+                im.disconnect();
+                return {sameFace,sameText,sameVisibility,changesOnSame,changedFace,changedSrc,
+                    interviewSame,mutationsSame,interviewChanged,interviewCleared};
+            })()`, returnByValue: true, awaitPromise: true
+        });
+        if (result.exceptionDetails) throw new Error(result.exceptionDetails.text + ' '+JSON.stringify(result.exceptionDetails.exception));
+        const r = result.result?.value;
+        assert.ok(r, '共通会話の比較結果を取得');
+        assert.strictEqual(r.sameFace, true, '同じ顔の台詞送りはimg要素を保持');
+        assert.strictEqual(r.sameText, '続く文章', '文章は切り替わる');
+        assert.strictEqual(r.sameVisibility, true, '会話画面を閉じずに文章を更新');
+        assert.strictEqual(r.changesOnSame, 0, '同じ顔のDOM張替えなし');
+        assert.strictEqual(r.changedFace, true, '話者の顔が変わったときだけ画像を更新');
+        assert.ok(r.changedSrc.includes('blue'), '別の顔へ切り替わる');
+        assert.strictEqual(r.interviewSame, true, '面談でも同じ顔DOMを維持');
+        assert.strictEqual(r.mutationsSame, 0, '面談でも同じ顔のDOM張替えなし');
+        assert.strictEqual(r.interviewChanged, true, '面談で異なる顔は切り替わる');
+        assert.strictEqual(r.interviewCleared, true, '面談のナレーションは顔を消す');
+    }
+    console.log('✓ r602 PC/スマホ 連続会話・面談の同一顔画像DOMを保持する visual regression');
+}
+
+
+async function validateDiplomacyQuantityHandoff(cdp) {
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const sliderSource = fs.readFileSync(path.join(ROOT, 'js', 'ui_slider.js'), 'utf8');
+    const start = sliderSource.indexOf('this.ui.quantityConfirmBtn.onclick = async () => {');
+    const end = sliderSource.indexOf('\n        const cancelBtn = this.ui.quantityModal.querySelector', start);
+    assert.ok(start >= 0 && end > start);
+    const handler = sliderSource.slice(start, end);
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css.replace(/<\/style/gi, '<\\/style')}</style></head><body>
+        <div id="quantity-modal" class="modal"><div class="modal-content"><button id="qty-confirm">金額を決定</button></div></div>
+        <div id="selector-modal" class="modal hidden"></div>
+        <div id="dialog-modal" class="modal hidden"><div class="modal-content modal-small"><div class="dialog-body-container">
+        <div class="dialog-face-column"><div id="dialog-left-name" class="dialog-name-label hidden"></div><div id="dialog-left-face" class="dialog-face-space"></div></div>
+        <div id="dialog-message" class="message-area"></div>
+        <div class="dialog-face-column"><div id="dialog-right-name" class="dialog-name-label hidden"></div><div id="dialog-right-face" class="dialog-face-space"></div></div>
+        </div><div class="modal-footer"><button id="dialog-btn-ok">進む</button></div></div></div></body></html>`;
+    for (const [width, height, pc] of [[1280, 720, true], [390, 844, false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !pc });
+        await cdp.call('Runtime.evaluate', {
+            expression: `document.open();document.write(${JSON.stringify(html)});document.close();document.body.classList.toggle('is-pc', ${pc});window.__r603UIManager=(new Function(${JSON.stringify(uiSource + '\nreturn UIManager;')}))();true`,
+            returnByValue: true
+        });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(async () => {
+                const ui=Object.create(window.__r603UIManager.prototype);
+                ui.game={isWatchMode:false};ui.dialogQueue=[];ui.isDialogShowing=false;ui._dialogGeneration=0;
+                ui._dialogGuardHeld=false;ui.hideAIGuardTemporarily=()=>{};ui.restoreAIGuard=()=>{};
+                ui._prepareDialogFaces=()=>new Promise(r=>setTimeout(()=>r({leftImg:null,rightImg:null}),80));
+                ui.quantityModal=document.getElementById('quantity-modal');
+                if(!ui.quantityModal) throw new Error('no qty DOM: '+document.body.innerHTML.slice(0,170));
+                ui.quantityConfirmBtn=document.getElementById('qty-confirm');
+                if(!ui.quantityConfirmBtn) throw new Error('no button DOM: '+document.body.innerHTML.slice(0,170));
+                ui.info={closeCommonModal(){}};
+                ui.cancelCoveredClose=()=>{};
+                ui.closeCoveredViewAfterRecovery=(_el, opts)=>{if(opts.afterHide)opts.afterHide();return Promise.resolve(true)};
+                const events=[];
+                const game={commandSystem:{handleQuantitySelection(){events.push('command');setTimeout(()=>ui.showDialog('交渉が始まりました',false,()=>{},null,{leftName:'使者'}),70)}}};
+                const self={ui,game};
+                const deps={type:'goodwill',extraData:{returnToParentSelector:true},selectionExtraData:{},parentSelectorSuspended:true,quantityOwnsAIGuardHide:false,
+                    inputs:{gold:{num:{value:'500'}}},targetId:2,data:[1],checkValidQuantity(){},cancelQuantityUIUpdate(){},
+                    finishQuantityModalClose(){ui.quantityModal.classList.add('hidden');},closeQuantityModal(){ui.quantityModal.classList.add('hidden');}};
+                const handler=${JSON.stringify(handler)};
+                const build=new Function('deps','const {type,extraData,selectionExtraData,parentSelectorSuspended,quantityOwnsAIGuardHide,inputs,targetId,data,checkValidQuantity,cancelQuantityUIUpdate,finishQuantityModalClose,closeQuantityModal}=deps;'+handler+';return this.ui.quantityConfirmBtn.onclick;');
+                const onConfirm=build.call(self,deps);
+                let running=true;let blanks=0;let observed=0;let changed=false;
+                const poll=()=>{if(!running)return;
+                    const quantityVisible=!ui.quantityModal.classList.contains('hidden');
+                    const dialogVisible=!document.getElementById('dialog-modal').classList.contains('hidden');
+                    observed++;if(!quantityVisible&&!dialogVisible)blanks++;
+                    if(dialogVisible&&!quantityVisible)changed=true;
+                    requestAnimationFrame(poll);
+                };
+                requestAnimationFrame(poll);
+                await onConfirm();
+                const keptBefore= !ui.quantityModal.classList.contains('hidden');
+                await new Promise(r=>setTimeout(r,340));running=false;
+                return {keptBefore,blanks,observed,changed,dialogVisible:!document.getElementById('dialog-modal').classList.contains('hidden'),
+                    quantityHidden:ui.quantityModal.classList.contains('hidden'),text:document.getElementById('dialog-message').textContent,events};
+            })()`, returnByValue: true, awaitPromise: true
+        });
+        if (result.exceptionDetails) throw new Error(result.exceptionDetails.text + ' ' + JSON.stringify(result.exceptionDetails.exception));
+        const r = result.result?.value;
+        assert.ok(r && r.keptBefore, '外交会話の顔画像decode待ちでは金額画面を保持する');
+        assert.strictEqual(r.blanks, 0, '外交開始中、画面を覆うモーダルが一枚もないframeを作らない');
+        assert.ok(r.changed && r.dialogVisible && r.quantityHidden, '次の会話画面が可視になってから数量画面を閉じる');
+        assert.strictEqual(r.text, '交渉が始まりました');
+    }
+    console.log('✓ r603 PC/スマホ 親善の金額決定→顔画像準備→外交会話の全画面coverを連続保持 (実ブラウザ)');
+}
+
+async function validateBreakAllianceResultTransition(cdp) {
+  const css = fs.readFileSync(path.join(ROOT, 'css','style.css'),'utf8');
+  const uiSource=fs.readFileSync(path.join(ROOT,'js','ui.js'),'utf8');
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css.replace(/<\/style/gi,'<\\/style')}</style></head><body>
+  <div id="dialog-modal" class="modal hidden"><div class="modal-content modal-small"><div class="dialog-body-container">
+  <div class="dialog-face-column"><div id="dialog-left-name" class="dialog-name-label hidden"></div><div id="dialog-left-face" class="dialog-face-space"></div></div>
+  <div id="dialog-message" class="message-area"></div><div class="dialog-face-column"><div id="dialog-right-name" class="dialog-name-label hidden"></div><div id="dialog-right-face" class="dialog-face-space"></div></div></div>
+  <div class="modal-footer"><button id="dialog-btn-ok">閉じる</button></div></div></div>
+  <div id="result-modal" class="modal hidden"><div class="modal-content"><div id="result-body"></div><div class="modal-footer" id="result-footer"></div></div></div></body></html>`;
+  for (const [width,height,pc] of [[1280,720,true],[390,844,false]]) {
+    await cdp.call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:!pc});
+    await cdp.call('Runtime.evaluate',{expression:`document.open();document.write(${JSON.stringify(html)});document.close();document.body.classList.toggle('is-pc',${pc});window.__dUI=(new Function(${JSON.stringify(uiSource+'\nreturn UIManager;')}))();true`,returnByValue:true});
+    const result=await cdp.call('Runtime.evaluate',{expression:`(async()=>{
+      const ui=Object.create(window.__dUI.prototype);ui.game={isWatchMode:false,phase:'play'};ui.dialogQueue=[];ui.isDialogShowing=false;ui._dialogGeneration=0;
+      ui._dialogGuardHeld=false;ui.hideAIGuardTemporarily=()=>{};ui.restoreAIGuard=()=>{};ui.pauseBackgroundUpdates=()=>{};ui.resumeBackgroundUpdates=()=>{};
+      ui._prepareDialogFaces=()=>new Promise(r=>setTimeout(()=>r({leftImg:null,rightImg:null}),120));
+      ui.resultBody=document.getElementById('result-body');ui.resultModal=document.getElementById('result-modal');
+      const dialog=document.getElementById('dialog-modal');let gaps=0,total=0,started=false,finish=false;const frame=()=>{if(finish)return;if(started){total++;if(ui.resultModal.classList.contains('hidden')&&dialog.classList.contains('hidden'))gaps++;}requestAnimationFrame(frame);};requestAnimationFrame(frame);
+      ui.showResultModal('断交しました',()=>ui.showDialogAsync('人質として預けていた武将が帰還しました',false,0,{leftFace:'test'}),null,null,{handoffToNextDialog:true});
+      await new Promise(r=>setTimeout(r,35));started=true;ui.closeResultModal();await new Promise(r=>setTimeout(r,480));finish=true;
+      return{gaps,total,dialogVisible:!dialog.classList.contains('hidden'),resultVisible:!ui.resultModal.classList.contains('hidden')};
+    })()`,returnByValue:true,awaitPromise:true});
+    if(result.exceptionDetails)throw Error(result.exceptionDetails.text+' '+JSON.stringify(result.exceptionDetails.exception));
+    console.log('✓ r604 断交→人質帰還の結果画面handoff',pc?'PC':'mobile',JSON.stringify(result.result.value));
+    assert.strictEqual(result.result.value.gaps,0,'結果画面から脱走人質の会話まで、地図だけが露出するframeなし');
+    assert.strictEqual(result.result.value.dialogVisible,true,'脱走人質の会話は表示される');
+    assert.strictEqual(result.result.value.resultVisible,false,'会話が表示された後だけ結果を閉じる');
+  }
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -1927,6 +2123,9 @@ async function main() {
         await validateLoadingPresentation(cdp);
         await validateCastleIconLoading(cdp);
         await validateDomImageDecode(cdp);
+        await validateDialogPortraitReuse(cdp);
+        await validateDiplomacyQuantityHandoff(cdp);
+        await validateBreakAllianceResultTransition(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

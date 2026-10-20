@@ -535,8 +535,8 @@ class InterviewView {
 
     _renderConversationFace(busho, narration = false) {
         if (!this.dialogFace || !this.dialogName) return;
-        this.dialogFace.replaceChildren();
         if (narration || !busho) {
+            this.dialogFace.replaceChildren();
             this.dialogName.textContent = '';
             this.dialogName.classList.add('hidden');
             return;
@@ -544,13 +544,19 @@ class InterviewView {
 
         this.dialogName.textContent = busho.name || '';
         this.dialogName.classList.remove('hidden');
+        const src = window.StatPresenter
+            ? StatPresenter.safeFaceIconPath(busho.faceIcon)
+            : 'data/images/faceicons/unknown_face.webp';
+        // 同じ話者の台詞送りでは顔画像の読み込みとDOMの張り替えを繰り返さない。
+        // 画像の差替えが必要な場合のみ新しいimgを挿入する。
+        const currentImg = this.dialogFace.querySelector?.('.dialog-face-img');
+        if (currentImg && currentImg.getAttribute('src') === src) return;
+        this.dialogFace.replaceChildren();
         const wrapper = document.createElement('div');
         wrapper.className = 'sp-face-wrapper dialog-face-wrapper';
         const img = document.createElement('img');
         img.className = 'dialog-face-img';
-        img.src = window.StatPresenter
-                ? StatPresenter.safeFaceIconPath(busho.faceIcon)
-                : 'data/images/faceicons/unknown_face.webp';
+        img.src = src;
         img.alt = '';
         img.onerror = () => {
             img.onerror = null;
