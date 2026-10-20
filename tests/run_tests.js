@@ -257,7 +257,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r609');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r610');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -25661,6 +25661,60 @@ test('r609 滅亡家から引き取った非一門姫だけでは婚姻画面を
     assert.strictEqual(command.canExecuteCommand('arrange_marriage'), true);
     assert.strictEqual(command.canExecuteCommand('marriage'), true);
     assert.deepStrictEqual(Array.from(command.getValidTargets('marriage')), [91]);
+});
+
+
+// r610: 実シナリオの城から通常の兵糧購入で資金を使い切った場合、
+// 徴兵候補の上限が0になればメニュー側も実行不可にする。
+test('r610 槇島城の通常取引で徴兵金が尽きた場合は徴兵命令を開始できない', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const c = scenario.castlesState.find(castle => Number(castle.id) === 90);
+    assert.strictEqual(c.name, '槇島城');
+    const castle = { ...c, tradeLimit: 0, provinceId: common.castlesMaster.find(x => Number(x.id) === 90).provinceId };
+    const states = scenario.warriorsState.filter(b =>
+        Number(b.castleId) === 90 && Number(b.clan) === Number(castle.ownerClan)
+        && Number(b.belongKunishuId || 0) === 0
+    );
+    const masters = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const officers = states.map(state => ({ ...masters.get(Number(state.id)), ...state }))
+        .filter(b => Number(b.startYear) <= 1560 && 1560 <= Number(b.endYear))
+        .map(b => ({ ...b, status: 'active', isActionDone: false }));
+    assert.ok(officers.length > 0, '通常の徴兵を実行できる在城家臣が存在する');
+
+    const ctx = createContext({ BushoStatusRules: { isActive: b => b.status === 'active' } });
+    for (const script of ['js/config.js', 'js/domestic_rules.js', 'js/economy_rules.js',
+                          'js/command_catalog.js', 'js/command_system.js']) loadScript(ctx, script);
+    const Economy = ctx.EconomyRules;
+    const Domestic = ctx.DomesticRules;
+    castle.tradeLimit = Economy.calcMonthlyTradeLimit(castle);
+    const game = {
+        phase: 'game', playerClanId: castle.ownerClan, provinces: [],
+        getCurrentTurnCastle: () => castle,
+        getCastleBushos: id => Number(id) === Number(castle.id) ? officers : [],
+        getClanDaimyo: () => null,
+        getBusho: id => officers.find(b => Number(b.id) === Number(id)) || null,
+        ui: { showDialog() {} }
+    };
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const command = new Command(game);
+    command.finishCommand = () => {};
+    assert.strictEqual(command.canExecuteCommand('draft'), true, '初期の徴兵は可能');
+
+    // 正規の「兵糧購入」命令。初期相場2.0、購入1656で金828をすべて使う。
+    const purchase = castle.gold * ctx.MainParams.Economy.TradeRateBase;
+    assert.ok(Economy.calcMaxTradeAmount('buy_rice', castle, null, null, game.provinces, game) >= purchase,
+        '実際の取引上限・兵糧保有量の範囲で購入できる');
+    command.executeTrade('buy_rice', purchase);
+    assert.strictEqual(castle.gold, 0, '正規の購入処理で金を使い切った');
+    assert.ok(officers.every(b => Domestic.calcMaxDraftAmount(castle, b) === 0),
+        '既存の徴兵上限計算では誰を選んでも0人');
+    assert.strictEqual(command.canExecuteCommand('draft'), false, '空の徴兵数画面を開かない');
+
+    // 兵糧の売却で資金が戻れば従来どおり徴兵可能になる。
+    command.executeTrade('sell_rice', 200);
+    assert.ok(castle.gold > 0);
+    assert.ok(officers.some(b => Domestic.calcMaxDraftAmount(castle, b) > 0));
+    assert.strictEqual(command.canExecuteCommand('draft'), true, '金が戻れば徴兵命令は復帰する');
 });
 
 Promise.all(pendingTests).then(() => {
