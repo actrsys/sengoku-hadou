@@ -1,0 +1,25 @@
+r616 浪人の前月行動済み持越し監査記録
+
+【設計原則と対象】
+操作画面の空候補や表示差ではなく、前月の行動済み状態が月を越えて残り、再登用した武将の当月の命令を不当に妨げる実害だけを対象とする。
+
+【通常プレイからの到達経路】
+1. 在城の大名家臣が月内に内政等の通常行動を実行し isActionDone=true となる。
+2. 出奔・追放などで AffiliationSystem.becomeRonin() により浪人化する。同月内は二重行動防止のため行動済みを保持する。
+3. 次月開始時、TurnManager.startMonth() は FactionSystem.processStartMonth() の出奔等を経て、全武将へ PersonnelRules.processMonthlyBushoMaintenance() を適用する。
+4. 通常の家臣はその後の城別給金・役職進捗 applyMonthlyRoleProgress() で行動済みが解除されるが、浪人は城所属家臣ではないため対象外となり、何か月経過しても true のまま残る。
+5. 浪人が自領城へ移動・登用されると、AffiliationSystem.joinClan() は同月の二重行動を防ぐため isActionDone を引き継ぐ。その値が前月のものでも残るため、登用当月の内政等の担当者に選べない。
+
+【修正前の再現結果と実害】
+実際の becomeRonin() で他家領の隣接城へ出奔させ、月初の processMonthlyBushoMaintenance() を通しても isActionDone=true のまま。続く joinClan() でも true が残るため、通常コマンドの未行動条件を満たさない。再現テスト追加時の結果は1,091件成功・1件失敗。架空の壊れた内部状態の注入ではなく、既存の移籍APIと前月行動の通常値を用いた。
+
+【修正・既存仕様の保持】
+js/personnel_rules.js の月次個人メンテナンスへ、浪人の場合のみ isActionDone=false を追加する。通常家臣は従来どおり applyMonthlyRoleProgress() が担当する。出奔・再登用が同月に完了した場合は行動済みを維持する（テスト確認）。給金・経験・忠誠・NPC移動・外交・戦闘・AI評価、表示、BIN、セーブschemaに変更なし。
+
+【検証範囲】
+実際の becomeRonin() と joinClan()、本番の月次人物Rulesを組み合わせた局所テストを使用。出奔移動に伴う城主自動選出・UIは検査の主眼ではないためテストでは無効化した。長期実プレイですべての出奔確率・登用分岐を通す試験ではない。
+
+【変更ファイル】
+更新: js/personnel_rules.js、js/config.js、tests/run_tests.js、ARCHITECTURE.md、docs/audits/README.md
+追加: docs/audits/r616_浪人の前月行動済み持越し監査記録.txt
+削除: なし

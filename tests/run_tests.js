@@ -257,7 +257,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r610');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r616');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -25664,9 +25664,9 @@ test('r609 滅亡家から引き取った非一門姫だけでは婚姻画面を
 });
 
 
-// r610: 実シナリオの城から通常の兵糧購入で資金を使い切った場合、
-// 徴兵候補の上限が0になればメニュー側も実行不可にする。
-test('r610 槇島城の通常取引で徴兵金が尽きた場合は徴兵命令を開始できない', () => {
+// r613: r610で追加した不要な開始制限を撤回する。
+// 実際の徴兵確定は0人を拒否するので、無害な数量画面への導線を閉じない。
+test('r613 槇島城で金が0でも徴兵数0人の決定は資源と行動を変えない', () => {
     const { common, scenario } = getRuntimeData('1560_okehazama');
     const c = scenario.castlesState.find(castle => Number(castle.id) === 90);
     assert.strictEqual(c.name, '槇島城');
@@ -25708,13 +25708,314 @@ test('r610 槇島城の通常取引で徴兵金が尽きた場合は徴兵命令
     assert.strictEqual(castle.gold, 0, '正規の購入処理で金を使い切った');
     assert.ok(officers.every(b => Domestic.calcMaxDraftAmount(castle, b) === 0),
         '既存の徴兵上限計算では誰を選んでも0人');
-    assert.strictEqual(command.canExecuteCommand('draft'), false, '空の徴兵数画面を開かない');
+    assert.strictEqual(command.canExecuteCommand('draft'), true, '従来どおり徴兵メニューは開始可能');
+    // 数量画面は最大0人・決定不可。万一、実行経路に0を渡しても副作用なし。
+    let advised = 0;
+    command.showAdviceAndExecute = () => advised++;
+    command.handleQuantitySelection('draft', { soldiers: { num: { value: '0' } } }, null, [officers[0].id]);
+    assert.strictEqual(advised, 0, '0人から軍師助言や実行経路に進まない');
+    command._validateLocalCommandActors = () => true;
+    const old = [castle.gold, castle.population, castle.soldiers, castle.training, castle.morale,
+        castle.peoplesLoyalty, officers[0].isActionDone, officers[0].achievementTotal];
+    command.executeDraft([officers[0].id], 0);
+    assert.deepStrictEqual([castle.gold, castle.population, castle.soldiers, castle.training, castle.morale,
+        castle.peoplesLoyalty, officers[0].isActionDone, officers[0].achievementTotal], old,
+        '0人では金・人口・兵・士気・訓練・民忠・行動・功績を一切更新しない');
 
     // 兵糧の売却で資金が戻れば従来どおり徴兵可能になる。
     command.executeTrade('sell_rice', 200);
     assert.ok(castle.gold > 0);
     assert.ok(officers.some(b => Domestic.calcMaxDraftAmount(castle, b) > 0));
     assert.strictEqual(command.canExecuteCommand('draft'), true, '金が戻れば徴兵命令は復帰する');
+});
+
+
+// r611: 1560年の弱小大名家が、隣接する大勢力への臣従を選ぶ時、
+// 内政で全在城武将を行動済みにしても地図・使者選択画面だけ開けてしまう不一致。
+test('r611 全使者が通常の訓練で行動済みになれば臣従願は開始できない', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const castleMasters = new Map(common.castlesMaster.map(c => [Number(c.id), c]));
+    const castles = scenario.castlesState.filter(c => c.enabled).map(c => ({
+        ...c, adjacentCastleIds: String(castleMasters.get(Number(c.id))?.adjacentCastle || '')
+            .split('|').map(s => parseInt(s, 10)).filter(Number.isFinite)
+    }));
+    const source = castles.find(c => Number(c.id) === 242);
+    const destination = castles.find(c => Number(c.id) === 24);
+    assert.ok(source && destination, '1560年の増山城と富山城を読み込む');
+    assert.strictEqual(source.ownerClan, 11, '神保家');
+    assert.strictEqual(destination.ownerClan, 2, '長尾家');
+
+    const prestige = new Map();
+    const castleByClan = new Map();
+    for (const c of castles) {
+        if (!castleByClan.has(c.ownerClan)) castleByClan.set(c.ownerClan, []);
+        castleByClan.get(c.ownerClan).push(c);
+    }
+    for (const [id, own] of castleByClan) {
+        const sum = key => own.reduce((n, c) => n + (Number(c[key]) || 0), 0);
+        prestige.set(id, Math.floor(sum('population') / 200) + Math.floor(sum('soldiers') / 20)
+            + Math.floor(sum('kokudaka') / 20) + Math.floor(sum('gold') / 150)
+            + Math.floor(sum('rice') / 300));
+    }
+    const clans = scenario.clansState.filter(c => c.enabled).map(c => ({
+        ...c, isDestroyed: false, daimyoPrestige: prestige.get(c.id) || 0
+    }));
+    assert.ok(prestige.get(2) >= 5 * prestige.get(11), '実際の拠点資源で長尾の威信は神保の5倍以上');
+
+    const warriorMasters = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const actors = scenario.warriorsState.filter(b =>
+        Number(b.clan) === 11 && Number(b.castleId) === 242
+        && Number(b.belongKunishuId || 0) === 0
+    ).map(b => ({ ...warriorMasters.get(Number(b.id)), ...b }))
+        .filter(b => Number(b.startYear) <= 1560 && Number(b.endYear) >= 1560)
+        .map(b => ({ ...b, status: 'active', isActionDone: false, achievementTotal: Number(b.achievementTotal) || 0 }));
+    assert.ok(actors.length > 0, '実シナリオに訓練を行える家臣がいる');
+    const leaderState = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+    const ctx = createContext({ BushoStatusRules: { isActive: b => b?.status === 'active' } });
+    for (const file of ['js/config.js', 'js/map_graph.js', 'js/domestic_rules.js',
+                        'js/command_catalog.js', 'js/command_system.js']) loadScript(ctx, file);
+    const game = {
+        playerClanId: 11, phase: 'game', castles, clans,
+        getCurrentTurnCastle: () => source,
+        getCastle: id => castles.find(c => Number(c.id) === Number(id)),
+        getClan: id => clans.find(c => Number(c.id) === Number(id)),
+        getClanCastles: id => castleByClan.get(Number(id)) || [],
+        getClanDaimyo: id => {
+            const clan = game.getClan(id);
+            const state = clan && leaderState.get(Number(clan.leaderId));
+            return state ? { ...state, id: clan.leaderId } : null;
+        },
+        getCastleBushos: id => Number(id) === Number(source.id) ? actors : [],
+        getBusho: id => actors.find(b => Number(b.id) === Number(id)),
+        getRelation: () => null,
+        factionSystem: { updateRecognition() {} },
+        ui: { showDialog() {} }
+    };
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const command = new Command(game);
+    command.finishCommand = () => {};
+    assert.ok(command.getValidTargets('vassalage').includes(2), '富山城と隣接する長尾家の春日山城（当主居城）を選択可能');
+    assert.strictEqual(command.canExecuteCommand('vassalage'), true, '未行動の使者がいれば開始できる');
+    assert.strictEqual(command.canExecuteCommand('training'), true, '通常の訓練が実行可能');
+    // 訓練は金や兵糧を使わずに全員をまとめて行動済みにできる通常命令。
+    command.executeCommand('training', actors.map(b => b.id), null);
+    assert.ok(actors.every(b => b.isActionDone === true), '実際の訓練処理で全使者が行動済みとなる');
+    assert.strictEqual(command.canExecuteCommand('vassalage'), false,
+        '使者の候補が0名なら地図選択を開始しない');
+});
+
+// r613: r612で追加した不要な候補除外を撤回する。
+// 数量確定ガードが0人を拒否するため、通常の武将一覧は従来どおり維持する。
+test('r613 槇島城の金3でも従来の武将選択を維持する', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const original = scenario.castlesState.find(c => Number(c.id) === 90);
+    assert.strictEqual(original.name, '槇島城');
+    const castle = { ...original, provinceId: common.castlesMaster.find(c => Number(c.id) === 90).provinceId };
+    const masters = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const officers = scenario.warriorsState.filter(b => Number(b.castleId) === 90
+        && Number(b.clan) === Number(castle.ownerClan) && Number(b.belongKunishuId || 0) === 0)
+        .map(b => ({ ...masters.get(Number(b.id)), ...b }))
+        .filter(b => Number(b.startYear) <= 1560 && Number(b.endYear) >= 1560)
+        .map(b => ({ ...b, status: 'active', isActionDone: false }));
+    assert.strictEqual(officers.length, 3);
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        StatPresenter: { getPerceivedStatValue: () => 0 }
+    });
+    for (const script of ['js/config.js', 'js/domestic_rules.js', 'js/economy_rules.js',
+            'js/command_catalog.js', 'js/command_system.js']) loadScript(ctx, script);
+    const game = {
+        phase: 'game', playerClanId: castle.ownerClan, provinces: [],
+        getCurrentTurnCastle: () => castle,
+        getCastleBushos: id => Number(id) === Number(castle.id) ? officers : [],
+        getClanDaimyo: () => null, getClanGunshi: () => null,
+        getBusho: id => officers.find(b => Number(b.id) === Number(id)) || null,
+        ui: { showDialog() {} }
+    };
+    const command = new (vm.runInContext('CommandSystem', ctx))(game);
+    command.finishCommand = () => {};
+    castle.tradeLimit = ctx.EconomyRules.calcMonthlyTradeLimit(castle);
+    assert.strictEqual(command.getBushoSelectorData('draft', null, null, castle).bushos.length, 3,
+        '資金に余裕があるときは在城中の3名全員が徴兵候補となる');
+    // 正規の購入。兵糧1650と交換して金825を使い、828から3にする。
+    const quantity = 1650;
+    assert.ok(ctx.EconomyRules.calcMaxTradeAmount('buy_rice', castle, null, null, game.provinces, game) >= quantity);
+    command.executeTrade('buy_rice', quantity);
+    assert.strictEqual(castle.gold, 3, '通常取引後の金が3になる');
+    const eligible = officers.filter(b => ctx.DomesticRules.calcMaxDraftAmount(castle, b) > 0);
+    assert.strictEqual(eligible.length, 2, '実際に1人以上徴兵できる武将は2名のみ');
+    assert.strictEqual(command.canExecuteCommand('draft'), true, '2名が徴兵できるので命令は有効');
+    const candidates = command.getBushoSelectorData('draft', null, null, castle).bushos;
+    assert.deepStrictEqual(candidates.map(b => b.id).sort((a,b) => a-b), officers.map(b => b.id).sort((a,b) => a-b),
+        '0人の武将も従来どおり候補に含み、数量画面で0人のまま決定できない');
+});
+
+
+// r614: 攻城戦で途中離脱した援軍も、通常帰還と同じ受入人数と士気・訓練度の合算を適用する。
+test('r614 攻城途中撤退した援軍の帰還で兵数と士気をともに統合する', () => {
+    const ctx = createContext({ WarParams: { War: {} } });
+    loadScript(ctx, 'js/war.js');
+    loadScript(ctx, 'js/war_effort.js');
+    const War = vm.runInContext('WarManager', ctx);
+    const helperCastle = { id: 101, ownerClan: 10, soldiers: 1000, morale: 80, training: 75 };
+    const officer = { id: 33, name: '援軍武将', clan: 10 };
+    const manager = new War({ getClan: () => ({name: '援軍勢力'}) });
+    manager.state = {
+        active: true, isPlayerInvolved: false, turn: 'attacker_ally_reinf',
+        attacker: {soldiers: 1000, morale: 80, ownerClan: 1},
+        defender: {soldiers: 1000, morale: 80, defense: 500, ownerClan: 2},
+        reinforcement: {
+            castle: helperCastle, ownerClan: 10, bushos: [officer], soldiers: 500,
+            fieldLoss: 50, morale: 0, training: 75, rice: 20, horses: 0, guns: 0
+        },
+        retreatedReinforcements: []
+    };
+    manager.recordSiegeReinforcementStartingSoldiers(manager.state);
+    // 実行中の攻城損害: 出陣した援軍500人が350人となり、士気が崩壊して撤退する。
+    manager.state.reinforcement.soldiers = 350;
+    manager.advanceWarTurn = () => {};
+    manager.resolveWarAction('retreat');
+    assert.strictEqual(manager.state.reinforcement, null, '実際の撤退命令で戦場から離脱する');
+    assert.strictEqual(manager.state.retreatedReinforcements.length, 1);
+    const ret = manager.state.retreatedReinforcements[0];
+    const counts = manager.getReinforcementReturnCounts(ret.data, ret.reinforcementKey, manager.state);
+    assert.strictEqual(counts.totalLoss, 200, '野戦50・攻城150の損害は別集計');
+    const returnedSoldiers = counts.survivingSoldiers + Math.floor(counts.totalLoss * 0.3);
+    assert.strictEqual(returnedSoldiers, 410);
+    const original = { ...helperCastle };
+    manager.mergeReturningArmyReadiness(helperCastle, ret.data, returnedSoldiers);
+    assert.deepStrictEqual([helperCastle.soldiers, helperCastle.morale, helperCastle.training],
+        [1410, 56, 75], '合流した410人の低士気を拠点の防衛戦力へ反映する');
+    const full = { ...original, soldiers: 99999 };
+    manager.mergeReturningArmyReadiness(full, ret.data, returnedSoldiers);
+    assert.deepStrictEqual([full.soldiers, full.morale, full.training], [99999, 80, 75],
+        '満員の拠点は帰還兵を受け入れず、士気と訓練度も変えない');
+    const src = read('js/war_effort.js');
+    const start = src.indexOf('if (s.retreatedReinforcements) {', src.indexOf('const returnReinforcement ='));
+    const end = src.indexOf('// ★敵の援軍に参加した大名との友好度を', start);
+    const retreatReturn = src.slice(start, end);
+    assert.ok(start >= 0 && end > start);
+    assert.ok(retreatReturn.includes('this.mergeReturningArmyReadiness(helperCastle, reinf, finalReturnSoldiers);'),
+        '攻城中の途中撤退でも、通常の城援軍帰還と同じ合流処理を使う');
+    assert.ok(retreatReturn.includes('this.mergeReturningArmyReadiness(kunishu, reinf, finalReturnSoldiers);'),
+        '諸勢力援軍の途中撤退でも士気・訓練度を統合する');
+});
+
+
+// r615: 諸勢力援軍の通常帰還で実際の低下後士気が拠点に反映されるか。
+// 正規の援軍編成と攻城損害計算を使用し、本番の帰還分岐をそのまま実行する。
+test('r615 諸勢力援軍の通常帰還も士気・兵数を同じ受入人数で統合する', () => {
+    const ctx = createContext({
+        WarParams: { Reinforcement: { KunishuRateDivisor: 100, MinimumSoldiers: 50, RicePerSoldier: 1 }, War: {} },
+        TroopAllocationService: { clampArmySoldiers: (n, bushos, available) => Math.min(n, available), getRequiredUnitCount: () => 1 }
+    });
+    loadScript(ctx, 'js/reinforcement_service.js');
+    loadScript(ctx, 'js/war.js');
+    loadScript(ctx, 'js/war_effort.js');
+    const KunishuReinforcement = vm.runInContext('ReinforcementService', ctx);
+    const War = vm.runInContext('WarManager', ctx);
+    const officer = {id: 15, name: '援軍大将', castleId: 99};
+    const kunishu = { id: 77, castleId: 99, soldiers: 1800, morale: 80, training: 70,
+        isDestroyed: false, horses: 0, guns: 0 };
+    const game = {
+        kunishuSystem: { getKunishuMembers: () => [officer], getKunishu: id => id === 77 ? kunishu : null },
+        affiliationSystem: { setCastleIdRaw: (b, id) => { b.castleId = id; } },
+        playerClanId: 99
+    };
+    const reinf = new KunishuReinforcement(game).createAutoKunishuReinforcement(
+        kunishu, {id: 99, ownerClan: 1}, 50, {isKunishuForce: true}
+    );
+    assert.strictEqual(reinf.soldiers, 900, '諸勢力の正規の援軍編成で900人が出陣する');
+    assert.strictEqual(kunishu.soldiers, 900, '出陣時に元兵力が減っている');
+    const war = new War(game);
+    const state = {defReinforcement: reinf, attacker: {ownerClan: 1}, defender: {ownerClan: 2},
+        sourceCastle: {ownerClan: 1}, deadSoldiers: {attacker: 0, defender: 0}, isPlayerInvolved: false,
+        atkBushos: []};
+    war.state = state;
+    war.recordSiegeReinforcementStartingSoldiers(state);
+    // 攻城戦の損害正本を使用して兵を減らし、攻城での士気低下を表す。
+    assert.strictEqual(war.applyWarArmyCasualties(reinf, 200), 200);
+    state.deadSoldiers.defender = 200;
+    reinf.morale = 40;
+    const {survivingSoldiers, totalLoss} = war.getReinforcementReturnCounts(reinf, 'defReinforcement', state);
+    const returned = survivingSoldiers + Math.floor(totalLoss * 0.25);
+    const expected = Math.floor((80 * 900 + 40 * returned) / (900 + returned));
+    const source = read('js/war_effort.js');
+    const start = source.indexOf('const returnReinforcement = (reinf, isAttackerData, reinforcementKey) => {');
+    const end = source.indexOf('returnReinforcement(s.selfReinforcement, true,', start);
+    assert.ok(start > 0 && end > start, '実際の援軍通常帰還関数を取得できる');
+    // endWar内部の関数定義を変更せず実行し、途中撤退分岐ではなく通常帰還を通す。
+    ctx.__war = war;
+    ctx.__state = state;
+    vm.runInContext(`(function () {
+        const s = __state;
+        const isRetreat = false;
+        const attackerWon = true;
+        let atkReinfTotalLoss = 0, defReinfTotalLoss = 0;
+        const getGroupRecoveryRate = () => 0.25;
+        ${source.slice(start, end)}
+        returnReinforcement(s.defReinforcement, false, 'defReinforcement');
+    }).call(__war)`, ctx);
+    assert.strictEqual(kunishu.soldiers, 900 + returned, '帰還した兵士の実数が合流する');
+    assert.strictEqual(kunishu.morale, expected, '援軍士気40が諸勢力本体の士気に反映される');
+    assert.strictEqual(kunishu.training, 70, '訓練度が不必要に変動しない');
+    assert.strictEqual(officer.castleId, kunishu.castleId, '武将も正規の所属拠点へ帰還する');
+});
+
+
+// r616: 前月に行動したまま出奔した浪人も、翌月には行動済みが解除される。
+// 仕官直後に「前月の行動」が残って1ヶ月行動できない経路を防ぐ。
+test('r616 出奔した浪人の行動済みは月替わりで解除され、同月再登用では保持される', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active', isRonin: b => b?.status === 'ronin' },
+        LifeStatusRules: { isPresent: b => b?.status === 'active' || b?.status === 'ronin' }
+    });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    loadScript(ctx, 'js/affiliation_system.js');
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const PersonnelRules = vm.runInContext('PersonnelRules', ctx);
+    const castleA = { id: 10, ownerClan: 1, castellanId: 12, samuraiIds: [40], adjacentCastleIds: [20] };
+    const castleB = { id: 20, ownerClan: 2, castellanId: 13, samuraiIds: [], adjacentCastleIds: [10] };
+    const castles = [castleA, castleB];
+    const busho = {
+        id: 40, name: '元家臣', clan: 1, castleId: 10, status: 'active',
+        isActionDone: true, isInterviewed: true, isCastellan: false,
+        isDaimyo: false, isCommander: false, wifeIds: [],
+        nemesisIds: [], nemesisList: [], affinity: 50, achievementTotal: 100
+    };
+    const game = {
+        playerClanId: 2, castles, bushos: [busho],
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getBusho: id => Number(id) === busho.id ? busho : null,
+        getClanCastles: id => castles.filter(c => c.ownerClan === Number(id)),
+        getClanDaimyo: () => ({ id: 90, affinity: 50 }),
+        factionSystem: { updateFactions() {} },
+        getCastleBushos: id => {
+            const castle = castles.find(c => c.id === Number(id));
+            return (castle?.samuraiIds || []).map(bid => bid === busho.id ? busho : null).filter(Boolean);
+        }
+    };
+    const affiliation = new AffiliationSystem(game);
+    // この検査では所属と在城名簿を正規APIで変更し、城主任命とUIだけをテスト外とする。
+    affiliation.updateCastleLord = () => {};
+    affiliation.updateUI = () => {};
+    affiliation.becomeRonin(busho, 'desertion');
+    assert.strictEqual(busho.status, 'ronin');
+    assert.strictEqual(busho.castleId, 20, '隣家へ通常の出奔移動をした');
+    assert.strictEqual(busho.isActionDone, true, '出奔した同月の行動済みは保持する');
+    PersonnelRules.processMonthlyBushoMaintenance(busho, game);
+    assert.strictEqual(busho.isActionDone, false, '翌月に浪人の行動済みが解除される');
+    affiliation.joinClan(busho, 2, 20);
+    assert.strictEqual(busho.status, 'active');
+    assert.strictEqual(busho.isActionDone, false, '翌月の登用で前月の行動済みが残らない');
+    assert.ok(game.getCastleBushos(20).some(b => b.clan === 2 && !b.isActionDone), '登用先で未行動の武将として扱える');
+
+    // 同一月にすぐ登用した場合は、以前の行動を二度使わない。
+    busho.isActionDone = true;
+    affiliation.becomeRonin(busho, 'desertion');
+    affiliation.joinClan(busho, 2, 20);
+    assert.strictEqual(busho.isActionDone, true, '出奔と再登用が同月なら行動済みを引き継ぐ');
 });
 
 Promise.all(pendingTests).then(() => {

@@ -473,7 +473,7 @@ class CommandSystem {
         const actionRequiredCommands = [
             'farm', 'commerce', 'repair', 'charity', 
             'war', 'draft', 'training', 'soldier_charity', 'transport', 'kunishu_subjugate', 
-            'goodwill', 'truce', 'alliance', 'marriage', 'dominate', 'subordinate', 'break_alliance',
+            'goodwill', 'truce', 'alliance', 'marriage', 'dominate', 'subordinate', 'vassalage', 'break_alliance',
             'kunishu_goodwill', 'kunishu_incorporate', 
             'sabotage', 'incite', 'rumor', 'headhunt', 'assassinate', 'kuko',
             'tribute', 'court_truce',

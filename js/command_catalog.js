@@ -380,13 +380,7 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: false, 
         startMode: 'busho_select', sortKey: 'leadership',
-        msg: "徴兵する兵士数を指定します",
-        // 実際の数量画面と同じ徴兵上限を参照。資金・人口・兵数枠の
-        // いずれかが尽き、誰を選んでも0人の場合は選択画面を開かない。
-        canExecute: (game, castle) => game.getCastleBushos(castle.id).some(b =>
-            Number(b.clan) === Number(castle.ownerClan)
-            && window.BushoStatusRules.isActive(b) && !b.isActionDone
-            && DomesticRules.calcMaxDraftAmount(castle, b) > 0)
+        msg: "徴兵する兵士数を指定します" 
     },
     'training': { 
         label: "訓練", category: 'MILITARY', 

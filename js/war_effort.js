@@ -1805,7 +1805,8 @@ Object.assign(WarManager.prototype, {
                 if (reinf.isKunishuForce) {
                     const kunishu = this.game.kunishuSystem.getKunishu(reinf.kunishuId);
                     if (kunishu && !kunishu.isDestroyed) {
-                        kunishu.soldiers = Math.min(99999, kunishu.soldiers + finalReturnSoldiers);
+                        // 通常帰還する諸勢力援軍も、途中撤退と同じ受入兵数で士気・訓練度を統合する。
+                        this.mergeReturningArmyReadiness(kunishu, reinf, finalReturnSoldiers);
                         kunishu.horses = Math.min(99999, (kunishu.horses || 0) + returnHorses); 
                         kunishu.guns = Math.min(99999, (kunishu.guns || 0) + returnGuns);       
                         reinf.bushos.forEach(b => {
@@ -1883,7 +1884,7 @@ Object.assign(WarManager.prototype, {
                     if (reinf.isKunishuForce) {
                         const kunishu = this.game.kunishuSystem.getKunishu(reinf.kunishuId);
                         if (kunishu && !kunishu.isDestroyed) {
-                            kunishu.soldiers = Math.min(99999, kunishu.soldiers + finalReturnSoldiers);
+                            this.mergeReturningArmyReadiness(kunishu, reinf, finalReturnSoldiers);
                             kunishu.horses = Math.min(99999, (kunishu.horses || 0) + (reinf.horses || 0)); 
                             kunishu.guns = Math.min(99999, (kunishu.guns || 0) + (reinf.guns || 0));       
                             reinf.bushos.forEach(b => {
@@ -1894,7 +1895,7 @@ Object.assign(WarManager.prototype, {
                     } else {
                         const helperCastle = this.game.getCastle(reinf.castle.id); 
                         if (helperCastle) {
-                            helperCastle.soldiers = Math.min(99999, helperCastle.soldiers + finalReturnSoldiers);
+                            this.mergeReturningArmyReadiness(helperCastle, reinf, finalReturnSoldiers);
                             helperCastle.rice = Math.min(99999, helperCastle.rice + reinf.rice);
                             helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + (reinf.horses || 0));
                             helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + (reinf.guns || 0));

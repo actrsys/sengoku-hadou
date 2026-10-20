@@ -279,6 +279,9 @@ class PersonnelRules {
     static processMonthlyBushoMaintenance(busho, game) {
         if (!window.BushoStatusRules.isActive(busho) && !window.BushoStatusRules.isRonin(busho)) return;
         busho.isInterviewed = false;
+        // 浪人は城ごとの月次給金・役職処理の対象外なので、ここで前月の行動済みを解除する。
+        // 通常家臣は従来どおり applyMonthlyRoleProgress() が解除する。
+        if (window.BushoStatusRules.isRonin(busho)) busho.isActionDone = false;
 
         if (busho.nemesisList && busho.nemesisList.length > 0) {
             busho.nemesisList = busho.nemesisList.filter(nemesis => {
