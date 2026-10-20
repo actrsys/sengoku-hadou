@@ -99,7 +99,15 @@ const CAN_EXECUTE_RULES = {
             !b.isDaimyo &&
             !b.isCommander
         );
-        return hasCandidate && legionNumber <= myCastles.length;
+        if (!hasCandidate || legionNumber > myCastles.length) return false;
+        // 国主任命画面と同じ城側の正本で、任命先が残っているかを判定する。
+        // 居城と現職国主の在城地しか残っていない場合、候補ゼロの画面を開かない。
+        const homeCastle = game.getDaimyoHomeCastle(game.playerClanId);
+        const occupiedCastleIds = game.castleManager.getActiveCommanderCastleIds(game.playerClanId);
+        return myCastles.some(c =>
+            (!homeCastle || Number(c.id) !== Number(homeCastle.id))
+            && !occupiedCastleIds.has(Number(c.id))
+        );
     },
     // 国主解任用の判定ルール（国主が存在する時だけ押せるようにします）
     canDismissLegion: (game, legionNumber) => {
@@ -112,11 +120,17 @@ const CAN_EXECUTE_RULES = {
     canAllotFief: (game, legionNumber) => {
         const myCastles = game.getClanCastles(game.playerClanId);
         if (myCastles.length <= 1) return false;
-        if (game.legions) {
-            const hasLegion = game.legions.some(l => Number(l.clanId) === Number(game.playerClanId) && Number(l.legionNo) === legionNumber && Number(l.commanderId) > 0);
-            return hasLegion;
-        }
-        return false;
+        const hasLegion = game.legions && game.legions.some(l =>
+            Number(l.clanId) === Number(game.playerClanId)
+            && Number(l.legionNo) === legionNumber && Number(l.commanderId) > 0);
+        if (!hasLegion) return false;
+        // 分配一覧と同じ除外条件。国主・大名の居城しかない場合は操作できない。
+        const homeCastle = game.getDaimyoHomeCastle(game.playerClanId);
+        const commanderCastleIds = game.castleManager.getActiveCommanderCastleIds(game.playerClanId);
+        return myCastles.some(c =>
+            (!homeCastle || Number(c.id) !== Number(homeCastle.id))
+            && !commanderCastleIds.has(Number(c.id))
+        );
     },
     hasSuccessor: (game) => {
         const daimyo = game.getClanDaimyo(game.playerClanId);
@@ -165,11 +179,18 @@ const CAN_EXECUTE_RULES = {
     hasGold200: (game, castle) => {
         return castle.gold >= 200;
     },
-    hasUnmarriedPrincess: (game) => {
+    // 婚姻の姫選択画面と同じ「大名一門の未婚姫」だけを実行候補とする。
+    // 滅亡勢力から引き取った姫が一門でなければ、名簿に載っても候補には出ない。
+    hasSelectableMarriagePrincess: (game) => {
         const myClan = game.getClan(game.playerClanId);
-        return myClan && myClan.princessIds && myClan.princessIds.some(pId => {
+        const daimyo = game.getClanDaimyo(game.playerClanId);
+        if (!myClan || !Array.isArray(myClan.princessIds) || !daimyo) return false;
+        const daimyoFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+        return myClan.princessIds.some(pId => {
             const p = game.getPrincess(pId);
-            return p && p.status === 'unmarried';
+            return p && p.status === 'unmarried'
+                && Array.isArray(p.familyIds)
+                && p.familyIds.some(fId => daimyoFamily.includes(fId));
         });
     },
     isNotSubordinate: (game) => {
@@ -423,7 +444,7 @@ const COMMAND_SPECS = {
         startMode: 'busho_select_special', subType: 'arrange_marriage_busho',
         sortKey: 'leadership',
         msg: "姫を嫁がせる武将を選択してください",
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game) && game.getClanBushos(game.playerClanId).some(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female)
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasSelectableMarriagePrincess(game) && game.getClanBushos(game.playerClanId).some(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female)
     },
     'employ': {
         label: "登用", category: 'PERSONNEL', 
@@ -537,6 +558,8 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0, 
         isMulti: false, hasAdvice: true, 
         startMode: 'map_select', targetType: 'other_clan_all',
+        // 二段階で異なる敵大名家を選択するため、最初から候補が2件必要。
+        minMapTargets: 2,
         sortKey: 'intelligence' 
     },
 
@@ -586,7 +609,7 @@ const COMMAND_SPECS = {
         costGold: 0, costRice: 0,
         isMulti: false, hasAdvice: true,
         startMode: 'map_select', targetType: 'marriage_valid',
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasUnmarriedPrincess(game)
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasSelectableMarriagePrincess(game)
     },
     'truce': {
         label: "和睦", category: 'FOREIGN_DAIMYO',

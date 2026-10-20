@@ -499,7 +499,9 @@ class CommandSystem {
         // ★ここから追加：対象をマップで選ぶコマンドの場合、選べる対象が1つもなければ実行不可にします
         if (spec.startMode === 'map_select') {
             const validTargets = this.getValidTargets(type);
-            if (!validTargets || validTargets.length === 0) {
+            // 複数の異なる勢力を順に選ぶ命令は、最初の画面を開く前に
+            // 必要な候補数を満たすことを確認する（通常の命令は1件）。
+            if (!validTargets || validTargets.length < (spec.minMapTargets || 1)) {
                 return false;
             }
         }
@@ -542,10 +544,19 @@ class CommandSystem {
                 });
             }
             
-            case 'enemy_all': 
-                return this.game.castles.filter(target => 
-                    Number(target.ownerClan) !== playerClanId && target.ownerClan !== 0
-                ).map(t => t.id);
+            case 'enemy_all': {
+                // 対人調略は、選んだ拠点で次に開く武将候補が存在するときだけ選べる。
+                // 対象資格は計略Systemを正本とし、拠点自体を狙う破壊工作・民心撹乱は従来通り。
+                const needsBushoTarget = ['rumor', 'headhunt', 'assassinate'].includes(type);
+                return this.game.castles.filter(target => {
+                    const ownerId = Number(target.ownerClan);
+                    if (ownerId === playerClanId || ownerId === 0) return false;
+                    if (!needsBushoTarget) return true;
+                    return this.game.getCastleBushos(target.id).some(b =>
+                        this.game.strategySystem.isRegularClanStrategyTarget(b, ownerId)
+                    );
+                }).map(t => t.id);
+            }
 
             case 'ally_other': {
                 // ★修正：同盟・支配・従属を通って繋がっている領土をまとめて取得します！
@@ -681,14 +692,8 @@ class CommandSystem {
             }
             
             case 'marriage_valid': {
-                // 1. まず、自分の大名家に嫁がせられる姫（未婚の姫）がいるかチェックします
-                const myClan = this.game.getClan(playerClanId);
-                const hasUnmarriedPrincess = myClan && myClan.princessIds && myClan.princessIds.some(pId => {
-                    const p = this.game.getPrincess(pId);
-                    return p && p.status === 'unmarried';
-                });
-                // 未婚の姫が一人もいなければ、選べる城は「ゼロ」にしておきます
-                if (!hasUnmarriedPrincess) return [];
+                // 姫候補があるかはメニューと同じ定義を使う。
+                if (!CAN_EXECUTE_RULES.hasSelectableMarriagePrincess(this.game)) return [];
 
                 // 2. 他の大名家の城を「フィルター（ふるい）」にかけて、条件に合うものだけを残します
                 return this.game.castles.filter(target => {

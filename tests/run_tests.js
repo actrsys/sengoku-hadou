@@ -257,7 +257,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r604');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r609');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10340,9 +10340,95 @@ test('軍師・国主任命コマンドは実際に選べる候補がいる時�
     assert.ok(legionRule.includes('const hasCandidate = game.getClanBushos(game.playerClanId).some'));
     assert.ok(legionRule.includes('!b.isDaimyo'));
     assert.ok(legionRule.includes('!b.isCommander'));
-    assert.ok(legionRule.includes('return hasCandidate && legionNumber <= myCastles.length;'));
+    assert.ok(legionRule.includes('!hasCandidate || legionNumber > myCastles.length'));
+    assert.ok(legionRule.includes('game.castleManager.getActiveCommanderCastleIds(game.playerClanId)'));
+    assert.ok(legionRule.includes('game.getDaimyoHomeCastle(game.playerClanId)'));
 });
 
+
+// r605: 通常の国主任命で非居城を使い切った場合、未使用席次を有効表示しない。
+test('r605 国主任命は大名居城と既存国主居城を除いた任命先がある場合だけ有効', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: b => b.status === 'active' } });
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/castle_manager.js');
+    const CastleManager = vm.runInContext('CastleManager', ctx);
+    const rule = vm.runInContext('CAN_EXECUTE_RULES.canManageLegion', ctx);
+    const castles = [
+        { id: 1, ownerClan: 4 }, { id: 2, ownerClan: 4 }, { id: 3, ownerClan: 4 }
+    ];
+    const bushos = [
+        { id: 40, clan: 4, castleId: 1, isDaimyo: true, status: 'active' },
+        { id: 41, clan: 4, castleId: 2, isCommander: true, isCastellan: true, status: 'active' },
+        { id: 42, clan: 4, castleId: 3, isCommander: true, isCastellan: true, status: 'active' },
+        { id: 43, clan: 4, castleId: 1, isDaimyo: false, isCommander: false, status: 'active' }
+    ];
+    const game = {
+        playerClanId: 4, castles, bushos,
+        legions: [{ clanId: 4, legionNo: 1, commanderId: 41 }, { clanId: 4, legionNo: 2, commanderId: 42 }],
+        getClanCastles: clan => castles.filter(c => c.ownerClan === clan),
+        getClanBushos: clan => bushos.filter(b => b.clan === clan),
+        getDaimyoHomeCastle: () => castles[0],
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getBusho: id => bushos.find(b => b.id === Number(id))
+    };
+    game.castleManager = new CastleManager(game);
+    const canSelectCastles = () => {
+        const home = game.getDaimyoHomeCastle(game.playerClanId);
+        const occupied = game.castleManager.getActiveCommanderCastleIds(game.playerClanId);
+        return game.getClanCastles(game.playerClanId).filter(c => Number(c.id) !== Number(home.id) && !occupied.has(Number(c.id)));
+    };
+    assert.strictEqual(canSelectCastles().length, 0, '既存の国主任命画面には選べる城がない');
+    assert.strictEqual(rule(game, 3), false, '第三席を有効表示してはならない');
+
+    // ひとつの国主席を解除して2城目が自由になれば、第三席にも任命できる。
+    game.legions.pop();
+    bushos[2].isCommander = false;
+    assert.strictEqual(canSelectCastles().length, 1);
+    assert.strictEqual(rule(game, 3), true, '任命できる城が存在する場合は従来どおり有効');
+    assert.strictEqual(rule(game, 1), false, '既に在任する席次は使えない');
+    assert.strictEqual(rule(game, 4), false, '保有城数を超える席次は使えない');
+});
+
+// r606: 所領分配の候補が空の場合、通常プレイでも確定不能な一覧が開く。
+test('r606 所領分配は居城と国主在城地を除いて分配できる拠点がある場合だけ有効', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: b => b.status === 'active' } });
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/castle_manager.js');
+    const CastleManager = vm.runInContext('CastleManager', ctx);
+    const rule = vm.runInContext('CAN_EXECUTE_RULES.canAllotFief', ctx);
+    const castles = [
+        { id: 1, ownerClan: 4, legionId: 0 },
+        { id: 2, ownerClan: 4, legionId: 1 }
+    ];
+    const bushos = [
+        { id: 40, clan: 4, castleId: 1, isDaimyo: true, status: 'active' },
+        { id: 41, clan: 4, castleId: 2, isCommander: true, status: 'active' }
+    ];
+    const seat = { id: 11, clanId: 4, legionNo: 1, commanderId: 41 };
+    const game = {
+        playerClanId: 4, castles, bushos, legions: [seat],
+        getClanCastles: clanId => castles.filter(c => c.ownerClan === clanId),
+        getDaimyoHomeCastle: () => castles[0],
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getBusho: id => bushos.find(b => b.id === Number(id)),
+        getLegionByClanNo: (clanId, n) => Number(clanId) === 4 && n === 1 ? seat : null
+    };
+    game.castleManager = new CastleManager(game);
+    const available = () => {
+        const home = game.getDaimyoHomeCastle(game.playerClanId);
+        const commanderCastles = game.castleManager.getActiveCommanderCastleIds(game.playerClanId);
+        return game.getClanCastles(game.playerClanId).filter(c =>
+            c.id !== home.id && !commanderCastles.has(c.id));
+    };
+    assert.strictEqual(available().length, 0, '正常な2拠点1国主構成で分配画面の一覧が空になる');
+    assert.strictEqual(rule(game, 1), false, '所領分配の空一覧を開かせない');
+    castles.push({ id: 3, ownerClan: 4, legionId: 0 });
+    assert.strictEqual(available().length, 1);
+    assert.strictEqual(rule(game, 1), true, '分配可能な第三拠点があれば従来どおり有効');
+    assert.strictEqual(rule(game, 2), false, '国主のいない席次では従来どおり無効');
+    castles[2].legionId = 1;
+    assert.strictEqual(rule(game, 1), true, '既に分配済みの第三拠点を直轄へ戻す操作も可能');
+});
 
 test('軍団割当は同じ武将を同一家の複数軍団長へ重複登録しない', () => {
     const staffing = read('js/ai_staffing.js');
@@ -25407,6 +25493,174 @@ test('r603 親善の金額確定後は次の会話・助言が描画されるま
     const kunishu = await perform('goodwill', {isKunishu:true}, false);
     assert.strictEqual(kunishu.quantityModal.hidden, true, '諸勢力親善の遷移は変更しない');
     assert.ok(!kunishu.events.includes('begin-handoff'));
+});
+
+
+// r607: 通常の同家内移動で敵拠点の最後の家臣が去ると、地図の計略対象が空候補になり得る。
+test('r607 離間・引抜・暗殺は空候補の敵拠点を選べず、破壊・民心撹乱は従来通り', () => {
+    const data = getRuntimeData('1560_okehazama');
+    const sourceRow = data.scenario.castlesState.find(c => Number(c.id) === 199);
+    const destinationRow = data.scenario.castlesState.find(c => Number(c.id) === 201);
+    assert.strictEqual(sourceRow.ownerClan, 70);
+    assert.strictEqual(destinationRow.ownerClan, 70);
+    const actorId = Number(sourceRow.castellanId);
+    const otherId = Number(destinationRow.castellanId);
+    const master = new Map(data.common.warriorsMaster.map(b => [Number(b.id), b]));
+    const states = new Map(data.scenario.warriorsState.map(b => [Number(b.id), b]));
+    const startingOccupants = data.scenario.warriorsState.filter(b => {
+        const base = master.get(Number(b.id));
+        return Number(b.castleId) === 199
+            && Number(base.startYear) <= 1560 && Number(base.endYear) >= 1560;
+    });
+    assert.deepStrictEqual(startingOccupants.map(b => Number(b.id)), [actorId],
+        '1560年の大林城には登場済みの武将が1人だけ在城している');
+    const officer = { ...master.get(actorId), ...states.get(actorId), status:'active', isDaimyo:false, isCastellan:true };
+    const other = { ...master.get(otherId), ...states.get(otherId), status:'active', isDaimyo:false, isCastellan:true };
+    assert.ok(officer.id && other.id && officer.id !== other.id, '実シナリオの通常家臣');
+    const currentCastle = {id:10, ownerClan:1, samuraiIds:[], castellanId:0};
+    const sourceCastle = { ...sourceRow, samuraiIds:[actorId] };
+    const destinationCastle = { ...destinationRow, samuraiIds:[otherId] };
+    const castles = [currentCastle, sourceCastle, destinationCastle];
+    const bushos = [officer, other];
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        LifeStatusRules: { isPresent: b => b?.status === 'active' }
+    });
+    for (const file of ['js/strategy_system.js', 'js/command_catalog.js', 'js/command_system.js', 'js/affiliation_system.js']) {
+        loadScript(ctx, file);
+    }
+    const CommandSystem = vm.runInContext('CommandSystem', ctx);
+    const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+    const game = {
+        playerClanId:1, castles, bushos, legions:[], phase:'game',
+        getCurrentTurnCastle:() => currentCastle,
+        getCastle:id => castles.find(c => c.id === Number(id)),
+        getBusho:id => bushos.find(b => Number(b.id) === Number(id)),
+        getCastleBushos(id) {
+            const c = this.getCastle(id);
+            return c ? c.samuraiIds.map(bid => this.getBusho(bid)).filter(b => b && b.status === 'active') : [];
+        },
+        getClanDaimyo:() => null
+    };
+    game.strategySystem = new (vm.runInContext('StrategySystem', ctx))(game);
+    const command = new CommandSystem(game);
+    const affiliation = new AffiliationSystem(game);
+    for (const type of ['rumor', 'headhunt', 'assassinate']) {
+        assert.ok(command.getValidTargets(type).includes(199), `${type}: 家臣在城時は選択できる`);
+    }
+    // 画面外から所属を壊すのではなく、現行の正規移動処理で最後の家臣を他拠点へ移動。
+    affiliation.moveCastle(officer, 201);
+    assert.strictEqual(sourceCastle.castellanId, 0, '最後の家臣移動により元拠点は城主不在');
+    assert.strictEqual(game.getCastleBushos(199).length, 0, '一覧も空になった');
+    for (const type of ['rumor', 'headhunt', 'assassinate']) {
+        assert.ok(!command.getValidTargets(type).includes(199), `${type}: 対象ゼロの拠点は選択不可`);
+        assert.ok(command.getValidTargets(type).includes(201), `${type}: 通常候補は維持`);
+    }
+    for (const type of ['sabotage', 'incite']) {
+        assert.ok(command.getValidTargets(type).includes(199), `${type}: 城を狙う計略の対象は変えない`);
+    }
+});
+
+
+// r608: 駆虎呑狼は相異なる敵大名家2家を順に選ぶ。統一目前でも二段階目が空にならないようにする。
+test('r608 駆虎呑狼は選択可能な敵大名家2家以上のときだけ開始できる', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: b => b?.status === 'active' } });
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const player = { id: 1, ownerClan: 1 };
+    const enemyA = { id: 20, ownerClan: 2 };
+    const enemyB = { id: 30, ownerClan: 3 };
+    const castles = [player, enemyA];
+    const leaders = {
+        2: { id: 200, clan: 2, castleId: 20, isDaimyo: true },
+        3: { id: 300, clan: 3, castleId: 30, isDaimyo: true }
+    };
+    const game = {
+        playerClanId: 1, castles,
+        getCurrentTurnCastle: () => player,
+        getClanCastles: id => castles.filter(c => Number(c.ownerClan) === Number(id)),
+        getCastleBushos: id => id === 1 ? [{ id: 10, clan: 1, status: 'active', isActionDone: false }] : [],
+        getClanDaimyo: id => leaders[id] || null,
+        getRelation: () => null,
+        getCastle: id => castles.find(c => c.id === Number(id)) || null
+    };
+    const command = new Command(game);
+    assert.deepStrictEqual(Array.from(command.getValidTargets('kuko')), [20], '残り敵1家なら一段目は候補が1件ある');
+    game.tempKukoData = { clanAId: 2 };
+    assert.deepStrictEqual(Array.from(command.getValidTargets('kuko_target_b')), [], '二段目は空となる');
+    assert.strictEqual(command.canExecuteCommand('kuko'), false, '実行不能な二段階選択は開始しない');
+    castles.push(enemyB);
+    assert.deepStrictEqual(Array.from(command.getValidTargets('kuko')), [20, 30]);
+    assert.deepStrictEqual(Array.from(command.getValidTargets('kuko_target_b')), [30]);
+    assert.strictEqual(command.canExecuteCommand('kuko'), true, '敵2家なら従来どおり選択可能');
+    assert.strictEqual(command.canExecuteCommand('sabotage'), true, '単一対象で十分な別の計略は変えない');
+});
+
+// r609: 正規の大名家滅亡によって未婚姫を譲り受けた後も、
+// 一門資格を満たさないなら姫候補一覧とコマンド可否を一致させる。
+test('r609 滅亡家から引き取った非一門姫だけでは婚姻画面を開かない', async () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { DEAD: 'dead', UNBORN: 'unborn' } },
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        LifeStatusRules: { isDead: b => b?.status === 'dead' }
+    });
+    for (const f of ['js/family_system.js', 'js/life_system.js', 'js/command_catalog.js', 'js/command_system.js']) loadScript(ctx, f);
+    const Family = vm.runInContext('FamilyLinker', ctx);
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const currentCastle = { id: 90, ownerClan: 2, gold: 1000, rice: 1000 };
+    const otherCastle = { id: 91, ownerClan: 4 };
+    const playerLeader = { id: 1001015, clan: 2, castleId: 90, status: 'active', isDaimyo: true, wifeIds: [] };
+    const playerVassal = { id: 201, clan: 2, castleId: 90, status: 'active', isDaimyo: false, female: false, wifeIds: [] };
+    const defeatedLeader = { id: 1002002, clan: 3, castleId: 0, status: 'dead', isDaimyo: true, wifeIds: [] };
+    const unrelatedLeader = { id: 400, clan: 4, castleId: 91, status: 'active', isDaimyo: true, wifeIds: [] };
+    const princess = { id: 4, name: '菊', currentClanId: 3, originalClanId: 3, realFatherId: 1002002, status: 'unmarried', husbandId: 0 };
+    const playerClan = { id: 2, name: '今川家', leaderId: 1001015, princessIds: [] };
+    const defeatedClan = { id: 3, name: '武田家', leaderId: 1002002, princessIds: [4] };
+    const otherClan = { id: 4, name: '他家', leaderId: 400, princessIds: [] };
+    const game = {
+        playerClanId: 2, castles: [currentCastle, otherCastle],
+        bushos: [playerLeader, playerVassal, defeatedLeader, unrelatedLeader],
+        princesses: [princess], clans: [playerClan, defeatedClan, otherClan],
+        getClan: id => game.clans.find(c => c.id === Number(id)),
+        getCastle: id => game.castles.find(c => c.id === Number(id)),
+        getBusho: id => game.bushos.find(b => b.id === Number(id)),
+        getPrincess: id => game.princesses.find(p => p.id === Number(id)),
+        getClanBushos: id => game.bushos.filter(b => b.clan === Number(id) && b.status === 'active'),
+        getClanCastles: id => game.castles.filter(c => c.ownerClan === Number(id)),
+        getClanDaimyo: id => game.bushos.find(b => b.clan === Number(id) && b.isDaimyo),
+        getCurrentTurnCastle: () => currentCastle,
+        getCastleBushos: id => game.bushos.filter(b => b.castleId === Number(id) && b.status === 'active'),
+        getRelation: () => null,
+        ui: { log() {}, renderMap() {}, async showDialogAsync() {} }
+    };
+    Family.rebuildAllFamilyIds(game.bushos, game.princesses);
+    const life = new Life(game);
+    life._captureLifeFlowContext = () => ({});
+    life._isLifeFlowCurrent = () => true;
+    const command = new Command(game);
+    assert.strictEqual(command.canExecuteCommand('arrange_marriage'), false, '滅亡処理前に姫候補なし');
+    // 戦争によって最後の拠点を失った後に呼ばれる、実際の滅亡処理を使用する。
+    await life.checkClanExtinction(3, 'no_castle', 2);
+    assert.deepStrictEqual(playerClan.princessIds, [4], '正規の滅亡処理で未婚姫を引き取る');
+    assert.strictEqual(princess.currentClanId, 2);
+    Family.rebuildAllFamilyIds(game.bushos, game.princesses);
+    const listCandidates = playerClan.princessIds.map(id => game.getPrincess(id)).filter(p =>
+        p.status === 'unmarried' && p.familyIds.some(id => playerLeader.familyIds.includes(id))
+    );
+    assert.strictEqual(listCandidates.length, 0, '既存の姫一覧の一門資格では表示されない');
+    assert.strictEqual(command.canExecuteCommand('arrange_marriage'), false, '家中婚姻の空候補を開かない');
+    assert.strictEqual(command.canExecuteCommand('marriage'), false, '対外婚姻の空候補を開かない');
+    assert.deepStrictEqual(Array.from(command.getValidTargets('marriage')), [], '外交地図候補も空にする');
+    // 大名一門の姫がいる通常状態は制限しない。
+    const naturalPrincess = { id: 5, name: '一門姫', currentClanId: 2, originalClanId: 2, realFatherId: playerLeader.id, status: 'unmarried', husbandId: 0 };
+    game.princesses.push(naturalPrincess);
+    playerClan.princessIds.push(5);
+    Family.rebuildAllFamilyIds(game.bushos, game.princesses);
+    assert.strictEqual(command.canExecuteCommand('arrange_marriage'), true);
+    assert.strictEqual(command.canExecuteCommand('marriage'), true);
+    assert.deepStrictEqual(Array.from(command.getValidTargets('marriage')), [91]);
 });
 
 Promise.all(pendingTests).then(() => {
