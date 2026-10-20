@@ -192,6 +192,9 @@ class AIStaffing {
                 !b.isDaimyo &&         // ★追加：大名はお供にしない！
                 !b.isCommander         // ★追加：国主もお供にしない！
             );
+            // 当主・国主だけが残る居城から自発的に移ると、旧拠点の城主が0人となり
+            // 以後の拠点AI行動が失われる。留守を任せる家臣がいない場合は移転しない。
+            if (castleBushos.length === 0) return false;
             const keepCount = Math.max(3, Math.ceil(castleBushos.length * 0.4));
             
             castleBushos.sort((a, b) => {

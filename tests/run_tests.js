@@ -257,7 +257,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r616');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r617');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -15628,7 +15628,9 @@ test('r445 AIの正式な居城移転は本拠地記録も移し、戦時の単�
         getClan: () => clan, getProvince: () => null, getRelation: () => null,
         mapGraph: { getAdjacentCastles: c => c.id === 1 ? [castle2] : [castle1] },
         aiOperationManager: { operations: {} },
-        getCastleBushos: () => [],
+        // 移転元には当主以外の留守居家臣がいる正常な配置を使用する。
+        getCastleBushos: id => Number(id) === 1 ? [{ id: 124, clan: 2, isDaimyo: false,
+            isCommander: false, status: 'active', factionId: 0, leadership: 50, strength: 50 }] : [],
         affiliationSystem: { moveCastle(b, id) { b.castleId = id; } }
     };
     const staffing = new Staffing(game);
@@ -23998,7 +24000,9 @@ test('r566 国主居城移転でも委任城の武将移動不可を守り、他
         let moves=0;
         const game = {playerClanId:playerId,getClan:()=>clan,getProvince:()=>null,getRelation:()=>null,
             mapGraph:{getAdjacentCastles:c=>c.id===1?[to]:[from]},aiOperationManager:{operations:{}},
-            getCastleBushos:()=>[],affiliationSystem:{moveCastle(b,id){moves++;b.castleId=id;}}};
+            getCastleBushos:id=>Number(id)===1?[{id:100,clan:2,isDaimyo:false,
+                isCommander:false,factionId:0,leadership:50,strength:50}]:[],
+            affiliationSystem:{moveCastle(b,id){moves++;b.castleId=id;}}};
         return {from,to,leader,clan,staffing:new Staffing(game),getMoves:()=>moves};
     }
     const mine=fixture(2);
@@ -26016,6 +26020,63 @@ test('r616 出奔した浪人の行動済みは月替わりで解除され、同
     affiliation.becomeRonin(busho, 'desertion');
     affiliation.joinClan(busho, 2, 20);
     assert.strictEqual(busho.isActionDone, true, '出奔と再登用が同月なら行動済みを引き継ぐ');
+});
+
+// r617: 出奔等で大名だけが居城に残った状態からの通常AI移転で、旧拠点を無人にしない。
+test('r617 AI居城移転は旧城に城主を残せない場合は移転しない', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
+        DiplomacyRules: { isAllianceOrVassal: () => false }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/ai_staffing.js');
+    const Affiliation = vm.runInContext('AffiliationSystem', ctx);
+    const Staffing = vm.runInContext('AIStaffing', ctx);
+    const source = { id: 1, name: '旧居城', ownerClan: 2, legionId: 0, provinceId: 1,
+        maxKokudaka: 200, maxDefense: 200, kokudaka: 200, defense: 200,
+        population: 30000, samuraiIds: [11, 12], castellanId: 11 };
+    const destination = { id: 2, name: '移転先', ownerClan: 2, legionId: 0, provinceId: 1,
+        maxKokudaka: 2000, maxDefense: 2000, kokudaka: 2000, defense: 2000,
+        population: 30000, samuraiIds: [13], castellanId: 13 };
+    const leader = { id: 11, name: '当主', castleId: 1, clan: 2, status: 'active', isDaimyo: true,
+        isCastellan: true, isCommander: false, factionId: 0, personality: 'balanced' };
+    const officer = { id: 12, name: '家臣', castleId: 1, clan: 2, status: 'active', isDaimyo: false,
+        isCastellan: false, isCommander: false, factionId: 0 };
+    const otherLord = { id: 13, name: '他城城主', castleId: 2, clan: 2, status: 'active',
+        isDaimyo: false, isCastellan: true, isCommander: false, factionId: 0 };
+    const clan = { id: 2, homeCastleId: 1 };
+    const officers = [leader, officer, otherLord];
+    const castles = [source, destination];
+    const game = { playerClanId: 1, legions: [], phase: 'game',
+        getClan: () => clan, getCastle: id => castles.find(c => c.id === Number(id)),
+        getBusho: id => officers.find(b => b.id === Number(id)),
+        getClanDaimyo: () => leader,
+        getCastleBushos: id => {
+            const castle = castles.find(c => c.id === Number(id));
+            return (castle?.samuraiIds || []).map(id => officers.find(b => b.id === Number(id))).filter(Boolean);
+        },
+        getProvince: () => null, getRelation: () => null,
+        mapGraph: { getAdjacentCastles: c => c.id === 1 ? [destination] : [source] },
+        aiOperationManager: { operations: {} }
+    };
+    game.affiliationSystem = new Affiliation(game);
+    game.affiliationSystem.updateUI = () => {}; // 画面更新のみ省略、城主更新と名簿更新は実処理
+    const staffing = new Staffing(game);
+    // 通常の武将移動で、当主だけが元の居城に残る状態を作る。
+    game.affiliationSystem.moveCastle(officer, destination.id);
+    assert.strictEqual(source.castellanId, leader.id);
+    assert.deepStrictEqual(source.samuraiIds, [leader.id]);
+    const result = staffing.relocateDaimyo(source, leader);
+    assert.strictEqual(result, false, '城主候補のいない旧拠点を残す移転は行わない');
+    assert.strictEqual(source.castellanId, leader.id, '元の城主を維持する');
+    assert.strictEqual(clan.homeCastleId, source.id, '本拠地は動かさない');
+    assert.strictEqual(leader.castleId, source.id);
+    // 家臣が残る場合は従来どおり、高評価の居城へ移転できる。
+    game.affiliationSystem.moveCastle(officer, source.id);
+    assert.strictEqual(staffing.relocateDaimyo(source, leader), true);
+    assert.strictEqual(source.castellanId, officer.id, '旧居城には城主が残る');
+    assert.strictEqual(clan.homeCastleId, destination.id, '正常な移転は維持する');
 });
 
 Promise.all(pendingTests).then(() => {
