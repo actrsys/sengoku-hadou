@@ -237,10 +237,8 @@ class CommandSystem {
             infoHtml = "<div>出陣武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'reward') {
-            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => 
-                window.BushoStatusRules.isActive(b) && 
-                !b.isDaimyo                          
-            );
+            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b =>
+                CAN_EXECUTE_RULES.isActiveNonDaimyoBusho(b));
             infoHtml = "<div>褒美を与える武将を選択してください</div>"; 
         }
         else if (actionType === 'banish') {

@@ -268,7 +268,10 @@ class EconomyRules {
             const rateInfo = this.getRiceActualRate('sell_rice', castle, provinces, game);
             const ricePerGold = rateInfo.ricePerGold;
             const maxGain = Math.min(GameConfig.Limits.CastleStock - castle.gold, castle.tradeLimit || 0);
-            const maxSellByGold = Math.floor(maxGain * ricePerGold);
+            // 売却代金はfloor(売却量 / 米相場)。相場が端数の時、
+            // 取引枠1でも兵糧をceil(米相場)だけ売れば金1を得られる。
+            // 金額上限を使い切る最小数量へ切り上げ、成立可能な売却を0件扱いしない。
+            const maxSellByGold = Math.ceil(maxGain * ricePerGold);
             const maxSell = Math.min(castle.rice, maxSellByGold);
             // 利益0の数量は確定処理でも不成立。数量選択とメニューでも
             // 同じ売却計算を参照し、取引が成立しない時は候補0件とする。

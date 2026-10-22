@@ -449,7 +449,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r667');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r669');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -29277,6 +29277,132 @@ test('r667 家中婚姻の婿候補はメニューと選択画面で同じ資格
     // 専用資格への委譲だけを固定し、別用途の婚姻資格に伝播させない。
     assert.ok(read('js/command_system.js').includes('CAN_EXECUTE_RULES.isHouseholdMarriageGroomCandidate(b)'));
     assert.ok(read('js/command_catalog.js').includes('isHouseholdMarriageGroomCandidate:'));
+});
+
+// r668: 褒美対象と「褒美・一括褒美・面談」のメニュー実行資格は
+// 現役・非大名という同一人物条件を共有する。対象の並び替えは褒美画面固有。
+test('r668 褒美対象の資格はメニューと選択画面で一致し、旧順序を維持する', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        MainParams: { CommandCost: { Reward: 100, RewardAll: 200 } },
+        StatPresenter: { getPerceivedStatValue: b => b.strength || 0 }
+    });
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/command_system.js');
+    const rules = vm.runInContext('CAN_EXECUTE_RULES', ctx);
+    const specs = vm.runInContext('COMMAND_SPECS', ctx);
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const castle = { id: 11, ownerClan: 2, gold: 5000, rice: 3000 };
+    const roster = [];
+    const game = {
+        playerClanId: 2,
+        getClanBushos: () => roster,
+        getClanGunshi: () => null,
+        getClanDaimyo: () => null,
+        getCurrentTurnCastle: () => castle
+    };
+    const command = new Command(game);
+    const oldCandidate = b => b.status === 'active' && !b.isDaimyo;
+    let seed = 668;
+    const rand = n => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % n; };
+    for (let i = 0; i < 600; i++) {
+        roster.length = 0;
+        const count = i % 11;
+        for (let j = 0; j < count; j++) {
+            roster.push({id: 20 + j, name: `家臣${String(rand(1000)).padStart(3, '0')}`,
+                status: ['active', 'ronin', 'unborn', 'dead'][rand(4)],
+                isDaimyo: rand(5) === 0, female: rand(2) === 0, strength: rand(120)});
+        }
+        const expected = roster.filter(oldCandidate).slice().sort((a,b) =>
+            String(a.name || '').localeCompare(String(b.name || ''), 'ja')).map(b => b.id);
+        const actual = command.getBushoSelectorData('reward', 11, {}, castle).bushos;
+        assert.deepStrictEqual(Array.from(actual, b=>b.id), expected, `褒美候補と順序 ${i}`);
+        assert.strictEqual(rules.hasActiveBushoExceptDaimyo(game), expected.length > 0, `共通メニュー資格 ${i}`);
+        assert.strictEqual(specs.reward.canExecute(game, castle), expected.length > 0, `褒美 ${i}`);
+        assert.strictEqual(specs.reward_all.canExecute(game, castle), expected.length > 0, `一括褒美 ${i}`);
+        assert.strictEqual(specs.interview.canExecute(game, castle), expected.length > 0, `面談 ${i}`);
+        for (const b of roster) assert.strictEqual(rules.isActiveNonDaimyoBusho(b), oldCandidate(b), `資格 ${i}/${b.id}`);
+    }
+    castle.gold = 0;
+    roster.length = 0;
+    roster.push({id: 1, name: '家臣', status: 'active', isDaimyo: false});
+    assert.strictEqual(specs.reward_all.canExecute(game, castle), false, '一括褒美の金条件は独立して維持');
+    assert.strictEqual(specs.interview.canExecute(game, castle), true, '面談には金条件を拡張しない');
+    assert.ok(read('js/command_system.js').includes('CAN_EXECUTE_RULES.isActiveNonDaimyoBusho(b)'));
+});
+
+
+// r669: 月次相場変動→兵糧購入→少額残枠での売却は通常操作で到達する。
+// 1560年の徳山館の管理マスター由来BINを使用し、実コマンドを通して確認する。
+test('r669 端数米相場と残り取引枠1でも正規の兵糧売却メニューを閉ざさない', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const contextMath = Object.assign(Object.create(Math), { random: () => 0.25 });
+    const ctx = createContext({ Math: contextMath });
+    for (const filename of ['js/config.js', 'js/economy_rules.js',
+                           'js/command_catalog.js', 'js/command_system.js']) loadScript(ctx, filename);
+    const states = new Map(scenario.castlesState.map(c => [Number(c.id), c]));
+    const castles = common.castlesMaster.map(c => ({
+        ...c, ...(states.get(Number(c.id)) || {}),
+        adjacentCastleIds: String(c.adjacentCastle || '')
+            .split('|').map(id => parseInt(id, 10)).filter(Number.isFinite)
+    }));
+    const castle = castles.find(c => Number(c.id) === 187);
+    assert.strictEqual(castle.name, '徳山館');
+    const castellan = { id: castle.castellanId, clan: castle.ownerClan, politics: 40, charm: 40 };
+    const game = {
+        year: 1560, month: 1, phase: 'game', playerClanId: castle.ownerClan,
+        castles, provinces: common.provinces.map(p => ({ ...p, marketRate: 2 })), clans: [],
+        getCurrentTurnCastle: () => castle,
+        getCastle: id => castles.find(c => Number(c.id) === Number(id)),
+        getBusho: id => Number(id) === Number(castellan.id) ? castellan : null,
+        getClanDaimyo: () => null,
+        getClanCastles: id => castles.filter(c => Number(c.ownerClan) === Number(id)),
+        getProvince(id) { return this.provinces.find(p => Number(p.id) === Number(id)); },
+        getRelation: () => null,
+        kunishuSystem: { getAliveKunishus: () => [] },
+        ui: { showDialog() { throw Error('正規の取引が拒否された'); } }
+    };
+    const economy = ctx.EconomyRules;
+    // 自然な月次変動。0.25は実際のMath.randomの範囲にある値。
+    economy.updateMonthlyProvinceMarketRates(game);
+    const rate = game.getProvince(castle.provinceId).marketRate;
+    assert.strictEqual(rate, 1.65);
+    castle.tradeLimit = economy.calcMonthlyTradeLimit(castle);
+    assert.strictEqual(castle.tradeLimit, 1060);
+
+    const command = new (vm.runInContext('CommandSystem', ctx))(game);
+    command.finishCommand = () => {};
+    // 実際の購入によって取引枠を1だけ残す。資金も初期実データ内で足りる。
+    command.executeTrade('buy_rice', 1747);
+    assert.strictEqual(castle.tradeLimit, 1);
+    assert.strictEqual(castle.gold, 259);
+    assert.strictEqual(economy.calcTradeCostAndRate('sell_rice', 2, castle,
+        null, castellan, game.provinces, game).cost, 1);
+
+    const rules = vm.runInContext('CAN_EXECUTE_RULES', ctx);
+    assert.strictEqual(economy.calcMaxTradeAmount('sell_rice', castle,
+        null, castellan, game.provinces, game), 2,
+        '金1を得られる兵糧2を最大売却数量に含める');
+    assert.strictEqual(rules.canSellRice(game, castle), true, '実行可能な取引をメニューで有効表示');
+    const oldRice = castle.rice;
+    command.executeTrade('sell_rice', 2);
+    assert.strictEqual(castle.gold, 260);
+    assert.strictEqual(castle.rice, oldRice - 2);
+    assert.strictEqual(castle.tradeLimit, 0);
+
+    // 現行ゲームの米相場範囲における各取引上限でも、金額上限を超えない。
+    for (const trialRate of [1.5, 1.65, 1.9, 2, 2.25, 2.5]) {
+        game.getProvince(castle.provinceId).marketRate = trialRate;
+        for (let cap = 1; cap <= 15; cap++) {
+            const state = { ...castle, rice: 1000, gold: 99999 - cap, tradeLimit: cap };
+            const amount = economy.calcMaxTradeAmount('sell_rice', state,
+                null, castellan, game.provinces, game);
+            assert.ok(amount > 0, `${trialRate}/${cap} 取引可能なのに売却不能`);
+            const gain = economy.calcTradeCostAndRate('sell_rice', amount, state,
+                null, castellan, game.provinces, game).cost;
+            assert.ok(gain > 0 && gain <= cap, `${trialRate}/${cap} 売却利益の範囲`);
+        }
+    }
 });
 
 Promise.all(pendingTests).then(() => {

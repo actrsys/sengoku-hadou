@@ -73,8 +73,11 @@ const COMMAND_MENU_STRUCTURE = [
    ========================================================================== */
 const CAN_EXECUTE_RULES = {
     // --- 人事用 ---
+    // 褒美候補と褒美・一括褒美・面談メニューが共有する人物資格。
+    // 個々の実行条件・並べ替え・面談相手選定とは切り離す。
+    isActiveNonDaimyoBusho: b => window.BushoStatusRules.isActive(b) && !b.isDaimyo,
     hasActiveBushoExceptDaimyo: (game) => {
-        return game.getClanBushos(game.playerClanId).some(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo);
+        return game.getClanBushos(game.playerClanId).some(b => CAN_EXECUTE_RULES.isActiveNonDaimyoBusho(b));
     },
     // 家中婚姻のメニューと婿候補画面は同じ人物資格を参照する。
     // 姫の一門資格・対外婚姻の相手資格は別の責務として維持する。
