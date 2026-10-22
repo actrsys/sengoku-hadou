@@ -235,7 +235,7 @@ class UISliderManager {
             quantityUiRaf = 0;
         };
         
-        const createSlider = (label, id, max, currentVal, minVal = 0, isTransport = false, targetCurrent = 0, targetMaxLimit = 99999) => {
+        const createSlider = (label, id, max, currentVal, minVal = 0, isTransport = false, targetCurrent = 0, targetMaxLimit = GameConfig.Limits.CastleStock) => {
             // スライダー枠内の文字と入力属性はすべてHTML生成の境界で保護する。
             // 正規の数値・入力制約・数量計算は変えず、改変セーブの文字列が属性を増やす事故を防ぐ。
             const safeMarkup = value => StatPresenter.escapePlainText(value);
@@ -547,11 +547,11 @@ class UISliderManager {
 
             const tCastle = this.game.getCastle(targetId); 
             
-            inputs.gold = createSlider("金", "gold", c.gold, 0, 0, true, tCastle.gold, 99999);
-            inputs.rice = createSlider("兵糧", "rice", c.rice, 0, 0, true, tCastle.rice, 99999);
-            inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0, 0, true, tCastle.soldiers, 99999);
-            inputs.horses = createSlider("軍馬", "horses", c.horses || 0, 0, 0, true, tCastle.horses || 0, 99999);
-            inputs.guns = createSlider("鉄砲", "guns", c.guns || 0, 0, 0, true, tCastle.guns || 0, 99999);
+            inputs.gold = createSlider("金", "gold", c.gold, 0, 0, true, tCastle.gold, GameConfig.Limits.CastleStock);
+            inputs.rice = createSlider("兵糧", "rice", c.rice, 0, 0, true, tCastle.rice, GameConfig.Limits.CastleStock);
+            inputs.soldiers = createSlider("兵士", "soldiers", c.soldiers, 0, 0, true, tCastle.soldiers, GameConfig.Limits.CastleStock);
+            inputs.horses = createSlider("軍馬", "horses", c.horses || 0, 0, 0, true, tCastle.horses || 0, GameConfig.Limits.CastleStock);
+            inputs.guns = createSlider("鉄砲", "guns", c.guns || 0, 0, 0, true, tCastle.guns || 0, GameConfig.Limits.CastleStock);
             
         } else if (['buy_rice', 'sell_rice', 'buy_ammo', 'buy_horses', 'buy_guns'].includes(type)) {
             // ★取引の処理は、この一箇所にすべてまとまりました！

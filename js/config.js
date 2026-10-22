@@ -10,7 +10,14 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r649'
+        Version: 'r654'
+    },
+
+    // 拠点の資源・人口の保存上限。モデル、計算、AI、入力画面、歴史イベントで共用する。
+    // 朝廷貢献度・石高・UIのz-index等、数値が同じでも意味が異なる値とは分離。
+    Limits: {
+        CastleStock: 99999,
+        CastlePopulation: 999999
     },
 
     History: {

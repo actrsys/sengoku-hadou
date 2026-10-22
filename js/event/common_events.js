@@ -1226,7 +1226,7 @@ window.GameEvents.push({
             if (c.statusEffects && c.statusEffects.includes('一揆')) {
                 riceIncome = Math.floor(riceIncome / 4);
             }
-            c.rice = Math.min(99999, c.rice + riceIncome);
+            c.rice = Math.min(GameConfig.Limits.CastleStock, c.rice + riceIncome);
         });
 
         // =========================================================
@@ -1793,7 +1793,7 @@ window.GameEvents.push({
                 if (leader) {
                     const daimyoCastle = game.getCastle(leader.castleId);
                     if (daimyoCastle) {
-                        daimyoCastle.gold = Math.min(99999, daimyoCastle.gold + totalTradeIncome);
+                        daimyoCastle.gold = Math.min(GameConfig.Limits.CastleStock, daimyoCastle.gold + totalTradeIncome);
                     }
                 }
             }

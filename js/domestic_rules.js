@@ -246,7 +246,7 @@ class DomesticRules {
             maxAffordable--;
         }
         // 人口や城の最大兵数（99999）を超えないようにします
-        return Math.min(castle.population, 99999 - castle.soldiers, maxAffordable);
+        return Math.min(castle.population, GameConfig.Limits.CastleStock - castle.soldiers, maxAffordable);
     }
 }
 

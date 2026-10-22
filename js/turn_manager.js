@@ -275,11 +275,11 @@ class TurnManager {
             const clanPopulationKey = Number(castle.ownerClan);
             const populationBeforeGrowth = castle.population;
             const income = EconomyRules.calcMonthlyGoldIncome(castle, game, clanPopulationById.get(clanPopulationKey));
-            castle.gold = Math.min(99999, castle.gold + income);
+            castle.gold = Math.min(GameConfig.Limits.CastleStock, castle.gold + income);
 
             const neighborMultiplier = DomesticRules.calcNeighborGrowthMultiplier(castle, game);
             const populationGrowth = DomesticRules.calcMonthlyPopulationGrowth(castle, neighborMultiplier);
-            castle.population = Math.min(999999, Math.max(0, castle.population + populationGrowth));
+            castle.population = Math.min(GameConfig.Limits.CastlePopulation, Math.max(0, castle.population + populationGrowth));
             // 従来は各拠点の港収入計算時にreduceしていたため、先に処理済みの拠点の人口増加は
             // 後続拠点の港ボーナスへ反映されていた。短命集計Mapも同じ順序で差分更新する。
             const trackedClanPopulation = clanPopulationById.get(clanPopulationKey);
@@ -293,7 +293,7 @@ class TurnManager {
             if (daimyo) {
                 const ownedCount = ownedCastleCountByClanId.get(castle.ownerClan) || 0;
                 const soldierGrowth = DomesticRules.calcMonthlySoldierGrowth(castle, daimyo, ownedCount, neighborMultiplier);
-                castle.soldiers = Math.min(99999, castle.soldiers + soldierGrowth);
+                castle.soldiers = Math.min(GameConfig.Limits.CastleStock, castle.soldiers + soldierGrowth);
             }
 
             castle.tradeLimit = EconomyRules.calcMonthlyTradeLimit(castle);

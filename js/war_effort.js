@@ -36,7 +36,7 @@ Object.assign(WarManager.prototype, {
     mergeReturningArmyReadiness(helperCastle, reinf, returningSoldiers) {
         const oldSoldiers = Math.max(0, Number(helperCastle.soldiers) || 0);
         const acceptedSoldiers = Math.min(
-            Math.max(0, 99999 - oldSoldiers),
+            Math.max(0, GameConfig.Limits.CastleStock - oldSoldiers),
             Math.max(0, Number(returningSoldiers) || 0)
         );
         const newSoldiers = oldSoldiers + acceptedSoldiers;
@@ -51,9 +51,9 @@ Object.assign(WarManager.prototype, {
     // 拠点制圧では攻略本隊を先に収容し、残った枠にだけ守備側の残兵・負傷兵を吸収する。
     // 兵数上限で受け入れられない兵まで士気・訓練度の加重平均へ混ぜない。
     mergeCapturedCastleReadiness(capturedCastle, attackingArmy, attackerSoldiers, absorbedSoldiers) {
-        const acceptedAttacker = Math.min(99999, Math.max(0, Number(attackerSoldiers) || 0));
+        const acceptedAttacker = Math.min(GameConfig.Limits.CastleStock, Math.max(0, Number(attackerSoldiers) || 0));
         const acceptedDefender = Math.min(
-            99999 - acceptedAttacker,
+            GameConfig.Limits.CastleStock - acceptedAttacker,
             Math.max(0, Number(absorbedSoldiers) || 0)
         );
         const acceptedTotal = acceptedAttacker + acceptedDefender;
@@ -840,10 +840,10 @@ Object.assign(WarManager.prototype, {
                 
                 if (!isConfirmed) {
                     const hc = selfReinforcementData.castle;
-                    hc.soldiers = Math.min(99999, hc.soldiers + selfReinforcementData.soldiers);
-                    hc.rice = Math.min(99999, hc.rice + selfReinforcementData.rice);
-                    hc.horses = Math.min(99999, (hc.horses || 0) + (selfReinforcementData.horses || 0));
-                    hc.guns = Math.min(99999, (hc.guns || 0) + (selfReinforcementData.guns || 0));
+                    hc.soldiers = Math.min(GameConfig.Limits.CastleStock, hc.soldiers + selfReinforcementData.soldiers);
+                    hc.rice = Math.min(GameConfig.Limits.CastleStock, hc.rice + selfReinforcementData.rice);
+                    hc.horses = Math.min(GameConfig.Limits.CastleStock, (hc.horses || 0) + (selfReinforcementData.horses || 0));
+                    hc.guns = Math.min(GameConfig.Limits.CastleStock, (hc.guns || 0) + (selfReinforcementData.guns || 0));
                     selfReinforcementData.bushos.forEach(b => b.isActionDone = false);
                     selfReinforcementData = null; 
                 } else {
@@ -1513,13 +1513,13 @@ Object.assign(WarManager.prototype, {
                 const carryHorses = Math.floor((defCastle.horses || 0) * (1.0 - lossRate));
                 const carryGuns = Math.floor((defCastle.guns || 0) * (1.0 - lossRate));
                 // ★追加：逃げ込んだ先の城がパンクしないように上限をかけます
-                target.gold = Math.min(99999, target.gold + carryGold); 
-                target.rice = Math.min(99999, target.rice + carryRice); 
+                target.gold = Math.min(GameConfig.Limits.CastleStock, target.gold + carryGold); 
+                target.rice = Math.min(GameConfig.Limits.CastleStock, target.rice + carryRice); 
                 // 生存兵は実際に収容できた人数だけで士気・訓練度へ反映する。
                 // 通常の帰還・援軍帰還と同じ窓口を使い、兵数だけの合流を残さない。
                 this.mergeReturningArmyReadiness(target, defCastle, defCastle.soldiers);
-                target.horses = Math.min(99999, (target.horses || 0) + carryHorses);
-                target.guns = Math.min(99999, (target.guns || 0) + carryGuns);
+                target.horses = Math.min(GameConfig.Limits.CastleStock, (target.horses || 0) + carryHorses);
+                target.guns = Math.min(GameConfig.Limits.CastleStock, (target.guns || 0) + carryGuns);
                 
                 // 撤退・捕縛によって在城名簿が空になる前に、実際の守備参戦者を確定する。
                 // 守備資格はWarManagerの共通窓口を使い、別勢力の同居者を含めない。
@@ -1807,8 +1807,8 @@ Object.assign(WarManager.prototype, {
                     if (kunishu && !kunishu.isDestroyed) {
                         // 通常帰還する諸勢力援軍も、途中撤退と同じ受入兵数で士気・訓練度を統合する。
                         this.mergeReturningArmyReadiness(kunishu, reinf, finalReturnSoldiers);
-                        kunishu.horses = Math.min(99999, (kunishu.horses || 0) + returnHorses); 
-                        kunishu.guns = Math.min(99999, (kunishu.guns || 0) + returnGuns);       
+                        kunishu.horses = Math.min(GameConfig.Limits.CastleStock, (kunishu.horses || 0) + returnHorses); 
+                        kunishu.guns = Math.min(GameConfig.Limits.CastleStock, (kunishu.guns || 0) + returnGuns);       
                         reinf.bushos.forEach(b => {
                             this.game.affiliationSystem.setCastleIdRaw(b, kunishu.castleId); b.isCastellan = false;
                         });
@@ -1827,9 +1827,9 @@ Object.assign(WarManager.prototype, {
                         let returnRice = reinf.rice || 0;
                         
                         this.mergeReturningArmyReadiness(helperCastle, reinf, finalReturnSoldiers);
-                        helperCastle.rice = Math.min(99999, helperCastle.rice + returnRice);
-                        helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + returnHorses);
-                        helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + returnGuns);
+                        helperCastle.rice = Math.min(GameConfig.Limits.CastleStock, helperCastle.rice + returnRice);
+                        helperCastle.horses = Math.min(GameConfig.Limits.CastleStock, (helperCastle.horses || 0) + returnHorses);
+                        helperCastle.guns = Math.min(GameConfig.Limits.CastleStock, (helperCastle.guns || 0) + returnGuns);
                         
                         reinf.bushos.forEach(b => {
                             // 援軍派遣中も城主の任は解いていない。帰還だけで城主資格を失わせない。
@@ -1885,8 +1885,8 @@ Object.assign(WarManager.prototype, {
                         const kunishu = this.game.kunishuSystem.getKunishu(reinf.kunishuId);
                         if (kunishu && !kunishu.isDestroyed) {
                             this.mergeReturningArmyReadiness(kunishu, reinf, finalReturnSoldiers);
-                            kunishu.horses = Math.min(99999, (kunishu.horses || 0) + (reinf.horses || 0)); 
-                            kunishu.guns = Math.min(99999, (kunishu.guns || 0) + (reinf.guns || 0));       
+                            kunishu.horses = Math.min(GameConfig.Limits.CastleStock, (kunishu.horses || 0) + (reinf.horses || 0)); 
+                            kunishu.guns = Math.min(GameConfig.Limits.CastleStock, (kunishu.guns || 0) + (reinf.guns || 0));       
                             reinf.bushos.forEach(b => {
                                 this.game.affiliationSystem.setCastleIdRaw(b, kunishu.castleId); 
                                 b.isCastellan = false;
@@ -1896,9 +1896,9 @@ Object.assign(WarManager.prototype, {
                         const helperCastle = this.game.getCastle(reinf.castle.id); 
                         if (helperCastle) {
                             this.mergeReturningArmyReadiness(helperCastle, reinf, finalReturnSoldiers);
-                            helperCastle.rice = Math.min(99999, helperCastle.rice + reinf.rice);
-                            helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + (reinf.horses || 0));
-                            helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + (reinf.guns || 0));
+                            helperCastle.rice = Math.min(GameConfig.Limits.CastleStock, helperCastle.rice + reinf.rice);
+                            helperCastle.horses = Math.min(GameConfig.Limits.CastleStock, (helperCastle.horses || 0) + (reinf.horses || 0));
+                            helperCastle.guns = Math.min(GameConfig.Limits.CastleStock, (helperCastle.guns || 0) + (reinf.guns || 0));
                             reinf.bushos.forEach(b => {
                                 // 途中撤退の帰還でも、援軍参加前の城主資格を保持する。
                                 this.game.affiliationSystem.setCastleIdRaw(b, helperCastle.id);
@@ -1985,9 +1985,9 @@ Object.assign(WarManager.prototype, {
                     // 鎮圧戦の帰還も通常の本隊帰還と同じ窓口で収容人数を確定する。
                     // 兵数だけ戻して士気・訓練度を据え置く旧経路を解消する。
                     this.mergeReturningArmyReadiness(srcC, s.attacker, s.attacker.soldiers);
-                    srcC.rice = Math.min(99999, srcC.rice + s.attacker.rice);
-                    srcC.horses = Math.min(99999, (srcC.horses || 0) + (s.attacker.horses || 0));
-                    srcC.guns = Math.min(99999, (srcC.guns || 0) + (s.attacker.guns || 0));
+                    srcC.rice = Math.min(GameConfig.Limits.CastleStock, srcC.rice + s.attacker.rice);
+                    srcC.horses = Math.min(GameConfig.Limits.CastleStock, (srcC.horses || 0) + (s.attacker.horses || 0));
+                    srcC.guns = Math.min(GameConfig.Limits.CastleStock, (srcC.guns || 0) + (s.attacker.guns || 0));
                 }
                 
                 if (s.isPlayerInvolved) {
@@ -2177,11 +2177,11 @@ Object.assign(WarManager.prototype, {
 
             if (s.attacker.rice > 0) {
                 // ★追加：戦争終了時の兵糧合流でも上限を超えないようにします
-                if (attackerWon) s.defender.rice = Math.min(99999, s.defender.rice + s.attacker.rice); 
+                if (attackerWon) s.defender.rice = Math.min(GameConfig.Limits.CastleStock, s.defender.rice + s.attacker.rice); 
                 else { 
                     if (!s.attacker.isKunishu) {
                         const srcC = this.game.getCastle(s.sourceCastle.id); 
-                        if (srcC) srcC.rice = Math.min(99999, srcC.rice + s.attacker.rice); 
+                        if (srcC) srcC.rice = Math.min(GameConfig.Limits.CastleStock, srcC.rice + s.attacker.rice); 
                     }
                 }
             }
@@ -2207,16 +2207,16 @@ Object.assign(WarManager.prototype, {
 
                 // 攻略本隊を優先し、収容枠に入った守備側の兵だけ能力値に反映する。
                 const acceptedAbsorbed = this.mergeCapturedCastleReadiness(s.defender, s.attacker, totalAtkSurvivors, totalAbsorbed);
-                s.defender.horses = Math.min(99999, defenderSurvivedHorses + attackerSurvivedHorses);
-                s.defender.guns = Math.min(99999, defenderSurvivedGuns + attackerSurvivedGuns);
+                s.defender.horses = Math.min(GameConfig.Limits.CastleStock, defenderSurvivedHorses + attackerSurvivedHorses);
+                s.defender.guns = Math.min(GameConfig.Limits.CastleStock, defenderSurvivedGuns + attackerSurvivedGuns);
                 if (s.isPlayerInvolved && acceptedAbsorbed > 0) this.game.ui.log(`(敵残存兵・負傷兵 計${acceptedAbsorbed}名 を吸収)`, { history: false });
             } else if (!attackerWon) {
                 if (s.attacker.isKunishu) {
                     const kunishu = this.game.kunishuSystem.getKunishu(s.attacker.kunishuId);
                     if (kunishu && !kunishu.isDestroyed) {
                         this.mergeReturningArmyReadiness(kunishu, s.attacker, totalAtkSurvivors);
-                        kunishu.horses = Math.min(99999, (kunishu.horses || 0) + attackerSurvivedHorses);
-                        kunishu.guns = Math.min(99999, (kunishu.guns || 0) + attackerSurvivedGuns);
+                        kunishu.horses = Math.min(GameConfig.Limits.CastleStock, (kunishu.horses || 0) + attackerSurvivedHorses);
+                        kunishu.guns = Math.min(GameConfig.Limits.CastleStock, (kunishu.guns || 0) + attackerSurvivedGuns);
                     }
                 } else {
                     const srcC = this.game.getCastle(s.sourceCastle.id);
@@ -2225,12 +2225,12 @@ Object.assign(WarManager.prototype, {
                     this.mergeReturningArmyReadiness(srcC, s.attacker, totalAtkSurvivors);
 
                     // 帰還兵の士気・訓練度と兵数は共通窓口で収容数を確定済み。
-                    srcC.horses = Math.min(99999, (srcC.horses || 0) + attackerSurvivedHorses);
-                    srcC.guns = Math.min(99999, (srcC.guns || 0) + attackerSurvivedGuns);
+                    srcC.horses = Math.min(GameConfig.Limits.CastleStock, (srcC.horses || 0) + attackerSurvivedHorses);
+                    srcC.guns = Math.min(GameConfig.Limits.CastleStock, (srcC.guns || 0) + attackerSurvivedGuns);
                 }
                 
                 const recovered = Math.floor(realDefDead * baseRecoveryRate); // 守備側は防衛成功（非撤退）なので基本の回復率を使います
-                s.defender.soldiers = Math.min(99999, s.defender.soldiers + recovered);
+                s.defender.soldiers = Math.min(GameConfig.Limits.CastleStock, s.defender.soldiers + recovered);
                 s.defender.horses = defenderSurvivedHorses;
                 s.defender.guns = defenderSurvivedGuns;
                 if (s.isPlayerInvolved && attackerRecovered > 0) this.game.ui.log(`(遠征軍 負傷兵 ${attackerRecovered}名 が帰還)`, { history: false });

@@ -618,7 +618,7 @@ class KunishuSystem {
                 if (amount < 10) return;
 
                 if (Math.random() > 0.5) {
-                    let maxAdd = 99999 - castle.gold;
+                    let maxAdd = GameConfig.Limits.CastleStock - castle.gold;
                     let actualAmount = Math.min(amount, maxAdd);
                     if (actualAmount > 0) {
                         castle.gold += actualAmount;
@@ -627,7 +627,7 @@ class KunishuSystem {
                         if (isPlayerCastle) await this.game.ui.showDialogAsync(msg);
                     }
                 } else {
-                    let maxAdd = 99999 - castle.rice;
+                    let maxAdd = GameConfig.Limits.CastleStock - castle.rice;
                     let actualAmount = Math.min(amount, maxAdd);
                     if (actualAmount > 0) {
                         castle.rice += actualAmount;
@@ -915,9 +915,9 @@ class KunishuSystem {
 
         this.game.castleManager.changeOwner(castle, newClanId, true); 
         
-        castle.soldiers = Math.min(99999, castle.soldiers + kunishu.soldiers);
-        castle.horses = Math.min(99999, (castle.horses || 0) + (kunishu.horses || 0));
-        castle.guns = Math.min(99999, (castle.guns || 0) + (kunishu.guns || 0));
+        castle.soldiers = Math.min(GameConfig.Limits.CastleStock, castle.soldiers + kunishu.soldiers);
+        castle.horses = Math.min(GameConfig.Limits.CastleStock, (castle.horses || 0) + (kunishu.horses || 0));
+        castle.guns = Math.min(GameConfig.Limits.CastleStock, (castle.guns || 0) + (kunishu.guns || 0));
 
         const members = this.getKunishuMembers(kunishu.id);
         members.forEach(b => {
@@ -1033,9 +1033,9 @@ class KunishuSystem {
         
         let resultMsg = '';
         if (isSuccess) {
-            castle.soldiers = Math.min(99999, castle.soldiers + kunishu.soldiers);
-            castle.horses = Math.min(99999, (castle.horses || 0) + (kunishu.horses || 0));
-            castle.guns = Math.min(99999, (castle.guns || 0) + (kunishu.guns || 0));
+            castle.soldiers = Math.min(GameConfig.Limits.CastleStock, castle.soldiers + kunishu.soldiers);
+            castle.horses = Math.min(GameConfig.Limits.CastleStock, (castle.horses || 0) + (kunishu.horses || 0));
+            castle.guns = Math.min(GameConfig.Limits.CastleStock, (castle.guns || 0) + (kunishu.guns || 0));
             
             const members = this.getKunishuMembers(kunishuId);
             members.forEach(b => {

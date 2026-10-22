@@ -262,12 +262,12 @@ class EconomyRules {
             while (maxBuy > 0 && Math.ceil(maxBuy / ricePerGold) > maxGold) {
                 maxBuy--;
             }
-            return Math.min(maxBuy, 99999 - castle.rice);
+            return Math.min(maxBuy, GameConfig.Limits.CastleStock - castle.rice);
         }
         else if (type === 'sell_rice') {
             const rateInfo = this.getRiceActualRate('sell_rice', castle, provinces, game);
             const ricePerGold = rateInfo.ricePerGold;
-            const maxGain = Math.min(99999 - castle.gold, castle.tradeLimit || 0);
+            const maxGain = Math.min(GameConfig.Limits.CastleStock - castle.gold, castle.tradeLimit || 0);
             const maxSellByGold = Math.floor(maxGain * ricePerGold);
             const maxSell = Math.min(castle.rice, maxSellByGold);
             // 利益0の数量は確定処理でも不成立。数量選択とメニューでも
@@ -278,21 +278,21 @@ class EconomyRules {
         else if (type === 'buy_ammo') {
             const price = parseInt(window.MainParams.Economy.PriceAmmo, 10);
             const maxBuy = price > 0 ? Math.floor(castle.gold / price) : 0;
-            return Math.min(maxBuy, 99999 - (castle.ammo || 0));
+            return Math.min(maxBuy, GameConfig.Limits.CastleStock - (castle.ammo || 0));
         }
         else if (type === 'buy_horses') {
             let maxBuy = this.calcBuyHorseAmount(castle.gold, daimyo, castellan, game);
             while (maxBuy > 0 && this.calcBuyHorseCost(maxBuy, daimyo, castellan, game) > castle.gold) {
                 maxBuy--;
             }
-            return Math.min(maxBuy, 99999 - (castle.horses || 0));
+            return Math.min(maxBuy, GameConfig.Limits.CastleStock - (castle.horses || 0));
         }
         else if (type === 'buy_guns') {
             let maxBuy = this.calcBuyGunAmount(castle.gold, daimyo, castellan, game);
             while (maxBuy > 0 && this.calcBuyGunCost(maxBuy, daimyo, castellan, game) > castle.gold) {
                 maxBuy--;
             }
-            return Math.min(maxBuy, 99999 - (castle.guns || 0));
+            return Math.min(maxBuy, GameConfig.Limits.CastleStock - (castle.guns || 0));
         }
         return 0;
     }

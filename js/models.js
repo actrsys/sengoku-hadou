@@ -192,15 +192,15 @@ class Castle {
         this.castlesColorCode = data.castlesColorCode || "";
         
         // 数値データの初期化（上限をセットする魔法を追加しました！）
-        this.soldiers = Math.min(99999, Number(this.soldiers || 0));
-        this.gold = Math.min(99999, Number(this.gold || 0));
-        this.rice = Math.min(99999, Number(this.rice || 0));
+        this.soldiers = Math.min(GameConfig.Limits.CastleStock, Number(this.soldiers || 0));
+        this.gold = Math.min(GameConfig.Limits.CastleStock, Number(this.gold || 0));
+        this.rice = Math.min(GameConfig.Limits.CastleStock, Number(this.rice || 0));
         
         this.defense = Number(this.defense || 0);
         this.maxDefense = Number(data.maxDefense !== undefined ? data.maxDefense : this.defense);
         
         // 人口だけは上限が99万9999です
-        this.population = Math.min(999999, Number(this.population || 0));
+        this.population = Math.min(GameConfig.Limits.CastlePopulation, Number(this.population || 0));
         
         // 現行マスターの peoplesLoyalty だけを正本として読む。旧CSV列は推測補完しない。
         this.peoplesLoyalty = Number(data.peoplesLoyalty !== undefined ? data.peoplesLoyalty : 0);
@@ -220,9 +220,9 @@ class Castle {
         this.commerce = Number(this.commerce || 0);
         this.maxCommerce = Number(data.maxCommerce !== undefined ? data.maxCommerce : this.commerce);
         
-        this.ammo = Math.min(99999, Number(this.ammo || 0));
-        this.horses = Math.min(99999, Number(this.horses || 0));
-        this.guns = Math.min(99999, Number(this.guns || 0));
+        this.ammo = Math.min(GameConfig.Limits.CastleStock, Number(this.ammo || 0));
+        this.horses = Math.min(GameConfig.Limits.CastleStock, Number(this.horses || 0));
+        this.guns = Math.min(GameConfig.Limits.CastleStock, Number(this.guns || 0));
 
         // ロード時に既存データがあれば維持する
         this.samuraiIds = Array.isArray(this.samuraiIds) ? this.samuraiIds : [];

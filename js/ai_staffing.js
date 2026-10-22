@@ -35,42 +35,10 @@ class AIStaffing {
             }
         }
 
-        // 自分が移動できるお城（自領で繋がっている城）のリストを作ります
-        const reachableMyCastles = [];
-        const visitedCastles = new Set();
-        const searchQueue = [castle];
-        let searchHead = 0;
-        visitedCastles.add(castle.id);
-
-        while (searchHead < searchQueue.length) {
-            const current = searchQueue[searchHead++];
-            
-            // 自軍団のお城なら、お引越し先の候補リストに入れます
-            if (Number(current.ownerClan) === Number(clanId) && Number(current.legionId) === Number(targetLegionId)) {
-                reachableMyCastles.push(current);
-            }
-
-            // ★軽量化：全国の全城を毎回filterせず、対称化した隣接索引だけを見ます。
-            // MapGraphService.isAdjacent と同じく「片側に記載があれば隣接」の結果を維持します。
-            const adjCastles = this._getAdjacentCastles(current).filter(c => !visitedCastles.has(c.id));
-
-            for (const n of adjCastles) {
-                let canPass = false;
-                if (Number(n.ownerClan) === Number(clanId)) {
-                    canPass = true; // 自分の大名家なら他の軍団の城でも通行OK
-                } else if (n.ownerClan !== 0) {
-                    const rel = this.game.getRelation(clanId, n.ownerClan);
-                    if (rel && window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
-                        canPass = true; // 同盟・支配・従属の勢力も通行OK
-                    }
-                }
-                
-                if (canPass) {
-                    visitedCastles.add(n.id);
-                    searchQueue.push(n);
-                }
-            }
-        }
+        // 同盟・従属領を通った自領城への到達判定は地図サービスを正本とする。
+        // AI人事は同じ軍団の候補だけを利用するが、途中は別軍団の自領城も通過できる。
+        const reachableMyCastles = this._getReachableOwnCastles(castle, clanId)
+            .filter(c => Number(c.legionId) === Number(targetLegionId));
 
         if (reachableMyCastles.length <= 1) return false;
 
@@ -245,6 +213,38 @@ class AIStaffing {
 
     _getAdjacentCastles(castle) {
         return this.game.mapGraph.getAdjacentCastles(castle);
+    }
+
+    // 連結・通行資格の計算はMapGraphServiceを唯一の正本とする。
+    // 同サービスのSetは起点を最後に追加する仕様なので、AI人事の従来BFSと同じ
+    // 「起点が先頭、その後は到達順」に揃えて同点評価と移動先優先順を維持する。
+    _getReachableOwnCastles(castle, clanId) {
+        if (!castle) return [];
+        const ids = this.game.mapGraph.getConnectedOwnIdsForMove(castle, clanId);
+        const reachable = [castle];
+        for (const id of ids) {
+            if (Number(id) === Number(castle.id)) continue;
+            const next = this.game.getCastle(id);
+            if (next && Number(next.ownerClan) === Number(clanId)) reachable.push(next);
+        }
+        return reachable;
+    }
+
+    // 軍団の新設・解散で使う共通の前線判定。
+    // 空き城、敵対・和睦など通行上安全とは言えない他家の城は警戒対象とし、
+    // 自領および同盟・支配・従属先は警戒対象から除外する。
+    // 軍団を新設するか、後方化で解散するかという判断自体は各呼出元に残す。
+    _hasPotentialEnemyNeighbor(clanId, castles) {
+        for (const castle of castles) {
+            for (const adjCastle of this._getAdjacentCastles(castle)) {
+                if (adjCastle.ownerClan === 0) return true;
+                if (adjCastle.ownerClan !== clanId) {
+                    const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
+                    if (!rel || !window.DiplomacyRules.isAllianceOrVassal(rel.status)) return true;
+                }
+            }
+        }
+        return false;
     }
 
     // getCastleBushos() / samuraiIds は同居する浪人・諸勢力等も含むため、
@@ -449,22 +449,7 @@ class AIStaffing {
         // ★今回追加：解散条件を満たすような無駄な新設をブロックする魔法
         // ==========================================
         // 【ブロック条件①】すべての隣接拠点が「自勢力」または「同盟・支配・従属」しかない場合
-        let hasEnemyNeighbor = false;
-        for (const castle of targetCastles) {
-            for (const adjCastle of this._getAdjacentCastles(castle)) {
-                if (adjCastle.ownerClan === 0) {
-                    hasEnemyNeighbor = true; // 空き城は敵扱い
-                    break;
-                } else if (adjCastle.ownerClan !== clanId) {
-                    const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
-                    if (!rel || !window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
-                        hasEnemyNeighbor = true; // 敵対や和睦も油断できない敵扱い
-                        break;
-                    }
-                }
-            }
-            if (hasEnemyNeighbor) break;
-        }
+        const hasEnemyNeighbor = this._hasPotentialEnemyNeighbor(clanId, targetCastles);
         if (!hasEnemyNeighbor) return false; // ★変更：失敗時は false を返す
 
         // 【ブロック条件②】新設後の武将数が拠点数を下回る場合（人手不足）
@@ -481,25 +466,29 @@ class AIStaffing {
         // 2. 新国主をカウント
         futureLegionBushoIds.add(newCommander.id);
         
-        // 3. お供の武将をカウント（同じ派閥の直轄武将の1/3）
-        if (newCommander.factionId !== 0) {
-            const sameFactionBushos = this.game.getClanBushos(clanId).filter(b => 
-                window.BushoStatusRules.isActive(b) && 
-                b.factionId === newCommander.factionId && 
-                !b.isDaimyo && 
-                !b.isCommander && 
-                !b.isCastellan && 
-                !b.isGunshi && 
+        // 3. お供の武将をカウント（同じ派閥の直轄武将の1/3）。
+        // 任命前の予定と、国主転任後の実行では役職・居城が変わり得るため、
+        // 資格と人数の式だけ共有し、候補配列は各段階で取り直す。
+        const getDirectFactionEscorts = () => {
+            const sameFactionBushos = this.game.getClanBushos(clanId).filter(b =>
+                window.BushoStatusRules.isActive(b) &&
+                b.factionId === newCommander.factionId &&
+                !b.isDaimyo &&
+                !b.isCommander &&
+                !b.isCastellan &&
+                !b.isGunshi &&
                 b.id !== newCommander.id
             );
             const directBushos = sameFactionBushos.filter(b => {
                 const bCastle = this.game.getCastle(b.castleId);
                 return bCastle && Number(bCastle.legionId) === 0;
             });
-            const maxMoveCount = Math.floor(directBushos.length / 3);
-            for (let i = 0; i < maxMoveCount; i++) {
-                futureLegionBushoIds.add(directBushos[i].id);
-                plannedMoverIds.add(directBushos[i].id);
+            return directBushos.slice(0, Math.floor(directBushos.length / 3));
+        };
+        if (newCommander.factionId !== 0) {
+            for (const b of getDirectFactionEscorts()) {
+                futureLegionBushoIds.add(b.id);
+                plannedMoverIds.add(b.id);
             }
         }
 
@@ -527,31 +516,10 @@ class AIStaffing {
         newCommander.isCommander = true;
         this.game.affiliationSystem.clearGunshiRole(newCommander); // 国主になる時は軍師役職を外す
         
-        // ★追加：新国主が派閥に所属している場合、同じ派閥の武将を移動先に集める
+        // ★新国主転任後の最新の役職・在城状況で候補を再評価してから移す。
+        // 見積り時の配列を使い回さず、資格・人数式だけ同じ関数を使う。
         if (newCommander.factionId !== 0) {
-            // 同じ大名家で、活動中で、同じ派閥で、大名・国主・城主・軍師ではない人を探します
-            const sameFactionBushos = this.game.getClanBushos(clanId).filter(b => 
-                window.BushoStatusRules.isActive(b) && 
-                b.factionId === newCommander.factionId && 
-                !b.isDaimyo && 
-                !b.isCommander && 
-                !b.isCastellan && 
-                !b.isGunshi && 
-                b.id !== newCommander.id
-            );
-
-            // ① まず、直轄（軍団IDが0）のお城にいるお友達だけを別のリストにまとめます
-            const directBushos = sameFactionBushos.filter(b => {
-                const bCastle = this.game.getCastle(b.castleId);
-                return bCastle && Number(bCastle.legionId) === 0;
-            });
-
-            // ② そのリストにいる人数の「3分の1」を計算します（端数は切り捨てます）
-            const maxMoveCount = Math.floor(directBushos.length / 3);
-
-            // ③ 計算した人数の分だけ、順番に新国主のお城へお引越しさせます
-            for (let i = 0; i < maxMoveCount; i++) {
-                const b = directBushos[i];
+            for (const b of getDirectFactionEscorts()) {
                 this.game.affiliationSystem.moveCastle(b, baseCastle.id);
             }
         }
@@ -623,26 +591,8 @@ class AIStaffing {
             }
 
             // 【条件①】すべての隣接拠点が「自勢力」または「同盟・支配・従属」しかない場合
-            let hasEnemyNeighbor = false;
-            for (const castle of legionCastles) {
-                for (const adjCastle of this._getAdjacentCastles(castle)) {
-                    if (adjCastle.ownerClan === 0) {
-                        // 空き城は敵の扱い（野盗がいるかもしれないので油断できない）
-                        hasEnemyNeighbor = true;
-                        break;
-                    } else if (adjCastle.ownerClan !== clanId) {
-                        // 自分以外の勢力なら、関係を調べます
-                        const rel = this.game.getRelation(clanId, adjCastle.ownerClan);
-                        // 同盟・支配・従属「以外」なら敵扱い（和睦や友好も油断できないとみなします）
-                        if (!rel || !window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
-                            hasEnemyNeighbor = true;
-                            break;
-                        }
-                    }
-                }
-                if (hasEnemyNeighbor) break; // 1つでも敵と面していたら、もう探さなくてOK
-            }
-            
+            const hasEnemyNeighbor = this._hasPotentialEnemyNeighbor(clanId, legionCastles);
+
             // もし敵と全く面していなければ（完全な後方になったら）、
             // 「現在の軍団が上限（8枠）まで埋まっている場合のみ」解散します
             const currentActiveCount = this.game.legions.filter(l => l.clanId === clanId && l.commanderId > 0).length;
@@ -889,42 +839,10 @@ class AIStaffing {
         this.clearCacheIfNeeded();
         const clanId = castle.ownerClan;
         
-        // ★追加：移動可能な城を、同盟・支配・従属を通れるルートで探し直します！
-        const myReachableCastles = [];
-        const visitedCastles = new Set();
-        const searchQueue = [castle];
-        let searchHead = 0;
-        visitedCastles.add(castle.id);
+        // 候補の再探索は地図サービスへ委譲し、移動計画ごとの通行条件の複製をなくす。
+        // この段階ではまだ所属移動を実行していないため、候補順序はBFSの到達順のまま。
+        const myReachableCastles = this._getReachableOwnCastles(castle, clanId);
 
-        while (searchHead < searchQueue.length) {
-            const current = searchQueue[searchHead++];
-            
-            if (Number(current.ownerClan) === Number(clanId)) {
-                myReachableCastles.push(current);
-            }
-
-            // ★軽量化：全国の全城を毎回filterせず、対称化した隣接索引だけを見ます。
-            // MapGraphService.isAdjacent と同じく「片側に記載があれば隣接」の結果を維持します。
-            const adjCastles = this._getAdjacentCastles(current).filter(c => !visitedCastles.has(c.id));
-
-            for (const n of adjCastles) {
-                let canPass = false;
-                if (Number(n.ownerClan) === Number(clanId)) {
-                    canPass = true;
-                } else if (n.ownerClan !== 0) {
-                    const rel = this.game.getRelation(clanId, n.ownerClan);
-                    if (rel && window.DiplomacyRules.isAllianceOrVassal(rel.status)) {
-                        canPass = true;
-                    }
-                }
-                
-                if (canPass) {
-                    visitedCastles.add(n.id);
-                    searchQueue.push(n);
-                }
-            }
-        }
-        
         // ★追加：武将の移動先を「同じ軍団のお城」だけに限定します！
         // 呼出元が大雪の候補を除外しても、この計画では同盟領を通る到達範囲を
         // 独自に再探索する。再探索後の候補にも既存の大雪通行制限を適用する。

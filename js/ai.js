@@ -83,7 +83,7 @@ class AIEngine {
     // 行動候補の計算は概算でも、資源の変更は現在の残高と取引上限を正本にする。
     _executeRicePurchase(castle, amount, availableGold) {
         if (!castle || !Number.isSafeInteger(amount) || amount <= 0 ||
-            !Number.isFinite(Number(castle.rice)) || castle.rice + amount > 99999) return false;
+            !Number.isFinite(Number(castle.rice)) || castle.rice + amount > GameConfig.Limits.CastleStock) return false;
         const {cost} = EconomyRules.calcTradeCostAndRate(
             'buy_rice', amount, castle, null, null, this.game.provinces, this.game
         );
@@ -2914,8 +2914,8 @@ class AIEngine {
                     }
 
                     // 兵士が上限（99999）を超えないようにします
-                    if (castle.soldiers + soldiers > 99999) {
-                        soldiers = 99999 - castle.soldiers;
+                    if (castle.soldiers + soldiers > GameConfig.Limits.CastleStock) {
+                        soldiers = GameConfig.Limits.CastleStock - castle.soldiers;
                         draftCost = DomesticRules.calcDraftCost(soldiers, doer, castle.peoplesLoyalty, castle.population);
                     }
 
@@ -3025,7 +3025,7 @@ class AIEngine {
                     const budgetAmount = isGun
                         ? EconomyRules.calcBuyGunAmount(500, daimyo, castellan, this.game)
                         : EconomyRules.calcBuyHorseAmount(500, daimyo, castellan, this.game);
-                    const remainingCapacity = Math.max(0, 99999 - (castle[stockKey] || 0));
+                    const remainingCapacity = Math.max(0, GameConfig.Limits.CastleStock - (castle[stockKey] || 0));
                     const amount = Math.min(budgetAmount, remainingCapacity);
                     if (!Number.isSafeInteger(amount) || amount <= 0) continue;
                     const cost = isGun
@@ -3066,14 +3066,14 @@ class AIEngine {
                         const gain = Math.floor(sellAmount / rate);
                         if (gain <= 0) continue;
                         
-                        if (castle.gold + gain <= 99999) {
+                        if (castle.gold + gain <= GameConfig.Limits.CastleStock) {
                             castle.rice -= sellAmount;
                             castle.gold += gain;
                             castle.tradeLimit -= gain; // ★変更：減らすのは米の量ではなく「得た金額」
                             tradeCount++; step--; actionDoneInThisStep = true; break;
                         } else {
                             // もし上限(99,999)を超えてしまう場合は、持てる分だけ売るように調整してあげます
-                            const maxGain = 99999 - castle.gold;
+                            const maxGain = GameConfig.Limits.CastleStock - castle.gold;
                             const limitedGain = Math.min(maxGain, castle.tradeLimit || 0); // ★変更：上限も考慮
                             sellAmount = Math.floor(limitedGain * rate);
 
@@ -3117,8 +3117,8 @@ class AIEngine {
                     }
 
                     // 上限(99,999)を超えないように調整します
-                    if (castle.rice + buyAmount > 99999) {
-                        buyAmount = Math.min(buyAmount, 99999 - castle.rice);
+                    if (castle.rice + buyAmount > GameConfig.Limits.CastleStock) {
+                        buyAmount = Math.min(buyAmount, GameConfig.Limits.CastleStock - castle.rice);
                     }
 
                     // 買う量が決まったら実行します
@@ -3147,7 +3147,7 @@ class AIEngine {
                         // ① 徴兵用のお金のお使い
                         if (task.type === 'draft_gold') {
                             // ★変更：先の輸送で金が減っているため、使用可能金を毎回計算し直します
-                            if (EconomyRules.calcAvailableGoldForAI(castle, this.game) >= Math.floor(baseSoldiers * 1.5) + 500 && targetCastle.gold + 500 <= 99999) {
+                            if (EconomyRules.calcAvailableGoldForAI(castle, this.game) >= Math.floor(baseSoldiers * 1.5) + 500 && targetCastle.gold + 500 <= GameConfig.Limits.CastleStock) {
                                 castle.gold -= 500;
                                 targetCastle.gold += 500;
                                 didTransport = true;
@@ -3158,12 +3158,12 @@ class AIEngine {
                             // ★変更：送った後の兵士数が、最低限のお留守番ライン（500人）とそれに必要な兵糧（2.5倍）を下回らないか最終チェックします
                             const afterSoldiers = Math.max(0, castle.soldiers - 300);
                             const requiredRice = Math.floor(afterSoldiers * 2.5);
-                            if (castle.soldiers >= 800 && castle.rice >= requiredRice + 500 && targetCastle.soldiers + 300 <= 99999 && targetCastle.rice + 500 <= 99999) {
+                            if (castle.soldiers >= 800 && castle.rice >= requiredRice + 500 && targetCastle.soldiers + 300 <= GameConfig.Limits.CastleStock && targetCastle.rice + 500 <= GameConfig.Limits.CastleStock) {
                                 castle.soldiers -= 300;
                                 castle.rice -= 500;
                                 
-                                const sendHorses = Math.min(castle.horses || 0, 300, 99999 - (targetCastle.horses || 0));
-                                const sendGuns = Math.min(castle.guns || 0, 300, 99999 - (targetCastle.guns || 0));
+                                const sendHorses = Math.min(castle.horses || 0, 300, GameConfig.Limits.CastleStock - (targetCastle.horses || 0));
+                                const sendGuns = Math.min(castle.guns || 0, 300, GameConfig.Limits.CastleStock - (targetCastle.guns || 0));
                                 castle.horses = (castle.horses || 0) - sendHorses;
                                 targetCastle.horses = (targetCastle.horses || 0) + sendHorses;
                                 castle.guns = (castle.guns || 0) - sendGuns;
@@ -3180,12 +3180,12 @@ class AIEngine {
                         // ③ 普通の金・兵士のお使い
                         else if (task.type === 'normal_gold_soldier') {
                             // ★変更：先行輸送後の現在金・兵士を再確認し、予備金を超えて輸送しません
-                            if (EconomyRules.calcAvailableGoldForAI(castle, this.game) >= Math.floor(baseSoldiers * 1.5) + 500 && castle.soldiers >= 2500 && targetCastle.gold + 500 <= 99999 && targetCastle.soldiers + 500 <= 99999) {
+                            if (EconomyRules.calcAvailableGoldForAI(castle, this.game) >= Math.floor(baseSoldiers * 1.5) + 500 && castle.soldiers >= 2500 && targetCastle.gold + 500 <= GameConfig.Limits.CastleStock && targetCastle.soldiers + 500 <= GameConfig.Limits.CastleStock) {
                                 castle.gold -= 500;
                                 castle.soldiers -= 500;
                                 
-                                const sendHorses = Math.min(castle.horses || 0, 500, 99999 - (targetCastle.horses || 0));
-                                const sendGuns = Math.min(castle.guns || 0, 500, 99999 - (targetCastle.guns || 0));
+                                const sendHorses = Math.min(castle.horses || 0, 500, GameConfig.Limits.CastleStock - (targetCastle.horses || 0));
+                                const sendGuns = Math.min(castle.guns || 0, 500, GameConfig.Limits.CastleStock - (targetCastle.guns || 0));
                                 castle.horses = (castle.horses || 0) - sendHorses;
                                 targetCastle.horses = (targetCastle.horses || 0) + sendHorses;
                                 castle.guns = (castle.guns || 0) - sendGuns;
@@ -3202,7 +3202,7 @@ class AIEngine {
                         // ④ 普通の兵糧のお使い
                         else if (task.type === 'normal_rice') {
                             // ★変更：実行直前にも、米の余裕を最終チェックします
-                            if (castle.rice >= Math.floor(baseSoldiers * 3.0) + 1000 && targetCastle.rice + 1000 <= 99999) {
+                            if (castle.rice >= Math.floor(baseSoldiers * 3.0) + 1000 && targetCastle.rice + 1000 <= GameConfig.Limits.CastleStock) {
                                 castle.rice -= 1000;
                                 targetCastle.rice += 1000;
                                 didTransport = true;

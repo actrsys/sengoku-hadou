@@ -907,8 +907,8 @@ window.GameEvents.push({
                     
                     // それぞれのお城に、均等に分けた兵士と人口を足してあげます！
                     // 上限（兵士は99,999、人口は999,999）を超えないようにストッパーもかけておきます
-                    c.soldiers = Math.min(99999, (c.soldiers || 0) + soldiersPerCastle);
-                    c.population = Math.min(999999, (c.population || 0) + populationPerCastle);
+                    c.soldiers = Math.min(GameConfig.Limits.CastleStock, (c.soldiers || 0) + soldiersPerCastle);
+                    c.population = Math.min(GameConfig.Limits.CastlePopulation, (c.population || 0) + populationPerCastle);
                 });
             }
 
@@ -1017,20 +1017,20 @@ window.GameEvents.push({
                         if ((c.soldiers || 0) < 5000) {
                             c.soldiers = 5000;
                         } else {
-                            c.soldiers = Math.min(99999, (c.soldiers || 0) + 1000);
+                            c.soldiers = Math.min(GameConfig.Limits.CastleStock, (c.soldiers || 0) + 1000);
                         }
                         // 人口を8000増やします（上限は99万9999）
-                        c.population = Math.min(999999, (c.population || 0) + 8000);
+                        c.population = Math.min(GameConfig.Limits.CastlePopulation, (c.population || 0) + 8000);
                     } else {
                         // 【家康の居城以外の拠点の場合】
                         // 兵士数が4000未満なら3000に、3000以上なら+500します（上限は99999）
                         if ((c.soldiers || 0) < 3000) {
                             c.soldiers = 3000;
                         } else {
-                            c.soldiers = Math.min(99999, (c.soldiers || 0) + 500);
+                            c.soldiers = Math.min(GameConfig.Limits.CastleStock, (c.soldiers || 0) + 500);
                         }
                         // 人口を5000増やします（上限は99万9999）
-                        c.population = Math.min(999999, (c.population || 0) + 5000);
+                        c.population = Math.min(GameConfig.Limits.CastlePopulation, (c.population || 0) + 5000);
                     }
                 });
                 
@@ -1798,7 +1798,7 @@ window.GameEvents.push({
         inabayama.peoplesLoyalty = inabayama.maxPeoplesLoyalty;
 
         // ④ 兵士を1000人増やし、人口は「5000人足した仮の数」を作って覚えておきます
-        inabayama.soldiers = Math.min(99999, (inabayama.soldiers || 0) + 1000);
+        inabayama.soldiers = Math.min(GameConfig.Limits.CastleStock, (inabayama.soldiers || 0) + 1000);
         let tempPopulation = (inabayama.population || 0) + 5000;
 
         // ⑤ ★追加：石高の入れ替え処理
@@ -1816,11 +1816,11 @@ window.GameEvents.push({
         if (tempPopulation <= kiyosuPopulation) {
             // 5000人を足しても清洲城を上回っていない（少ないか同じ）なら、数字を入れ替えます
             // 人口の上限は99万9999なので、それを超えないようにストッパーをかけます
-            inabayama.population = Math.min(999999, kiyosuPopulation);
-            kiyosu.population = Math.min(999999, tempPopulation);
+            inabayama.population = Math.min(GameConfig.Limits.CastlePopulation, kiyosuPopulation);
+            kiyosu.population = Math.min(GameConfig.Limits.CastlePopulation, tempPopulation);
         } else {
             // 5000人を足して清洲城を上回ったなら、入れ替えずにそのまま足した数を確定させます
-            inabayama.population = Math.min(999999, tempPopulation);
+            inabayama.population = Math.min(GameConfig.Limits.CastlePopulation, tempPopulation);
         }
 
         // ⑦ プレイヤーが織田家を担当していない（AIが操作している）場合のみ、特別な整理を行います
@@ -1917,7 +1917,7 @@ window.GameEvents.push({
         hikuma.peoplesLoyalty = hikuma.maxPeoplesLoyalty;
 
         // ④ 兵士を1000人増やし、人口は「5000人足した仮の数」を作って覚えておきます
-        hikuma.soldiers = Math.min(99999, (hikuma.soldiers || 0) + 1000);
+        hikuma.soldiers = Math.min(GameConfig.Limits.CastleStock, (hikuma.soldiers || 0) + 1000);
         let tempPopulation = (hikuma.population || 0) + 5000;
 
         // ⑤ 石高の入れ替え処理
@@ -1934,11 +1934,11 @@ window.GameEvents.push({
         const okazakiPopulation = okazaki.population || 0;
         if (okazakiPopulation > tempPopulation) {
             // 5000人を足した後の浜松城の人口より、岡崎城の人口の方が大きい（上回っている）なら入れ替えます
-            hikuma.population = Math.min(999999, okazakiPopulation);
-            okazaki.population = Math.min(999999, tempPopulation);
+            hikuma.population = Math.min(GameConfig.Limits.CastlePopulation, okazakiPopulation);
+            okazaki.population = Math.min(GameConfig.Limits.CastlePopulation, tempPopulation);
         } else {
             // 上回っていないなら、入れ替えずにそのまま足した数を確定させます
-            hikuma.population = Math.min(999999, tempPopulation);
+            hikuma.population = Math.min(GameConfig.Limits.CastlePopulation, tempPopulation);
         }
 
         // ⑦ プレイヤーが担当していない（AIが操作している）場合のみ、特別な整理を行います
@@ -2349,10 +2349,10 @@ window.GameEvents.push({
         const asakuraCastles = game.getClanCastles(asakuraClanId);
         asakuraCastles.forEach(c => {
             c.peoplesLoyalty = 100; 
-            c.population = Math.min(999999, (c.population || 0) + 2000);
-            c.rice = Math.min(99999, (c.rice || 0) + 2000);
-            c.soldiers = Math.min(99999, (c.soldiers || 0) + 1000);
-            c.gold = Math.min(99999, (c.gold || 0) + 1000);
+            c.population = Math.min(GameConfig.Limits.CastlePopulation, (c.population || 0) + 2000);
+            c.rice = Math.min(GameConfig.Limits.CastleStock, (c.rice || 0) + 2000);
+            c.soldiers = Math.min(GameConfig.Limits.CastleStock, (c.soldiers || 0) + 1000);
+            c.gold = Math.min(GameConfig.Limits.CastleStock, (c.gold || 0) + 1000);
         });
 
         // --- 会話イベントのための準備 ---
@@ -2710,10 +2710,10 @@ window.GameEvents.push({
         const odaCastles = game.getClanCastles(nobunagaClanId);
         odaCastles.forEach(c => {
             c.peoplesLoyalty = 100;
-            c.population = Math.min(999999, (c.population || 0) + 5000);
-            c.rice = Math.min(99999, (c.rice || 0) + 5000);
-            c.soldiers = Math.min(99999, (c.soldiers || 0) + 2000);
-            c.gold = Math.min(99999, (c.gold || 0) + 2000);
+            c.population = Math.min(GameConfig.Limits.CastlePopulation, (c.population || 0) + 5000);
+            c.rice = Math.min(GameConfig.Limits.CastleStock, (c.rice || 0) + 5000);
+            c.soldiers = Math.min(GameConfig.Limits.CastleStock, (c.soldiers || 0) + 2000);
+            c.gold = Math.min(GameConfig.Limits.CastleStock, (c.gold || 0) + 2000);
         });
 
         // 朝倉勢力の全ての拠点の民忠が１０低下し、それぞれ人口・兵士が０．７倍になる（小数点以下切り捨て）。
@@ -3041,10 +3041,10 @@ window.GameEvents.push({
         // 将軍擁立勢力のすべての拠点にボーナスを与えます
         const sponsorCastles = game.castles.filter(c => c.ownerClan === sponsorClanId);
         sponsorCastles.forEach(c => {
-            c.soldiers = Math.min(99999, c.soldiers + 1000);
-            c.gold = Math.min(99999, c.gold + 1000);
-            c.population = Math.min(999999, c.population + 3000);
-            c.rice = Math.min(99999, c.rice + 3000);
+            c.soldiers = Math.min(GameConfig.Limits.CastleStock, c.soldiers + 1000);
+            c.gold = Math.min(GameConfig.Limits.CastleStock, c.gold + 1000);
+            c.population = Math.min(GameConfig.Limits.CastlePopulation, c.population + 3000);
+            c.rice = Math.min(GameConfig.Limits.CastleStock, c.rice + 3000);
         });
 
         // 将軍擁立勢力に所属するすべての武将の忠誠度を上げます

@@ -92,6 +92,16 @@ class CommandSystem {
         const myDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
         const c = currentCastle;
 
+        // 命令選択で繰り返す「拠点所有勢力の現役武将」を一つの条件で扱う。
+        // 同居する浪人・別勢力の武将は含めない。行動済みの除外などは各命令固有。
+        const isActiveOwnerBusho = (b, castle) =>
+            b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b);
+        const getActiveOwnerBushos = castle => this.game.getCastleBushos(castle.id).filter(b =>
+            isActiveOwnerBusho(b, castle));
+        // 離間・引抜・暗殺の対象は、同じ現役所属判定に国衆・大名の除外を追加する。
+        const getIntrigueTargets = castle => this.game.getCastleBushos(castle.id).filter(b =>
+            isActiveOwnerBusho(b, castle) && Number(b.belongKunishuId || 0) === 0 && !b.isDaimyo);
+
         // --- 条件分岐（誰をリストに出すか） ---
         if (actionType === 'employ_target') { 
             bushos = [];
@@ -105,59 +115,59 @@ class CommandSystem {
             infoHtml = "<div>登用する浪人を選択してください</div>"; 
         }
         else if (actionType === 'employ_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
+            bushos = getActiveOwnerBushos(c); 
             infoHtml = "<div>登用を行う担当官を選択してください</div>"; 
         } 
         else if (actionType === 'diplomacy_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
+            bushos = getActiveOwnerBushos(c); 
             infoHtml = "<div>外交の担当官を選択してください</div>"; 
         }
         // ★追加：貢物を持っていく使者を選ぶリスト
         else if (actionType === 'tribute_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
+            bushos = getActiveOwnerBushos(c); 
             infoHtml = "<div>朝廷への使者を選択してください</div>"; 
         }
         else if (actionType === 'rumor_target_busho') { 
             const targetCastle = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && Number(b.belongKunishuId || 0) === 0 && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
+            bushos = getIntrigueTargets(targetCastle); 
             infoHtml = "<div>離間計の対象とする武将を選択してください</div>"; 
         }
         else if (actionType === 'rumor_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
+            bushos = getActiveOwnerBushos(c); 
             infoHtml = "<div>離間計を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'incite_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
+            bushos = getActiveOwnerBushos(c); 
             infoHtml = "<div>民心撹乱を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'sabotage_doer') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
+            bushos = getActiveOwnerBushos(c); 
             infoHtml = "<div>破壊工作を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_target') { 
             const targetCastle = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && Number(b.belongKunishuId || 0) === 0 && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
+            bushos = getIntrigueTargets(targetCastle); 
             infoHtml = "<div>武将引抜の対象とする武将を選択してください </div>"; 
         }
         else if (actionType === 'assassinate_target') { 
             const targetCastle = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetCastle.ownerClan && Number(b.belongKunishuId || 0) === 0 && window.BushoStatusRules.isActive(b) && !b.isDaimyo); 
+            bushos = getIntrigueTargets(targetCastle); 
             infoHtml = "<div>暗殺の対象とする武将を選択してください</div>"; 
         }
         else if (actionType === 'kuko_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
+            bushos = getActiveOwnerBushos(c); 
             infoHtml = "<div>駆虎呑狼を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'kunishu_incorporate_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
+            bushos = getActiveOwnerBushos(c); 
             infoHtml = "<div>取込の交渉を行う担当官を選択してください</div>"; 
         }
         else if (actionType === 'headhunt_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
+            bushos = getActiveOwnerBushos(c); 
             infoHtml = "<div>引抜を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'assassinate_doer') {
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
+            bushos = getActiveOwnerBushos(c); 
             infoHtml = "<div>暗殺を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'arrange_marriage_busho') { 
@@ -166,7 +176,7 @@ class CommandSystem {
             if (extraData) extraData.allowDone = true;
         }
         else if (actionType === 'investigate_deploy') { 
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b)); 
+            bushos = getActiveOwnerBushos(c); 
             infoHtml = "<div>調査を行う武将を選択してください(複数可)</div>"; 
         }
         else if (actionType === 'view_only') { 
@@ -220,17 +230,17 @@ class CommandSystem {
         }
         else if (actionType === 'def_intercept_deploy') {
             const targetC = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && window.BushoStatusRules.isActive(b));
+            bushos = getActiveOwnerBushos(targetC);
             infoHtml = "<div>出陣武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'def_reinf_deploy' || actionType === 'atk_reinf_deploy') {
             const targetC = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && window.BushoStatusRules.isActive(b));
+            bushos = getActiveOwnerBushos(targetC);
             infoHtml = "<div>派遣する武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'def_self_reinf_deploy' || actionType === 'atk_self_reinf_deploy') {
             const targetC = this.game.getCastle(targetId);
-            bushos = this.game.getCastleBushos(targetId).filter(b => b.clan === targetC.ownerClan && window.BushoStatusRules.isActive(b));
+            bushos = getActiveOwnerBushos(targetC);
             infoHtml = "<div>出陣武将を選択してください（最大5名まで）</div>";
         }
         else if (actionType === 'reward') {
@@ -275,7 +285,7 @@ class CommandSystem {
         }
         else {
             // ★追加: 内政などの通常の命令でも、未登場の武将や諸勢力が勝手にリストに出ないようにします
-            bushos = this.game.getCastleBushos(c.id).filter(b => b.clan === c.ownerClan && window.BushoStatusRules.isActive(b));
+            bushos = getActiveOwnerBushos(c);
             
             if (spec.msg) {
                 infoHtml = `<div>${spec.msg}</div>`;
@@ -1848,11 +1858,11 @@ class CommandSystem {
         if (!this._validateTravelOrder('transport', bushoIds, targetId)) return;
 
         // ★ここから追加：輸送先が上限を超えないか事前にチェックして、超えるならお断りします！
-        if (t.gold + vals.gold > 99999) { this.game.ui.showDialog("輸送先の「金」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
-        if (t.rice + vals.rice > 99999) { this.game.ui.showDialog("輸送先の「兵糧」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
-        if (t.soldiers + vals.soldiers > 99999) { this.game.ui.showDialog("輸送先の「兵数」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
-        if ((t.horses || 0) + vals.horses > 99999) { this.game.ui.showDialog("輸送先の「軍馬」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
-        if ((t.guns || 0) + vals.guns > 99999) { this.game.ui.showDialog("輸送先の「鉄砲」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
+        if (t.gold + vals.gold > GameConfig.Limits.CastleStock) { this.game.ui.showDialog("輸送先の「金」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
+        if (t.rice + vals.rice > GameConfig.Limits.CastleStock) { this.game.ui.showDialog("輸送先の「兵糧」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
+        if (t.soldiers + vals.soldiers > GameConfig.Limits.CastleStock) { this.game.ui.showDialog("輸送先の「兵数」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
+        if ((t.horses || 0) + vals.horses > GameConfig.Limits.CastleStock) { this.game.ui.showDialog("輸送先の「軍馬」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
+        if ((t.guns || 0) + vals.guns > GameConfig.Limits.CastleStock) { this.game.ui.showDialog("輸送先の「鉄砲」が上限(99,999)を超えてしまうため、輸送できません。", false); return; }
 
         // ★修正: エラーの原因だった「訓練・士気の計算式」を直接計算するように直しました
         if(vals.soldiers > 0) { 
@@ -1976,7 +1986,7 @@ class CommandSystem {
             // ★変更：共通魔法でチェックします
             if(!this.checkResource(castle, costOrGain, 0)) return;
             // ★追加: 買うと上限を超えるならストップ
-            if(castle.rice + amount > 99999) { this.game.ui.showDialog("これ以上兵糧は買えません", false); return; }
+            if(castle.rice + amount > GameConfig.Limits.CastleStock) { this.game.ui.showDialog("これ以上兵糧は買えません", false); return; }
             if(costOrGain > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
             castle.gold -= costOrGain; castle.rice += amount; 
             castle.tradeLimit -= costOrGain;
@@ -1990,24 +2000,24 @@ class CommandSystem {
             // ★変更：売却なのでお金が足りるかのチェックはなし
             if(!this.checkResource(castle, 0, amount)) return;
             // ★追加: 売ると金が上限を超えるならストップ
-            if(castle.gold + costOrGain > 99999) { this.game.ui.showDialog("これ以上兵糧は売れません", false); return; }
+            if(castle.gold + costOrGain > GameConfig.Limits.CastleStock) { this.game.ui.showDialog("これ以上兵糧は売れません", false); return; }
             if(costOrGain > (castle.tradeLimit || 0)) { this.game.ui.showDialog("取引上限を超えています", false); return; }
             castle.rice -= amount; castle.gold += costOrGain; 
             castle.tradeLimit -= costOrGain;
             msg = `兵糧${amount}を売却しました\n(金+${costOrGain})`; 
         } else if (type === 'buy_ammo') {
             if(!this.checkResource(castle, costOrGain, 0)) return;
-            if((castle.ammo || 0) + amount > 99999) { this.game.ui.showDialog("これ以上矢弾は買えません", false); return; }
+            if((castle.ammo || 0) + amount > GameConfig.Limits.CastleStock) { this.game.ui.showDialog("これ以上矢弾は買えません", false); return; }
             castle.gold -= costOrGain; castle.ammo = (castle.ammo || 0) + amount; 
             msg = `矢弾${amount}を購入しました\n(金-${costOrGain})`; 
         } else if (type === 'buy_horses') {
             if(!this.checkResource(castle, costOrGain, 0)) return;
-            if((castle.horses || 0) + amount > 99999) { this.game.ui.showDialog("これ以上軍馬は買えません", false); return; }
+            if((castle.horses || 0) + amount > GameConfig.Limits.CastleStock) { this.game.ui.showDialog("これ以上軍馬は買えません", false); return; }
             castle.gold -= costOrGain; castle.horses = (castle.horses || 0) + amount; 
             msg = `軍馬${amount}を購入しました\n(金-${costOrGain})`; 
         } else if (type === 'buy_guns') {
             if(!this.checkResource(castle, costOrGain, 0)) return;
-            if((castle.guns || 0) + amount > 99999) { this.game.ui.showDialog("これ以上鉄砲は買えません", false); return; }
+            if((castle.guns || 0) + amount > GameConfig.Limits.CastleStock) { this.game.ui.showDialog("これ以上鉄砲は買えません", false); return; }
             castle.gold -= costOrGain; castle.guns = (castle.guns || 0) + amount; 
             msg = `鉄砲${amount}を購入しました\n(金-${costOrGain})`; 
         }
@@ -2040,7 +2050,7 @@ class CommandSystem {
             return; 
         }
 
-        if (castle.soldiers + soldiers > 99999) {
+        if (castle.soldiers + soldiers > GameConfig.Limits.CastleStock) {
             this.game.ui.showDialog(`兵数が上限(99,999)を超えるため、これ以上徴兵できません。\n(現在の兵数: ${castle.soldiers})`, false);
             return;
         }

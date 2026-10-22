@@ -2635,11 +2635,11 @@ class DiplomacyManager {
         }
 
         // ★追加：物資（金・兵糧・兵士・馬・鉄砲）を全て引越し先のお城に運びます！
-        castleB.gold = Math.min(99999, castleB.gold + castleA.gold);
-        castleB.rice = Math.min(99999, castleB.rice + castleA.rice);
-        castleB.soldiers = Math.min(99999, castleB.soldiers + castleA.soldiers);
-        castleB.horses = Math.min(99999, (castleB.horses || 0) + (castleA.horses || 0));
-        castleB.guns = Math.min(99999, (castleB.guns || 0) + (castleA.guns || 0));
+        castleB.gold = Math.min(GameConfig.Limits.CastleStock, castleB.gold + castleA.gold);
+        castleB.rice = Math.min(GameConfig.Limits.CastleStock, castleB.rice + castleA.rice);
+        castleB.soldiers = Math.min(GameConfig.Limits.CastleStock, castleB.soldiers + castleA.soldiers);
+        castleB.horses = Math.min(GameConfig.Limits.CastleStock, (castleB.horses || 0) + (castleA.horses || 0));
+        castleB.guns = Math.min(GameConfig.Limits.CastleStock, (castleB.guns || 0) + (castleA.guns || 0));
 
         // 運び終わったので、元の城（A）の物資はからっぽにします。
         castleA.gold = 0;
@@ -3117,7 +3117,7 @@ class DiplomacyManager {
 
             if (type === 'goodwill') {
                 const doerCastle = this.game.getCastle(doer.castleId);
-                if (doerCastle) doerCastle.gold = Math.min(99999, doerCastle.gold + gold);
+                if (doerCastle) doerCastle.gold = Math.min(GameConfig.Limits.CastleStock, doerCastle.gold + gold);
                 this.game.ui.showResultModal(`親善の品を突き返しました。`, () => {
                     this._scheduleProposalCompletion(onComplete, 100);
                 });
@@ -3157,7 +3157,7 @@ class DiplomacyManager {
 
             if (type === 'goodwill') {
                 const myCastleObj = this.game.getClanCastles(targetClanId)[0];
-                if (myCastleObj) myCastleObj.gold = Math.min(99999, myCastleObj.gold + gold);
+                if (myCastleObj) myCastleObj.gold = Math.min(GameConfig.Limits.CastleStock, myCastleObj.gold + gold);
                 const increase = this.calcGoodwillIncrease(gold, doer);
                 this.updateSentiment(doer.clan, targetClanId, increase);
                 this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}からの親善を受け入れました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
