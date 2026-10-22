@@ -1,0 +1,26 @@
+r649 兵士合流時の士気・訓練度 加重平均算式の共通化監査記録
+
+【基準】r648
+【監査対象】戦後の兵士帰還、落城時の兵士収容、プレイヤー徴兵・輸送、AI徴兵・輸送、外交城割譲後の兵士退避
+
+【観察】
+加重平均の切捨て算式が、AI・CommandSystem・DiplomacyManager・WarManagerで重複していた。
+この重複は計算上同一でありながら、それぞれ今後の変更で丸め処理がばらつく要因になる。
+ただし、戦後の上限99,999人、攻略軍の能力を下回らない仕様、未設定値の既定値、合流後0人時の扱い、AI輸送に武将を随伴させない仕様は相互に異なる正当な責務であり、統合しない。
+
+【改修】
+GameMath.weightedAverageFloor(existingValue, existingCount, incomingValue, incomingCount) に算術式のみ集約。
+対象：js/ai.js、js/command_system.js、js/diplomacy.js、js/war_effort.js。
+更新前の乗算順序・加算順序・除算・Math.floorを維持し、数値規則を変更しない。
+各業務側の受け入れ条件、人数上限、能力下限、未設定値フォールバック、兵士数と物資の書換、履歴処理、UIは維持。
+実行時JS依存の読込順はindex.htmlでGameMathが各呼出側より前であることを確認。
+単独vmテストとNode直接テストでも、本番同様にGameMathを先に用意するようtests/run_tests.jsの環境を更新。
+
+【テスト】
+算術一致：固定7例＋生成1000例を従来の計算式と比較。
+既存ロジックテスト：1,125件がr648時点で成功。
+r649：追加1件を含む1,126件すべて成功。
+ゲームデータ、セーブ形式、UI表現、戦闘や内政のパラメータ変更なし。
+自然な月次進行を長期間実行した通しプレイではない。
+
+【変更したもの】js/game_math.js、js/ai.js、js/command_system.js、js/diplomacy.js、js/war_effort.js、js/config.js、tests/run_tests.js、ARCHITECTURE.md、docs/audits/README.md。この記録ファイルを新規追加。

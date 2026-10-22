@@ -1858,8 +1858,8 @@ class CommandSystem {
         if(vals.soldiers > 0) { 
             const totalS = t.soldiers + vals.soldiers;
             if (totalS > 0) {
-                t.training = Math.floor(((t.training * t.soldiers) + (c.training * vals.soldiers)) / totalS);
-                t.morale = Math.floor(((t.morale * t.soldiers) + (c.morale * vals.soldiers)) / totalS);
+                t.training = GameMath.weightedAverageFloor(t.training, t.soldiers, c.training, vals.soldiers);
+                t.morale = GameMath.weightedAverageFloor(t.morale, t.soldiers, c.morale, vals.soldiers);
             }
         }
         
@@ -2059,8 +2059,8 @@ class CommandSystem {
         const newTraining = 30; 
         
         if (castle.soldiers + soldiers > 0) {
-            castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
-            castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
+            castle.training = GameMath.weightedAverageFloor(castle.training, castle.soldiers, newTraining, soldiers);
+            castle.morale = GameMath.weightedAverageFloor(castle.morale, castle.soldiers, newMorale, soldiers);
         }
         castle.soldiers += soldiers; 
         busho.isActionDone = true; 

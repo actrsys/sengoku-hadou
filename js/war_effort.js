@@ -41,14 +41,8 @@ Object.assign(WarManager.prototype, {
         );
         const newSoldiers = oldSoldiers + acceptedSoldiers;
         if (newSoldiers > 0 && acceptedSoldiers > 0) {
-            helperCastle.training = Math.floor(
-                ((helperCastle.training ?? 50) * oldSoldiers +
-                 (reinf.training ?? 50) * acceptedSoldiers) / newSoldiers
-            );
-            helperCastle.morale = Math.floor(
-                ((helperCastle.morale ?? 50) * oldSoldiers +
-                 (reinf.morale ?? 50) * acceptedSoldiers) / newSoldiers
-            );
+            helperCastle.training = GameMath.weightedAverageFloor(helperCastle.training ?? 50, oldSoldiers, reinf.training ?? 50, acceptedSoldiers);
+            helperCastle.morale = GameMath.weightedAverageFloor(helperCastle.morale ?? 50, oldSoldiers, reinf.morale ?? 50, acceptedSoldiers);
         }
         helperCastle.soldiers = newSoldiers;
         return acceptedSoldiers;
@@ -66,14 +60,10 @@ Object.assign(WarManager.prototype, {
         if (acceptedTotal > 0) {
             const attackerTraining = Number(attackingArmy.training) || 0;
             const attackerMorale = Number(attackingArmy.morale) || 0;
-            const averageTraining = Math.floor(
-                ((Number(capturedCastle.training) || 0) * acceptedDefender +
-                 attackerTraining * acceptedAttacker) / acceptedTotal
-            );
-            const averageMorale = Math.floor(
-                ((Number(capturedCastle.morale) || 0) * acceptedDefender +
-                 attackerMorale * acceptedAttacker) / acceptedTotal
-            );
+            const averageTraining = GameMath.weightedAverageFloor(
+                Number(capturedCastle.training) || 0, acceptedDefender, attackerTraining, acceptedAttacker);
+            const averageMorale = GameMath.weightedAverageFloor(
+                Number(capturedCastle.morale) || 0, acceptedDefender, attackerMorale, acceptedAttacker);
             // 既存の制圧時規則（攻略軍の士気・訓練度を下回らない）は維持する。
             capturedCastle.training = Math.max(attackerTraining, averageTraining);
             capturedCastle.morale = Math.max(attackerMorale, averageMorale);

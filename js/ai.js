@@ -2949,8 +2949,8 @@ class AIEngine {
                         
                         const newMorale = Math.max(0, castle.morale - 10);
                         const newTraining = Math.max(0, castle.training - 10);
-                        castle.training = Math.floor(((castle.training * castle.soldiers) + (newTraining * soldiers)) / (castle.soldiers + soldiers));
-                        castle.morale = Math.floor(((castle.morale * castle.soldiers) + (newMorale * soldiers)) / (castle.soldiers + soldiers));
+                        castle.training = GameMath.weightedAverageFloor(castle.training, castle.soldiers, newTraining, soldiers);
+                        castle.morale = GameMath.weightedAverageFloor(castle.morale, castle.soldiers, newMorale, soldiers);
                         castle.soldiers += soldiers;
                         
                         // 頑張ったご褒美をあげます
@@ -3169,9 +3169,8 @@ class AIEngine {
                                 castle.guns = (castle.guns || 0) - sendGuns;
                                 targetCastle.guns = (targetCastle.guns || 0) + sendGuns;
 
-                                const totalS = targetCastle.soldiers + 300;
-                                targetCastle.training = Math.floor(((targetCastle.training * targetCastle.soldiers) + (castle.training * 300)) / totalS);
-                                targetCastle.morale = Math.floor(((targetCastle.morale * targetCastle.soldiers) + (castle.morale * 300)) / totalS);
+                                targetCastle.training = GameMath.weightedAverageFloor(targetCastle.training, targetCastle.soldiers, castle.training, 300);
+                                targetCastle.morale = GameMath.weightedAverageFloor(targetCastle.morale, targetCastle.soldiers, castle.morale, 300);
                                 
                                 targetCastle.soldiers += 300;
                                 targetCastle.rice += 500;
@@ -3192,9 +3191,8 @@ class AIEngine {
                                 castle.guns = (castle.guns || 0) - sendGuns;
                                 targetCastle.guns = (targetCastle.guns || 0) + sendGuns;
 
-                                const totalS = targetCastle.soldiers + 500;
-                                targetCastle.training = Math.floor(((targetCastle.training * targetCastle.soldiers) + (castle.training * 500)) / totalS);
-                                targetCastle.morale = Math.floor(((targetCastle.morale * targetCastle.soldiers) + (castle.morale * 500)) / totalS);
+                                targetCastle.training = GameMath.weightedAverageFloor(targetCastle.training, targetCastle.soldiers, castle.training, 500);
+                                targetCastle.morale = GameMath.weightedAverageFloor(targetCastle.morale, targetCastle.soldiers, castle.morale, 500);
                                 
                                 targetCastle.gold += 500; 
                                 targetCastle.soldiers += 500;

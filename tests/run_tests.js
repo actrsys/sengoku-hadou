@@ -9,6 +9,13 @@ const zlib = require('zlib');
 
 const ROOT = path.resolve(__dirname, '..');
 
+// ブラウザではindex.htmlが先行読込する純粋な共通計算Rules。
+// Node直実行とvm単独実行でも、本番と同じ依存を先に用意する。
+const GAME_MATH_SOURCE = fs.readFileSync(path.join(ROOT, 'js/game_math.js'), 'utf8');
+const gameMathRuntime = { window: {} };
+vm.runInNewContext(GAME_MATH_SOURCE, gameMathRuntime, { filename: 'js/game_math.js' });
+global.GameMath = gameMathRuntime.window.GameMath;
+
 let passed = 0;
 let failed = 0;
 const pendingTests = [];
@@ -56,6 +63,7 @@ function createContext(extra = {}) {
     };
     context.window = context;
     vm.createContext(context);
+    vm.runInContext(GAME_MATH_SOURCE, context, { filename: 'js/game_math.js' });
     return context;
 }
 
@@ -109,6 +117,32 @@ function fakeElement(id) {
         getAttribute() { return null; }
     };
 }
+
+// r649: 士気・訓練度の合流計算の丸めを共通の算術Rulesに集約する。
+// 対象ごとの上限・最低値・未設定値の意味は専門System側が保持する。
+test('r649 兵士合流時の加重平均は従来の切捨て算式と一致し、全入口が共通Rulesを利用する', () => {
+    const arithmetic = (a, n, b, m) => Math.floor((a * n + b * m) / (n + m));
+    const examples = [
+        [20, 100, 80, 50], [80, 90000, 20, 9999], [50, 0, 80, 100],
+        [120, 99998, 0, 1], [0, 1, 120, 99998], [65, 300, 66, 500],
+        [75.5, 311, 45.25, 389]
+    ];
+    for (let i = 1; i <= 1000; i++) {
+        examples.push([i % 121, (i * 7919) % 99999, (i * 37) % 121, 1 + (i * 1297) % 99999]);
+    }
+    examples.forEach(([a, n, b, m]) => {
+        assert.strictEqual(GameMath.weightedAverageFloor(a, n, b, m), arithmetic(a, n, b, m));
+    });
+    for (const file of ['js/ai.js', 'js/command_system.js', 'js/diplomacy.js', 'js/war_effort.js']) {
+        assert.ok(read(file).includes('GameMath.weightedAverageFloor('), `${file} uses the shared arithmetic`);
+    }
+    const html = read('index.html');
+    const mathIdx = html.indexOf('src="js/game_math.js"');
+    assert.ok(mathIdx > 0);
+    for (const file of ['command_system.js', 'ai.js', 'war_effort.js', 'diplomacy.js']) {
+        assert.ok(mathIdx < html.indexOf(`src="js/${file}"`), `${file} loads after game_math.js`);
+    }
+});
 
 // 月次ターン順はマスター行の初期位置に依存しない一様なシャッフルを使用する。
 // 通常のstartMonthから対象部分を取り出し、実際のゲーム配列への作用を確認する。
@@ -257,7 +291,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r648');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r649');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);

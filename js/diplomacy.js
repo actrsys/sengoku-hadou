@@ -2630,8 +2630,8 @@ class DiplomacyManager {
         // ★追加：合流先の訓練と士気を割合に応じて再計算します！
         const totalSoldiers = castleB.soldiers + castleA.soldiers;
         if (totalSoldiers > 0) {
-            castleB.training = Math.floor(((castleB.training || 0) * castleB.soldiers + (castleA.training || 0) * castleA.soldiers) / totalSoldiers);
-            castleB.morale = Math.floor(((castleB.morale || 0) * castleB.soldiers + (castleA.morale || 0) * castleA.soldiers) / totalSoldiers);
+            castleB.training = GameMath.weightedAverageFloor(castleB.training || 0, castleB.soldiers, castleA.training || 0, castleA.soldiers);
+            castleB.morale = GameMath.weightedAverageFloor(castleB.morale || 0, castleB.soldiers, castleA.morale || 0, castleA.soldiers);
         }
 
         // ★追加：物資（金・兵糧・兵士・馬・鉄砲）を全て引越し先のお城に運びます！
