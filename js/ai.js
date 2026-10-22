@@ -69,6 +69,16 @@ class AIEngine {
             && this._clampDispatchRice(operation.requiredRice, castle) > 0;
     }
 
+    // 外交関係を変える前と開戦直前で参照する、既存の大雪による出撃制限。
+    // 史実イベントの強制作戦には適用しない。対象地と出撃地の双方を確認する。
+    _isAttackBlockedByHeavySnow(sourceProvinceId, targetProvinceId, isEventOperation) {
+        if (isEventOperation) return false;
+        return [sourceProvinceId, targetProvinceId].some(id => {
+            const province = this.game.getProvince(id);
+            return !!(province && province.statusEffects && province.statusEffects.includes('heavySnow'));
+        });
+    }
+
     // AIの兵糧購入も金1あたりの兵糧量をEconomyRulesで換算し、実支出を一度だけ確定する。
     // 行動候補の計算は概算でも、資源の変更は現在の残高と取引上限を正本にする。
     _executeRicePurchase(castle, amount, availableGold) {
@@ -211,6 +221,7 @@ class AIEngine {
                     let canReach = false;
                     let isStillEnemy = false; // ★追加：まだ敵のままかどうかの印です
                     let targetProvId = castle.provinceId; // ★この時点では出撃元の国を仮置きしておきます
+                    let isHeavySnow = false; // 経路・外交判定と出陣判定で同じ積雪結果を使用する
                     
                     if (myOperation.isKunishuTarget) {
                         if (myOperation.isEventOperation) {
@@ -245,12 +256,13 @@ class AIEngine {
                             } else {
                                 // 道が繋がっているか、魔法を使って再確認します！
                                 canReach = MapGraphService.isReachable(this.game, castle, targetCastle, castle.ownerClan);
+                                isHeavySnow = this._isAttackBlockedByHeavySnow(castle.provinceId, targetProvId, false);
 
                                 if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'operation:reachability:done');
                                 
                                 // ★追加：お休み期間（immunityUntil）ではないか、味方や同盟国になっていないかチェックします！
                                 // 今の月（TurnId）よりもお休み期間の方が未来なら、攻撃は我慢します
-                                if ((targetCastle.immunityUntil || 0) < this.game.getCurrentTurnId()) {
+                                if (canReach && (targetCastle.immunityUntil || 0) < this.game.getCurrentTurnId()) {
                                     if (targetCastle.ownerClan !== castle.ownerClan) {
                                         if (targetCastle.ownerClan === 0) {
                                             isStillEnemy = true; // 空き城なら攻撃OKです
@@ -262,6 +274,15 @@ class AIEngine {
                                                 // ★修正：同盟の場合、友好度が50以上の「仲良し」なら絶対に破棄しません（作戦中止）
                                                 if (rel.status === '同盟' && rel.sentiment >= 50) {
                                                     isStillEnemy = false; 
+                                                } else if (isHeavySnow) {
+                                                    // 大雪なら作戦は保持するが、同盟・従属は破棄しない。
+                                                    // 積雪解除後に本来の出撃条件を再確認する。
+                                                    isStillEnemy = true;
+                                                } else if (!MapGraphService.isReachable(this.game, castle, targetCastle, castle.ownerClan,
+                                                    { blockedTransitClanId: targetCastle.ownerClan })) {
+                                                    // 攻撃対象との断交で相手領の通行権も失う。
+                                                    // 断交後の経路がなければ、外交だけ変更せず作戦を再検討する。
+                                                    canReach = false;
                                                 } else {
                                                     // ★今回追加：大名家の名前を調べて、関係に合わせたメッセージを作ります！
                                                     const myClanData = this.game.getClan(castle.ownerClan);
@@ -300,6 +321,10 @@ class AIEngine {
                         }
                     }
 
+                    if (myOperation.isKunishuTarget) {
+                        isHeavySnow = this._isAttackBlockedByHeavySnow(castle.provinceId, targetProvId, myOperation.isEventOperation);
+                    }
+
                     if (this.game.writeAIDiagnostic && myOperation.isEventOperation) {
                         this.game.writeAIDiagnostic(castle, 'operation:reachability:done');
                     }
@@ -310,21 +335,7 @@ class AIEngine {
                         await this.game.aiOperationManager.generateOperation(castle.ownerClan, castle.legionId);
                         if (!isCurrentTurnFlow()) return;
                     } else {
-                        // ★追加：自分のお城か目的地が大雪になっていないかチェックをします！
-                        let isHeavySnow = false;
-                        if (!myOperation.isEventOperation) {
-                            const srcProv = this.game.getProvince(castle.provinceId);
-                            if (srcProv && srcProv.statusEffects && srcProv.statusEffects.includes('heavySnow')) {
-                                isHeavySnow = true;
-                            }
-                            if (!isHeavySnow) {
-                                const tgtProv = this.game.getProvince(targetProvId);
-                                if (tgtProv && tgtProv.statusEffects && tgtProv.statusEffects.includes('heavySnow')) {
-                                    isHeavySnow = true;
-                                }
-                            }
-                        }
-
+                        // 大雪の判定は外交関係を変更する前に済ませた正本を使用する。
                         // 大雪じゃなければ、予定通り出陣します！
                         if (!isHeavySnow && this.game.aiOperationManager.canUseAsAttackBase(castle)) {
                             // 外交処遇のawait中に委任設定が変更されても、禁止した城から出撃しない。

@@ -46,7 +46,9 @@ class MapGraphService {
     /**
      * 同盟・支配・従属領を通過して、目標城まで到達できるか判定する。
      */
-    static isReachable(game, startCastle, targetCastle, movingClanId) {
+    // 将来の断交後に通行権を失う勢力を指定して、実際の外交状態を変えずに判定できる。
+    // 中間拠点の通行だけを禁止し、目標城への最後の一歩は従来どおり許可する。
+    static isReachable(game, startCastle, targetCastle, movingClanId, options = null) {
         if (!game || !startCastle || !targetCastle) return false;
         if (this.isAdjacent(startCastle, targetCastle)) return true;
 
@@ -60,6 +62,7 @@ class MapGraphService {
         const canPassClan = (ownerClan) => {
             const ownerId = Number(ownerClan);
             if (ownerId === movingId) return true;
+            if (options && ownerId === Number(options.blockedTransitClanId)) return false;
             if (ownerId === 0) return false;
             // 不正値は別々の生値を同一候補へ丸めないためキャッシュしない。
             if (Number.isFinite(ownerId) && passableClanCache.has(ownerId)) {

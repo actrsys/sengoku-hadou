@@ -257,7 +257,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r643');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r645');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -27816,6 +27816,138 @@ test('r643 AIは出撃不能の作戦で同盟・従属を破棄せず、兵力�
     assert.strictEqual(wars,1,'出撃可能時は実際に開戦する');
 });
 
+
+
+// r644: 経路切断・大雪で出撃不能のとき、外交関係だけを先に破棄しない。
+test('r644 AIは進軍不能・大雪では断交せず、大雪解除時だけ従来どおり開戦する', async () => {
+    let reachable = true;
+    let snowy = false;
+    let snowyProvince = 2;
+    let relationStatus = '従属';
+    const ctx = createContext({
+        MapGraphService:{isReachable:()=>reachable,isSeaRoute:()=>false},
+        TroopAllocationService:{clampArmySoldiers:(n,bs,stock)=>Math.min(n,Math.max(0,Number(stock)||0),bs.length*2000)},
+        BushoStatusRules:{isActive:b=>b.status==='active'},
+        AIParams:{AI:{Difficulty:'normal',AbilityBase:50,AbilitySensitivity:1}},
+        setTimeout:fn=>{fn();return 1;}
+    });
+    loadScript(ctx, 'js/ai.js');
+    const castle = {id:10,ownerClan:2,legionId:0,castellanId:101,provinceId:1,
+        soldiers:1600,rice:1600,isDelegated:false};
+    const target = {id:20,ownerClan:3,provinceId:2,immunityUntil:0};
+    const general = {id:101,clan:2,status:'active',isActionDone:false,
+        intelligence:80,leadership:70,strength:80};
+    const makeOp = () => ({type:'攻撃',status:'実行中',stagingBase:10,targetId:20,
+        isKunishuTarget:false,requiredForce:1000,requiredRice:1000});
+    let breaks=0,wars=0,domestic=0,generated=0;
+    const game = {phase:'game',isRestoringSave:false,year:1570,month:1,currentIndex:0,
+        turnQueue:[castle],playerClanId:1,turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationCurrent:()=>true},
+        updateClanPrestige(){},getBusho:()=>general,getCastle:id=>Number(id)===10?castle:target,
+        getCastleBushos:()=>[general],getProvince:id=>({id,statusEffects:snowy && id===snowyProvince?['heavySnow']:[]}),
+        getCurrentTurnId:()=>123,getRelation:()=>({status:relationStatus,sentiment:0}),
+        getClan:id=>({name:id===2?'攻撃側':'守備側'}),
+        ui:{showDialog(){},log(){}},aiStaffing:{relocateDaimyo:()=>false},
+        affiliationSystem:{appointAIGunshi(){}},finishTurn(){},
+        diplomacyManager:{applyBreakAlliancePenalty:()=>{breaks++;return {becameHostile:true};},
+            resolveBreakAllianceConsequences:async()=>{}},
+        aiOperationManager:{operations:{2:{0:makeOp()}},canUseAsAttackBase:()=>true,
+            generateOperation:async()=>{generated++;}},
+        warPreparationController:{checkReinforcementAndStartWar(){wars++;}}
+    };
+    const ai = new (vm.runInContext('AIEngine',ctx))(game);
+    ai.execInternalAffairs=async()=>{domestic++;};
+    reachable=false;
+    await ai.execAI(castle);
+    assert.strictEqual(breaks,0,'経路がなく攻撃できなければ外交関係を変更しない');
+    assert.strictEqual(wars,0,'経路切断時は開戦しない');
+    assert.strictEqual(generated,1,'進軍不能の作戦は従来どおり再検討に戻す');
+    reachable=true;
+    snowy=true;
+    game.aiOperationManager.operations[2][0]=makeOp();
+    await ai.execAI(castle);
+    assert.strictEqual(breaks,0,'大雪時は敵対への関係変更をしない');
+    assert.strictEqual(wars,0,'大雪時は開戦しない');
+    assert.strictEqual(domestic,2,'作戦不能でもAIの内政を続ける');
+    assert.strictEqual(game.aiOperationManager.operations[2][0].status,'実行中','大雪で作戦を破棄しない');
+    // 同盟の場合や出撃元側の大雪でも同じ条件を使用する。
+    relationStatus='同盟';
+    snowyProvince=1;
+    await ai.execAI(castle);
+    assert.strictEqual(breaks,0,'同盟で出撃元に大雪があっても断交しない');
+    assert.strictEqual(wars,0,'出撃元の大雪でも開戦しない');
+    assert.strictEqual(domestic,3,'出撃元の大雪でも通常内政へ進む');
+    snowy=false;
+    await ai.execAI(castle);
+    assert.strictEqual(breaks,1,'融雪後の出陣時は従来どおり外交関係を処理する');
+    assert.strictEqual(wars,1,'融雪後に実際の開戦へ進む');
+});
+
+
+
+// r645: 通行可能な同盟領が攻撃対象自身に属する場合、断交すると中間の通行権がなくなる。
+// 同じMapGraphServiceで「今の経路」と「断交後の経路」を評価し、断交だけ発生させない。
+test('r645 AIは同盟破棄後に通行不能となる経路では外交を維持し、別経路があれば出陣する', async () => {
+    const ctx = createContext({
+        TroopAllocationService:{clampArmySoldiers:(n,bs,stock)=>Math.min(n,Math.max(0,Number(stock)||0),bs.length*2000)},
+        AIParams:{AI:{Difficulty:'normal',AbilityBase:50,AbilitySensitivity:1}},
+        setTimeout:fn=>{fn();return 1;}
+    });
+    for (const script of ['js/constants.js','js/map_graph.js','js/ai.js']) loadScript(ctx,script);
+    const MapGraph=vm.runInContext('MapGraphService',ctx);
+    const AI=vm.runInContext('AIEngine',ctx);
+    const castle={id:10,ownerClan:2,adjacentCastleIds:[15],castellanId:101,
+        legionId:0,provinceId:1,soldiers:1600,rice:1600,isDelegated:false};
+    const transit={id:15,ownerClan:3,adjacentCastleIds:[10,20],provinceId:1};
+    const target={id:20,ownerClan:3,adjacentCastleIds:[15],provinceId:2,immunityUntil:0};
+    const castles=[castle,transit,target];
+    const general={id:101,clan:2,status:'active',isActionDone:false,
+        intelligence:80,leadership:70,strength:80};
+    const operation=()=>({type:'攻撃',status:'実行中',stagingBase:10,targetId:20,
+        isKunishuTarget:false,requiredForce:1000,requiredRice:1000});
+    let targetRelation='同盟',breaks=0,wars=0,domestic=0,replans=0;
+    const game={phase:'game',isRestoringSave:false,year:1570,month:4,
+        currentIndex:0,turnQueue:[castle],playerClanId:1,castles,
+        turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationCurrent:()=>true},
+        updateClanPrestige(){},getBusho:()=>general,
+        getCastle:id=>castles.find(c=>c.id===Number(id)),getCastleBushos:()=>[general],
+        getProvince:()=>null,getCurrentTurnId:()=>123,
+        getRelation:(from,to)=>({status:Number(to)===3?targetRelation:'同盟',sentiment:20}),
+        getClan:id=>({name:id===2?'攻撃側':'防御側'}),
+        ui:{showDialog(){},log(){}},aiStaffing:{relocateDaimyo:()=>false},
+        affiliationSystem:{appointAIGunshi(){}},finishTurn(){},
+        diplomacyManager:{applyBreakAlliancePenalty:()=>{breaks++;targetRelation='敵対';return{becameHostile:true}},
+            resolveBreakAllianceConsequences:async()=>{},isNonAggression:status=>ctx.DiplomacyRules.isProtectedFromImmediateAttack(status)},
+        aiOperationManager:{operations:{2:{0:operation()}},canUseAsAttackBase:()=>true,
+            generateOperation:async()=>{replans++;}},
+        warPreparationController:{checkReinforcementAndStartWar(){wars++;}}
+    };
+    const ai=new AI(game);
+    ai.execInternalAffairs=async()=>{domestic++};
+    assert.strictEqual(MapGraph.isReachable(game,castle,target,2),true,'同盟下では中間の相手城を通過できる');
+    assert.strictEqual(MapGraph.isReachable(game,castle,target,2,{blockedTransitClanId:3}),false,
+        '目標勢力と断交する場合は中間の相手領を通過できない');
+    await ai.execAI(castle);
+    assert.strictEqual(breaks,0,'断交後の経路がない場合、同盟は破棄しない');
+    assert.strictEqual(wars,0,'不可能な進軍は開始しない');
+    assert.strictEqual(replans,1,'失効した攻撃作戦を再検討する');
+    assert.strictEqual(domestic,1,'外交関係を維持したまま内政へ戻る');
+    // 中間城が自領であれば、攻撃目標だけが敵領なので断交・開戦できる。
+    transit.ownerClan=2;
+    game.aiOperationManager.operations[2][0]=operation();
+    assert.strictEqual(MapGraph.isReachable(game,castle,target,2,{blockedTransitClanId:3}),true);
+    await ai.execAI(castle);
+    assert.strictEqual(breaks,1,'断交後の経路がある場合、通常の外交処理を実行する');
+    assert.strictEqual(wars,1,'断交しても進軍可能なら開戦準備へ進む');
+    assert.strictEqual(MapGraph.isReachable(game,castle,target,2),true,'断交後の通行も成立');
+    // 中間城が第三者の同盟領なら、目標勢力との断交でその通行権は失われない。
+    targetRelation='同盟';transit.ownerClan=4;
+    game.aiOperationManager.operations[2][0]=operation();
+    assert.strictEqual(MapGraph.isReachable(game,castle,target,2,{blockedTransitClanId:3}),true,
+        '攻撃対象以外の同盟領は今までどおり通過可能');
+    await ai.execAI(castle);
+    assert.strictEqual(breaks,2,'第三者の同盟領を通る場合も正常に断交可能');
+    assert.strictEqual(wars,2,'第三者の通行権を維持した経路で出陣可能');
+});
 
 
 Promise.all(pendingTests).then(() => {
