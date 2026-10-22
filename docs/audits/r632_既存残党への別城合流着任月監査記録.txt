@@ -1,0 +1,26 @@
+戦国覇道 r632 監査記録：滅亡後の残党諸勢力へ別城から合流する家臣の着任月未更新
+
+基準：r631完全版。設計正本：ZIP内ARCHITECTURE.md（監査判断・重要状態の書換・移動履歴一元化）。
+
+【到達性と観測事実】
+正式な AffiliationSystem.becomeRonin() は、元の大名家が全領喪失しており、すでに同家の残党諸勢力がある場合、_joinSurvivalKunishu() に進む。
+常陸の不死鳥を持つ小田氏治は、現行の1560/1570両シナリオに存在する。1570シナリオには同家家臣が氏治と別の城に配置されているため、残党結成後に別城の旧家臣が合流する状況は実装の通常経路として到達可能である。
+ただし、一連の城攻略によって自然乱数のまま残党結成・家臣合流が起こる長期通しプレイは行っていない。用意した局所テストは滅亡条件と既存残党を設定して、通常のbecomeRoninから処理している。通常プレイでの発生頻度を立証したものではない。
+
+【問題と影響】
+旧処理は leaveCastle()/enterCastle() の組合せで在城名簿を正しく移したが、別城移動における arrivalTurn を変更しなかった。移転先での登用後に短期間で再転任すると、派閥用 stayHistory に残党拠点への長期滞在を誤登録し得る。将来の派閥得点に影響するが、直接の移転先・所属資格・兵数などは変わらない。
+
+【最小改修】
+_joinSurvivalKunishu() にある別城転任部分だけを既存 AffiliationSystem.moveCastle(..., { stayHistoryFromCastleId: 0, deferUI: true }) に変更。移動元0指定は旧所属での滞在期間を新たに推定して履歴へ追記しないという意味。内部の FactionSystem.handleMove() を呼ぶ経路は引き続き AffiliationSystem だけが所有する。
+deferUI:true は外側の becomeRonin()/残党結成処理が既存どおりまとめて画面を更新するため。ほかの特例raw所在更新は機械的に変更しない。
+
+【検証】
+修正前：追加テスト（滅亡後に既存残党へ合流→同城で登用→2か月で転任）が arrivalTurn 不一致で失敗。既存1108件は成功。
+修正後：追加1件と既存1108件の計1109件が成功し、失敗0件。
+検査は実際の AffiliationSystem.becomeRonin()/joinClan()/moveCastle() と FactionSystem.handleMove() を使用した局所再現。実ブラウザ実機の長期通しプレイや、全滅亡パターンの網羅は未検証。
+
+【変更ファイル】
+追加：docs/audits/r632_既存残党への別城合流着任月監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/affiliation_system.js、js/config.js、tests/run_tests.js
+削除：なし
+管理用Excel・各実行用BIN・セーブ構造：無変更。

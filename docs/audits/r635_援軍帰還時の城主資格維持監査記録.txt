@@ -1,0 +1,29 @@
+# 監査・改修記録
+
+戦国覇道 r635：援軍帰還で在任中のAI城主が意図せず交代する問題
+
+基準：r634完全版。正本：ARCHITECTURE.md（実害のある正常経路・共通System・最小改修）。
+
+【到達性と原因】
+援軍自動編成の正規サービス `ReinforcementService.createAutoClanReinforcement()` は、拠点の同家現役武将を武勇順で選抜する。選ばれた武将の元の在城名簿・城主役職は変更しない。
+しかし `WarManager.endWar()` の大名家援軍通常帰還と途中撤退帰還は、援軍武将の `isCastellan` を無条件で false にしたうえで `game.updateCastleLord(helperCastle)` を実行していた。城主本人が選抜されていてもその役職キャッシュだけが解除され、AI拠点では `AffiliationSystem.updateCastleLord()` が城主空席とみなして再選任する場合がある。
+
+【再現の種類】
+正規 `ReinforcementService` による自動編成から、実際の `WarManager.endWar()` の援軍帰還、実際の `AffiliationSystem.updateCastleLord()` までの局所関数経路を実行した。城主（武勇95、総合能力低め）と同城の能力の高い家臣を配置し、正常な役職・所有・兵力状態で城主を援軍に選抜。修正前は通常帰還後、城主IDが31から32へ変わり、健在の旧城主フラグも false となる。追加テストは修正前 1 件失敗した。
+実際の長期AIプレイを通じて援軍を派遣・終了させる通しプレイではない。戦歴記録以降の処理はテストで意図的に打ち切り、援軍帰還部分だけを実行した。
+
+【修正】
+`js/war_effort.js` の通常帰還・途中撤退帰還の大名家用2経路で、援軍に参加した全武将の `isCastellan=false` を除去。帰還元名簿と所在の扱い、および城主の正規更新窓口 `AffiliationSystem.updateCastleLord()` を変えない。城主がもともと不在の場合などの既存の再選任機能は維持する。
+諸勢力援軍・捕虜処遇・所属・援軍物資・士気・訓練度・友好度は変更しない。
+
+【一元管理の判断】
+城主の正本は `Castle.castellanId` と `AffiliationSystem.updateCastleLord()` であり、単なる援軍帰還で利用側が城主資格の解除を追加するのは不適切。新しい選任計算や救済フラグを追加せず、既存の正本の判断へ任せた。城主以外の理由で役職を外す処理は変更していない。
+
+【回帰】
+正規編成→終戦時帰還の局所テストに、通常帰還と援軍途中撤退の双方を追加。修正後は両経路で城主ID31・城主フラグtrue・同僚false・所在ID30を維持した。ロジックテスト1112件成功。ビジュアル検証と配布ZIP整合性の結果は最終確認結果を参照。
+
+【変更ファイル】
+追加：docs/audits/r635_援軍帰還時の城主資格維持監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/war_effort.js、tests/run_tests.js
+削除：なし。
+管理用Excel・実行BIN・セーブ形式は変更しない。

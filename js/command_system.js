@@ -1648,8 +1648,6 @@ class CommandSystem {
                 }
             }
             else if (type === 'move_deploy') { 
-                this.game.factionSystem.handleMove(busho, castle.id, targetId); 
-                
                 this.game.affiliationSystem.moveCastle(busho, targetId);
 
                 count++; actionName = "移動"; 
@@ -1880,8 +1878,7 @@ class CommandSystem {
         
         bushoIds.forEach(id => {
             const b = this.game.getBusho(id);
-            this.game.factionSystem.handleMove(b, c.id, targetId); 
-            
+
             this.game.affiliationSystem.moveCastle(b, targetId);
             
             b.isActionDone = true;
@@ -1917,6 +1914,7 @@ class CommandSystem {
         // 一覧が古い場合でも、別軍団の現職国主の在城地を新任国主の本拠で上書きしない。
         if (this.game.castleManager.getActiveCommanderCastleIds(clanId).has(Number(castle.id))) return;
 
+        // 国主任命の別城着任も在城履歴は所属変更窓口が記録する。
         this.game.affiliationSystem.moveCastle(busho, castleId);
 
         if (!this.game.legions) this.game.legions = [];

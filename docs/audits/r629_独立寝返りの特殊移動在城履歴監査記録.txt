@@ -1,0 +1,21 @@
+戦国覇道 r629 監査記録：独立・寝返り時の特殊な城間移動
+
+基準：r628完全版。r628では通常の武将移動の在城履歴をAffiliationSystem.moveCastleへ集約した。
+
+【再現した問題】
+1. 独立・寝返りの正規処理で、非城主の派閥主を神輿として別城から決起城に迎える場合、executeRebellion内で城内名簿と所属を更新した後、setCastleIdRaw()に履歴記録の指定がなかった。
+2. 同じ独立・寝返りで、遠方の同派閥家臣が新大名の居城へ合流する場合も、resolveDistantFactionMembers内のsetCastleIdRaw()に履歴記録の指定がなかった。
+いずれも武将は実際に移動するが、以前の城への着任月が残る。次の別城移動時に新城での短期滞在を長期滞在として扱い、派閥の在城期間評価に影響する。
+
+【修正】
+独立Systemが城内名簿・所属・役職の更新を管理する既存構成を維持し、該当2か所でAffiliationSystem.setCastleIdRaw(..., { recordStayHistory: true })を指定する。履歴計算を重複実装せず、AffiliationSystem._recordCastleArrival→FactionSystem.handleMoveの正本を使う。実際に同じ城なら共通窓口が履歴を追加しない。
+
+【再現テスト】
+- 1570年6月、旧城へ前年12月に着任した派閥家臣が独立勢力へ遠方合流する処理を、実際のresolveDistantFactionMembers、AffiliationSystem、FactionSystemで再現。修正前は新城のarrivalTurn未更新で失敗。修正後は旧城の滞在履歴が1件残り、翌月に移動しても新城の1か月滞在を記録しない。
+- 非城主の派閥主を擁立する寝返りを、正規のexecuteRebellionで再現。修正前は別城移動後のarrivalTurnが古いままで失敗。修正後は旧城履歴と新城着任月が正しく更新される。
+- 既存1,104テストは変更前のr628で全件成功。上記追加2テストだけが修正前に失敗。修正後のテストは1,106件成功、失敗0件。
+
+【今回変更しない範囲】
+独立・寝返りの発生確率、裏切り先と派閥員の選定、忠誠・功績、城主・軍団、城内名簿管理、派閥評価式、通常のmoveCastle、セーブ形式、管理用Excel/BIN、戦闘・外交は変更しない。他の低レベル所在更新については今回の2経路の実害が確認できたことを根拠に一括置換しない。長期通しプレイと全ての独立分岐は未検証。
+
+変更：js/independence_system.js、js/config.js、tests/run_tests.js、ARCHITECTURE.md、docs/audits/README.md、本記録（新規）。

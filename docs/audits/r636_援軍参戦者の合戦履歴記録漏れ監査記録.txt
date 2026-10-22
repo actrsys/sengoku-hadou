@@ -1,0 +1,26 @@
+# 監査・改修記録
+
+戦国覇道 r636：援軍参加武将の合戦記録・認知評価が終戦時に欠落する問題
+
+基準：r635完全版。設計正本：ARCHITECTURE.md。
+
+【到達性・不具合】
+正規のReinforcementService.createAutoClanReinforcement()で援軍を出し、WarManager.endWar()まで進めると、援軍は別部隊データに保持される一方、戦後のFactionSystem.recordBattle()/updateRecognition()は本隊のs.atkBushosと守備城の在城者だけを列挙していた。攻撃援軍は帰還時にs.atkBushosから除かれる仕様であり、守備援軍も別城から出るため守備城の在城者ではない。その結果、実際に参戦した援軍武将に戦歴・合戦功績・認知評価が付かない。
+
+【事前再現】
+AI城の城主（ID31）をReinforcementServiceにより正規編成し、通常のWarManager.endWar()を実行する局所回帰テストを追加。城主は援軍から帰還しても、合戦履歴の記録呼び出しには含まれなかった。r635原本では既存1112件成功／新規1件失敗となった。
+
+【改修】
+戦後の合戦履歴付与をWarManager.endWar()の一つの局所窓口recordBattleParticipantにまとめた。本隊・守備城の対象者に加えて、攻守双方の通常援軍・自家援軍と、途中撤退した援軍の部隊データに含まれる参戦武将も同一窓口に通す。武将IDによる1戦1回の重複防止を行い、留守居で出陣していない家臣は対象外。計算の正本であるFactionSystem.recordBattle() / updateRecognition()は変更しない。
+
+【一元管理と変更しない仕様】
+戦闘計算・兵力／装備／兵糧の帰還と負傷兵回復・城主資格・捕虜処遇・派閥得点式・城内名簿・援軍出陣条件には手を加えない。戦後履歴だけを既存FactionSystemへ委譲する。援軍の帰還処理とは責務を混ぜない。
+
+【検証範囲】
+正規援軍編成から終戦時の実際の履歴記録呼び出しまで局所再現。攻撃／守備 × 通常帰還／途中撤退の4経路で参戦ID31が1回だけ記録され、同城に残る非参戦家臣ID32には付与されないことを確認。r636で1113件成功、PC/スマホの画面回帰23件成功。長期通しプレイや全援軍参加組合せの検証ではない。
+
+【変更ファイル】
+追加：docs/audits/r636_援軍参戦者の合戦履歴記録漏れ監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/war_effort.js、tests/run_tests.js
+削除：なし
+データBIN、管理用Excel、セーブスキーマの変更なし。

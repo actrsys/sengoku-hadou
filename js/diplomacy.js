@@ -2623,6 +2623,7 @@ class DiplomacyManager {
                 }
             }
 
+            // 城割譲による退避も所属変更窓口が旧城の在城期間を確定する。
             this.game.affiliationSystem.moveCastle(b, castleB.id);
         });
 

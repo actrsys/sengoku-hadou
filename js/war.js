@@ -289,6 +289,19 @@ class WarManager {
     }
     
     // ★追加：部隊のデータ（兵士数や士気など）をまとめて取り出す、便利なおまとめ魔法です！
+    // 攻城戦の守備側に実際に属する武将の正本。
+    // getCastleBushos() は同じ城の浪人・別諸勢力・他家武将も返すため、
+    // 戦力計算・経験値・迎撃判断・戦後処遇で同じ守備資格を共有する。
+    getDefendingCastleBushos(castle) {
+        if (!castle || !this.game || typeof this.game.getCastleBushos !== 'function') return [];
+        return this.game.getCastleBushos(castle.id).filter(b =>
+            window.BushoStatusRules.isActive(b)
+            && (castle.isKunishu
+                ? b.belongKunishuId === castle.kunishuId
+                : (b.clan === castle.ownerClan && b.belongKunishuId === 0))
+        );
+    }
+
     getArmyData(role) {
         const s = this.state;
         if (role === 'attacker') return { army: s.attacker, bushos: s.atkBushos, soldiers: s.attacker ? s.attacker.soldiers : 0, morale: s.attacker ? s.attacker.morale ?? 50 : 50, training: s.attacker ? s.attacker.training ?? 50 : 50 };
@@ -809,7 +822,7 @@ class WarManager {
             if (s.defender && s.defender.soldiers > 0) {
                 let defBushos = [];
                 if (this.game && this.game.getCastleBushos) {
-                    defBushos = this.game.getCastleBushos(s.defender.id).filter(b => window.BushoStatusRules.isActive(b) && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : (b.clan === s.defender.ownerClan && b.belongKunishuId === 0)));
+                    defBushos = this.getDefendingCastleBushos(s.defender);
                 }
                 if (defBushos.length === 0 && s.defBusho) defBushos = [s.defBusho];
                 addExp(defBushos, false);
@@ -1509,7 +1522,7 @@ class WarManager {
             let subs = bushos.slice(1);
 
             if (isDefendingCastle && this.game && s.defender) {
-                const castleBushos = this.game.getCastleBushos(s.defender.id).filter(b => b.clan === s.defender.ownerClan && window.BushoStatusRules.isActive(b));
+                const castleBushos = this.getDefendingCastleBushos(s.defender);
                 if (castleBushos.length > 0) {
                     let bestBusho = castleBushos.reduce((best, current) => {
                         let bestScore = best.leadership + best.strength + best.intelligence;

@@ -1,0 +1,20 @@
+# 戦国覇道 r641：三好義継追放後の旧居城城主必置と配置資格共通化監査
+
+基準：r640完全版。設計正本：ARCHITECTURE.md。
+
+【再現した問題】
+三好長慶死亡、三好義継・松永久秀がそれぞれ大名、三好三人衆が義継家臣、三好家と松永家が敵対という通常の発生条件を満たすと、歴史イベント historical_yoshitsugu_exile が発火する。義継が別城の唯一の家臣であっても義継を松永家へ移籍させ、三好家が引き続き所有する義継の旧居城が castellanId=0・在城家臣0名になる。城主必置に反し、AIの行動機会にも影響する。発生可否に元城の後任確認はなかった。
+
+【旧版での局所再現】
+正規イベント checkCondition()→execute()、実物の AffiliationSystem.joinClan()・moveCastle()・updateCastleLord()、および実装と同じ castle.samuraiIds を参照する getCastleBushos() を接続して再現。旧版ではチェック成功のあと、義継の単独居城（所有は三好家）の城主が0になる。
+
+【修正と一元化】
+発生条件・実行時とも EventCheck.getYoshitsuguExileCastellanPlan() の計画を使用する。旧居城に義継以外の現役三好家臣がいれば転任を追加せず、いなければ元城に城主を残せる別城の余剰家臣1名を移す。適格候補を用意できない場合はイベントを延期し、execute() の直接呼び出しでも状態を変更しない。余剰家臣資格の判断は、r640永禄の変の判定を EventCheck.getEventCastellanRelocationCandidates() に抽出して両イベントで共用する。軍団席・城側の城主正本を優先し、大名・城主・国主・軍師・諸勢力所属の人物は候補から除外する。実際の異動は AffiliationSystem.moveCastle() を使い、名簿・着任月・新城主選任の共通処理へ委譲する。
+
+【検証】
+家臣を別城から補充できる場合、三人衆全員が現職城主で余剰候補がない場合、元居城に既に他の三好家臣がいる場合の3経路を、実物の歴史イベントと所属Systemで確認。候補不足時は家督・所属・城主の副作用がない。r640の永禄の変を含むロジック1,119件成功・失敗0。PC・スマホ画面回帰23件成功。JavaScript構文・配布ZIP整合性を確認。長期通しプレイでの自然発生は未検証。
+
+【変更ファイル】
+追加：docs/audits/r641_三好義継追放後の旧居城城主必置監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/event/historical_event.js、tests/run_tests.js
+削除：なし。

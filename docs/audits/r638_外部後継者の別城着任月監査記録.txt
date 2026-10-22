@@ -1,0 +1,20 @@
+# 戦国覇道 r638：外部後継者の別城着任月監査
+
+基準：r637完全版。設計正本：ARCHITECTURE.md。
+
+【到達性と実害】
+AI大名の死亡・AI国主の死亡では、同家の現役一門がいなければ、別城にいる浪人・諸勢力所属の一門が後継者候補に入り得る。これは人工的な所属破壊ではなく `LifeSystem.handleDaimyoDeath()` と `handleCommanderDeath()` の既存選定条件に基づく。継承に際し新本拠へ移動しても、従来の `recordStayHistory` は「旧大名家の現役武将」であるときだけ有効で、外部後継者の `arrivalTurn` を更新しなかった。後日、本拠から別城へ異動すると短期滞在を旧居城に着任した時からの長期滞在として派閥履歴へ誤記録し得る。
+
+【修正前の局所再現】
+AI大名の死亡→一門浪人の正規選出→本拠への異動を `handleDaimyoDeath()` から実行。1570年6月の着任を期待する追加テストは、旧版ロジックで浪人時代の1569年1月が残るため失敗（1114成功・新規1失敗）。同様の移動を行う `handleCommanderDeath()` にも既存コード上同じ条件があった。
+
+【修正と一元管理】
+`AffiliationSystem.setCastleIdRaw()` の既存 `recordStayHistory` に通常移動の `stayHistoryFromCastleId` と同じ意味の引数を追加。外部から別城への新任時は `recordStayHistory: true, stayHistoryFromCastleId: 0` として同じ `_recordCastleArrival()` → `FactionSystem.handleMove()` に委譲する。旧浪人居城・旧諸勢力所属の期間は推定して追加せず、新任地への到着月のみ記録する。在職する同家家臣の旧城滞在は従来どおり記録し、同じ城で継承する場合は変更しない。大名・国主の二つの継承経路に同じオプションを適用。別個の計算や新しい状態正本は追加しない。
+
+【検証】
+AI大名死亡・AI国主死亡から一門浪人を後継者にする局所再現を各1件追加。両ケースで旧所属の履歴が追加されず、着任から2か月後の異動も3か月以上の滞在として誤記録されないことを確認。修正後のロジックテスト1116件・失敗0、PC/スマホなど画面回帰23件成功。これは関数から実際の後継者選出を経由する局所再現であり、長期自然進行での死亡発生までを網羅したものではない。
+
+【変更ファイル】
+追加：docs/audits/r638_外部後継者の別城着任月監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/affiliation_system.js、js/life_system.js、tests/run_tests.js
+削除：なし。ゲームデータとセーブ形式は変更なし。

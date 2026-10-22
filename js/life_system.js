@@ -1431,13 +1431,22 @@ class LifeSystem {
             // 選ばれた後任者を、死亡した国主がいた城に移動させます
             const baseCastle = this.game.getCastle(commander.castleId);
             if (baseCastle) {
+                // 別城の在職家臣は旧城の在城履歴を区切る。浪人・諸勢力・未登場者を
+                // 外部から迎える場合は旧所属の期間を推定せず、着任月だけ確定する。
+                const isCastleTransfer = Number(successor.castleId) !== Number(baseCastle.id);
+                const shouldRecordFormerCastle = Number(successor.castleId) > 0
+                    && Number(successor.clan) === Number(commander.clan)
+                    && window.BushoStatusRules.isActive(successor);
                 if (window.BushoStatusRules.isRonin(successor) || window.BushoStatusRules.isActive(successor)) {
                     this.game.affiliationSystem.leaveCastle(successor);
                 }
 
                 this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
                 this.game.affiliationSystem.transferClanRaw(successor, commander.clan, { syncSpouses: true });
-                this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id);
+                this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id, {
+                    recordStayHistory: isCastleTransfer,
+                    stayHistoryFromCastleId: shouldRecordFormerCastle ? undefined : 0
+                });
                 successor.loyalty = 100;
                 if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
             }
@@ -1639,12 +1648,22 @@ class LifeSystem {
         // 本拠が失陥していた場合は正本による直轄拠点の再選定に従う。
         const baseCastle = this.game.getDaimyoHomeCastle(oldDaimyo.clan);
         if (baseCastle) {
+            // 生前譲位・死亡継承とも、実際に別城へ着任すれば着任月を更新する。
+            // 在職家臣の転任は旧城の滞在歴を記録するが、浪人・諸勢力・未登場者を
+            // 外部から迎える場合は旧所属の期間を推定せず、移動元0として着任月だけ確定する。
+            const isCastleTransfer = Number(successor.castleId) !== Number(baseCastle.id);
+            const shouldRecordFormerCastle = Number(successor.castleId) > 0
+                && Number(successor.clan) === Number(oldDaimyo.clan)
+                && window.BushoStatusRules.isActive(successor);
             if (window.BushoStatusRules.isRonin(successor) || window.BushoStatusRules.isActive(successor)) {
                 this.game.affiliationSystem.leaveCastle(successor);
             }
             this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
             this.game.affiliationSystem.transferClanRaw(successor, oldDaimyo.clan, { syncSpouses: true });
-            this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id);
+            this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id, {
+                recordStayHistory: isCastleTransfer,
+                stayHistoryFromCastleId: shouldRecordFormerCastle ? undefined : 0
+            });
             successor.loyalty = 100;
             if (!baseCastle.samuraiIds.includes(successor.id)) {
                 baseCastle.samuraiIds.push(successor.id);

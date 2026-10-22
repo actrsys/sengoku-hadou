@@ -207,17 +207,11 @@ class AIStaffing {
 
             const movers = castleBushos.slice(keepCount);
             movers.forEach(mover => {
-                if (this.game.factionSystem && this.game.factionSystem.handleMove) {
-                    this.game.factionSystem.handleMove(mover, castle.id, bestCastle.id);
-                }
                 this.game.affiliationSystem.moveCastle(mover, bestCastle.id);
                 mover.isActionDone = true; 
             });
 
             // 大名自身も移動します
-            if (this.game.factionSystem && this.game.factionSystem.handleMove) {
-                this.game.factionSystem.handleMove(castellan, castle.id, bestCastle.id);
-            }
             this.game.affiliationSystem.moveCastle(castellan, bestCastle.id);
             // AIによる正式な居城移転だけ本拠地を更新する。出陣・占領の移動では変更しない。
             if (castellan.isDaimyo) {
@@ -475,6 +469,8 @@ class AIStaffing {
 
         // 【ブロック条件②】新設後の武将数が拠点数を下回る場合（人手不足）
         const futureLegionBushoIds = new Set();
+        // 国主任命と同時に移す派閥家臣も含め、元の城に留守居が残るかを確定前に判定する。
+        const plannedMoverIds = new Set([newCommander.id]);
         
         // 1. 元々軍団の対象となる城にいる武将をカウント
         targetCastles.forEach(c => {
@@ -503,9 +499,20 @@ class AIStaffing {
             const maxMoveCount = Math.floor(directBushos.length / 3);
             for (let i = 0; i < maxMoveCount; i++) {
                 futureLegionBushoIds.add(directBushos[i].id);
+                plannedMoverIds.add(directBushos[i].id);
             }
         }
-        
+
+        // 自発的な国主任命で元の拠点が無人になると、城主不在でAIの拠点行動が失われる。
+        // 軍団の席を確保した後で取り消すのではなく、正規の人事が始まる前に見送る。
+        const originCastle = this.game.getCastle(newCommander.castleId);
+        if (originCastle && Number(originCastle.ownerClan) === Number(clanId)
+            && Number(originCastle.id) !== Number(baseCastle.id)) {
+            const hasStayBehind = this.game.getCastleBushos(originCastle.id).some(b =>
+                b.clan === clanId && window.BushoStatusRules.isActive(b) && !plannedMoverIds.has(b.id));
+            if (!hasStayBehind) return false;
+        }
+
         if (futureLegionBushoIds.size < targetCastles.length) return false; // ★変更：失敗時は false を返す
         // ==========================================
         
@@ -515,7 +522,7 @@ class AIStaffing {
         // 番号が割り当てられなかったら失敗として中止します
         if (newLegionNo === -1) return false;
         
-        // 新国主を移動させて国主にする
+        // 新国主を移動させて国主にする。在城履歴は所属変更窓口が記録する。
         this.game.affiliationSystem.moveCastle(newCommander, baseCastle.id);
         newCommander.isCommander = true;
         this.game.affiliationSystem.clearGunshiRole(newCommander); // 国主になる時は軍師役職を外す
@@ -919,7 +926,12 @@ class AIStaffing {
         }
         
         // ★追加：武将の移動先を「同じ軍団のお城」だけに限定します！
-        const sameLegionCastles = myReachableCastles.filter(c => Number(c.legionId) === Number(castle.legionId));
+        // 呼出元が大雪の候補を除外しても、この計画では同盟領を通る到達範囲を
+        // 独自に再探索する。再探索後の候補にも既存の大雪通行制限を適用する。
+        const sameLegionCastles = myReachableCastles.filter(c =>
+            Number(c.legionId) === Number(castle.legionId)
+            && !this.game.getProvince?.(c.provinceId)?.statusEffects?.includes('heavySnow'));
+
 
         // 1回の移動計画中は実際の所属変更を行わないため、各拠点の配置人数は不変です。
         // 候補武将×移動先の評価ごとに同じsamuraiIdsを数え直さず、この同期計画内だけ再利用します。

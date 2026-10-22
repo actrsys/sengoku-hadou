@@ -604,7 +604,9 @@ class FactionSystem {
         const currentTurn = this.game.year * 12 + this.game.month;
         const duration = currentTurn - busho.arrivalTurn;
 
-        if (duration >= 3) {
+        // 戦後の捕虜解放では移動元0（実在しない城）が渡る。
+        // 架空の城0を履歴に残すと他の捕虜との同城滞在として派閥評価に混入する。
+        if (Number(fromCastleId) > 0 && duration >= 3) {
             busho.stayHistory.push({
                 castleId: fromCastleId,
                 start: busho.arrivalTurn,

@@ -1,0 +1,18 @@
+戦国覇道 r630 監査記録：独立・寝返りで捕縛した家臣の解放先着任月
+
+基準：r629完全版。在城履歴の管理正本はAffiliationSystem→FactionSystem。
+
+【発生経路】
+IndependenceSystem.resolveSubordinates() の反対派家臣は、旧家の残存城があり脱出判定に失敗すると捕らえられ、一時的にcastleId=0となる。続くhandleCaptives()で処断されず旧家の残存城へ解放される場合、実際の所在と名簿だけが更新され、arrivalTurnが捕縛前の城への着任月のまま残る。
+
+【影響】
+解放直後に短期間で転任した場合でも、解放先の城へ長期間滞在したと誤記録される。派閥形成に利用される同城滞在期間の評価に影響し得る。捕虜の帰還自体・所属・城主・武将名簿は従来どおり成立する。
+
+【修正】
+handleCaptives内で旧家の残存城へ解放する3経路について、既存AffiliationSystem.setCastleIdRaw(p,target.id,{recordStayHistory:true})へ委譲した。移動元0からの着任月は更新するが、実在しない城0の履歴は残さない。捕縛結果、解放城の選定、処断判定、一般の転任や戦後帰還の契約は変えない。
+
+【検証】
+独立側の城が旧家の所有でなくなった状態から、正規resolveSubordinates→handleCaptivesの捕縛・解放関数を実行。修正前は追加テストがarrivalTurnの不一致で失敗（既存1,106件は成功）。修正後は解放月で着任し、翌月の再異動で1か月しか在城していない履歴が過大計上されない。
+これは実関数を人工的に構成した状態での局所再現であり、長期ゲーム本体通しプレイによる発生率検証ではない。
+
+変更：js/independence_system.js、js/config.js、tests/run_tests.js、ARCHITECTURE.md、docs/audits/README.md、本記録（新規）。

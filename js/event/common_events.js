@@ -1927,8 +1927,9 @@ window.GameEvents.push({
                                 return distA - distB;
                             });
                             const target = otherCastles[0];
-                            game.affiliationSystem.leaveCastle(ronin);
-                            game.affiliationSystem.enterCastle(ronin, target.id);
+                            // 浪人の移住も所属Systemの正規城間移動を通し、着任月を同期する。
+                            // 登用・下野と同様、旧城での在城履歴は推定して増やさない。
+                            game.affiliationSystem.moveCastle(ronin, target.id, { stayHistoryFromCastleId: 0 });
                         }
                     }
                 } else {

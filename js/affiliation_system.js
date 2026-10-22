@@ -88,9 +88,23 @@ class AffiliationSystem {
      * 低レベル配置書換API。城内名簿の同期まで必要な通常移動では moveCastle を使用してください。
      * busho.castleId の直接代入はこのクラス以外では行いません。
      */
-    setCastleIdRaw(busho, newCastleId) {
+    setCastleIdRaw(busho, newCastleId, { recordStayHistory = false, stayHistoryFromCastleId } = {}) {
         if (!busho) return;
+        // 低レベル更新は原則履歴を動かさない。家督・国主継承など、
+        // 名簿と役職を呼び出し元が管理する実際の転任だけ明示的に指定する。
+        if (recordStayHistory) this._recordCastleArrival(busho, stayHistoryFromCastleId === 0 ? 0 : busho.castleId, newCastleId);
         busho.castleId = Number(newCastleId) || 0;
+    }
+
+    /** 城を移った事実と着任月の同期は、所属移動の正本からだけ依頼する。 */
+    _recordCastleArrival(busho, fromCastleId, toCastleId) {
+        const from = Number(fromCastleId) || 0;
+        const to = Number(toCastleId) || 0;
+        if (!busho || from === to || to <= 0) return;
+        const factions = this.game && this.game.factionSystem;
+        if (factions && typeof factions.handleMove === 'function') {
+            factions.handleMove(busho, from, to);
+        }
     }
 
     /**
@@ -104,7 +118,13 @@ class AffiliationSystem {
             console.warn('AffiliationSystem: activity status 以外の書換要求を拒否しました', newStatus, busho.id);
             return;
         }
+        const wasUnborn = busho.status === S.UNBORN;
         busho.status = newStatus;
+        // 元服・初登場時はそれ以前の未登場期間を在城履歴へ含めない。
+        // 再登用・出奔など通常の活動状態変更では着任月を維持する。
+        if (wasUnborn && this.game && Number.isFinite(Number(this.game.year)) && Number.isFinite(Number(this.game.month))) {
+            busho.arrivalTurn = Number(this.game.year) * 12 + Number(this.game.month);
+        }
     }
 
     /**
@@ -150,7 +170,12 @@ class AffiliationSystem {
             this.updateLoyaltyForNewLord(busho, newClanId);
         }
 
-        // 6. 新しいお城に入ります
+        // 6. 別城へ着任した場合、今月から新城での在城期間を数える。
+        // 引抜・捕虜登用では旧城からの離脱時点が一定しないため、
+        // 旧城の滞在歴を推定して追加せず、既存の履歴処理で着任月だけを更新する。
+        if (Number(busho.castleId) !== Number(newCastleId)) {
+            this._recordCastleArrival(busho, 0, newCastleId);
+        }
         this.enterCastle(busho, newCastleId);
 
         // 7. 既婚武将の妻は夫の所属へ追従させる。
@@ -318,6 +343,11 @@ class AffiliationSystem {
 
             // 新しい行き先が見つかっていればそこへ、見つからなければ（滅亡時など）元のお城の周辺にとどまります
             const nextCastleId = targetCastle ? targetCastle.id : busho.castleId;
+            // 下野先が別城である場合だけ滞在開始月を更新する。
+            // 旧城での実際の離脱日が不定なので、架空の滞在履歴は作らない。
+            if (Number(busho.castleId) !== Number(nextCastleId)) {
+                this._recordCastleArrival(busho, 0, nextCastleId);
+            }
             this.enterCastle(busho, nextCastleId);
         }
 
@@ -441,8 +471,9 @@ class AffiliationSystem {
             refreshDiplomacy: busho.isHostage !== true
         });
 
-        this.leaveCastle(busho);
-        this.enterCastle(busho, kunishu.castleId);
+        // 滅亡後の別城からの残党合流も、実際の着任月を所属移動の正本で記録する。
+        // 旧家での滞在期間は所属変更で不定のため推定せず、合流先への着任だけ確定する。
+        this.moveCastle(busho, kunishu.castleId, { stayHistoryFromCastleId: 0, deferUI: true });
     }
 
     /**
@@ -452,6 +483,12 @@ class AffiliationSystem {
      */
     moveCastle(busho, newCastleId, options = {}) {
         const previousCastleId = busho.castleId;
+        // 通常転任ではここが唯一の在城履歴記録箇所。
+        // 戦後の捕虜帰還は移動元の滞在を保証できないため、移動元0を明示する。
+        if (Number(previousCastleId) !== Number(newCastleId)) {
+            this._recordCastleArrival(busho,
+                options.stayHistoryFromCastleId === 0 ? 0 : previousCastleId, newCastleId);
+        }
         // 1. 今のお城から出ます。戦後の一括移動などでは城主再選を最後まで保留できます。
         this.leaveCastle(busho, options);
         

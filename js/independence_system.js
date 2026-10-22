@@ -371,7 +371,7 @@ class IndependenceSystem {
                     this.game.updateCastleLord(leaderCastle);
                 }
                 this.game.affiliationSystem.transferClanRaw(rebellionLeader, newClanId);
-                this.game.affiliationSystem.setCastleIdRaw(rebellionLeader, castle.id);
+                this.game.affiliationSystem.setCastleIdRaw(rebellionLeader, castle.id, { recordStayHistory: true });
                 castle.samuraiIds.push(rebellionLeader.id);
                 if (rebellionLeader.isDaimyo) {
                     rebellionLeader.loyalty = 100;
@@ -844,7 +844,7 @@ class IndependenceSystem {
                     busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
                 }
                 this.game.affiliationSystem.transferClanRaw(busho, newClanId);
-                this.game.affiliationSystem.setCastleIdRaw(busho, mainCastle.id);
+                this.game.affiliationSystem.setCastleIdRaw(busho, mainCastle.id, { recordStayHistory: true });
                 busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
                 mainCastle.samuraiIds.push(busho.id);
                 this._logIndependence(`  -> ${busho.name}が拠点を脱出し、${newDaimyo.name}の元へ駆けつけました！`, [oldClanId, newClanId]);
@@ -863,7 +863,7 @@ class IndependenceSystem {
                 } else {
                     if (returnCastles.length > 0) {
                         const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
-                        this.game.affiliationSystem.setClanIdRaw(p, oldClanId); this.game.affiliationSystem.setCastleIdRaw(p, target.id); target.samuraiIds.push(p.id);
+                        this.game.affiliationSystem.setClanIdRaw(p, oldClanId); this.game.affiliationSystem.setCastleIdRaw(p, target.id, { recordStayHistory: true }); target.samuraiIds.push(p.id);
                         this.game.updateCastleLord(target);
                     } else { 
                         // ★新しいお引越しセンターの魔法を使います！
@@ -875,7 +875,7 @@ class IndependenceSystem {
                 // ★プレイヤーの城に寝返った場合、戦争画面ではないので捕虜画面を出さず、逃がしてあげる魔法にします！
                 if (returnCastles.length > 0) {
                     const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
-                    this.game.affiliationSystem.setClanIdRaw(p, oldClanId); this.game.affiliationSystem.setCastleIdRaw(p, target.id); target.samuraiIds.push(p.id);
+                    this.game.affiliationSystem.setClanIdRaw(p, oldClanId); this.game.affiliationSystem.setCastleIdRaw(p, target.id, { recordStayHistory: true }); target.samuraiIds.push(p.id);
                     this.game.updateCastleLord(target);
                 } else {
                     // ★逃げる城がなければ浪にします
@@ -886,7 +886,7 @@ class IndependenceSystem {
                 if (Math.random() < 0.3) { this.game.lifeSystem.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); this.game.affiliationSystem.setClanIdRaw(p, 0); }
                 else if (returnCastles.length > 0) {
                     const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
-                    this.game.affiliationSystem.setClanIdRaw(p, oldClanId); this.game.affiliationSystem.setCastleIdRaw(p, target.id); target.samuraiIds.push(p.id);
+                    this.game.affiliationSystem.setClanIdRaw(p, oldClanId); this.game.affiliationSystem.setCastleIdRaw(p, target.id, { recordStayHistory: true }); target.samuraiIds.push(p.id);
                     this.game.updateCastleLord(target);
                 } else {
                     // ★AIの場合も、逃げる城がなければ浪人になるように安全対策を入れます！

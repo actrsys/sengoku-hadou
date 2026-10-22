@@ -53,6 +53,22 @@ class AIEngine {
         );
     }
 
+    // 作戦の立案後に援軍派遣等で兵力が減る場合がある。
+    // 同盟・従属を破棄する前に、出撃時と同じ兵数・兵糧の正本で実行可能か調べる。
+    // 出撃武将の人数上限はTroopAllocationServiceへ委譲し、別の配分式を持たない。
+    _getAttackEligibleBushos(castle) {
+        return this.game.getCastleBushos(castle.id).filter(b =>
+            b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b)
+        );
+    }
+
+    _canDispatchPlannedAttack(castle, operation) {
+        if (!castle || !operation) return false;
+        const bushos = this._getAttackEligibleBushos(castle);
+        return TroopAllocationService.clampArmySoldiers(operation.requiredForce, bushos, castle.soldiers) > 0
+            && this._clampDispatchRice(operation.requiredRice, castle) > 0;
+    }
+
     // AIの兵糧購入も金1あたりの兵糧量をEconomyRulesで換算し、実支出を一度だけ確定する。
     // 行動候補の計算は概算でも、資源の変更は現在の残高と取引上限を正本にする。
     _executeRicePurchase(castle, amount, availableGold) {
@@ -175,6 +191,15 @@ class AIEngine {
                 myOperation = null;
             }
             
+            // 期限切れの出陣予定で外交関係だけを破棄しない。
+            // 出撃可能な兵数・兵糧がない場合は今月は内政に回し、作戦は翌月の専門部署で再評価する。
+            if (myOperation && myOperation.type === '攻撃' && myOperation.status === '実行中'
+                && myOperation.stagingBase === castle.id
+                && this.game.aiOperationManager.canUseAsAttackBase(castle)
+                && !this._canDispatchPlannedAttack(castle, myOperation)) {
+                myOperation = null;
+            }
+
             // 自分の大名家に「作戦」があり、それが「攻撃」で、かつ「実行中」の場合
             if (myOperation && myOperation.type === '攻撃' && myOperation.status === '実行中' &&
                 this.game.aiOperationManager.canUseAsAttackBase(castle)) {
@@ -1351,7 +1376,7 @@ class AIEngine {
         }
         
         // 城にいる武将（自勢力で活動中の武将）を集めます
-        const bushos = this.game.getCastleBushos(source.id).filter(b => b.clan === source.ownerClan && window.BushoStatusRules.isActive(b));
+        const bushos = this._getAttackEligibleBushos(source);
         
         // ★ここから追加・書き換え：戦闘力による足切りと、智謀による「見誤り」の魔法！
         // 1. 城主(general)の智謀によって、どれくらい戦闘力を見誤るか（誤差）を決めます
@@ -1468,7 +1493,7 @@ class AIEngine {
             return;
         }
         
-        const bushos = this.game.getCastleBushos(sourceCastle.id).filter(b => b.clan === sourceCastle.ownerClan && window.BushoStatusRules.isActive(b));
+        const bushos = this._getAttackEligibleBushos(sourceCastle);
         
         let evaluatorInt = general.intelligence;
         let maxError = 0;
@@ -3200,8 +3225,6 @@ class AIEngine {
                     if (movers.length > 0) {
                         // リストに入っている全員を一斉に移動させます
                         movers.forEach(mover => {
-                            this.game.factionSystem.handleMove(mover, castle.id, action.targetId);
-                            
                             // お引越しセンターの機能を使って所属を書き換えます
                             this.game.affiliationSystem.moveCastle(mover, action.targetId);
                             

@@ -42,6 +42,66 @@ window.EventCheck = {
         return game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(game.courtRankSystem.RANK_ID_SHOGUN));
     },
 
+    // 将軍就任で新政権へ加わる城主候補の判定正本。発生条件と実行時に共用する。
+    getCoronationFollowers: function(game, candidate) {
+        if (!candidate) return [];
+        const candidateFamily = Array.isArray(candidate.familyIds) ? candidate.familyIds : [];
+        return game.bushos.filter(b => {
+            if (!b || b.id < 1017000 || b.id > 1017999) return false;
+            if (b.isDaimyo || b.isCastellan) return false;
+            const family = Array.isArray(b.familyIds) ? b.familyIds : [];
+            if (family.includes(candidate.id) || candidateFamily.includes(b.id)) return false;
+            return window.BushoStatusRules.isActive(b) || window.BushoStatusRules.isRonin(b);
+        });
+    },
+
+    // 歴史イベントで後任城主を確保する際の転任候補はこの窓口で共用する。
+    // 既存城主・大名・国主・軍師を移動させず、元城には正規城主を残す。
+    getEventCastellanRelocationCandidates: function(game, clanId) {
+        const occupiedCommanderIds = new Set((game.legions || [])
+            .filter(l => Number(l.clanId) === Number(clanId))
+            .map(l => Number(l.commanderId)));
+        return game.bushos.filter(b => {
+            if (b.clan !== clanId || Number(b.belongKunishuId || 0) !== 0 ||
+                !window.BushoStatusRules.isActive(b) || b.isDaimyo || b.isCastellan ||
+                b.isCommander || b.isGunshi || occupiedCommanderIds.has(Number(b.id))) return false;
+            const source = game.getCastle(b.castleId);
+            const lord = source && game.getBusho(source.castellanId);
+            return !!source && Number(source.ownerClan) === Number(clanId) &&
+                Number(source.castellanId || 0) !== Number(b.id) &&
+                lord && lord.clan === clanId && lord.castleId === source.id &&
+                window.BushoStatusRules.isActive(lord) &&
+                game.getCastleBushos(source.id).some(resident => resident.id === b.id);
+        });
+    },
+
+    // 永禄の変の接収城に配置できる家臣がいれば補充する任意計画。
+    // 城主不在は許容されるため、人員不足で史実イベントを止めない。
+    getEirokuOccupationPlan: function(game, oldClanId, newClanId) {
+        const castles = game.getClanCastles(oldClanId);
+        const needsStaff = castles.filter(c => !game.getCastleBushos(c.id).some(b =>
+            b.clan === newClanId && Number(b.belongKunishuId || 0) === 0 &&
+            window.BushoStatusRules.isActive(b) && !b.isGunshi));
+        const available = this.getEventCastellanRelocationCandidates(game, newClanId);
+        return available.slice(0, needsStaff.length)
+            .map((busho, i) => ({ castleId: needsStaff[i].id, bushoId: busho.id }));
+    },
+
+    // 三好義継追放後に旧居城へ配置可能な家臣がいれば補充する任意計画。
+    // 不在でも当主交代と出奔は実行する。
+    getYoshitsuguExileCastellanPlan: function(game, yoshitsugu) {
+        if (!yoshitsugu) return [];
+        const source = game.getCastle(yoshitsugu.castleId);
+        if (!source || Number(source.ownerClan) !== Number(yoshitsugu.clan)) return [];
+        const hasRemaining = game.getCastleBushos(source.id).some(b =>
+            b.id !== yoshitsugu.id && b.clan === yoshitsugu.clan &&
+            Number(b.belongKunishuId || 0) === 0 && window.BushoStatusRules.isActive(b));
+        if (hasRemaining) return [];
+        const candidate = this.getEventCastellanRelocationCandidates(game, yoshitsugu.clan)
+            .find(b => Number(b.castleId) !== Number(source.id));
+        return candidate ? [{ castleId: source.id, bushoId: candidate.id }] : [];
+    },
+
     // 3. 指定したIDの武将が存在して、「生きている（活動中か浪人）」か確認します
     isAlive: function(game, bushoId) {
         const busho = game.getBusho(bushoId);
@@ -2018,7 +2078,7 @@ window.GameEvents.push({
         // 8. 足利家と三好家の領地（お城同士の道）が隣接しているか確認します
         if (!window.EventCheck.areClansAdjacent(game, ashikagaClanId, miyoshiClanId)) return false;
 
-        // すべての条件を満たしたらイベント発生の合図を出します
+        // 城主候補不足は発生条件ではない（配置できる家臣がいれば実行時に補充する）。
         return true;
     },
     
@@ -2034,6 +2094,8 @@ window.GameEvents.push({
         
         const ashikagaClanId = yoshiteru.clan;
         const miyoshiClanId = yoshitsugu.clan;
+        // 城主配置は任意。候補がいなくても史実イベント本体は実行する。
+        const occupationPlan = window.EventCheck.getEirokuOccupationPlan(game, ashikagaClanId, miyoshiClanId);
         
         // 大名家のデータを取得し、現在の家名（動的）を特定します
         const miyoshiClan = game.getClan(miyoshiClanId);
@@ -2129,11 +2191,14 @@ window.GameEvents.push({
             ashikagaClan.extinctionNotified = true;
         }
 
-        // ⑤ 城主更新
+        // ⑤ 配置可能な三好家臣だけを通常の転任窓口で補充する。
+        // 不足分は城主不在を許容し、着任月・城内名簿・役職をAffiliationSystemで同期する。
+        occupationPlan.forEach(({ castleId, bushoId }) => {
+            const busho = game.getBusho(bushoId);
+            if (busho) game.affiliationSystem.moveCastle(busho, castleId, { deferUI: true });
+        });
         ashikagaCastles.forEach(castle => {
-            if (game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(castle);
-            }
+            game.affiliationSystem.updateCastleLord(castle);
         });
 
         const yoshitsuguName = yoshitsugu.fullName;
@@ -2836,7 +2901,7 @@ window.GameEvents.push({
         // ⑨ 朝廷に「征夷大将軍（ID1）」の官位の空きがあるか確認します
         if (!game.courtRankSystem || !game.courtRankSystem.availableRanks.includes(game.courtRankSystem.RANK_ID_SHOGUN)) return false;
 
-        // すべての条件をクリアしたら、イベント発生（true）の合図を出します！
+        // 将軍に随行する家臣がいなくても、将軍就任は成立する。
         return true;
     },
     
@@ -2845,7 +2910,10 @@ window.GameEvents.push({
         
         const candidate = window.EventCheck.getCandidateBusho(game);
         if (!candidate) return;
-        
+
+        // 家臣移籍・槇島城主配置は任意。候補がいなくても新政権を成立させる。
+        const followers = window.EventCheck.getCoronationFollowers(game, candidate);
+
         const sponsorClanId = candidate.clan;
         const sponsorClan = game.getClan(sponsorClanId);
         const nijoCastle = game.getCastle(26);
@@ -2916,24 +2984,7 @@ window.GameEvents.push({
 
         game.diplomacyManager.setSentimentAbsolute(sponsorClanId, newClanId, 100);
 
-        // --- 6. 指定された武将たちを、配下として将軍家に移動させます ---
-        const followers = [];
-        game.bushos.forEach(b => {
-            // IDが 1017000 ～ 1017999 の範囲であること
-            if (b.id >= 1017000 && b.id <= 1017999) {
-                // 将軍とは一門関係ではないこと（お互いの家族リストに入っていないか確認）
-                if (!b.familyIds.includes(candidate.id) && !candidate.familyIds.includes(b.id)) {
-                    // 大名でも城主でもないこと
-                    if (!b.isDaimyo && !b.isCastellan) {
-                        // 活動中、または浪人であること
-                        if (window.BushoStatusRules.isActive(b) || window.BushoStatusRules.isRonin(b)) {
-                            followers.push(b); // 条件をすべて満たしたらリストに入れます
-                        }
-                    }
-                }
-            }
-        });
-
+        // --- 6. 発生条件と同じ判定で確定した家臣を新政権へ移す ---
         // リストに入った武将を将軍家のお引越しセンターで移動させます
         followers.forEach(b => {
             // ★追加：第4引数に「100」を渡して、イベント専用の固定忠誠度にします
@@ -2961,12 +3012,6 @@ window.GameEvents.push({
                 // 城主のバッジを直接渡します
                 bestFollower.isCastellan = true;
                 makishimaCastle.castellanId = bestFollower.id;
-            }
-        } else {
-            // 誰も配下がいなければ、槇島城は城主なし（空っぽ）になります
-            makishimaCastle.castellanId = 0;
-            if (game.affiliationSystem) {
-                game.affiliationSystem.updateCastleLord(makishimaCastle);
             }
         }
 
@@ -3156,7 +3201,7 @@ window.GameEvents.push({
         const rel = game.diplomacyManager ? game.diplomacyManager.getRelation(miyoshiClanId, hisahide.clan) : null;
         if (!rel || rel.status !== '敵対') return false;
 
-        // すべての条件を満たしたらイベント発生です！
+        // 旧居城の後任不在は出奔の成立条件ではない。
         return true;
     },
     
@@ -3165,6 +3210,13 @@ window.GameEvents.push({
         const hisahide = game.getBusho(1202004);
         const nagayasu = game.getBusho(1020021);
         const miyoshiClanId = yoshitsugu.clan;
+        // 後任が見つかれば配置する。いなければ城主不在のまま出奔を進める。
+        const relocationPlan = window.EventCheck.getYoshitsuguExileCastellanPlan(game, yoshitsugu);
+        relocationPlan.forEach(({ castleId, bushoId }) => {
+            const officer = game.getBusho(bushoId);
+            if (officer) game.affiliationSystem.moveCastle(officer, castleId, { deferUI: true });
+        });
+
         
         // ① 三好長逸を新しい大名（殿様）にします
         const miyoshiClan = game.getClan(miyoshiClanId);

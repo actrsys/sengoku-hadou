@@ -1,0 +1,21 @@
+戦国覇道 r621 監査記録
+
+基準版：r620
+対象：プレイヤーの CommandSystem.executeAppointLegionLeader()、FactionSystem.handleMove()、AffiliationSystem.moveCastle()
+
+発見・影響：
+プレイヤーの国主任命は実行時に武将を対象城へ移動するが、通常の武将移動で呼ぶ在城履歴処理を呼んでいなかった。したがって転任しても arrivalTurn は旧城の着任月のままとなり、前城の stayHistory は確定されない。FactionSystem.updateFactions() が滞在重複を後の派閥形成で参照するため、単なる表示上の差ではない。
+
+確認方法：
+正規の CommandSystem.executeAppointLegionLeader() を使ったテストで、旧城に5か月滞在した家臣を別城の国主として任命し、任命後の在城履歴を確認。修正前はゲーム上の異動・任命が成立する一方で、arrivalTurn が元の月のまま残りテストは不一致を検出した。テストは実関数を使った局所再現で、シナリオの長期通しプレイではない。
+
+修正：
+既存の任命可否確認を通過し、実際に異なる城へ転任する場合だけ、所属移動前に既存 FactionSystem.handleMove() を呼んで履歴を確定する。既に任命先に在城している場合は区切らない。派閥の評価式、資格・席次・城主処理・移動本体・UI・セーブ形式・マスターは変えない。
+
+回帰：
+1) 別城任命で旧城の履歴を保持し、新城着任月を更新。
+2) 同城任命で着任月・履歴を維持。
+3) 既存の国主任命・軍団新設・他の人事処理のテスト結果も確認。
+
+変更：
+js/command_system.js、js/config.js、tests/run_tests.js、ARCHITECTURE.md、docs/audits/README.md、本記録。

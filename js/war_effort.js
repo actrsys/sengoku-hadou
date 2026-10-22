@@ -122,6 +122,15 @@ Object.assign(WarManager.prototype, {
         return Number.isFinite(clanId) && clanId > 0 ? clanId : null;
     },
 
+    // 途中撤退した援軍も、その合戦へ参戦した大名家として扱う。
+    // 友好度の敵対判定だけで使い、途中撤退部隊へ勝利協力報酬を与えるものではない。
+    getParticipatingExternalReinforcementClanId(key, state = this.state) {
+        if (!state) return null;
+        const retreat = (state.retreatedReinforcements || []).find(item => item && item.reinforcementKey === key);
+        const reinf = state[key] || (retreat && retreat.data);
+        return reinf && !reinf.isSelf ? this.getReinforcementClanId(reinf) : null;
+    },
+
     // ★Round 9：援軍が「プレイヤー勢力そのもの」かを一元判定します。
     isPlayerClanReinforcement(reinfData, playerClanId = null) {
         const clanId = this.getReinforcementClanId(reinfData);
@@ -204,7 +213,6 @@ Object.assign(WarManager.prototype, {
         const previousCapturedCastellanId = Number(s.defender.castellanId || 0);
 
         (s.atkBushos || []).forEach(b => {
-            this.game.factionSystem.handleMove(b, s.sourceCastle.id, s.defender.id);
             this.game.affiliationSystem.moveCastle(b, s.defender.id, { deferCastleLordUpdate: true, deferUI: true });
         });
 
@@ -1083,7 +1091,7 @@ Object.assign(WarManager.prototype, {
                             } else onResult('siege');
                         }
                     } else {
-                        let availableDefBushos = this.game.getCastleBushos(defCastle.id).filter(b => window.BushoStatusRules.isActive(b) && (defCastle.isKunishu ? b.belongKunishuId === defCastle.kunishuId : (b.clan === defCastle.ownerClan && b.belongKunishuId === 0)));
+                        let availableDefBushos = this.getDefendingCastleBushos(defCastle);
                         let evaluator = availableDefBushos.find(b => b.isDaimyo);
                         if (!evaluator) evaluator = availableDefBushos.find(b => b.isCastellan);
                         
@@ -1523,6 +1531,9 @@ Object.assign(WarManager.prototype, {
                 target.horses = Math.min(99999, (target.horses || 0) + carryHorses);
                 target.guns = Math.min(99999, (target.guns || 0) + carryGuns);
                 
+                // 撤退・捕縛によって在城名簿が空になる前に、実際の守備参戦者を確定する。
+                // 守備資格はWarManagerの共通窓口を使い、別勢力の同居者を含めない。
+                const retreatingDefenders = this.getDefendingCastleBushos(defCastle);
                 const capturedBushos = [];
                 const retreatingClanId = Number(defCastle.ownerClan);
                 this.game.getCastleBushos(defCastle.id).forEach(b => { 
@@ -1538,7 +1549,6 @@ Object.assign(WarManager.prototype, {
                         // ★城から出て捕虜になります
                         this.game.affiliationSystem.leaveCastle(b);
                     } else { 
-                        this.game.factionSystem.handleMove(b, defCastle.id, target.id);
                         // ★新しいお引越しセンターの魔法を使います！
                         this.game.affiliationSystem.moveCastle(b, target.id); 
                         
@@ -1564,14 +1574,14 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.log(`${defCastle.name}から${target.name}へ撤退しました。`, { history: false });
                     this.game.ui.log(`(物資搬出率: ${(100*(1-lossRate)).toFixed(0)}%, 捕縛者: ${capturedBushos.length}名)`, { history: false });
                 }
-                this.endWar(true, true, capturedBushos, target.id); 
+                this.endWar(true, true, capturedBushos, target.id, retreatingDefenders); 
             }
         };
         candidates.sort((a,b) => WarSystem.calcRetreatScore(this.game, b) - WarSystem.calcRetreatScore(this.game, a)); 
         runRetreat(candidates[0].id);
     },
     
-    async endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null) { // ★ async を追加
+    async endWar(attackerWon, isRetreat = false, capturedInRetreat = [], retreatTargetId = null, retreatingDefenders = null) { // ★ async を追加
         // ★ここを書き足します：既に「終わったよ」の処理中なら、2回目は無視するストッパーです！
         if (!this.state.active || this._warEnding) return;
         const warGeneration = Number(this._warGeneration || 0);
@@ -1832,8 +1842,8 @@ Object.assign(WarManager.prototype, {
                         helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + returnGuns);
                         
                         reinf.bushos.forEach(b => {
-                            this.game.affiliationSystem.setCastleIdRaw(b, helperCastle.id); 
-                            b.isCastellan = false;
+                            // 援軍派遣中も城主の任は解いていない。帰還だけで城主資格を失わせない。
+                            this.game.affiliationSystem.setCastleIdRaw(b, helperCastle.id);
                             if (!helperCastle.samuraiIds.includes(b.id)) helperCastle.samuraiIds.push(b.id);
                         });
                         this.game.updateCastleLord(helperCastle);
@@ -1900,8 +1910,8 @@ Object.assign(WarManager.prototype, {
                             helperCastle.horses = Math.min(99999, (helperCastle.horses || 0) + (reinf.horses || 0));
                             helperCastle.guns = Math.min(99999, (helperCastle.guns || 0) + (reinf.guns || 0));
                             reinf.bushos.forEach(b => {
-                                this.game.affiliationSystem.setCastleIdRaw(b, helperCastle.id); 
-                                b.isCastellan = false;
+                                // 途中撤退の帰還でも、援軍参加前の城主資格を保持する。
+                                this.game.affiliationSystem.setCastleIdRaw(b, helperCastle.id);
                                 if (!helperCastle.samuraiIds.includes(b.id)) helperCastle.samuraiIds.push(b.id);
                             });
                             this.game.updateCastleLord(helperCastle);
@@ -1918,11 +1928,11 @@ Object.assign(WarManager.prototype, {
             if (this.game.diplomacyManager) {
                 // 攻撃陣営（大名と援軍）を調べます
                 const atkClan = (!s.attacker.isKunishu && s.attacker.ownerClan !== 0) ? s.attacker.ownerClan : null;
-                const atkAlly = (s.reinforcement && !s.reinforcement.isSelf) ? this.getReinforcementClanId(s.reinforcement) : null;
+                const atkAlly = this.getParticipatingExternalReinforcementClanId('reinforcement', s);
                 
-                // 守備陣営（大名と援軍）を調べます
+                // 守備陣営（大名と援軍）を調べます。途中撤退も参戦事実は残る。
                 const defClan = (!s.defender.isKunishu && s.oldDefClanId !== 0) ? s.oldDefClanId : null;
-                const defAlly = (s.defReinforcement && !s.defReinforcement.isSelf) ? this.getReinforcementClanId(s.defReinforcement) : null;
+                const defAlly = this.getParticipatingExternalReinforcementClanId('defReinforcement', s);
 
                 // 攻撃側大名 と 守備側援軍大名 の友好度ダウン
                 if (atkClan && defAlly) {
@@ -2066,9 +2076,6 @@ Object.assign(WarManager.prototype, {
                         if (Number(b.clan) !== Number(oldOwner) || Number(b.belongKunishuId || 0) > 0) return;
                         if (friendlyCastles.length > 0) {
                             const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
-                            if (this.game.factionSystem) {
-                                this.game.factionSystem.handleMove(b, targetC.id, escapeCastle.id);
-                            }
                             this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
                             this.handleDaimyoEscape(b, escapeCastle);
                         } else {
@@ -2138,11 +2145,31 @@ Object.assign(WarManager.prototype, {
                 
             }
 
-            s.atkBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
+            // 本隊・城内守備・援軍を同じ戦歴記録へ集約する。
+            // 援軍は帰還処理で本隊の名簿から除かれる場合があるため、
+            // 別に保持されている援軍データ（途中撤退分を含む）も参照する。
+            const recordedBattleBushoIds = new Set();
+            const recordBattleParticipant = b => {
+                if (!b || !b.id || recordedBattleBushoIds.has(b.id)) return;
+                recordedBattleBushoIds.add(b.id);
+                this.game.factionSystem.recordBattle(b, s.defender.id);
+                this.game.factionSystem.updateRecognition(b, 25);
+            };
+            s.atkBushos.forEach(recordBattleParticipant);
             // ★大名の戦いなら諸勢力を弾き、諸勢力の戦いなら大名を弾く魔法！
-            const defBushos = this.game.getCastleBushos(s.defender.id).filter(b => window.BushoStatusRules.isActive(b) && (s.defender.isKunishu ? b.belongKunishuId === s.defender.kunishuId : (b.clan === s.defender.ownerClan && b.belongKunishuId === 0))).concat(this.pendingPrisoners);
+            // 守備側が別城へ撤退した時は、移動・捕縛前に確定した参戦者を使う。
+            // 通常の終戦は従来どおり現在の城から共通資格で抽出する。
+            const defBushos = (isRetreat && attackerWon && Array.isArray(retreatingDefenders)
+                ? retreatingDefenders : this.getDefendingCastleBushos(s.defender)).concat(this.pendingPrisoners);
             if (s.defBusho && s.defBusho.id && !defBushos.find(b => b.id === s.defBusho.id)) defBushos.push(s.defBusho);
-            defBushos.forEach(b => { this.game.factionSystem.recordBattle(b, s.defender.id); this.game.factionSystem.updateRecognition(b, 25); });
+            defBushos.forEach(recordBattleParticipant);
+            for (const reinf of [s.selfReinforcement, s.reinforcement,
+                s.defSelfReinforcement, s.defReinforcement,
+                ...(s.retreatedReinforcements || []).map(ret => ret.data)]) {
+                if (reinf && Array.isArray(reinf.bushos)) {
+                    reinf.bushos.forEach(recordBattleParticipant);
+                }
+            }
 
             // ★修正：結果画面を出す前に合戦画面を消す魔法を復活させます！
             if (s.isPlayerInvolved) { this.game.ui.setWarModalVisible(false); }
@@ -2455,7 +2482,6 @@ Object.assign(WarManager.prototype, {
             } else { 
                 if (friendlyCastles.length > 0) {
                     const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
-                    this.game.factionSystem.handleMove(b, defeatedCastle.id, escapeCastle.id); 
                     // ★新しいお引越しセンターの魔法を使います！
                     this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
                     escapees.push(b);
@@ -2670,8 +2696,7 @@ Object.assign(WarManager.prototype, {
                 // ★一元化された魔法を使って帰還先を決めます！
                 const returnCastle = this.getReleaseReturnCastle(prisoner, friendlyCastles, originalClanId);
 
-                this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); 
-                this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id);
+                this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id, { stayHistoryFromCastleId: 0 });
                 this.game.affiliationSystem.setActivityStatusRaw(prisoner, window.GameConstants.BushoStatus.ACTIVE); 
                 prisoner.isCastellan = false;
             } else {
@@ -2932,7 +2957,7 @@ Object.assign(WarManager.prototype, {
                 if (kunishu && !kunishu.isDestroyed) {
                     const returnCastle = this.game.getCastle(kunishu.castleId);
                     if (returnCastle) {
-                        this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id);
+                        this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id, { stayHistoryFromCastleId: 0 });
                         this.game.affiliationSystem.setActivityStatusRaw(prisoner, window.GameConstants.BushoStatus.ACTIVE); 
                     }
                 } else {
@@ -2940,8 +2965,7 @@ Object.assign(WarManager.prototype, {
                         // ★一元化された魔法を使って帰還先を決めます！
                         const returnCastle = this.getReleaseReturnCastle(prisoner, friendlyCastles, originalClanId);
 
-                        this.game.factionSystem.handleMove(prisoner, 0, returnCastle.id); 
-                        this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id);
+                        this.game.affiliationSystem.moveCastle(prisoner, returnCastle.id, { stayHistoryFromCastleId: 0 });
                         this.game.affiliationSystem.setActivityStatusRaw(prisoner, window.GameConstants.BushoStatus.ACTIVE); 
                         prisoner.isCastellan = false;
                     } else { 
@@ -3096,8 +3120,7 @@ Object.assign(WarManager.prototype, {
                         // ★一元化された魔法を使って帰還先を決めます！
                         const returnCastle = this.getReleaseReturnCastle(p, friendlyCastlesExt, originalClanId);
 
-                        this.game.factionSystem.handleMove(p, 0, returnCastle.id); 
-                        this.game.affiliationSystem.moveCastle(p, returnCastle.id);
+                        this.game.affiliationSystem.moveCastle(p, returnCastle.id, { stayHistoryFromCastleId: 0 });
                         this.game.affiliationSystem.setActivityStatusRaw(p, window.GameConstants.BushoStatus.ACTIVE); 
                         p.isCastellan = false;
                     } else {

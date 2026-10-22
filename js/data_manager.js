@@ -411,7 +411,13 @@ class DataManager {
                 } else {
                     b.status = 'active'; // 明確に「活動中」にします
                 }
-                
+
+                // 新規シナリオで既に在城する武将の滞在開始はシナリオ開始月。
+                // 未登場者にはここで着任月を付けず、実際の初登場時に記録する。
+                if (!Number.isFinite(Number(b.arrivalTurn)) || Number(b.arrivalTurn) <= 0) {
+                    b.arrivalTurn = startYear * 12 + Number(window.MainParams.StartMonth);
+                }
+
                 // お城の中に武将を入れてあげます
                 // ★高速化：早見表（castleMap）からお城をパッと探します！
                 const c = castleMap.get(Number(b.castleId));
