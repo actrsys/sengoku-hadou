@@ -258,8 +258,13 @@ class WarPreparationController {
         }
     }
 
-    executeReinforcementRequest(gold, helperCastle, force, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
+    // 援軍の持参金は要請時ではなく、実際に援軍派遣が成立した時だけ支払う。
+    // AIの承諾とプレイヤー手動派遣の双方がこの窓口を共用する。
+    _payAcceptedReinforcementOffer(atkCastle, gold) {
         if (gold > 0) atkCastle.gold -= gold;
+    }
+
+    executeReinforcementRequest(gold, helperCastle, force, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
 
         const myClanId = atkCastle.ownerClan;
         
@@ -360,7 +365,7 @@ class WarPreparationController {
 
             // ★修正：AI（要請側）から見てプレイヤー（受諾側）が「支配」されている相手かどうかを確認します！
             const isBoss = (myToHelperRel && myToHelperRel.status === window.GameConstants.DiplomacyStatus.DOMINANT);
-            const startSelection = () => this._promptPlayerAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, isBoss, selfReinfData);
+            const startSelection = () => this._promptPlayerAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, isBoss, selfReinfData, gold);
             
             // ★メッセージ係にお任せします！
             this.game.warManager.reinfMsgHelper.showRequest(this.game, myClanName, targetInfoStr, gold, isBoss, true, startSelection, () => {
@@ -409,6 +414,7 @@ class WarPreparationController {
             helperDaimyo,
             { isSelf: false }
         );
+        if (reinforcementData) this._payAcceptedReinforcementOffer(atkCastle, gold);
 
         this.game.warManager.applyWarHostility(helperCastle.ownerClan, false, targetCastle.ownerClan, targetCastle.isKunishu, true);
         
@@ -426,7 +432,7 @@ class WarPreparationController {
         }
     }
 
-    _promptPlayerAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, isBoss, selfReinfData) {
+    _promptPlayerAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, isBoss, selfReinfData, offerGold = 0) {
         const promptBusho = () => {
             this.game.ui.openBushoSelector('atk_reinf_deploy', helperCastle.id, {
                 hideCancel: isBoss, 
@@ -443,7 +449,7 @@ class WarPreparationController {
                     const rR = i.rice ? parseInt(i.rice.num.value) : 500;
                     const rH = i.horses ? parseInt(i.horses.num.value) : 0;
                     const rG = i.guns ? parseInt(i.guns.num.value) : 0;
-                    this._applyManualAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinfBushos, rS, rR, rH, rG, selfReinfData);
+                    this._applyManualAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinfBushos, rS, rR, rH, rG, selfReinfData, offerGold);
                 },
                 returnToParentSelector: true
             });
@@ -451,12 +457,13 @@ class WarPreparationController {
         promptBusho();
     }
 
-    _applyManualAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinfBushos, reinfSoldiers, reinfRice, reinfHorses, reinfGuns, selfReinfData) {
+    _applyManualAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinfBushos, reinfSoldiers, reinfRice, reinfHorses, reinfGuns, selfReinfData, offerGold = 0) {
         const reinforcementData = this.game.reinforcementService.createManualCastleReinforcement(
             helperCastle, reinfBushos,
             { soldiers: reinfSoldiers, rice: reinfRice, horses: reinfHorses, guns: reinfGuns },
             { isAttacker: true, isSelf: false }
         );
+        if (reinforcementData) this._payAcceptedReinforcementOffer(atkCastle, offerGold);
 
         this.game.warManager.applyWarHostility(helperCastle.ownerClan, false, targetCastle.ownerClan, targetCastle.isKunishu, true);
         

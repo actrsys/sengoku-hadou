@@ -257,7 +257,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r645');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r646');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -27947,6 +27947,65 @@ test('r645 AIは同盟破棄後に通行不能となる経路では外交を維�
     await ai.execAI(castle);
     assert.strictEqual(breaks,2,'第三者の同盟領を通る場合も正常に断交可能');
     assert.strictEqual(wars,2,'第三者の通行権を維持した経路で出陣可能');
+});
+
+
+
+// r646: AI援軍とプレイヤー援軍の持参金は、派遣成立時だけ負担する。
+// 承諾前に減額すると拒否・選択取消でも金だけ失われる。
+test('r646 攻撃側の援軍持参金は派遣成立時に一度だけ支払い、拒否・取消では減らない', () => {
+    const ctx=createContext({DiplomacyRules:{isAllianceOrVassal:()=>true},
+        GameConstants:{DiplomacyStatus:{DOMINANT:'支配'}}});
+    loadScript(ctx,'js/war_preparation_controller.js');
+    const Controller=vm.runInContext('WarPreparationController',ctx);
+    function scenario(helperIsPlayer, aiAccepted) {
+        const source={id:10,ownerClan:2,gold:700,provinceId:1};
+        const helper={id:20,ownerClan:helperIsPlayer?1:3,provinceId:1,castellanId:201};
+        const target={id:30,ownerClan:4,provinceId:2,soldiers:1000,name:'攻撃対象'};
+        const counters={wars:0,withHelp:0,auto:0,manual:0};
+        let requestAccept,requestRefuse,selectBushos;
+        const game={playerClanId:1,getProvince:()=>null,getClan:()=>({name:'勢力'}),
+            getBusho:()=>({id:201,name:'城主'}),getClanDaimyo:()=>({duty:50}),
+            getRelation:()=>({status:'同盟'}),
+            ui:{showDialog(message,confirm,onOk){if(onOk) onOk();},
+                openBushoSelector(type,id,opts){selectBushos=opts;},
+                openQuantitySelector(type,castles,unused,opts){opts.onConfirm({20:{
+                    soldiers:{num:{value:'400'}},rice:{num:{value:'400'}},
+                    horses:{num:{value:'0'}},guns:{num:{value:'0'}}
+                }});}},
+            diplomacyManager:{checkAIReinforcementAcceptance:()=>({accepted:aiAccepted,blockedByHeavySnow:false}),
+                updateSentiment:()=>{}},
+            reinforcementService:{createAutoClanReinforcement(){counters.auto++;return {bushos:[{id:301}]};},
+                createManualCastleReinforcement(){counters.manual++;return {bushos:[{id:302}]};}},
+            warManager:{applyWarHostility:()=>{},startWar(...args){counters.wars++;if(args[7]) counters.withHelp++;},
+                reinfMsgHelper:{showRequest(...args){requestAccept=args[6];requestRefuse=args[7];},
+                    showRefusal(...args){args[3]();},showAcceptance(...args){args[5]();}}}
+        };
+        const prep=new Controller(game);
+        prep.executeReinforcementRequest(300,helper,null,source,target,[{id:101}],1000,1000,0,0,null);
+        return {source,counters,requestAccept,requestRefuse,getSelection:()=>selectBushos};
+    }
+    const refusalAI=scenario(false,false);
+    assert.strictEqual(refusalAI.source.gold,700,'AIが拒否した要請の金は減らない');
+    assert.strictEqual(refusalAI.counters.withHelp,0);
+    const acceptanceAI=scenario(false,true);
+    assert.strictEqual(acceptanceAI.source.gold,400,'AIの承諾時だけ300を支払う');
+    assert.strictEqual(acceptanceAI.counters.withHelp,1);
+    const refusalPlayer=scenario(true,true);
+    refusalPlayer.requestRefuse();
+    assert.strictEqual(refusalPlayer.source.gold,700,'プレイヤーの拒否で持参金は減らない');
+    assert.strictEqual(refusalPlayer.counters.manual,0);
+    const cancelPlayer=scenario(true,true);
+    cancelPlayer.requestAccept();
+    cancelPlayer.getSelection().onCancel();
+    assert.strictEqual(cancelPlayer.source.gold,700,'了承後でも武将選択を取り消せば支払わない');
+    assert.strictEqual(cancelPlayer.counters.manual,0);
+    const acceptancePlayer=scenario(true,true);
+    acceptancePlayer.requestAccept();
+    acceptancePlayer.getSelection().onConfirm([201]);
+    assert.strictEqual(acceptancePlayer.counters.manual,1,'実際の手動出撃を生成する');
+    assert.strictEqual(acceptancePlayer.source.gold,400,'手動援軍派遣成立時に一度だけ支払う');
+    assert.strictEqual(acceptancePlayer.counters.withHelp,1);
 });
 
 
