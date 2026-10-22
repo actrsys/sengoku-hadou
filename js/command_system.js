@@ -171,7 +171,7 @@ class CommandSystem {
             infoHtml = "<div>暗殺を実行する担当官を選択してください</div>"; 
         }
         else if (actionType === 'arrange_marriage_busho') { 
-            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female); 
+            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => CAN_EXECUTE_RULES.isHouseholdMarriageGroomCandidate(b)); 
             infoHtml = "<div>姫を嫁がせる武将を選択してください</div>"; 
             if (extraData) extraData.allowDone = true;
         }

@@ -76,6 +76,10 @@ const CAN_EXECUTE_RULES = {
     hasActiveBushoExceptDaimyo: (game) => {
         return game.getClanBushos(game.playerClanId).some(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo);
     },
+    // 家中婚姻のメニューと婿候補画面は同じ人物資格を参照する。
+    // 姫の一門資格・対外婚姻の相手資格は別の責務として維持する。
+    isHouseholdMarriageGroomCandidate: b =>
+        window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female,
     hasBanishableBusho: (game) => {
         return game.getClanBushos(game.playerClanId).some(b => PersonnelRules.canBanish(game, b));
     },
@@ -445,7 +449,7 @@ const COMMAND_SPECS = {
         startMode: 'busho_select_special', subType: 'arrange_marriage_busho',
         sortKey: 'leadership',
         msg: "姫を嫁がせる武将を選択してください",
-        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasSelectableMarriagePrincess(game) && game.getClanBushos(game.playerClanId).some(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.female)
+        canExecute: (game, castle) => CAN_EXECUTE_RULES.hasSelectableMarriagePrincess(game) && game.getClanBushos(game.playerClanId).some(b => CAN_EXECUTE_RULES.isHouseholdMarriageGroomCandidate(b))
     },
     'employ': {
         label: "登用", category: 'PERSONNEL', 

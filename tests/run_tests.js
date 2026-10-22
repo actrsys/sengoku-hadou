@@ -449,7 +449,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r666');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r667');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -29221,6 +29221,62 @@ test('r666 軍師・国主任命の人物資格はメニューと選択画面で
     assert.ok(catalogSource.includes('isGunshiAppointmentCandidate:') && catalogSource.includes('isLegionCommanderAppointmentCandidate:'));
     assert.ok(selectorSource.includes('CAN_EXECUTE_RULES.isGunshiAppointmentCandidate(b)'));
     assert.ok(selectorSource.includes('CAN_EXECUTE_RULES.isLegionCommanderAppointmentCandidate(b)'));
+});
+
+
+// r667: 家中婚姻の婿候補資格だけを、実行可否と選択画面で共有する。
+// 姫の一門・未婚資格と、対外婚姻の資格へは適用しない。
+test('r667 家中婚姻の婿候補はメニューと選択画面で同じ資格・取得順を保つ', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        StatPresenter: { getPerceivedStatValue: (b, key) => b[key] || 0 }
+    });
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/command_system.js');
+    const rules = vm.runInContext('CAN_EXECUTE_RULES', ctx);
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const roster = [];
+    const daimyo = { id: 1, familyIds: [201] };
+    const clan = { id: 2, princessIds: [300] };
+    const princess = { id: 300, status: 'unmarried', familyIds: [201] };
+    const castle = { id: 50, ownerClan: 2, gold: 5000, rice: 5000 };
+    const game = {
+        playerClanId: 2,
+        getClan: () => clan,
+        getClanDaimyo: () => daimyo,
+        getClanGunshi: () => null,
+        getPrincess: id => id === 300 ? princess : null,
+        getClanBushos: () => roster,
+        getCurrentTurnCastle: () => castle
+    };
+    const command = new Command(game);
+    const oldGroom = b => b.status === 'active' && !b.isDaimyo && !b.female;
+    let seed = 667;
+    const rand = n => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % n; };
+    for (let i = 0; i < 600; i++) {
+        roster.length = 0;
+        for (let j = 0; j < 12; j++) {
+            roster.push({ id: j + 10, name: `候補${j}`, status: ['active', 'ronin', 'unborn'][rand(3)],
+                isDaimyo: rand(5) === 0, female: rand(2) === 0,
+                strength: rand(120) + j / 100 });
+        }
+        const expected = roster.filter(oldGroom)
+            .slice().sort((a, b) => b.strength - a.strength).map(b => b.id);
+        assert.deepStrictEqual(Array.from(command.getBushoSelectorData('arrange_marriage_busho', 50, {}, castle).bushos, b => b.id), expected, `婿候補 ${i}`);
+        assert.strictEqual(command.canExecuteCommand('arrange_marriage'), expected.length > 0, `家中婚姻メニュー ${i}`);
+        for (const b of roster) assert.strictEqual(rules.isHouseholdMarriageGroomCandidate(b), oldGroom(b), `人物資格 ${i}/${b.id}`);
+    }
+    // 姫側資格は従来の大名一門・未婚条件のまま。婿がいても非一門姫だけなら実行不可。
+    roster.length = 0;
+    roster.push({ id: 30, name: '家臣', status: 'active', isDaimyo: false, female: false, strength: 90 });
+    assert.strictEqual(command.canExecuteCommand('arrange_marriage'), true);
+    princess.familyIds = [999];
+    assert.strictEqual(command.canExecuteCommand('arrange_marriage'), false);
+    princess.familyIds = [201];
+    assert.strictEqual(command.canExecuteCommand('arrange_marriage'), true);
+    // 専用資格への委譲だけを固定し、別用途の婚姻資格に伝播させない。
+    assert.ok(read('js/command_system.js').includes('CAN_EXECUTE_RULES.isHouseholdMarriageGroomCandidate(b)'));
+    assert.ok(read('js/command_catalog.js').includes('isHouseholdMarriageGroomCandidate:'));
 });
 
 Promise.all(pendingTests).then(() => {
