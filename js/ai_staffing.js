@@ -86,6 +86,14 @@ class AIStaffing {
             bestScore += operationBonus;
         }
 
+        // 居城移転では現居城が比較基準。0除算回避は従来のMath.max(1, ...)を維持する。
+        const relativeBaseline = {
+            maxKokudaka: Math.max(1, castle.maxKokudaka),
+            maxDefense: Math.max(1, castle.maxDefense),
+            kokudaka: Math.max(1, castle.kokudaka),
+            defense: Math.max(1, castle.defense)
+        };
+
         // 自分が移動できるお城（自領で繋がっているお城）を順番に調べて、点数をつけていきます
         for (const target of validCandidates) {
             // 今いるお城は調べる必要がないので飛ばします
@@ -104,42 +112,7 @@ class AIStaffing {
                 score += operationBonus;
             }
 
-            // 1. 最大石高の点数計算（2倍で+30点、半分で-30点）
-            // ※0で割り算するとエラーになってしまうので、最低でも1になるように守ってあげます
-            const baseMaxKoku = Math.max(1, castle.maxKokudaka);
-            const rateMaxKoku = target.maxKokudaka / baseMaxKoku; // 今のお城の何倍あるか？を計算します
-            if (rateMaxKoku >= 1.0) {
-                score += (rateMaxKoku - 1.0) * 30; // 1倍より大きければ、増えた分だけプラスします
-            } else {
-                score += (rateMaxKoku - 1.0) * 60; // 0.5倍（半分）の時にちょうど-30点になるように、60をかけます
-            }
-
-            // 2. 最大防御力の点数計算（2倍で+30点、半分で-30点）
-            const baseMaxDef = Math.max(1, castle.maxDefense);
-            const rateMaxDef = target.maxDefense / baseMaxDef;
-            if (rateMaxDef >= 1.0) {
-                score += (rateMaxDef - 1.0) * 30;
-            } else {
-                score += (rateMaxDef - 1.0) * 60;
-            }
-
-            // 3. 現在石高の点数計算（2倍で+50点、半分で-50点）
-            const baseKoku = Math.max(1, castle.kokudaka);
-            const rateKoku = target.kokudaka / baseKoku;
-            if (rateKoku >= 1.0) {
-                score += (rateKoku - 1.0) * 50;
-            } else {
-                score += (rateKoku - 1.0) * 100; // 0.5倍（半分）の時にちょうど-50点になるように、100をかけます
-            }
-
-            // 4. 現在防御力の点数計算（2倍で+50点、半分で-50点）
-            const baseDef = Math.max(1, castle.defense);
-            const rateDef = target.defense / baseDef;
-            if (rateDef >= 1.0) {
-                score += (rateDef - 1.0) * 50;
-            } else {
-                score += (rateDef - 1.0) * 100;
-            }
+            score = this._scoreCastleRelativeToBaseline(target, relativeBaseline, score);
 
             // 全部の点数を足して、今までの最高得点よりも高かったらメモを書き換えます！
             if (score > bestScore) {
@@ -228,6 +201,22 @@ class AIStaffing {
             if (next && Number(next.ownerClan) === Number(clanId)) reachable.push(next);
         }
         return reachable;
+    }
+
+    // 居城移転と軍団新設で共通する拠点の相対評価算術だけを一元化する。
+    // 基準は呼出側が決める（移転は現居城、軍団新設は候補群の平均）。
+    // 初期得点と4項目の加算順を保ち、既存の同点候補優先順を変えない。
+    _scoreCastleRelativeToBaseline(target, baseline, initialScore = 0) {
+        let score = initialScore;
+        const rateMaxKoku = target.maxKokudaka / baseline.maxKokudaka;
+        score += (rateMaxKoku >= 1.0) ? (rateMaxKoku - 1.0) * 30 : (rateMaxKoku - 1.0) * 60;
+        const rateMaxDef = target.maxDefense / baseline.maxDefense;
+        score += (rateMaxDef >= 1.0) ? (rateMaxDef - 1.0) * 30 : (rateMaxDef - 1.0) * 60;
+        const rateKoku = target.kokudaka / baseline.kokudaka;
+        score += (rateKoku >= 1.0) ? (rateKoku - 1.0) * 50 : (rateKoku - 1.0) * 100;
+        const rateDef = target.defense / baseline.defense;
+        score += (rateDef >= 1.0) ? (rateDef - 1.0) * 50 : (rateDef - 1.0) * 100;
+        return score;
     }
 
     // 軍団の新設・解散で使う共通の前線判定。
@@ -411,20 +400,19 @@ class AIStaffing {
         const avgKoku = Math.max(1, candidateCastles.reduce((s,c)=>s+c.kokudaka,0) / candidateCastles.length);
         const avgDef = Math.max(1, candidateCastles.reduce((s,c)=>s+c.defense,0) / candidateCastles.length);
 
+        // 軍団新設では候補群の平均値が比較基準。居城移転とは基準だけ異なる。
+        const relativeBaseline = {
+            maxKokudaka: avgMaxKoku,
+            maxDefense: avgMaxDef,
+            kokudaka: avgKoku,
+            defense: avgDef
+        };
         const castleScores = [];
         for (const target of candidateCastles) {
-            let score = 0;
-            const rateMaxKoku = target.maxKokudaka / avgMaxKoku;
-            score += (rateMaxKoku >= 1.0) ? (rateMaxKoku - 1.0) * 30 : (rateMaxKoku - 1.0) * 60;
-            const rateMaxDef = target.maxDefense / avgMaxDef;
-            score += (rateMaxDef >= 1.0) ? (rateMaxDef - 1.0) * 30 : (rateMaxDef - 1.0) * 60;
-            const rateKoku = target.kokudaka / avgKoku;
-            score += (rateKoku >= 1.0) ? (rateKoku - 1.0) * 50 : (rateKoku - 1.0) * 100;
-            const rateDef = target.defense / avgDef;
-            score += (rateDef >= 1.0) ? (rateDef - 1.0) * 50 : (rateDef - 1.0) * 100;
+            const score = this._scoreCastleRelativeToBaseline(target, relativeBaseline);
             castleScores.push({ castle: target, score: score });
         }
-        
+
         castleScores.sort((a, b) => b.score - a.score);
         const baseCastle = castleScores[0].castle;
         

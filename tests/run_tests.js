@@ -449,7 +449,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r655');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r666');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -10419,7 +10419,11 @@ test('国主就任は軍師兼任を残さず、軍師選択UIも国主を候補
     const command = read('js/command_system.js');
     const gunshiAt = command.indexOf("actionType === 'appoint_gunshi'");
     const gunshiBlock = command.slice(gunshiAt, gunshiAt + 1800);
-    assert.ok(gunshiBlock.includes('!b.isCommander'));
+    const catalog = read('js/command_catalog.js');
+    assert.ok(gunshiBlock.includes('CAN_EXECUTE_RULES.isGunshiAppointmentCandidate(b)'));
+    const gunshiRuleStart = catalog.indexOf('isGunshiAppointmentCandidate:');
+    const gunshiRule = catalog.slice(gunshiRuleStart, gunshiRuleStart + 210);
+    assert.ok(gunshiRule.includes('!b.isCommander'));
 
     const leaderAt = command.indexOf('executeAppointLegionLeader(bushoId');
     const leaderBlock = command.slice(leaderAt, leaderAt + 3600);
@@ -10522,16 +10526,20 @@ test('出陣・降伏勧告・従属・臣従のコマンド可否もMapGraphSer
 
 test('軍師・国主任命コマンドは実際に選べる候補がいる時だけ有効になる', () => {
     const catalog = read('js/command_catalog.js');
-    const gunshiAt = catalog.indexOf('hasActiveBushoExceptDaimyoAndCastellan');
-    const gunshiRule = catalog.slice(gunshiAt, gunshiAt + 450);
+    const gunshiAt = catalog.indexOf('isGunshiAppointmentCandidate:');
+    const gunshiRule = catalog.slice(gunshiAt, gunshiAt + 210);
     assert.ok(gunshiRule.includes('!b.isCommander'));
     assert.ok(gunshiRule.includes('!b.isCastellan'));
+    assert.ok(catalog.includes('game.getClanBushos(game.playerClanId).some(b => CAN_EXECUTE_RULES.isGunshiAppointmentCandidate(b))'));
 
+    const commanderAt = catalog.indexOf('isLegionCommanderAppointmentCandidate:');
+    const commanderRule = catalog.slice(commanderAt, commanderAt + 165);
+    assert.ok(commanderRule.includes('!b.isDaimyo'));
+    assert.ok(commanderRule.includes('!b.isCommander'));
     const legionAt = catalog.indexOf('canManageLegion:');
     const legionRule = catalog.slice(legionAt, legionAt + 1100);
     assert.ok(legionRule.includes('const hasCandidate = game.getClanBushos(game.playerClanId).some'));
-    assert.ok(legionRule.includes('!b.isDaimyo'));
-    assert.ok(legionRule.includes('!b.isCommander'));
+    assert.ok(legionRule.includes('CAN_EXECUTE_RULES.isLegionCommanderAppointmentCandidate(b)'));
     assert.ok(legionRule.includes('!hasCandidate || legionNumber > myCastles.length'));
     assert.ok(legionRule.includes('game.castleManager.getActiveCommanderCastleIds(game.playerClanId)'));
     assert.ok(legionRule.includes('game.getDaimyoHomeCastle(game.playerClanId)'));
@@ -12020,7 +12028,7 @@ test('AI月次作戦と派閥代表選定は同じfilter集計を短命Mapへま
     const staffing = read('js/ai_staffing.js');
     assert.ok(ops.includes('const castlesByLegionId = new Map();'));
     assert.ok(ops.includes('const myLegionCastles = castlesByLegionId.get(legionId) || [];'));
-    assert.ok(ops.includes('currentTargetCount = this._countPacificationTargets(clan.id, myLegionCastles);'));
+    assert.ok(ops.includes('grandObj.type, objectiveTargetId, myLegionCastles)'));
     assert.ok(ops.includes('const currentMyCastleCount = myCastles.length;'));
     assert.ok(staffing.includes('const factionMemberCounts = new Map();'));
     assert.ok(staffing.includes('factionMemberCounts.get(a.factionId)'));
@@ -13689,6 +13697,57 @@ test('AI攻撃候補比較は不変な勢力兵数・領内敵対諸勢力を一
     assert.ok(block.includes('if (!queuedCastleIds.has(vCastle.id))'));
 });
 
+
+test('r658 AI攻撃評価の全領地・同一軍団の隣接勢力集合は旧方式と取得順まで一致する', () => {
+    const ai = read('js/ai.js');
+    const start = ai.indexOf('const collectAdjacentClanIds = (sameLegionOnly = false) => {');
+    const end = ai.indexOf('\n\n        // 自家全領地', start);
+    assert.ok(start > 0 && end > start, '同一メソッド内の局所共通窓口だけを抽出する');
+    const helperSource = ai.slice(start, end);
+    assert.ok(ai.includes('const allAdjacentClans = collectAdjacentClanIds();'));
+    assert.ok(ai.includes('const adjacentClans = collectAdjacentClanIds(true);'));
+    // 断交評価は同じ勢力に複数拠点がある場合、拠点一覧を必要とする別用途。統合しない。
+    assert.ok(ai.includes('neighborCastles.push(adjCastle);'));
+    const createCollector = new Function('myClanCastles', 'myClanId', 'myCastle', 'game',
+        `return (function () { ${helperSource}\n return collectAdjacentClanIds; }).call({ game });`);
+    let seed = 658;
+    const next = (max) => {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        return seed % max;
+    };
+    for (let iteration = 0; iteration < 1000; iteration++) {
+        const castles = [];
+        const count = 5 + next(35);
+        for (let id = 1; id <= count; id++) {
+            const owned = id === 1 || next(4) === 0;
+            const castle = { id, ownerClan: owned ? 1 : next(7), legionId: next(4), adjacentCastleIds: [] };
+            const degree = next(7);
+            for (let n = 0; n < degree; n++) {
+                castle.adjacentCastleIds.push(1 + next(count + 2)); // 重複・不明IDも含む
+            }
+            if (next(9) === 0) castle.adjacentCastleIds = null;
+            castles.push(castle);
+        }
+        const castleById = new Map(castles.map(c => [c.id, c]));
+        const game = { getCastle(id) { return castleById.get(id); } };
+        const myClanCastles = castles.filter(c => c.ownerClan === 1);
+        const myCastle = myClanCastles[0];
+        const collect = createCollector(myClanCastles, 1, myCastle, game);
+        for (const sameLegionOnly of [false, true]) {
+            const oldResult = new Set();
+            myClanCastles.forEach(myC => {
+                if ((!sameLegionOnly || myC.legionId === myCastle.legionId) && myC.adjacentCastleIds) {
+                    myC.adjacentCastleIds.forEach(adjId => {
+                        const c = game.getCastle(adjId);
+                        if (c && c.ownerClan !== 0 && c.ownerClan !== 1) oldResult.add(c.ownerClan);
+                    });
+                }
+            });
+            assert.deepStrictEqual([...collect(sameLegionOnly)], [...oldResult],
+                `状態${iteration}・軍団絞り込み${sameLegionOnly}の候補集合と出現順`);
+        }
+    }
+});
 
 test('通常ターンの0ms継続はTurnManager世代で一元管理しシナリオ切替時に破棄する', () => {
     const turn = read('js/turn_manager.js');
@@ -23044,8 +23103,10 @@ test('r550 国内平定の進捗判定は商人しか残らなければ達成と
 
 test('r550 国内平定の3集計経路は単一の鎮圧対象数算定窓口を使う', () => {
     const source = read('js/ai_operation.js');
-    assert.strictEqual((source.match(/this\._countPacificationTargets\(/g) || []).length, 3,
-        '一括初期目標・月次進捗・自動作戦初期目標の3箇所で計算を共用する');
+    assert.strictEqual((source.match(/this\._countPacificationTargets\(/g) || []).length, 1,
+        '鎮圧対象数は長期方針の共通集計窓口からのみ委譲する');
+    assert.strictEqual((source.match(/this\._countGrandObjectiveTargets\(/g) || []).length, 4,
+        '一括初期・月次進捗・自動作戦初期の3入口が同じ目標数正本を使う');
     assert.ok(source.includes('kunishuSystem.getSubjugationEligibility('), '可否判定の正本へ委譲する');
     assert.ok(!source.includes("k.ideology !== '商人'"), '商人だけを特例除外する古い独自判定を残さない');
 });
@@ -28555,6 +28616,611 @@ test('r655 MapGraph進軍到達と海路種別は共通BFSで最短経路・断�
         '目標へ隣接する最終一歩はその勢力との外交関係を要しない');
     assert.strictEqual(Graph.isSeaRoute(game, start, start, 1), false,
         '起点と終点が同じ場合は海戦扱いしない');
+});
+
+// r656: 大方針の残目標数は、登録・再評価・新規作戦立案の3経路で同じ集計窓口を使う。
+// 外交・奪還履歴・国内平定の各意味は旧実装と同値であることを固定する。
+test('r656 AI大方針の目標数は全5種・変動外交/履歴で旧数式と一致する', () => {
+    const ctx = createContext({ DiplomacyRules: { isFriendly: s => s === '友好' || s === '同盟' } });
+    loadScript(ctx, 'js/ai_operation.js');
+    const Manager = vm.runInContext('AIOperationManager', ctx);
+    let seed = 1560656;
+    const rand = n => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % n; };
+    const statuses = ['友好', '同盟', '敵対', '和睦', null];
+    for (let iteration = 0; iteration < 400; iteration++) {
+        const clanId = 1, targetId = 7;
+        const castles = Array.from({ length: 18 }, (_, i) => ({
+            id: i + 1, ownerClan: rand(5), regionId: rand(3), provinceId: rand(4),
+            legionId: rand(3)
+        }));
+        const myCastles = castles.filter(c => c.ownerClan === clanId);
+        const statusesByClan = Array.from({length: 5}, () => statuses[rand(statuses.length)]);
+        const game = {
+            getClanCastles: id => id === clanId ? myCastles : castles.filter(c => c.ownerClan === id),
+            getRegionCastles: () => castles.filter(c => c.regionId === 0),
+            getProvinceCastles: () => castles.filter(c => c.provinceId === 0),
+            getCastle: id => castles.find(c => c.id === id) || null,
+            getRelation: (_, id) => statusesByClan[id] === null ? null : { status: statusesByClan[id] },
+            kunishuSystem: {
+                getKunishusInCastle: id => (id % 3 === 0 ? [
+                    { getRelation: () => 10 }, { getRelation: () => 60 }
+                ] : []),
+                getSubjugationEligibility: (kunishu, _clan, castle) => ({ eligible: castle.id % 2 === 0 })
+            }
+        };
+        const mgr = new Manager(game);
+        const previous = Array.from({length: 4}, () => Array.from({length: rand(12)}, () => rand(18) + 1));
+        mgr.historyOwnedCastles[clanId] = previous;
+        const eligible = c => {
+            const rel = game.getRelation(clanId, c.ownerClan);
+            return !rel || !ctx.DiplomacyRules.isFriendly(rel.status);
+        };
+        const old = {
+            '大名攻略': game.getClanCastles(targetId).length,
+            '地方統一': game.getRegionCastles(targetId).filter(c => c.ownerClan !== clanId && eligible(c)).length,
+            '国攻略': game.getProvinceCastles(targetId).filter(c => c.ownerClan !== clanId && eligible(c)).length,
+            '反攻作戦': (() => {
+                let total = 0;
+                const past = new Set(previous.flat());
+                const owned = new Set(myCastles.map(c => c.id));
+                for (const id of past) {
+                    if (owned.has(id)) continue;
+                    const c = game.getCastle(id);
+                    if (c && eligible(c)) total++;
+                }
+                return total;
+            })(),
+            '国内平定': myCastles.filter(c => c.legionId === 0 && c.id % 6 === 0).length
+        };
+        const legionCastles = myCastles.filter(c => c.legionId === 0);
+        for (const type of Object.keys(old)) {
+            const actual = mgr._countGrandObjectiveTargets(clanId, type, targetId, legionCastles);
+            assert.strictEqual(actual, old[type], `${iteration}番地図の${type}集計を維持`);
+        }
+    }
+    const source = read('js/ai_operation.js');
+    assert.strictEqual((source.match(/_countGrandObjectiveTargets\(/g) || []).length, 5,
+        '定義1・呼出4箇所に限る（軍団別国内平定の再評価を含む）');
+});
+
+
+// r657: 進軍経路とAI作戦候補の隣接は同じ双方向地図グラフを利用する。
+// 片方向登録でも本来隣接する城をAIが見落とさず、双方向登録では候補の優先順を変えない。
+test('r657 AI作戦の攻撃候補はMapGraphの双方向隣接を正本とする', async () => {
+    const ctx = createContext({
+        document: {body: {classList: {contains: () => true}}},
+        MainParams: {StartYear: 1560, StartMonth: 1},
+        DiplomacyRules: {canPassTerritory: status => status === '同盟'}
+    });
+    loadScript(ctx, 'js/map_graph.js');
+    loadScript(ctx, 'js/ai_operation.js');
+    const Graph = vm.runInContext('MapGraphService', ctx);
+    const Operations = vm.runInContext('AIOperationManager', ctx);
+    async function capture(sourceEdges, targetEdges) {
+        const from = {id: 1, ownerClan: 1, legionId: 0, castellanId: 10,
+            provinceId: 1, adjacentCastleIds: sourceEdges, soldiers: 1200};
+        const enemy = {id: 2, ownerClan: 2, legionId: 0,
+            provinceId: 1, adjacentCastleIds: targetEdges, immunityUntil: 0, soldiers: 200};
+        const castles = [from, enemy];
+        const general = {id: 10, clan: 1, isActionDone: false};
+        const seen = [];
+        const captureDone = new Error('capture candidate');
+        const game = {
+            castles, clans: [{id: 1}, {id: 2}], provinces: [], playerClanId: 99,
+            gameStartYear: 1560, gameStartMonth: 1, year: 1560, month: 5,
+            getCastle: id => castles.find(c => c.id === Number(id)) || null,
+            getClanCastles: id => castles.filter(c => c.ownerClan === Number(id)),
+            getBusho: () => general, getClanDaimyo: () => ({intelligence: 60}),
+            getRelation: () => null, getCurrentTurnId: () => 5,
+            diplomacyManager: {isNonAggression: () => false},
+            kunishuSystem: {getKunishusInCastle: () => []},
+            aiEngine: {decideAttackTarget(_, __, targets) {
+                seen.push(...targets.map(t => t.id)); throw captureDone;
+            }}
+        };
+        game.mapGraph = new Graph(game);
+        const mgr = new Operations(game);
+        mgr.operations[1] = {0: null};
+        mgr.setInternalOperation = () => {};
+        try { await mgr.generateOperation(1, 0); }
+        catch (e) { if (e !== captureDone) throw e; }
+        assert.strictEqual(vm.runInContext('MapGraphService', ctx).isAdjacent(from, enemy), true,
+            '片側登録でも正規の地図判定では隣接する');
+        return seen;
+    }
+    assert.deepStrictEqual(await capture([2], [1]), [2], '双方向登録の攻撃候補を維持');
+    assert.deepStrictEqual(await capture([], [1]), [2], '相手城からのみ登録された道も攻撃候補とする');
+    assert.deepStrictEqual(await capture([2], []), [2], '出撃元からのみ登録された道も攻撃候補とする');
+    const source = read('js/ai_operation.js');
+    assert.ok(source.includes('this.game.mapGraph.getAdjacentIds(castle)'),
+        'AI側で別の地図接続規則を持たず、共通サービスを参照する');
+});
+
+
+// 既存マップの双方向登録では、共通索引へ移しても隣接候補と順序を変えない。
+test('r657 双方向登録済み地図の隣接候補順は300種類の配置で旧配列と一致する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/map_graph.js');
+    loadScript(ctx, 'js/ai_operation.js');
+    const Graph = vm.runInContext('MapGraphService', ctx);
+    let seed = 20261022;
+    const rand = () => {seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296;};
+    for (let round = 0; round < 300; round++) {
+        const n = 4 + round % 11;
+        const castles = Array.from({length: n}, (_, i) => ({id: i + 1, ownerClan: 1, adjacentCastleIds: []}));
+        for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+            if (rand() < 0.25) {
+                castles[i].adjacentCastleIds.push(j + 1);
+                castles[j].adjacentCastleIds.push(i + 1);
+            }
+        }
+        // 配列順まで一致させるため、両端の元の格納順を個別にシャッフルする。
+        for (const c of castles) {
+            for (let j = c.adjacentCastleIds.length - 1; j > 0; j--) {
+                const k = Math.floor(rand() * (j + 1));
+                [c.adjacentCastleIds[j], c.adjacentCastleIds[k]] =
+                    [c.adjacentCastleIds[k], c.adjacentCastleIds[j]];
+            }
+        }
+        const game = {castles, getCastle: id => castles.find(c => c.id === Number(id)) || null};
+        game.mapGraph = new Graph(game);
+        const planner = new (vm.runInContext('AIOperationManager', ctx))(game);
+        for (const castle of castles) {
+            assert.deepStrictEqual(Array.from(planner._getAdjacentIds(castle)),
+                castle.adjacentCastleIds, `双方向の地図${round}／${castle.id}は旧候補順を保持する`);
+        }
+    }
+});
+
+// r659: 援軍の「接続領＋隣接」「目標＋隣接」は地図サービスの双方向接続を共有する。
+// 兵力・大雪・外交・候補順の固有資格は変えず、旧来の全拠点辺走査と実際の援軍候補を照合する。
+test('r659 援軍距離資格の共通化は旧全辺走査と攻守・双方向で同値', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/map_graph.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    const Graph = vm.runInContext('MapGraphService', ctx);
+    const Diplomacy = vm.runInContext('DiplomacyManager', ctx);
+    const ACTIVE = ctx.GameConstants.BushoStatus.ACTIVE;
+    let seed = 20261022;
+    const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+    for (let round = 0; round < 300; round++) {
+        const n = 4 + round % 14;
+        const castles = Array.from({length: n}, (_, i) => ({
+            id: i + 1, ownerClan: 1 + (i + round) % 3, soldiers: 1600,
+            rice: i % 7 === 0 ? 300 : 800,
+            provinceId: 1, castellanId: i + 100, adjacentCastleIds: []
+        }));
+        for (const c of castles) {
+            for (const other of castles) if (c !== other && random() < 0.18) {
+                c.adjacentCastleIds.push(other.id);
+                if (random() < 0.05) c.adjacentCastleIds.push(other.id);
+            }
+            if (random() < 0.13) c.adjacentCastleIds.push(n + 50);
+        }
+        const connected = new Set(castles.filter((_, i) => i % 3 === round % 3).map(c => c.id));
+        const target = castles[(round * 5 + 1) % n];
+        const initial = castles[0];
+        // r658の旧式（全辺を走査して両端へ追加）を独立した比較基準として再現。
+        const oldConnected = new Set(connected);
+        const oldTarget = new Set([target.id]);
+        for (const c of castles) for (const rawId of c.adjacentCastleIds) {
+            const adj = Number(rawId);
+            if (connected.has(c.id)) oldConnected.add(adj);
+            if (connected.has(adj)) oldConnected.add(c.id);
+            if (c.id === target.id) oldTarget.add(adj);
+            if (adj === target.id) oldTarget.add(c.id);
+        }
+        const game = {
+            castles, provinces: [],
+            getCastle: id => castles.find(c => c.id === Number(id)) || null,
+            getProvince: () => ({statusEffects: []}),
+            getClan: id => ({id, name: `勢力${id}`}),
+            getBusho: () => null,
+            getCastleBushos: id => {const c = castles.find(c => c.id === Number(id));
+                return c ? [{id: c.id + 100, clan: c.ownerClan, status: ACTIVE}] : [];},
+            kunishuSystem: {getKunishusInCastle: () => []}
+        };
+        game.mapGraph = new Graph(game);
+        const diplomacy = new Diplomacy(game);
+        // 外交関係の専門判定はこの比較では固定。敵対側から援軍を呼ばない。
+        diplomacy.getRelation = (a, b) => Number(a) === 1 && Number(b) === 3 ? {status: '同盟', sentiment: 50} : null;
+        for (const castle of castles) {
+            const expectedConnected = oldConnected.has(castle.id);
+            const actualConnected = connected.has(castle.id) || [...connected].some(id =>
+                Graph.getAdjacentIds(game, game.getCastle(id)).includes(castle.id));
+            assert.strictEqual(actualConnected, expectedConnected, `接続城資格 r${round}, ${castle.id}`);
+            assert.strictEqual(new Set([target.id, ...Graph.getAdjacentIds(game, target)]).has(castle.id),
+                oldTarget.has(castle.id), `目標隣接資格 r${round}, ${castle.id}`);
+        }
+        for (const defending of [false, true]) {
+            const minRice = defending ? 500 : 0;
+            const expectedSelf = castles.filter(c => c.id !== initial.id && c.id !== target.id &&
+                c.ownerClan === 1 && c.soldiers >= 1000 && c.rice >= minRice &&
+                (oldConnected.has(c.id) || oldTarget.has(c.id))).map(c => c.id);
+            const actualSelf = diplomacy.findAvailableReinforcements(true, defending, initial.id, target, 1, 2, connected)
+                .map(c => c.id);
+            assert.deepStrictEqual(Array.from(actualSelf), expectedSelf, `自家援軍 r${round}, 防御=${defending}`);
+            const expectedAlly = castles.filter(c => c.id !== initial.id && c.id !== target.id &&
+                c.ownerClan === 3 && c.soldiers >= 1000 && c.rice >= minRice &&
+                (oldConnected.has(c.id) || (!defending && oldTarget.has(c.id)))).map(c => c.id);
+            const actualAlly = diplomacy.findAvailableReinforcements(false, defending, initial.id, target, 1, 2, connected)
+                .map(c => c.castle.id);
+            assert.deepStrictEqual(Array.from(actualAlly), expectedAlly, `他家援軍 r${round}, 防御=${defending}`);
+        }
+    }
+    const source = read('js/diplomacy.js');
+    assert.ok(source.includes('MapGraphService.getAdjacentIds(this.game, connectedCastle)'), '接続領の隣接は地図サービスに委譲');
+    assert.ok(source.includes('MapGraphService.getAdjacentIds(this.game, registeredTarget)'), '目標の隣接も同じ正本を利用');
+});
+
+// r660: AI和睦・外交評価と面談助言の直接隣接勢力資格を一元管理する。
+test('r660 直接隣接する外交相手IDは面談・和睦で同じ正本と旧データ順を使う', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/diplomacy.js');
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager; this.InterviewSystem = InterviewSystem;', ctx);
+    let seed = 660;
+    const rnd = n => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % n; };
+    const expectedLegacy = (game, clanId) => {
+        const result = new Set();
+        game.getClanCastles(clanId).forEach(castle => {
+            (castle.adjacentCastleIds || []).forEach(adjId => {
+                const adj = game.getCastle(adjId);
+                const ownerClan = adj ? Number(adj.ownerClan || 0) : 0;
+                if (ownerClan > 0 && ownerClan !== Number(clanId)) result.add(ownerClan);
+            });
+        });
+        return [...result];
+    };
+    for (let round = 0; round < 500; round++) {
+        const castles = Array.from({length: 12}, (_, i) => ({
+            id: i + 1, ownerClan: rnd(6), adjacentCastleIds: []
+        }));
+        for (const castle of castles) {
+            const count = rnd(6);
+            for (let j = 0; j < count; j++) castle.adjacentCastleIds.push(rnd(16));
+            if (rnd(5) === 0) castle.adjacentCastleIds = null;
+        }
+        const game = {
+            castles,
+            getClanCastles: id => castles.filter(c => Number(c.ownerClan) === Number(id)),
+            getCastle: id => castles.find(c => c.id === Number(id)) || null
+        };
+        const dm = new ctx.DiplomacyManager(game);
+        game.diplomacyManager = dm;
+        const interview = new ctx.InterviewSystem(game);
+        for (let clanId = 1; clanId <= 5; clanId++) {
+            const expected = expectedLegacy(game, clanId);
+            assert.deepStrictEqual(Array.from(dm.getDirectNeighborClanIds(clanId)), expected,
+                `外交 r${round} clan=${clanId}`);
+            assert.deepStrictEqual(Array.from(interview._getNeighborClanIds(clanId)), expected,
+                `面談 r${round} clan=${clanId}`);
+            for (let targetId = 1; targetId <= 5; targetId++) {
+                assert.strictEqual(dm.areClansDirectlyAdjacent(clanId, targetId),
+                    targetId !== clanId && expected.includes(targetId),
+                    `和睦候補 r${round} clan=${clanId}, target=${targetId}`);
+            }
+        }
+    }
+    const interviewCode = read('js/interview_system.js');
+    const diplomacyCode = read('js/diplomacy.js');
+    assert.ok(interviewCode.includes('diplomacy.getDirectNeighborClanIds(clanId)'),
+        '面談内で外交候補を独自再計算しない');
+    assert.ok(diplomacyCode.includes('getDirectNeighborClanIds(clanId)'), '外交側の公開窓口を正本にする');
+});
+
+
+// r662: AI内政の現役・当該勢力・未行動資格だけを局所共有する。
+// 数回の内政行動中に行動済みへ変わるため、2回目以降も必ず再評価する。
+test('r662 AI内政の武将候補は同一資格を事前・行動直前に用い毎回再取得する', () => {
+    const src = read('js/ai.js');
+    const start = src.indexOf('async execInternalAffairs(');
+    const end = src.indexOf('\n    async ', start + 10);
+    const block = src.slice(start, end > start ? end : src.length);
+    const declaration = block.match(/const getActionableBushos = \(\) => this\.game\.getCastleBushos\(castle\.id\)\.filter\(b =>\s*!b\.isActionDone && b\.clan === castle\.ownerClan && window\.BushoStatusRules\.isActive\(b\)\s*\);/);
+    assert.ok(declaration, '候補資格は同一局所窓口に保持');
+    assert.strictEqual((block.match(/getCastleBushos\(castle\.id\)\.filter\(b =>\s*!b\.isActionDone/g) || []).length, 1, '同一資格の独立実装を残さない');
+    assert.ok(block.includes('let availableBushos = getActionableBushos();'));
+    assert.ok(block.includes('availableBushos = getActionableBushos();'), '行動直前に再取得');
+    const castle = { id: 8, ownerClan: 2 };
+    const mine = { id: 1, clan: 2, status: 'active', isActionDone: false };
+    const alreadyUsed = { id: 2, clan: 2, status: 'active', isActionDone: true };
+    const outsider = { id: 3, clan: 9, status: 'active', isActionDone: false };
+    const ronin = { id: 4, clan: 2, status: 'ronin', isActionDone: false };
+    let current = [mine, alreadyUsed, outsider, ronin];
+    const lookedUp = [];
+    const game = { getCastleBushos(id) { lookedUp.push(id); return current; } };
+    const getActionableBushos = new Function('castle', 'window',
+        'return function () {' + declaration[0] + 'return getActionableBushos; }'
+    ).call({ game }, castle, { BushoStatusRules: { isActive: b => b.status === 'active' } })
+      .call({ game });
+    assert.deepStrictEqual(Array.from(getActionableBushos(), b => b.id), [1]);
+    mine.isActionDone = true;
+    alreadyUsed.isActionDone = false;
+    assert.deepStrictEqual(Array.from(getActionableBushos(), b => b.id), [2], '行動済み状態を毎回再評価');
+    current = [{ id: 5, clan: 2, status: 'active', isActionDone: false }];
+    assert.deepStrictEqual(Array.from(getActionableBushos(), b => b.id), [5], '異動・名簿変更後も古い配列を流用しない');
+    assert.deepStrictEqual(lookedUp, [8, 8, 8]);
+});
+
+// r661: 新勢力の色選択は、独立元を含む第1～第4隣接の元データ順と段階を保持する。
+// 旧版r660から固定した期待色で、片方向接続・重複・欠損ID・他家同居を含む色を比較する。
+test('r661 新勢力色の第2～第4隣接共通化は旧版の色と80地図で同値', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/independence_system.js');
+    const Independence = vm.runInContext('IndependenceSystem', ctx);
+    const expectedColors = '#0000ff #ff0000 #ffff00 #ffff00 #ffff00 #0000ff #00ff2b #ff00ff #0000ff #ff00ff #ff00ff #00ff00 #0000ff #0000ff #990000 #ff00ff #ffff00 #00ff00 #00ff00 #0000ff #0000ff #ff00ff #ff0000 #ffff00 #00ff00 #7f00ff #00ffff #0000ff #00ff00 #0000ff #00ffff #00ffff #00ffff #00ffff #d4ff00 #00ffff #ff00ff #0000ff #00aaff #d400ff #ffd500 #ffff00 #ff00ff #ffff00 #00ffff #ffff00 #ff0000 #ffff00 #ffff00 #ffff00 #ff00ff #ff0000 #0000ff #ff00ff #ffff00 #00ffff #00ffff #ff00ff #00ff00 #ff00ff #ff0000 #ff00ff #00ffff #00ffff #ff0000 #00ffff #000099 #00ff00 #00ffff #ff8000 #ffff00 #ff5500 #00ff00 #0000ff #ff0000 #00ff00 #ffff00 #80ff00 #7f00ff #ffff00'.split(' ');
+    let seed = 661;
+    const rand = n => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % n; };
+    for (let r = 0; r < expectedColors.length; r++) {
+        const count = 7 + rand(12);
+        const colors = new Map(Array.from({length: 9}, (_, i) => [i + 1, {
+            color: '#' + Array.from({length: 3}, () => rand(256).toString(16).padStart(2, '0')).join('')
+        }]));
+        const castles = Array.from({length: count}, (_, i) => ({
+            id: i + 1, ownerClan: rand(10), adjacentCastleIds: []
+        }));
+        for (const castle of castles) {
+            for (let j = 0, k = rand(7); j < k; j++) castle.adjacentCastleIds.push(rand(count + 4));
+            if (rand(8) === 0) castle.adjacentCastleIds = null;
+        }
+        const game = {
+            castles,
+            getCastle: id => castles.find(c => c.id === id) || null,
+            getClan: id => colors.get(id) || null
+        };
+        const actual = new Independence(game).generateDistinctColor(castles[rand(count)]);
+        assert.strictEqual(actual, expectedColors[r], `旧版色と異なる: 地図 ${r}`);
+    }
+    const source = read('js/independence_system.js');
+    assert.ok(source.includes('const collectNextDegree = (sourceClans, destinationClans) =>'),
+        '第2～第4隣接だけを局所的に共有する');
+    assert.ok(!source.includes('MapGraphService.getAdjacentIds('),
+        '色の段階評価を双方向補完して範囲を広げない');
+});
+
+
+// r663: AI人事の相対拠点評価は「居城との比較」と「候補城平均との比較」で
+// 算術だけを共用し、異なる基準値・先行ボーナス・同点判定を保持する。
+test('r663 AI居城移転・軍団新設の拠点相対評価算術は旧式と同値', () => {
+    const source = read('js/ai_staffing.js');
+    const relocate = source.slice(source.indexOf('relocateDaimyo(castle, castellan)'), source.indexOf('constructor(game)'));
+    const legion = source.slice(source.indexOf('createNewLegionIfNeeded(clanId)'), source.indexOf('checkLegionDisband(clanId)'));
+    assert.ok(relocate.includes('this._scoreCastleRelativeToBaseline(target, relativeBaseline, score)'), '居城移転から共通スコアへ委譲');
+    assert.ok(legion.includes('this._scoreCastleRelativeToBaseline(target, relativeBaseline)'), '軍団新設から同じ共通スコアへ委譲');
+    assert.ok(relocate.includes('maxKokudaka: Math.max(1, castle.maxKokudaka)'), '移転基準は現在の居城');
+    assert.ok(legion.includes('maxKokudaka: avgMaxKoku'), '軍団新設基準は候補群の平均');
+
+    const context = createContext();
+    loadScript(context, 'js/ai_staffing.js');
+    const Staffing = vm.runInContext('AIStaffing', context);
+    const staffing = new Staffing({});
+    // 共通化前のr662の式を、加算順・演算子順を変えず比較用に固定する。
+    function original(target, reference, initialScore = 0) {
+        let score = initialScore;
+        const rateMaxKoku = target.maxKokudaka / reference.maxKokudaka;
+        if (rateMaxKoku >= 1.0) score += (rateMaxKoku - 1.0) * 30;
+        else score += (rateMaxKoku - 1.0) * 60;
+        const rateMaxDef = target.maxDefense / reference.maxDefense;
+        if (rateMaxDef >= 1.0) score += (rateMaxDef - 1.0) * 30;
+        else score += (rateMaxDef - 1.0) * 60;
+        const rateKoku = target.kokudaka / reference.kokudaka;
+        if (rateKoku >= 1.0) score += (rateKoku - 1.0) * 50;
+        else score += (rateKoku - 1.0) * 100;
+        const rateDef = target.defense / reference.defense;
+        if (rateDef >= 1.0) score += (rateDef - 1.0) * 50;
+        else score += (rateDef - 1.0) * 100;
+        return score;
+    }
+    let seed = 663;
+    const rand = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 0x100000000; };
+    const attrs = ['maxKokudaka', 'maxDefense', 'kokudaka', 'defense'];
+    const build = () => Object.fromEntries(attrs.map(a => [a, [0, 1, 499, 1000, 5000, 20000, 99999, 2.5, rand() * 100000][Math.floor(rand() * 9)]]));
+    for (let i = 0; i < 2500; i++) {
+        const target = build();
+        const home = build();
+        const relocationBaseline = Object.fromEntries(attrs.map(a => [a, Math.max(1, home[a])]));
+        const initialScore = [0, 30, 60, 90][i % 4];
+        assert.ok(Object.is(staffing._scoreCastleRelativeToBaseline(target, relocationBaseline, initialScore), original(target, relocationBaseline, initialScore)), `居城移転 ${i}`);
+        // 軍団新設は複数候補の平均を同じ順番で算定した値で比較する。
+        const candidates = [target, build(), build()];
+        const meanBaseline = Object.fromEntries(attrs.map(a => [a, Math.max(1, candidates.reduce((sum, c) => sum + c[a], 0) / candidates.length)]));
+        assert.ok(Object.is(staffing._scoreCastleRelativeToBaseline(target, meanBaseline), original(target, meanBaseline, 0)), `軍団新設 ${i}`);
+    }
+});
+
+// r665: 家督・養子のメニュー実行可否と武将選択の資格判定だけを共有する。
+// r594で撤回した「非同期中に武将状態が変わる」ことを仮定する事前/確定時ガードは追加しない。
+test('r665 家督・養子の選択候補と事前有効判定は旧式と一致し、同じ資格正本を使う', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        LifeStatusRules: { isUnborn: b => b.status === 'unborn' },
+        StatPresenter: { getPerceivedStatValue: b => b.strength || 0 }
+    });
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/command_system.js');
+    const rules = vm.runInContext('CAN_EXECUTE_RULES', ctx);
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const oldSuccessor = (b, daimyo) => {
+        if (b.isDaimyo || b.isRetired) return false;
+        if (b.status !== 'active' && b.status !== 'unborn') return false;
+        if (b.status === 'unborn' && b.isNotBorn) return false;
+        const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+        const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
+        return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
+    };
+    const oldAdoptable = (b, daimyo) => b.status === 'active' && !b.isDaimyo
+        && b.birthYear >= daimyo.birthYear + 15;
+    const daimyo = { id: 1, birthYear: 1510, familyIds: [12, 15] };
+    const roster = [];
+    const game = {
+        playerClanId: 1,
+        getClanDaimyo: () => daimyo,
+        getClanBushos: () => roster,
+        getClanGunshi: () => null
+    };
+    const command = new Command(game);
+    const castle = { id: 1, ownerClan: 1 };
+    let seed = 665;
+    const rnd = n => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % n; };
+    for (let i = 0; i < 600; i++) {
+        roster.length = 0;
+        daimyo.familyIds = i % 7 === 0 ? null : [12, 15];
+        for (let j = 0; j < 16; j++) {
+            const id = j + 2;
+            roster.push({ id, name: `武将${id}`, strength: id,
+                status: ['active', 'unborn', 'ronin', 'dead'][rnd(4)],
+                isRetired: rnd(8) === 0,
+                isDaimyo: rnd(11) === 0,
+                isNotBorn: rnd(5) === 0,
+                birthYear: 1510 + rnd(34),
+                familyIds: rnd(4) === 0 ? null : (rnd(3) === 0 ? [1] : [100])
+            });
+        }
+        const expectedSuccessors = roster.filter(b => oldSuccessor(b, daimyo));
+        const expectedAdoptable = roster.filter(b => oldAdoptable(b, daimyo));
+        const successorList = command.getBushoSelectorData('succession_target', null, null, castle).bushos;
+        const adoptList = command.getBushoSelectorData('adopt_son_target', null, null, castle).bushos;
+        const idsSorted = arr => Array.from(arr, b => b.id).sort((a, b) => b - a);
+        assert.deepStrictEqual(idsSorted(successorList), idsSorted(expectedSuccessors), `家督候補 ${i}`);
+        assert.deepStrictEqual(idsSorted(adoptList), idsSorted(expectedAdoptable), `養子候補 ${i}`);
+        // ソート自体は変更しておらず、元のstrength優先順を保つ。
+        assert.deepStrictEqual(Array.from(successorList, b => b.id), idsSorted(expectedSuccessors), `家督候補順 ${i}`);
+        assert.deepStrictEqual(Array.from(adoptList, b => b.id), idsSorted(expectedAdoptable), `養子候補順 ${i}`);
+        assert.strictEqual(rules.hasSuccessor(game), expectedSuccessors.length > 0, `家督ボタン ${i}`);
+        assert.strictEqual(rules.canAdoptSon(game), expectedSuccessors.length === 0 && expectedAdoptable.length > 0,
+            `養子ボタン ${i}`);
+    }
+    // 大名不在ではメニューを開けず、候補も表示されない従来動作を維持。
+    game.getClanDaimyo = () => null;
+    assert.strictEqual(rules.hasSuccessor(game), false);
+    assert.strictEqual(rules.canAdoptSon(game), false);
+    assert.deepStrictEqual(Array.from(command.getBushoSelectorData('succession_target', null, null, castle).bushos), []);
+    assert.deepStrictEqual(Array.from(command.getBushoSelectorData('adopt_son_target', null, null, castle).bushos), []);
+    const catalog = read('js/command_catalog.js');
+    const commandSource = read('js/command_system.js');
+    assert.ok(catalog.includes('isSuccessorCandidate:') && catalog.includes('isAdoptableCandidate:'));
+    assert.ok(commandSource.includes('CAN_EXECUTE_RULES.isSuccessorCandidate(b, daimyo, dFamily)'));
+    assert.ok(commandSource.includes('CAN_EXECUTE_RULES.isAdoptableCandidate(b, daimyo)'));
+});
+
+// r664: 過去所領の集合化はAI作戦Managerの正本で行い、月次更新後もキャッシュしない。
+// 同じ集合を作戦進捗、反攻方針、攻撃目標評価が使う（反攻の評価式は独立して保持）。
+test('r664 AIの過去所領ID集合は旧式と順序・型・月次再評価が一致する', () => {
+    const context = createContext({DiplomacyRules: {isFriendly: status => status === '同盟'}});
+    loadScript(context, 'js/ai_operation.js');
+    const Operations = vm.runInContext('AIOperationManager', context);
+    const castles = Array.from({length: 12}, (_, i) => ({id: i + 1, ownerClan: i % 4, provinceId: 1}));
+    const game = {
+        getClanCastles: id => castles.filter(c => c.ownerClan === id),
+        getCastle: id => castles.find(c => c.id === id) || null,
+        getRelation: (_, id) => id === 3 ? {status: '同盟'} : null
+    };
+    const mgr = new Operations(game);
+    let seed = 664;
+    const rand = n => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % n; };
+    assert.deepStrictEqual(Array.from(mgr.getPastOwnedCastleIds(1)), [], '履歴がない場合は空集合');
+    for (let i = 0; i < 500; i++) {
+        const history = Array.from({length: rand(10)}, () => Array.from({length: rand(15)}, () => {
+            const id = rand(15);
+            return rand(8) === 0 ? String(id) : id;
+        }));
+        mgr.historyOwnedCastles[1] = history;
+        const oldSet = new Set();
+        history.forEach(month => month.forEach(id => oldSet.add(id)));
+        const actual = mgr.getPastOwnedCastleIds(1);
+        assert.deepStrictEqual(Array.from(actual), Array.from(oldSet), `集合・登録順・ID型 ${i}`);
+        const expectedRetake = Array.from(oldSet).filter(id => {
+            if (game.getClanCastles(1).some(c => c.id === id)) return false;
+            const c = game.getCastle(id);
+            const rel = c && game.getRelation(1, c.ownerClan);
+            return !!c && (!rel || rel.status !== '同盟');
+        }).length;
+        assert.strictEqual(mgr._countGrandObjectiveTargets(1, '反攻作戦', 0), expectedRetake, `反攻目標数 ${i}`);
+        history.unshift([20 + i, 20 + i]);
+        assert.strictEqual(mgr.getPastOwnedCastleIds(1).has(20 + i), true, '履歴変更後は再取得');
+        assert.strictEqual(actual.has(20 + i), false, '取得済み集合は独立');
+    }
+    const operations = read('js/ai_operation.js');
+    const ai = read('js/ai.js');
+    assert.strictEqual((operations.match(/history\.forEach\(list => list\.forEach\(id =>/g) || []).length, 1,
+        '履歴集合への変換式はManager内で1か所に限定');
+    assert.strictEqual((ai.match(/historyOwnedCastles/g) || []).length, 0,
+        'AI攻撃評価は履歴内部配列を直接読まない');
+    assert.ok(ai.includes('getPastOwnedCastleIds(myClanId)') && ai.includes('getPastOwnedCastleIds(target.ownerClan)'),
+        '自家・敵家の過去所領判定に同じ入口を使う');
+});
+
+
+// r666: 軍師・国主の任命人物資格をメニューと選択画面で共有。
+// 国主の空き席・拠点資格および候補順・取得時点は変更しない。
+test('r666 軍師・国主任命の人物資格はメニューと選択画面で同一、旧候補順を保持', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        StatPresenter: { getPerceivedStatValue: (b, key) => b[key] || 0 }
+    });
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/command_system.js');
+    const rules = vm.runInContext('CAN_EXECUTE_RULES', ctx);
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const castleList = [{ id: 11 }, { id: 12 }, { id: 13 }];
+    const roster = [];
+    const occupiedIds = new Set();
+    const game = {
+        playerClanId: 1,
+        legions: [],
+        getClanBushos: () => roster,
+        getClanCastles: () => castleList,
+        getDaimyoHomeCastle: () => castleList[0],
+        getClanDaimyo: () => ({ id: 1 }),
+        getClanGunshi: () => null,
+        castleManager: { getActiveCommanderCastleIds: () => occupiedIds }
+    };
+    const command = new Command(game);
+    const oldGunshi = b => b.status === 'active' && !b.isDaimyo && !b.isCommander && !b.isCastellan;
+    const oldCommander = b => b.status === 'active' && !b.isDaimyo && !b.isCommander;
+    const ordered = (candidates, key) => candidates.slice().sort((a,b) => (b[key] || 0) - (a[key] || 0)).map(b => b.id);
+    let seed = 666;
+    const rand = n => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % n; };
+    for (let i = 0; i < 700; i++) {
+        roster.length = 0;
+        for (let j = 0; j < 15; j++) {
+            roster.push({ id: j + 2, name: `候補${j}`, status: ['active', 'ronin', 'unborn'][rand(3)],
+                isDaimyo: rand(6) === 0, isCommander: rand(5) === 0,
+                isCastellan: rand(4) === 0, intelligence: rand(150) + j / 100,
+                strength: rand(100) + j / 100 });
+        }
+        const expectedGunshi = roster.filter(oldGunshi);
+        const expectedCommander = roster.filter(oldCommander);
+        const gunshi = command.getBushoSelectorData('appoint_gunshi', 11, null, castleList[0]).bushos;
+        const commander = command.getBushoSelectorData('appoint_legion_leader', 11, null, castleList[0]).bushos;
+        assert.deepStrictEqual(Array.from(gunshi, b => b.id), ordered(expectedGunshi, 'intelligence'), `軍師候補順 ${i}`);
+        assert.deepStrictEqual(Array.from(commander, b => b.id), ordered(expectedCommander, 'strength'), `国主候補順 ${i}`);
+        assert.strictEqual(rules.hasActiveBushoExceptDaimyoAndCastellan(game), expectedGunshi.length > 0, `軍師メニュー ${i}`);
+        occupiedIds.clear();
+        if (i % 3 === 0) occupiedIds.add(12);
+        if (i % 5 === 0) occupiedIds.add(13);
+        game.legions = i % 7 === 0 ? [{clanId: 1, legionNo: 2, commanderId: 18}] : [];
+        const hasVacancy = !occupiedIds.has(12) || !occupiedIds.has(13);
+        assert.strictEqual(rules.canManageLegion(game, 2), expectedCommander.length > 0 && hasVacancy && game.legions.length === 0,
+            `国主メニュー ${i}`);
+    }
+    // 城主フラグだけが違う場合、軍師には不可・国主には可という元からの資格差を維持。
+    roster.length = 0;
+    roster.push({ id: 20, status: 'active', isDaimyo: false, isCommander: false,
+        isCastellan: true, intelligence: 90, strength: 80 });
+    game.legions = [];
+    occupiedIds.clear();
+    assert.strictEqual(rules.hasActiveBushoExceptDaimyoAndCastellan(game), false);
+    assert.strictEqual(rules.canManageLegion(game, 2), true);
+    assert.deepStrictEqual(Array.from(command.getBushoSelectorData('appoint_gunshi', 11, null, castleList[0]).bushos), []);
+    assert.deepStrictEqual(Array.from(command.getBushoSelectorData('appoint_legion_leader', 11, null, castleList[0]).bushos, b=>b.id), [20]);
+    const catalogSource = read('js/command_catalog.js');
+    const selectorSource = read('js/command_system.js');
+    assert.ok(catalogSource.includes('isGunshiAppointmentCandidate:') && catalogSource.includes('isLegionCommanderAppointmentCandidate:'));
+    assert.ok(selectorSource.includes('CAN_EXECUTE_RULES.isGunshiAppointmentCandidate(b)'));
+    assert.ok(selectorSource.includes('CAN_EXECUTE_RULES.isLegionCommanderAppointmentCandidate(b)'));
 });
 
 Promise.all(pendingTests).then(() => {

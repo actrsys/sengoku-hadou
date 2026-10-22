@@ -121,6 +121,35 @@ class AIOperationManager {
         );
     }
 
+    // 隣接資格の正本はMapGraphServiceの双方向索引。ただしAIの同点候補順には
+    // 元の隣接配列順が使われていたため、従来の記載順を先に並べ、逆向きのみの辺を後置する。
+    // 単独テストの軽量fixtureなどmapGraph未初期化時だけ元配列をそのまま利用する。
+    _getAdjacentIds(castle) {
+        if (!castle) return [];
+        const recorded = Array.isArray(castle.adjacentCastleIds) ? castle.adjacentCastleIds : [];
+        if (!this.game.mapGraph || typeof this.game.mapGraph.getAdjacentIds !== 'function') return recorded;
+        const graphIds = this.game.mapGraph.getAdjacentIds(castle);
+        if (!recorded.length) return graphIds;
+        const validIds = new Set(graphIds.map(Number));
+        const seen = new Set();
+        const ordered = [];
+        for (const rawId of recorded) {
+            const id = Number(rawId);
+            if (validIds.has(id) && !seen.has(id)) {
+                ordered.push(id);
+                seen.add(id);
+            }
+        }
+        for (const rawId of graphIds) {
+            const id = Number(rawId);
+            if (!seen.has(id)) {
+                ordered.push(id);
+                seen.add(id);
+            }
+        }
+        return ordered;
+    }
+
     // 国内平定の進捗は「攻撃可能な諸勢力」の数を示す。
     // 出撃元にいる候補だけを数えるので、接続領域はその拠点自身で十分。
     // 鎮圧可否（商人・壊滅・到達条件）はKunishuSystemを唯一の正本とする。
@@ -140,6 +169,50 @@ class AIOperationManager {
         return count;
     }
 
+    // 長期方針の目標数は、全軍団への配布・月次評価・新規立案で同じ正本を使う。
+    // 外交上の「友好」と自領の除外は、作戦目標に共通する資格判定。
+    _isNonFriendlyObjectiveOwner(clanId, ownerClanId) {
+        const rel = this.game.getRelation(clanId, ownerClanId);
+        return !rel || !window.DiplomacyRules.isFriendly(rel.status);
+    }
+
+    _countGrandObjectiveTargets(clanId, objectiveType, targetId, legionCastles = []) {
+        if (objectiveType === '大名攻略') {
+            return this.game.getClanCastles(targetId).length;
+        }
+        if (objectiveType === '地方統一' || objectiveType === '国攻略') {
+            const castles = objectiveType === '地方統一'
+                ? this.game.getRegionCastles(targetId) : this.game.getProvinceCastles(targetId);
+            return castles.filter(c => c.ownerClan !== clanId &&
+                this._isNonFriendlyObjectiveOwner(clanId, c.ownerClan)).length;
+        }
+        if (objectiveType === '反攻作戦') {
+            const pastOwnedIds = this.getPastOwnedCastleIds(clanId);
+            const currentOwnedIds = new Set(this.game.getClanCastles(clanId).map(c => c.id));
+            let count = 0;
+            for (const id of pastOwnedIds) {
+                if (currentOwnedIds.has(id)) continue;
+                const castle = this.game.getCastle(id);
+                if (castle && this._isNonFriendlyObjectiveOwner(clanId, castle.ownerClan)) count++;
+            }
+            return count;
+        }
+        if (objectiveType === '国内平定') {
+            return this._countPacificationTargets(clanId, legionCastles);
+        }
+        return 0;
+    }
+
+    // 過去の所領履歴を重複のないID集合として取得する唯一の窓口。
+    // 作戦評価とAI攻撃判断の双方から呼ばれ、月次履歴の更新後は毎回取り直す。
+    // 履歴配列の記録順とID型を変えず、新しいSetを返す（キャッシュしない）。
+    getPastOwnedCastleIds(clanId) {
+        const history = (this.historyOwnedCastles && this.historyOwnedCastles[clanId]) || [];
+        const ids = new Set();
+        history.forEach(list => list.forEach(id => ids.add(id)));
+        return ids;
+    }
+
     // ★追加：特定の大名勢力のすべての軍団に、一括で方針を持たせる一元化ロジックです！
     setGrandObjectiveToAllLegions(clanId, objectiveType, targetId, turnCount) {
         if (!this.grandObjectives) this.grandObjectives = {};
@@ -152,44 +225,9 @@ class AIOperationManager {
         const legionIds = [...new Set(clanCastles.map(c => Number(c.legionId || 0)))]
             .filter(legionId => legionId === 0 || this.isActiveLegion(clanId, legionId));
 
-        // ターゲットの初期数を数えます
-        let initialTargetCount = 0;
-        if (objectiveType === '大名攻略') {
-            initialTargetCount = this.game.getClanCastles(targetId).length;
-        } else if (objectiveType === '地方統一') {
-            initialTargetCount = this.game.getRegionCastles(targetId).filter(c => {
-                if (c.ownerClan !== clanId) {
-                    const rel = this.game.getRelation(clanId, c.ownerClan);
-                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
-                }
-                return false;
-            }).length;
-        } else if (objectiveType === '国攻略') {
-            initialTargetCount = this.game.getProvinceCastles(targetId).filter(c => {
-                if (c.ownerClan !== clanId) {
-                    const rel = this.game.getRelation(clanId, c.ownerClan);
-                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
-                }
-                return false;
-            }).length;
-        } else if (objectiveType === '反攻作戦') {
-            const history = this.historyOwnedCastles[clanId] || [];
-            const pastOwnedSet = new Set();
-            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
-            const currentMyCastles = new Set(clanCastles.map(c => c.id));
-            for (const cid of pastOwnedSet) {
-                if (!currentMyCastles.has(cid)) {
-                    const c = this.game.getCastle(cid);
-                    if (c) {
-                        const rel = this.game.getRelation(clanId, c.ownerClan);
-                        // 友好勢力でなければ取り返す拠点としてカウント
-                        if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
-                            initialTargetCount++;
-                        }
-                    }
-                }
-            }
-        }
+        // 国内平定だけは軍団別に数えるため、共通の目標数判定を軍団内で再評価する。
+        const initialTargetCount = objectiveType === '国内平定' ? 0 :
+            this._countGrandObjectiveTargets(clanId, objectiveType, targetId);
 
         // 見つかったすべての軍団に、方針をセットします！
         for (const legionId of legionIds) {
@@ -197,7 +235,7 @@ class AIOperationManager {
             // 国内平定だけは、自軍団の領内にいる諸勢力の数を数えるので軍団ごとに計算します
             if (objectiveType === '国内平定') {
                 const legionCastles = clanCastles.filter(c => c.legionId === legionId);
-                legionTargetCount = this._countPacificationTargets(clanId, legionCastles);
+                legionTargetCount = this._countGrandObjectiveTargets(clanId, objectiveType, targetId, legionCastles);
             }
 
             this.grandObjectives[clanId][legionId] = {
@@ -400,50 +438,10 @@ class AIOperationManager {
                     } else {
                         grandObj.prevMyCastleCount = currentMyCastleCount;
                         
-                        let currentTargetCount = 0;
-                        if (grandObj.type === '大名攻略') {
-                            currentTargetCount = this.game.getClanCastles(grandObj.targetClanId).length;
-                        } else if (grandObj.type === '地方統一') {
-                            currentTargetCount = this.game.getRegionCastles(grandObj.targetRegionId).filter(c => {
-                                if (c.ownerClan !== clan.id) {
-                                    const rel = this.game.getRelation(clan.id, c.ownerClan);
-                                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
-                                }
-                                return false;
-                            }).length;
-                        } else if (grandObj.type === '国攻略') {
-                            currentTargetCount = this.game.getProvinceCastles(grandObj.targetProvId).filter(c => {
-                                if (c.ownerClan !== clan.id) {
-                                    const rel = this.game.getRelation(clan.id, c.ownerClan);
-                                    return !rel || !window.DiplomacyRules.isFriendly(rel.status);
-                                }
-                                return false;
-                            }).length;
-                        } else if (grandObj.type === '反攻作戦') {
-                            // ★今回追加：反攻作戦の時の、取り返すべき拠点の数を調べます
-                            const history = this.historyOwnedCastles[clan.id] || [];
-                            const pastOwnedSet = new Set();
-                            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
-                            
-                            const currentMyCastles = new Set(this.game.getClanCastles(clan.id).map(c => c.id));
-                            
-                            for (const cid of pastOwnedSet) {
-                                // 今は自分のものではない場合
-                                if (!currentMyCastles.has(cid)) {
-                                    const c = this.game.getCastle(cid);
-                                    if (c) {
-                                        const rel = this.game.getRelation(clan.id, c.ownerClan);
-                                        // 友好勢力（同盟・支配・従属・友好）でなければ、取り返す拠点としてカウント
-                                        if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
-                                            currentTargetCount++;
-                                        }
-                                    }
-                                }
-                            }
-                        } else if (grandObj.type === '国内平定') {
-                            // ★追加：国内平定の場合、自軍団の管轄内（自分の城）にいる敵対諸勢力の数を数えます
-                            currentTargetCount = this._countPacificationTargets(clan.id, myLegionCastles);
-                        }
+                        const objectiveTargetId = grandObj.type === '大名攻略' ? grandObj.targetClanId :
+                            grandObj.type === '地方統一' ? grandObj.targetRegionId : grandObj.targetProvId;
+                        const currentTargetCount = this._countGrandObjectiveTargets(
+                            clan.id, grandObj.type, objectiveTargetId, myLegionCastles);
 
                         let shouldCancel = false;
 
@@ -519,9 +517,7 @@ class AIOperationManager {
                             }
                         } else if (!shouldCancel && grandObj.type === '反攻作戦') {
                             // ★変更：反攻作戦でも、同盟国を挟まずに直接攻撃できるか判定します
-                            const history = this.historyOwnedCastles[clan.id] || [];
-                            const pastOwnedSet = new Set();
-                            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                            const pastOwnedSet = this.getPastOwnedCastleIds(clan.id);
                             
                             const currentMyCastleIds = new Set(this.game.getClanCastles(clan.id).map(c => c.id));
                             
@@ -632,8 +628,9 @@ class AIOperationManager {
         const myClanCastles = this.game.getClanCastles(clanId);
         const neighborCastles = [];
         myClanCastles.forEach(myC => {
-            if (myC.adjacentCastleIds) {
-                myC.adjacentCastleIds.forEach(adjId => {
+            const adjacentIds = this._getAdjacentIds(myC);
+            if (adjacentIds.length) {
+                adjacentIds.forEach(adjId => {
                     const adjCastle = this.game.getCastle(adjId);
                     if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== clanId) {
                         neighborCastles.push(adjCastle);
@@ -731,8 +728,9 @@ class AIOperationManager {
             const current = searchQueue[searchHead++];
             reachableMyCastles.push(current);
 
-            if (current.adjacentCastleIds) {
-                current.adjacentCastleIds.forEach(adjId => {
+            const adjacentIds = this._getAdjacentIds(current);
+            if (adjacentIds.length) {
+                adjacentIds.forEach(adjId => {
                     const c = this.game.getCastle(adjId);
                     if (c && c.ownerClan === clanId && c.legionId === legionId && !visitedCastles.has(c.id)) {
                         visitedCastles.add(c.id);
@@ -773,8 +771,9 @@ class AIOperationManager {
         const myCastles = this.game.getClanCastles(myClanId);
         const neighborCastles = [];
         myCastles.forEach(myCastle => {
-            if (myCastle.adjacentCastleIds) {
-                myCastle.adjacentCastleIds.forEach(adjId => {
+            const adjacentIds = this._getAdjacentIds(myCastle);
+            if (adjacentIds.length) {
+                adjacentIds.forEach(adjId => {
                     const adjCastle = this.game.getCastle(adjId);
                     if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== myClanId) {
                         neighborCastles.push(adjCastle);
@@ -803,8 +802,9 @@ class AIOperationManager {
             if (rel && rel.status === '敵対') {
                 const enemyCastles = this.game.getClanCastles(neighborId);
                 enemyCastles.forEach(enemyCastle => {
-                    if (enemyCastle.adjacentCastleIds) {
-                        enemyCastle.adjacentCastleIds.forEach(adjId => {
+                    const adjacentIds = this._getAdjacentIds(enemyCastle);
+                    if (adjacentIds.length) {
+                        adjacentIds.forEach(adjId => {
                             const adjCastle = this.game.getCastle(adjId);
                             // 空き城(0)でもなく、自分でもなく、その敵対勢力自身でもないなら、リストに追加します！
                             if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== myClanId && adjCastle.ownerClan !== neighborId) {
@@ -927,8 +927,9 @@ class AIOperationManager {
         const adjacentEnemyClans = new Set();
 
         for (const myCastle of myClanCastles) {
-            if (myCastle.adjacentCastleIds) {
-                for (const adjId of myCastle.adjacentCastleIds) {
+            const adjacentIds = this._getAdjacentIds(myCastle);
+            if (adjacentIds.length) {
+                for (const adjId of adjacentIds) {
                     const adjCastle = this.game.getCastle(adjId);
                     // 空き城(0)ではなく、自分の家でもないお城を調べます
                     if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== clanId) {
@@ -988,8 +989,9 @@ class AIOperationManager {
                 const current = currentData.castle;
                 const currentDist = currentData.distance;
 
-                if (current.adjacentCastleIds) {
-                    current.adjacentCastleIds.forEach(adjId => {
+                const adjacentIds = this._getAdjacentIds(current);
+                if (adjacentIds.length) {
+                    adjacentIds.forEach(adjId => {
                         if (!visited.has(adjId)) {
                             visited.add(adjId);
                             const adjCastle = this.game.getCastle(adjId);
@@ -1010,8 +1012,9 @@ class AIOperationManager {
 
             const validEnemies = neighbors.filter(target => {
                 let isDirectlyAdjacent = false;
-                if (target.adjacentCastleIds) {
-                    isDirectlyAdjacent = target.adjacentCastleIds.some(adjId => {
+                const adjacentIds = this._getAdjacentIds(target);
+                if (adjacentIds.length) {
+                    isDirectlyAdjacent = adjacentIds.some(adjId => {
                         const adjCastle = this.game.getCastle(adjId);
                         // ★修正：ここも直轄なら他の軍団を隣接の足場にできるようにします！
                         return adjCastle && adjCastle.ownerClan === clanId && (adjCastle.legionId === legionId || legionId === 0);
@@ -1102,9 +1105,7 @@ class AIOperationManager {
                                 isTargetMatch = true;
                             } else if (myGrandObj.type === '反攻作戦') {
                                 // ★今回追加：反攻作戦の場合、目標が過去60ヶ月に持っていた拠点ならマッチ
-                                const history = (this.historyOwnedCastles && this.historyOwnedCastles[clanId]) ? this.historyOwnedCastles[clanId] : [];
-                                const pastOwnedSet = new Set();
-                                history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                                const pastOwnedSet = this.getPastOwnedCastleIds(clanId);
                                 if (pastOwnedSet.has(decision.target.id)) {
                                     isTargetMatch = true;
                                 }
@@ -1120,9 +1121,7 @@ class AIOperationManager {
                                 isTargetMatch = true;
                             } else if (myGrandObj.type === '反攻作戦') {
                                 // ★今回追加：諸勢力の場合でも、その居城が奪還対象ならマッチ
-                                const history = (this.historyOwnedCastles && this.historyOwnedCastles[clanId]) ? this.historyOwnedCastles[clanId] : [];
-                                const pastOwnedSet = new Set();
-                                history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
+                                const pastOwnedSet = this.getPastOwnedCastleIds(clanId);
                                 if (pastOwnedSet.has(decision.target.id)) {
                                     isTargetMatch = true;
                                 }
@@ -1248,8 +1247,9 @@ class AIOperationManager {
                 } else {
                     // 同じ目標に届く他の城がなかった場合、出撃元のお隣の城（自領）を予備として選ぶ魔法
                     const stagingCastle = this.game.getCastle(cand.castleId);
-                    if (stagingCastle && stagingCastle.adjacentCastleIds) {
-                        const adjMyCastles = stagingCastle.adjacentCastleIds
+                    const stagingAdjacentIds = stagingCastle ? this._getAdjacentIds(stagingCastle) : [];
+                    if (stagingAdjacentIds.length) {
+                        const adjMyCastles = stagingAdjacentIds
                             .map(id => this.game.getCastle(id))
                             // ★修正：直轄なら他の軍団の城も予備拠点候補にします！
                             .filter(c => c && c.ownerClan === clanId && (c.legionId === legionId || legionId === 0))
@@ -1463,15 +1463,9 @@ class AIOperationManager {
 
                         // ★今回追加：国攻略にもならなかった場合、反攻作戦の判定
                         if (!objectiveType && !firstTarget.isKunishuTarget) {
-                            if (this.historyOwnedCastles && this.historyOwnedCastles[clanId]) {
-                                const history = this.historyOwnedCastles[clanId];
-                                const pastOwnedSet = new Set();
-                                history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
-                                
-                                // 攻めようとしている相手の城が、過去に持っていた城なら反攻作戦にします
-                                if (pastOwnedSet.has(firstTarget.targetId)) {
-                                    objectiveType = '反攻作戦';
-                                }
+                            // 攻めようとしている相手の城が、過去に持っていた城なら反攻作戦にします
+                            if (this.getPastOwnedCastleIds(clanId).has(firstTarget.targetId)) {
+                                objectiveType = '反攻作戦';
                             }
                         }
 
@@ -1482,50 +1476,13 @@ class AIOperationManager {
 
                         // ★objectiveTypeがセットされている時だけ、方針を記録します
                         if (objectiveType) {
-                            let initialTargetCount = 0;
-                            if (objectiveType === '大名攻略') {
-                                initialTargetCount = this.game.getClanCastles(targetClanId).length;
-                            } else if (objectiveType === '地方統一') {
-                                initialTargetCount = this.game.getRegionCastles(targetRegionId).filter(c => {
-                                    if (c.ownerClan !== clanId) {
-                                        const rel = this.game.getRelation(clanId, c.ownerClan);
-                                        return !rel || !window.DiplomacyRules.isFriendly(rel.status);
-                                    }
-                                    return false;
-                                }).length;
-                            } else if (objectiveType === '国攻略') {
-                                initialTargetCount = this.game.getProvinceCastles(targetProvId).filter(c => {
-                                    if (c.ownerClan !== clanId) {
-                                        const rel = this.game.getRelation(clanId, c.ownerClan);
-                                        return !rel || !window.DiplomacyRules.isFriendly(rel.status);
-                                    }
-                                    return false;
-                                }).length;
-                            } else if (objectiveType === '反攻作戦') {
-                                // ★今回追加：反攻作戦の時の初期ターゲット数（取り返すべき拠点数）を計算します
-                                const history = this.historyOwnedCastles[clanId];
-                                const currentMyCastles = new Set(this.game.getClanCastles(clanId).map(c => c.id));
-                                const pastOwnedSet = new Set();
-                                history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
-                                
-                                for (const cid of pastOwnedSet) {
-                                    if (!currentMyCastles.has(cid)) {
-                                        const c = this.game.getCastle(cid);
-                                        if (c) {
-                                            const rel = this.game.getRelation(clanId, c.ownerClan);
-                                            // 友好勢力でなければ、取り返す拠点としてカウント
-                                            if (!rel || !window.DiplomacyRules.isFriendly(rel.status)) {
-                                                initialTargetCount++;
-                                            }
-                                        }
-                                    }
-                                }
-                            } else if (objectiveType === '国内平定') {
-                                // ★追加：初期ターゲット数として、自軍団内の敵対諸勢力の数をカウントします
-                                const myCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
-                                initialTargetCount = this._countPacificationTargets(clanId, myCastles);
-                            }
-                            
+                            const objectiveTargetId = objectiveType === '大名攻略' ? targetClanId :
+                                objectiveType === '地方統一' ? targetRegionId : targetProvId;
+                            const legionCastles = objectiveType === '国内平定'
+                                ? this.game.getClanCastles(clanId).filter(c => c.legionId === legionId) : [];
+                            const initialTargetCount = this._countGrandObjectiveTargets(
+                                clanId, objectiveType, objectiveTargetId, legionCastles);
+
                             const myCastleCount = this.game.getClanCastles(clanId).length;
                             
                             this.grandObjectives[clanId][legionId] = {

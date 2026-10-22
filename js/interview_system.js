@@ -604,15 +604,10 @@ class InterviewSystem {
     }
 
     _getNeighborClanIds(clanId) {
-        if (!this.game || !this.game.getClanCastles || !this.game.getCastle) return [];
-        const ids = new Set();
-        this.game.getClanCastles(Number(clanId)).forEach(castle => {
-            (castle.adjacentCastleIds || []).forEach(adjId => {
-                const adj = this.game.getCastle(adjId);
-                if (adj && Number(adj.ownerClan) > 0 && Number(adj.ownerClan) !== Number(clanId)) ids.add(Number(adj.ownerClan));
-            });
-        });
-        return [...ids];
+        // 面談固有の外交候補を再計算せず、直接国境を接する他家の正本を参照する。
+        const diplomacy = this.game && this.game.diplomacyManager;
+        return diplomacy && typeof diplomacy.getDirectNeighborClanIds === 'function'
+            ? diplomacy.getDirectNeighborClanIds(clanId) : [];
     }
 
     _getDiplomacyPolicyTarget(busho) {

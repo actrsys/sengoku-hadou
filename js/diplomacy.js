@@ -598,7 +598,7 @@ class DiplomacyManager {
     }
 
     _countHostileClans(clanId, { directOnly = false } = {}) {
-        const allowed = directOnly ? new Set(this._getDirectNeighborClanIds(clanId).map(Number)) : null;
+        const allowed = directOnly ? new Set(this.getDirectNeighborClanIds(clanId).map(Number)) : null;
         let count = 0;
         this.game.clans.forEach(c => {
             const id = Number(c.id || 0);
@@ -3415,7 +3415,8 @@ class DiplomacyManager {
      * AI和睦で「現在の前線相手」だけを扱うための共通判定。
      * 親善・同盟などは二段先の外交候補も許すが、和睦は実際に領地が接している敵対勢力に限定する。
      */
-    _getDirectNeighborClanIds(clanId) {
+    /** 直接隣接する他家IDを、領地・隣接データの元の走査順で取得する唯一の窓口。 */
+    getDirectNeighborClanIds(clanId) {
         const ownCastles = this.game.getClanCastles ? this.game.getClanCastles(clanId) : [];
         const result = new Set();
         ownCastles.forEach(castle => {
@@ -3432,7 +3433,7 @@ class DiplomacyManager {
     areClansDirectlyAdjacent(clanAId, clanBId) {
         const targetId = Number(clanBId);
         if (targetId <= 0 || Number(clanAId) === targetId) return false;
-        return this._getDirectNeighborClanIds(clanAId).some(id => Number(id) === targetId);
+        return this.getDirectNeighborClanIds(clanAId).some(id => Number(id) === targetId);
     }
 
     canAttemptAITruce(clanId, targetClanId) {
@@ -3447,7 +3448,7 @@ class DiplomacyManager {
     _getAITrucePressureScore(clanId, opponentClanId) {
         const myPower = Math.max(1, Number(this.game.getClanTotalSoldiers(clanId) || 1));
         const opponentPower = Math.max(1, Number(this.game.getClanTotalSoldiers(opponentClanId) || 1));
-        const directEnemyIds = this._getDirectNeighborClanIds(clanId).filter(id => {
+        const directEnemyIds = this.getDirectNeighborClanIds(clanId).filter(id => {
             const rel = this.getRelation(clanId, id);
             return rel && rel.status === window.GameConstants.DiplomacyStatus.HOSTILE;
         });
@@ -3576,7 +3577,7 @@ class DiplomacyManager {
         
         // AI和睦は現在の前線相手だけを対象にする。
         // 二段先まで広げた一般外交候補から、領地が接していない敵対勢力へ和睦を打診しない。
-        const directEnemyIds = this._getDirectNeighborClanIds(myClanId).filter(cId => {
+        const directEnemyIds = this.getDirectNeighborClanIds(myClanId).filter(cId => {
             const clan = this.game.getClan(cId);
             if (!clan || clan.isDestroyed) return false;
             const r = this.getRelation(myClanId, cId);
@@ -3980,22 +3981,24 @@ class DiplomacyManager {
             }
         }
 
-        // ★Round10：援軍候補ごとに全城を some() し直さないよう、
-        // 「接続領＋その隣接城」と「攻撃対象＋その隣接城」を1回だけ集合化します。
-        // isAdjacent() と同じく、隣接IDが片側にしか書かれていない場合も両方向として扱います。
+        // 援軍候補の距離資格は「接続領＋その隣接」「攻撃対象＋その隣接」。
+        // 双方向接続の正本はMapGraphServiceを利用し、援軍固有の資格・候補順は変えない。
         const connectedIdSet = new Set(Array.from(connectedCastles || [], id => Number(id)));
         const connectedOrAdjacentIds = new Set(connectedIdSet);
         const targetId = Number(targetCastle.id);
         const targetOrAdjacentIds = new Set([targetId]);
 
-        for (const castle of this.game.castles) {
-            const castleId = Number(castle.id);
-            for (const rawAdjId of (castle.adjacentCastleIds || [])) {
-                const adjId = Number(rawAdjId);
-                if (connectedIdSet.has(castleId)) connectedOrAdjacentIds.add(adjId);
-                if (connectedIdSet.has(adjId)) connectedOrAdjacentIds.add(castleId);
-                if (castleId === targetId) targetOrAdjacentIds.add(adjId);
-                if (adjId === targetId) targetOrAdjacentIds.add(castleId);
+        for (const id of connectedIdSet) {
+            const connectedCastle = this.game.getCastle(id);
+            if (!connectedCastle) continue;
+            for (const adjacentId of MapGraphService.getAdjacentIds(this.game, connectedCastle)) {
+                connectedOrAdjacentIds.add(Number(adjacentId));
+            }
+        }
+        const registeredTarget = this.game.getCastle(targetId);
+        if (registeredTarget) {
+            for (const adjacentId of MapGraphService.getAdjacentIds(this.game, registeredTarget)) {
+                targetOrAdjacentIds.add(Number(adjacentId));
             }
         }
 

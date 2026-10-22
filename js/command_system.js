@@ -211,20 +211,13 @@ class CommandSystem {
             isMulti = false;
         }
         else if (actionType === 'appoint_gunshi') {
-            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => 
-                window.BushoStatusRules.isActive(b) && 
-                !b.isDaimyo && 
-                !b.isCommander &&
-                !b.isCastellan
-            );
+            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b =>
+                CAN_EXECUTE_RULES.isGunshiAppointmentCandidate(b));
             infoHtml = "<div>軍師に任命する武将を選択してください</div>";
         }
         else if (actionType === 'appoint_legion_leader') {
-            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => 
-                window.BushoStatusRules.isActive(b) && 
-                !b.isDaimyo &&
-                !b.isCommander
-            );
+            bushos = this.game.getClanBushos(this.game.playerClanId).filter(b =>
+                CAN_EXECUTE_RULES.isLegionCommanderAppointmentCandidate(b));
             infoHtml = "<div>国主に任命する武将を選択してください</div>"; 
             isMulti = false;
         }
@@ -260,26 +253,16 @@ class CommandSystem {
             const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
             if (daimyo) {
                 const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-                bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => {
-                    if (b.isDaimyo || b.isRetired) return false; // 隠居状態（isRetired）は除外する
-                    if (!window.BushoStatusRules.isActive(b) && !window.LifeStatusRules.isUnborn(b)) return false;
-
-                    // ★追加：unborn の中でも「出生前」フラグが立っている場合は除外する
-                    if (window.LifeStatusRules.isUnborn(b) && b.isNotBorn) return false;
-
-                    const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
-                    return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
-                });
+                bushos = this.game.getClanBushos(this.game.playerClanId).filter(b =>
+                    CAN_EXECUTE_RULES.isSuccessorCandidate(b, daimyo, dFamily));
             }
             infoHtml = "<div>家督を譲る一門武将を選択してください</div>";
         }
         else if (actionType === 'adopt_son_target') {
             const daimyo = this.game.getClanDaimyo(this.game.playerClanId);
             if (daimyo) {
-                bushos = this.game.getClanBushos(this.game.playerClanId).filter(b => {
-                    if (!window.BushoStatusRules.isActive(b) || b.isDaimyo) return false;
-                    return b.birthYear >= daimyo.birthYear + 15;
-                });
+                bushos = this.game.getClanBushos(this.game.playerClanId).filter(b =>
+                    CAN_EXECUTE_RULES.isAdoptableCandidate(b, daimyo));
             }
             infoHtml = "<div>養子にする武将を選択してください</div>";
         }

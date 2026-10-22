@@ -79,8 +79,13 @@ const CAN_EXECUTE_RULES = {
     hasBanishableBusho: (game) => {
         return game.getClanBushos(game.playerClanId).some(b => PersonnelRules.canBanish(game, b));
     },
+    // 任命メニューと候補画面で同じ人物資格を使用する。任命先拠点・軍団枠は別の条件。
+    isGunshiAppointmentCandidate: b =>
+        window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander && !b.isCastellan,
+    isLegionCommanderAppointmentCandidate: b =>
+        window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander,
     hasActiveBushoExceptDaimyoAndCastellan: (game) => {
-        return game.getClanBushos(game.playerClanId).some(b => window.BushoStatusRules.isActive(b) && !b.isDaimyo && !b.isCommander && !b.isCastellan);
+        return game.getClanBushos(game.playerClanId).some(b => CAN_EXECUTE_RULES.isGunshiAppointmentCandidate(b));
     },
     hasEmployableRonin: (game) => {
         return game.bushos.some(b => {
@@ -95,10 +100,7 @@ const CAN_EXECUTE_RULES = {
             if (hasLegion) return false;
         }
         const hasCandidate = game.getClanBushos(game.playerClanId).some(b =>
-            window.BushoStatusRules.isActive(b) &&
-            !b.isDaimyo &&
-            !b.isCommander
-        );
+            CAN_EXECUTE_RULES.isLegionCommanderAppointmentCandidate(b));
         if (!hasCandidate || legionNumber > myCastles.length) return false;
         // 国主任命画面と同じ城側の正本で、任命先が残っているかを判定する。
         // 居城と現職国主の在城地しか残っていない場合、候補ゼロの画面を開かない。
@@ -132,35 +134,34 @@ const CAN_EXECUTE_RULES = {
             && !commanderCastleIds.has(Number(c.id))
         );
     },
+    // メニューの実行可否と実際の候補一覧は同じ資格を使う。
+    // 取得方法（some/filter）と候補の並び替えは各呼出元の責務のままにする。
+    isSuccessorCandidate: (b, daimyo, daimyoFamily) => {
+        // active（登場済み）または unborn（元服前）、隠居・出生前は除外。
+        if (b.isDaimyo || b.isRetired) return false;
+        if (!window.BushoStatusRules.isActive(b) && !window.LifeStatusRules.isUnborn(b)) return false;
+        if (window.LifeStatusRules.isUnborn(b) && b.isNotBorn) return false;
+        const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+        return bFamily.includes(daimyo.id) || daimyoFamily.includes(b.id);
+    },
+    isAdoptableCandidate: (b, daimyo) => {
+        if (!window.BushoStatusRules.isActive(b) || b.isDaimyo) return false;
+        return b.birthYear >= daimyo.birthYear + 15;
+    },
     hasSuccessor: (game) => {
         const daimyo = game.getClanDaimyo(game.playerClanId);
         if (!daimyo) return false;
         const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
-        return game.getClanBushos(game.playerClanId).some(b => {
-            // active（登場済み）または unborn（元服前）を対象にする
-            // 隠居状態（isRetired）は除外する
-            if (b.isDaimyo || b.isRetired) return false;
-            if (!window.BushoStatusRules.isActive(b) && !window.LifeStatusRules.isUnborn(b)) return false;
-            
-            // unborn の中でも「出生前」フラグが立っている場合は除外する
-            if (window.LifeStatusRules.isUnborn(b) && b.isNotBorn) return false;
-
-            const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
-            return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
-        });
+        return game.getClanBushos(game.playerClanId).some(b =>
+            CAN_EXECUTE_RULES.isSuccessorCandidate(b, daimyo, dFamily));
     },
     canAdoptSon: (game) => {
-        // 条件①：家督相続できる武将が「いない」こと
+        // 家督相続候補がいる場合は養子縁組を開始しない。
         if (CAN_EXECUTE_RULES.hasSuccessor(game)) return false;
-
-        // 条件②：養子にできる武将（自勢力で活動中、大名ではなく、15歳以上若い）が1人以上いること
         const daimyo = game.getClanDaimyo(game.playerClanId);
         if (!daimyo) return false;
-        
-        return game.getClanBushos(game.playerClanId).some(b => {
-            if (!window.BushoStatusRules.isActive(b) || b.isDaimyo) return false;
-            return b.birthYear >= daimyo.birthYear + 15;
-        });
+        return game.getClanBushos(game.playerClanId).some(b =>
+            CAN_EXECUTE_RULES.isAdoptableCandidate(b, daimyo));
     },
     // --- 軍事用 ---
     canTraining: (game, castle) => {

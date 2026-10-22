@@ -1558,48 +1558,27 @@ class IndependenceSystem {
             }
         }
         
-        // 2. 第1隣接大名が所有する城を起点に、さらに隣接する城の持ち主（第2隣接）を取得します
-        for (const c of this.game.castles) {
-            if (degree1Clans.has(c.ownerClan)) {
-                if (c.adjacentCastleIds) {
-                    for (const adjId of c.adjacentCastleIds) {
-                        const adjCastle = this.game.getCastle(adjId);
-                        if (adjCastle && adjCastle.ownerClan !== 0 && !degree1Clans.has(adjCastle.ownerClan)) {
-                            degree2Clans.add(adjCastle.ownerClan);
-                        }
+        // 第2～第4隣接は「前段の勢力が持つ全城の、元データに記録された隣接先」から探す。
+        // 第1隣接は上で旧主家も含めて確定済み。各段階で見つけた勢力は、
+        // その段階の走査が終わってから除外集合へ加える（同じ段階の追加候補を省かない）。
+        // ここでMapGraphの双方向補完を使うと旧来の色評価範囲が変わるため利用しない。
+        const assignedClans = new Set(degree1Clans);
+        const collectNextDegree = (sourceClans, destinationClans) => {
+            for (const c of this.game.castles) {
+                if (!sourceClans.has(c.ownerClan) || !c.adjacentCastleIds) continue;
+                for (const adjId of c.adjacentCastleIds) {
+                    const adjCastle = this.game.getCastle(adjId);
+                    if (adjCastle && adjCastle.ownerClan !== 0 && !assignedClans.has(adjCastle.ownerClan)) {
+                        destinationClans.add(adjCastle.ownerClan);
                     }
                 }
             }
-        }
+            for (const clanId of destinationClans) assignedClans.add(clanId);
+        };
+        collectNextDegree(degree1Clans, degree2Clans);
+        collectNextDegree(degree2Clans, degree3Clans);
+        collectNextDegree(degree3Clans, degree4Clans);
 
-        // 3. 第2隣接大名が所有する城を起点に、さらに隣接する城の持ち主（第3隣接）を取得します
-        for (const c of this.game.castles) {
-            if (degree2Clans.has(c.ownerClan)) {
-                if (c.adjacentCastleIds) {
-                    for (const adjId of c.adjacentCastleIds) {
-                        const adjCastle = this.game.getCastle(adjId);
-                        if (adjCastle && adjCastle.ownerClan !== 0 && !degree1Clans.has(adjCastle.ownerClan) && !degree2Clans.has(adjCastle.ownerClan)) {
-                            degree3Clans.add(adjCastle.ownerClan);
-                        }
-                    }
-                }
-            }
-        }
-
-        // ★追加：4. 第3隣接大名が所有する城を起点に、さらに隣接する城の持ち主（第4隣接）を取得します
-        for (const c of this.game.castles) {
-            if (degree3Clans.has(c.ownerClan)) {
-                if (c.adjacentCastleIds) {
-                    for (const adjId of c.adjacentCastleIds) {
-                        const adjCastle = this.game.getCastle(adjId);
-                        if (adjCastle && adjCastle.ownerClan !== 0 && !degree1Clans.has(adjCastle.ownerClan) && !degree2Clans.has(adjCastle.ownerClan) && !degree3Clans.has(adjCastle.ownerClan)) {
-                            degree4Clans.add(adjCastle.ownerClan);
-                        }
-                    }
-                }
-            }
-        }
-        
         // 生存している（城を持っている）大名家のリストを作ります
         const aliveClanIds = new Set(this.game.castles.filter(c => c.ownerClan !== 0).map(c => c.ownerClan));
         

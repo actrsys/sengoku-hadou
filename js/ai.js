@@ -669,11 +669,9 @@ class AIEngine {
 
         // =========================================================================
         // ★新規追加：過去の記憶から「奪われた拠点（失地）」を洗い出し、勢力ごとに数を数えます！
-        const pastOwnedSet = new Set();
-        if (this.game.aiOperationManager && this.game.aiOperationManager.historyOwnedCastles && this.game.aiOperationManager.historyOwnedCastles[myClanId]) {
-            const history = this.game.aiOperationManager.historyOwnedCastles[myClanId];
-            history.forEach(list => list.forEach(id => pastOwnedSet.add(id)));
-        }
+        const pastOwnedSet = this.game.aiOperationManager
+            ? this.game.aiOperationManager.getPastOwnedCastleIds(myClanId)
+            : new Set();
 
         // 過去に自分のもので、今は他の大名家に奪われている拠点をカウントします
         const stolenCountsByClan = {};
@@ -726,18 +724,26 @@ class AIEngine {
             }
         });
 
-        // ★追加：自分の大名家全体が現在隣接している勢力をリストアップします！
-        const allAdjacentClans = new Set();
-        myClanCastles.forEach(myC => {
-            if (myC.adjacentCastleIds) {
-                myC.adjacentCastleIds.forEach(adjId => {
-                    const c = this.game.getCastle(adjId);
-                    if (c && c.ownerClan !== 0 && c.ownerClan !== myClanId) {
-                        allAdjacentClans.add(c.ownerClan);
-                    }
-                });
-            }
-        });
+        // 全領地・同一軍団で共通の「隣接する他勢力」資格判定。
+        // 周辺城そのものを並べる断交評価や経路探索とは用途が異なるため、ここだけで共有する。
+        const collectAdjacentClanIds = (sameLegionOnly = false) => {
+            const clans = new Set();
+            myClanCastles.forEach(myC => {
+                if (sameLegionOnly && myC.legionId !== myCastle.legionId) return;
+                if (myC.adjacentCastleIds) {
+                    myC.adjacentCastleIds.forEach(adjId => {
+                        const c = this.game.getCastle(adjId);
+                        if (c && c.ownerClan !== 0 && c.ownerClan !== myClanId) {
+                            clans.add(c.ownerClan);
+                        }
+                    });
+                }
+            });
+            return clans;
+        };
+
+        // 自家全領地の隣接勢力（占領後に新しく接する勢力の判定用）。
+        const allAdjacentClans = collectAdjacentClanIds();
         
         // ★見積もりをする人（評価者）の智謀を決めます
         // プレイヤーの委任城なら「城主（myGeneral）」、敵AIなら「大名（myDaimyo）」の智謀を使います
@@ -748,19 +754,8 @@ class AIEngine {
             evaluatorInt = myDaimyo.intelligence ?? 50;
         }
         
-        // 自領のどこかと隣接している大名家をリストアップします
-        const adjacentClans = new Set();
-        myClanCastles.forEach(myC => {
-            // ★変更：大名家全体ではなく、このお城と同じ「軍団」に隣接している敵だけをリストに入れます！
-            if (myC.legionId === myCastle.legionId && myC.adjacentCastleIds) {
-                myC.adjacentCastleIds.forEach(adjId => {
-                    const c = this.game.getCastle(adjId);
-                    if (c && c.ownerClan !== 0 && c.ownerClan !== myClanId) {
-                        adjacentClans.add(c.ownerClan);
-                    }
-                });
-            }
-        });
+        // 同一軍団の隣接勢力だけを警戒評価に使用する。全領地の集合とは混同しない。
+        const adjacentClans = collectAdjacentClanIds(true);
         
         // 警戒すべき敵対大名を複数リストアップします！
         const adjacentEnemyClans = [];
@@ -1281,13 +1276,9 @@ class AIEngine {
             // 7. ★追加：「取った拠点を同じ勢力に取り返された」泥沼拠点の執着緩和！
             if (target.ownerClan !== 0 && pastOwnedSet.has(target.id)) {
                 // 今の持ち主（相手）の「過去の所持記憶」を調べます
-                if (this.game.aiOperationManager && this.game.aiOperationManager.historyOwnedCastles && this.game.aiOperationManager.historyOwnedCastles[target.ownerClan]) {
-                    const targetHistory = this.game.aiOperationManager.historyOwnedCastles[target.ownerClan];
-                    // 相手の記憶にもこのお城がある（＝お互いに奪い合ったことがある）場合
-                    const isMutual = targetHistory.some(list => list.includes(target.id));
-                    if (isMutual) {
-                        prob -= 15; // お互いに過去、所持していた事のある拠点に対してスコアを減らします
-                    }
+                // 相手の記憶にもこのお城がある（＝お互いに奪い合ったことがある）場合
+                if (this.game.aiOperationManager && this.game.aiOperationManager.getPastOwnedCastleIds(target.ownerClan).has(target.id)) {
+                    prob -= 15; // お互いに過去、所持していた事のある拠点に対してスコアを減らします
                 }
             }
             
@@ -1674,9 +1665,12 @@ class AIEngine {
         let maxActions = 1 + Math.floor(baseAP / 40);
 
         // お城にいる動ける武将（自分の大名家で、活動中の人）をリストアップします
-        let availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
+        // 行動回数の上限確定前と各行動直前に同じ資格を適用する。
+        // 行動済み状態は途中で変わるので、候補配列は使い回さず毎回取得する。
+        const getActionableBushos = () => this.game.getCastleBushos(castle.id).filter(b =>
             !b.isActionDone && b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b)
         );
+        let availableBushos = getActionableBushos();
 
         // まず、お城に動ける武将がいるか確認します。誰もいなければ何もできません
         if (availableBushos.length === 0) return;
@@ -1745,9 +1739,7 @@ class AIEngine {
             const availableGold = EconomyRules.calcAvailableGoldForAI(castle, this.game);
 
             // まだ動ける武将を再確認します
-            availableBushos = this.game.getCastleBushos(castle.id).filter(b => 
-                !b.isActionDone && b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b)
-            );
+            availableBushos = getActionableBushos();
 
             // --- 候補となる行動の点数（スコア）をつける表を作ります ---
             let actions = [];
