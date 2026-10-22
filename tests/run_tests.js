@@ -449,7 +449,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r654');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r655');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -28516,6 +28516,45 @@ test('r654 AI人事の通行探索は旧BFSの候補順と350地図で一致す�
         assert.deepStrictEqual(Array.from(staffing._getReachableOwnCastles(start, 1), c => c.id),
             expected, `地図${trial}で探索候補・順序が一致`);
     }
+});
+
+// r655: 進軍可否と海路判定は同じ中間通行資格・最短探索の正本を使う。
+// 先に発見した到着辺だけで海陸を決め、後続の別経路へ結果をすり替えない。
+test('r655 MapGraph進軍到達と海路種別は共通BFSで最短経路・断交後条件を維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/map_graph.js');
+    const Graph = vm.runInContext('MapGraphService', ctx);
+    const castles = [
+        { id: 1, ownerClan: 1, adjacentCastleIds: [2, 3], seaRouteIds: [] },
+        { id: 2, ownerClan: 2, adjacentCastleIds: [4], seaRouteIds: [] },
+        { id: 3, ownerClan: 3, adjacentCastleIds: [4], seaRouteIds: [4] },
+        { id: 4, ownerClan: 4, adjacentCastleIds: [], seaRouteIds: [] }
+    ];
+    const states = { 2: '同盟', 3: '従属' };
+    const game = { castles,
+        getCastle: id => castles.find(c => c.id === Number(id)) || null,
+        getRelation: (_, clanId) => ({ status: states[Number(clanId)] || '敵対' })
+    };
+    game.mapGraph = new Graph(game);
+    const start = castles[0], target = castles[3];
+    assert.strictEqual(Graph.isReachable(game, start, target, 1), true);
+    assert.strictEqual(Graph.isSeaRoute(game, start, target, 1), false,
+        '同じ長さの陸路が先に見つかれば陸戦を維持');
+    // 探索順は旧実装のBFS順そのまま。海路が優先されるわけではない。
+    start.adjacentCastleIds = [3, 2];
+    game.mapGraph.invalidate();
+    assert.strictEqual(Graph.isSeaRoute(game, start, target, 1), true,
+        '先に見つかる到着辺が海路なら海戦となる');
+    assert.strictEqual(Graph.isReachable(game, start, target, 1,
+        { blockedTransitClanId: 3 }), true, '断交対象を避けた別経路は利用できる');
+    states[2] = '敵対';
+    assert.strictEqual(Graph.isReachable(game, start, target, 1,
+        { blockedTransitClanId: 3 }), false, '全経路が閉じれば断交前の到達を誤認しない');
+    assert.strictEqual(Graph.isReachable(game, castles[2], target, 3), true,
+        '目標へ隣接する最終一歩はその勢力との外交関係を要しない');
+    assert.strictEqual(Graph.isSeaRoute(game, start, start, 1), false,
+        '起点と終点が同じ場合は海戦扱いしない');
 });
 
 Promise.all(pendingTests).then(() => {

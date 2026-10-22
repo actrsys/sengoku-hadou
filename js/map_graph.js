@@ -44,18 +44,16 @@ class MapGraphService {
 
 
     /**
-     * 同盟・支配・従属領を通過して、目標城まで到達できるか判定する。
+     * 地図の通行資格と幅優先探索を、進軍可否・海路判定の単一の正本とする。
+     * 最短探索で最初に発見した目標への進入元を返す。
+     * 目標自体は敵領・空き城でも到達可能、中間城だけ外交通行資格を要求する。
+     * blockedTransitClanId は断交後の仮定でのみ利用し、ゲーム状態は変更しない。
      */
-    // 将来の断交後に通行権を失う勢力を指定して、実際の外交状態を変えずに判定できる。
-    // 中間拠点の通行だけを禁止し、目標城への最後の一歩は従来どおり許可する。
-    static isReachable(game, startCastle, targetCastle, movingClanId, options = null) {
-        if (!game || !startCastle || !targetCastle) return false;
-        if (this.isAdjacent(startCastle, targetCastle)) return true;
-
+    static _findTargetApproach(game, startCastle, targetCastle, movingClanId, options = null) {
+        const movingId = Number(movingClanId);
         const visited = new Set([Number(startCastle.id)]);
         const queue = [startCastle];
         let head = 0;
-        const movingId = Number(movingClanId);
         const passableClanCache = new Map([[0, false]]);
         if (Number.isFinite(movingId)) passableClanCache.set(movingId, true);
 
@@ -64,7 +62,6 @@ class MapGraphService {
             if (ownerId === movingId) return true;
             if (options && ownerId === Number(options.blockedTransitClanId)) return false;
             if (ownerId === 0) return false;
-            // 不正値は別々の生値を同一候補へ丸めないためキャッシュしない。
             if (Number.isFinite(ownerId) && passableClanCache.has(ownerId)) {
                 return passableClanCache.get(ownerId);
             }
@@ -76,22 +73,27 @@ class MapGraphService {
 
         while (head < queue.length) {
             const current = queue[head++];
-            const adjacentIds = this.getAdjacentIds(game, current);
-            for (const adjId of adjacentIds) {
+            for (const adjId of this.getAdjacentIds(game, current)) {
                 const next = game.getCastle(adjId);
                 if (!next) continue;
-                if (Number(next.id) === Number(targetCastle.id)) return true;
-
+                // 目標への最終一歩は通行資格不要。海路判定はこの進入元の辺を見る。
+                if (Number(next.id) === Number(targetCastle.id)) return current;
                 const nextId = Number(next.id);
                 if (visited.has(nextId)) continue;
-
                 if (canPassClan(next.ownerClan)) {
                     visited.add(nextId);
                     queue.push(next);
                 }
             }
         }
-        return false;
+        return null;
+    }
+
+    /** 同盟・支配・従属領を中継して、目標拠点へ到達できるか判定する。 */
+    static isReachable(game, startCastle, targetCastle, movingClanId, options = null) {
+        if (!game || !startCastle || !targetCastle) return false;
+        if (this.isAdjacent(startCastle, targetCastle)) return true;
+        return !!this._findTargetApproach(game, startCastle, targetCastle, movingClanId, options);
     }
 
     /**
@@ -133,53 +135,14 @@ class MapGraphService {
         };
     }
 
-    /**
-     * 最短到達経路の最後の一歩が海路かを判定する。
-     */
+    /** 最短到達経路の最初に発見した最終辺が海路か判定する。 */
     static isSeaRoute(game, startCastle, targetCastle, movingClanId) {
         if (!game || !startCastle || !targetCastle) return false;
         if (startCastle.id === targetCastle.id) return false;
-
-        const visited = new Set([startCastle.id]);
-        const queue = [startCastle];
-        let head = 0;
-        const movingId = Number(movingClanId);
-        const passableClanCache = new Map([[0, false]]);
-        if (Number.isFinite(movingId)) passableClanCache.set(movingId, true);
-
-        const canPassClan = (ownerClan) => {
-            const ownerId = Number(ownerClan);
-            if (ownerId === movingId) return true;
-            if (ownerId === 0) return false;
-            if (Number.isFinite(ownerId) && passableClanCache.has(ownerId)) {
-                return passableClanCache.get(ownerId);
-            }
-            const rel = game.getRelation(movingClanId, ownerClan);
-            const passable = !!(rel && window.DiplomacyRules.canPassTerritory(rel.status));
-            if (Number.isFinite(ownerId)) passableClanCache.set(ownerId, passable);
-            return passable;
-        };
-
-        while (head < queue.length) {
-            const current = queue[head++];
-            const adjacentIds = this.getAdjacentIds(game, current);
-            for (const adjId of adjacentIds) {
-                const next = game.getCastle(adjId);
-                if (!next) continue;
-
-                if (next.id === targetCastle.id) {
-                    return !!((current.seaRouteIds && current.seaRouteIds.includes(next.id)) ||
-                        (next.seaRouteIds && next.seaRouteIds.includes(current.id)));
-                }
-
-                if (visited.has(next.id)) continue;
-                if (canPassClan(next.ownerClan)) {
-                    visited.add(next.id);
-                    queue.push(next);
-                }
-            }
-        }
-        return false;
+        const approach = this._findTargetApproach(game, startCastle, targetCastle, movingClanId);
+        if (!approach) return false;
+        return !!((approach.seaRouteIds && approach.seaRouteIds.includes(targetCastle.id)) ||
+            (targetCastle.seaRouteIds && targetCastle.seaRouteIds.includes(approach.id)));
     }
 
     invalidate() {
