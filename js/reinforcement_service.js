@@ -144,6 +144,12 @@ class ReinforcementService {
         return data;
     }
 
+    // 攻守の持参金は、要請ではなく援軍データが成立した時にだけ支払う。
+    // 金額の計算・受諾判断は DiplomacyManager、実際の負担確定はここに集約する。
+    payAcceptedOffer(requesterCastle, gold) {
+        if (gold > 0) requesterCastle.gold -= gold;
+    }
+
     restoreCastleReinforcement(data) {
         if (!data || !data.castle) return;
         const castle = data.castle;

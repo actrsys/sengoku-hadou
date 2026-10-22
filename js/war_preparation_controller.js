@@ -258,12 +258,6 @@ class WarPreparationController {
         }
     }
 
-    // 援軍の持参金は要請時ではなく、実際に援軍派遣が成立した時だけ支払う。
-    // AIの承諾とプレイヤー手動派遣の双方がこの窓口を共用する。
-    _payAcceptedReinforcementOffer(atkCastle, gold) {
-        if (gold > 0) atkCastle.gold -= gold;
-    }
-
     executeReinforcementRequest(gold, helperCastle, force, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, selfReinfData) {
 
         const myClanId = atkCastle.ownerClan;
@@ -414,7 +408,7 @@ class WarPreparationController {
             helperDaimyo,
             { isSelf: false }
         );
-        if (reinforcementData) this._payAcceptedReinforcementOffer(atkCastle, gold);
+        if (reinforcementData) this.game.reinforcementService.payAcceptedOffer(atkCastle, gold);
 
         this.game.warManager.applyWarHostility(helperCastle.ownerClan, false, targetCastle.ownerClan, targetCastle.isKunishu, true);
         
@@ -433,9 +427,13 @@ class WarPreparationController {
     }
 
     _promptPlayerAtkReinforcement(helperCastle, atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, isBoss, selfReinfData, offerGold = 0) {
+        // 主家の要請でも＜表裏比興＞の拒否権があれば、承諾後の武将選択を取り消せる。
+        // 拒否権の有無は攻守共通のSkillManagerを正本とし、ここでは表示可否だけ判断する。
+        const forcedByBoss = isBoss && !(typeof SkillManager !== 'undefined'
+            && SkillManager.canDeclineBossReinforcement(this.game.playerClanId, this.game));
         const promptBusho = () => {
             this.game.ui.openBushoSelector('atk_reinf_deploy', helperCastle.id, {
-                hideCancel: isBoss, 
+                hideCancel: forcedByBoss, 
                 onConfirm: (selectedBushoIds) => promptQuantity(selectedBushoIds.map(id => this.game.getBusho(id))),
                 onCancel: () => this.game.ui.showDialog("援軍の派遣を取りやめました。", false, () => this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData), null, { closeBeforeOk: true })
             });
@@ -463,7 +461,7 @@ class WarPreparationController {
             { soldiers: reinfSoldiers, rice: reinfRice, horses: reinfHorses, guns: reinfGuns },
             { isAttacker: true, isSelf: false }
         );
-        if (reinforcementData) this._payAcceptedReinforcementOffer(atkCastle, offerGold);
+        if (reinforcementData) this.game.reinforcementService.payAcceptedOffer(atkCastle, offerGold);
 
         this.game.warManager.applyWarHostility(helperCastle.ownerClan, false, targetCastle.ownerClan, targetCastle.isKunishu, true);
         

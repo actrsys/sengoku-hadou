@@ -3506,8 +3506,7 @@ Object.assign(WarManager.prototype, {
     },
 
     executeDefReinforcement(gold, helperCastle, force, defCastle, onComplete) {
-        if (gold > 0) defCastle.gold -= gold;
-
+        // 支払いは派遣成立後。拒否・武将選択の取消では負担させない。
         const myClanId = defCastle.ownerClan;
         
         // ★大雪判定
@@ -3600,7 +3599,7 @@ Object.assign(WarManager.prototype, {
             }
 
             const isBoss = (myToHelperRel && myToHelperRel.status === '支配');
-            const startSelection = () => this._promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss);
+            const startSelection = () => this._promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss, gold);
             
             this.game.warManager.reinfMsgHelper.showRequest(this.game, myClanName, targetInfoStr, gold, isBoss, false, startSelection, () => {
                 this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
@@ -3642,6 +3641,9 @@ Object.assign(WarManager.prototype, {
             helperDaimyo,
             { isSelf: false }
         );
+        if (this.state.defReinforcement) {
+            this.game.reinforcementService.payAcceptedOffer(defCastle, gold);
+        }
 
         const atkForce = this.state.attacker;
         const atkIsKunishu = atkForce.isKunishu || false;
@@ -3665,7 +3667,7 @@ Object.assign(WarManager.prototype, {
         }
     },
 
-    _promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss) {
+    _promptPlayerDefReinforcement(helperCastle, defCastle, myToHelperRel, onComplete, isBoss, offerGold = 0) {
         let hideCancel = isBoss;
         // ★追加: スキルを持っていればキャンセルボタン（×ボタン）を隠さないようにします
         if (isBoss && typeof SkillManager !== 'undefined') {
@@ -3689,7 +3691,7 @@ Object.assign(WarManager.prototype, {
                     const rR = i.rice ? parseInt(i.rice.num.value) : 500;
                     const rH = i.horses ? parseInt(i.horses.num.value) : 0;
                     const rG = i.guns ? parseInt(i.guns.num.value) : 0;
-                    this._applyManualDefReinforcement(helperCastle, defCastle, myToHelperRel, reinfBushos, rS, rR, rH, rG, onComplete);
+                    this._applyManualDefReinforcement(helperCastle, defCastle, myToHelperRel, reinfBushos, rS, rR, rH, rG, onComplete, offerGold);
                 },
                 returnToParentSelector: true
             });
@@ -3697,7 +3699,7 @@ Object.assign(WarManager.prototype, {
         promptBusho();
     },
     
-    _applyManualDefReinforcement(helperCastle, defCastle, myToHelperRel, reinfBushos, reinfSoldiers, reinfRice, reinfHorses, reinfGuns, onComplete) {
+    _applyManualDefReinforcement(helperCastle, defCastle, myToHelperRel, reinfBushos, reinfSoldiers, reinfRice, reinfHorses, reinfGuns, onComplete, offerGold = 0) {
         const helperClanId = helperCastle.ownerClan;
 
         // ★追加：プレイヤーが参戦することになったので、透明化の魔法を解除して文字が見えるようにします！
@@ -3708,7 +3710,10 @@ Object.assign(WarManager.prototype, {
             { soldiers: reinfSoldiers, rice: reinfRice, horses: reinfHorses, guns: reinfGuns },
             { isSelf: false }
         );
-        
+        if (this.state.defReinforcement) {
+            this.game.reinforcementService.payAcceptedOffer(defCastle, offerGold);
+        }
+
         const atkForce = this.state.attacker;
         const atkIsKunishu = atkForce.isKunishu || false;
         const atkId = atkIsKunishu ? atkForce.kunishuId : atkForce.ownerClan;
