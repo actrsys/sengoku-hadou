@@ -1,0 +1,16 @@
+戦国覇道 r672 監査記録：外部セーブの人口下限・民忠・防御力
+
+対象：r671完全版を起点とした外部セーブ受入境界の追加検証。
+
+実際の到達経路：プレイヤーが外部セーブファイルを読み込む→SaveManagerの復号・現行schema検査→Castleモデル復元→月次処理または戦争処理。通常プレイ自体が不正値を生成するとの主張ではない。
+
+修正前の実コード再現：
+1. population=-1：SaveManagerの構造検査は受理し、Castle.population=-1を維持する。DomesticRules.calcMonthlyPopulationGrowth()の平方根でNaNになる。
+2. peoplesLoyalty="not-a-number"：構造検査は受理し、Castle.peoplesLoyalty=NaN。月次人口増減はNaNになる。
+3. defense="not-a-number"：構造検査は受理し、Castle.defense=NaN。WarSystem.calcRetreatScore()の結果はNaNになる。
+
+修正：SaveManager._validateSaveDataStructure()の既存拠点資源検査に人口の負数拒否を加え、防御力と民忠の有限性だけを同じ復元前の信頼境界で確認する。セーブ値の自動補正、モデル変更、内政・戦争ルール側へのガード重複は行わない。人口以外の資源値の下限、他の能力値、スキーマ構造も変更しない。
+
+回帰：対象の不正値拒否、通常値受理、未指定値の従来扱い、無限大拒否を既存SaveManagerのテストへ追加。全回帰、画面回帰、データ一致、配布ZIP整合性を再検査する。
+
+変更：追加 docs/audits/r672_外部セーブの人口下限と民忠防御力監査記録.txt／更新 ARCHITECTURE.md、js/config.js、js/save_manager.js、tests/run_tests.js／削除なし。

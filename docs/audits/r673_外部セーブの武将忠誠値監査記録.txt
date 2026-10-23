@@ -1,0 +1,28 @@
+戦国覇道 r673　外部セーブの武将忠誠値監査記録
+
+1. 監査対象
+現行r672における外部ファイルからのセーブ読込と復元前の構造検査。ゲーム内で忠誠を増減する通常処理ではなく、読み込むファイルを信頼する境界を対象とする。
+
+2. 正規の到達経路と症状
+ファイル選択 → SaveManager.loadGameFromFile() → _decryptData() → _validateSaveDataStructure() → _restoreSaveDataObj() → Busho() → 通常の内政計算。
+外部保存のbushos[].loyaltyへ-1、broken、Infinityを記録した場合、r672の復元前検査は受理した。BushoはNumber(this.loyalty || 0)で値を数値化するため、負数・非数値・無限大が維持される。
+DomesticRules.calcDevelopment() は Math.sqrt(busho.loyalty) を用いる。1560年実データの武将で検証すると、正常値95は有限、-1とbrokenはNaN、InfinityはInfinityを返した。
+※通常プレイによってこれらの不正値が作られるとは主張しない。読み込み対象に破損・改変ファイルが指定される正規の外部ファイル読込経路の問題である。任意コード実行ではない。
+
+3. 修正
+SaveManager._validateSaveDataStructure()の武将行検査へ、忠誠値のNumber変換結果が有限・非負かのチェックを追加する。未指定／空値は既存のモデル処理と同じ0扱いとする。異常値は復元開始前に拒否し、正常な人物やマスターデータ・内政計算へガードを追加しない。
+忠誠上限100や丸め規則の新設、保存スキーマ変更は行わない。
+
+4. 回帰検証
+旧r672／新版r673で同一の外部セーブ形式の最小状態を検査：忠誠95は双方受理、-1・broken・Infinityは旧版受理／新版拒否。
+既存のSaveManager回帰へ -1・非数値・Infinity の拒否、0・1・95・100・未指定値の受理を追加。
+ロジック回帰1,149件、PC・スマホ画面回帰23項目、Excel/BIN一致全3組、配布元データの主要数式検査、シミュレーター4件が成功。
+実ブラウザのゲーム本体長期観戦までは今回実施していない。
+
+5. 変更範囲
+js/save_manager.js：復元前の武将忠誠値検査
+js/config.js：版番号r673
+ARCHITECTURE.md：今回の設計判断
+ tests/run_tests.js：実値・不正値の回帰
+本記録：新規
+ゲームデータ、その他コード、セーブスキーマ変更なし。

@@ -449,7 +449,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r669');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r677');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5243,7 +5243,7 @@ test('SaveLoadView は保存形式・IndexedDB・復号を直接扱わない', (
 
 test('SaveManager がスロット読込・保存時刻抽出の公開窓口を持つ', () => {
     const source = read('js/save_manager.js');
-    assert.ok(source.includes('async readSaveSlots(prefix, count = 5)'));
+    assert.ok(source.includes('async readSaveSlots(prefix, count = 5, options = {})'));
     assert.ok(source.includes('decodeStoredData(rawData)'));
     assert.ok(source.includes('getSaveTimestamp(data)'));
     assert.ok(source.includes('this._readSlotAfterPendingSave(prefix + slotNo)'));
@@ -7238,15 +7238,19 @@ test('セーブ復元は城主フラグをCastle.castellanIdから再構築す�
 });
 
 test('SaveManager は現行スキーマだけを復元前に受理し、旧形式を移行しない', () => {
-    const ctx = createContext({
+    const ctx = createContext({TextEncoder, TextDecoder, Uint8Array,
         SCENARIOS: [{ folder: '1560_okehazama' }],
         Castle: class { getConnectedCastles() {} },
         Busho: class {}
     });
     loadScript(ctx, 'js/save_manager.js');
     const manager = new ctx.SaveManager({});
+    // 構造検査を独立に検証するため、各ケースを現行形式で署名してから判定する。
+    // 照合情報の欠落・改変拒否は専用テストで別途直接確認する。
+    const checkSignedStructure = value => manager._validateSaveDataStructure(manager._sealSaveData(value));
+    const isLoadableSigned = value => manager.isLoadableSaveData(manager._sealSaveData(value));
     const valid = {
-        saveSchemaVersion: 3,
+        saveSchemaVersion: 4,
         saveTimestamp: 1770000000000,
         saveTime: '2026/08/25 23:30',
         year: 1560, month: 4, gameStartYear: 1560, gameStartMonth: 4,
@@ -7259,20 +7263,64 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
         flags: {}, historyEntries: [],
         aiOperations: { operations: {}, draftBases: {}, grandObjectives: {}, historyOwnedCastles: {} }
     };
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ id: 1, samuraiIds: [10] }] }), /委任・城攻め・武将移動設定/, '設定が欠けた保存を拒否');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ ...valid.castles[0], _allowAttack: 1 }] }), /委任・城攻め・武将移動設定/, '不正な真偽値を拒否');
-    assert.strictEqual(manager.isLoadableSaveData({ ...valid, saveSchemaVersion: 2 }), false, 'r562までの保存は現行形式として誤受理しない');
-    assert.strictEqual(manager._validateSaveDataStructure(valid), true);
+    assert.throws(() => checkSignedStructure({ ...valid, castles: [{ id: 1, samuraiIds: [10] }] }), /委任・城攻め・武将移動設定/, '設定が欠けた保存を拒否');
+    assert.throws(() => checkSignedStructure({ ...valid, castles: [{ ...valid.castles[0], _allowAttack: 1 }] }), /委任・城攻め・武将移動設定/, '不正な真偽値を拒否');
+    assert.strictEqual(isLoadableSigned({ ...valid, saveSchemaVersion: 2 }), false, 'r562までの保存は現行形式として誤受理しない');
+    assert.strictEqual(checkSignedStructure(valid), true);
+    // r671: 外部セーブの主要資源が非数値ならCastle復元でNaNになり月次に伝播する。
+    // 通常ゲームが書き出す有限数値と、既存の未指定値の扱いは維持する。
+    for (const field of ['gold', 'rice', 'soldiers', 'population', 'ammo', 'horses', 'guns']) {
+        assert.throws(() => checkSignedStructure({
+            ...valid, castles: [{ ...valid.castles[0], [field]: 'not-a-number' }]
+        }), new RegExp(field), `${field} の非数値を拒否`);
+        assert.throws(() => checkSignedStructure({
+            ...valid, castles: [{ ...valid.castles[0], [field]: Infinity }]
+        }), new RegExp(`${field}`), `${field} の無限大を拒否`);
+        assert.strictEqual(checkSignedStructure({
+            ...valid, castles: [{ ...valid.castles[0], [field]: 1000 }]
+        }), true, `${field} の正常値は受理`);
+    }
+    // r672: 外部セーブから負の人口を復元すると月次人口増減でMath.sqrt(負数)がNaNに、
+    // 非数値の防御力は撤退評価を、非数値の民忠は人口増減計算をNaNにする。
+    // 通常の有限値および従来どおり未指定の値は受理する。
+    for (const [field, value] of [['population', -1], ['defense', 'not-a-number'], ['peoplesLoyalty', 'not-a-number']]) {
+        assert.throws(() => checkSignedStructure({
+            ...valid, castles: [{ ...valid.castles[0], [field]: value }]
+        }), new RegExp(field), `${field} でゲーム計算が壊れる外部保存値を拒否する`);
+        assert.strictEqual(checkSignedStructure({
+            ...valid, castles: [{ ...valid.castles[0], [field]: field === 'population' ? 1000 : 80 }]
+        }), true, `${field} の通常値を受理する`);
+        assert.strictEqual(checkSignedStructure({
+            ...valid, castles: [{ ...valid.castles[0], [field]: undefined }]
+        }), true, `${field} の既存未指定値を維持する`);
+    }
+    for (const field of ['defense', 'peoplesLoyalty']) {
+        assert.throws(() => checkSignedStructure({
+            ...valid, castles: [{ ...valid.castles[0], [field]: 'Infinity' }]
+        }), new RegExp(field), `${field} の無限大を拒否する`);
+    }
+    // r673: 外部セーブで負数・非数値の武将忠誠を受理すると、
+    // 内政のsqrt(loyalty)がNaN/Infinityになって結果へ伝播する。
+    for (const loyalty of [-1, 'broken', Infinity, 'Infinity']) {
+        assert.throws(() => checkSignedStructure({
+            ...valid, bushos: [{ ...valid.bushos[0], loyalty }]
+        }), /bushos\[0\]\.loyalty/, `不正な忠誠 ${loyalty} を復元前に拒否`);
+    }
+    for (const loyalty of [0, 1, 95, 100, undefined]) {
+        assert.strictEqual(checkSignedStructure({
+            ...valid, bushos: [{ ...valid.bushos[0], loyalty }]
+        }), true, `正常・未指定の忠誠 ${loyalty} は維持`);
+    }
     // r599: 現行の三好寿命常駐イベントは__residentEventStatesへ状態を書き戻す。
     // 外部セーブから真偽値や文字列の状態帳を受理すると、onEnter適用後に書込が失敗し、
     // 翌月以降の適用/解除状態を保持できなくなる。状態帳の外側だけを復元前に確認する。
-    assert.throws(() => manager._validateSaveDataStructure({
+    assert.throws(() => checkSignedStructure({
         ...valid, flags: { __residentEventStates: 'broken' }
     }), /__residentEventStates/, '書込みできない常駐イベント状態帳を拒否する');
-    assert.throws(() => manager._validateSaveDataStructure({
+    assert.throws(() => checkSignedStructure({
         ...valid, flags: { __residentEventStates: [] }
     }), /__residentEventStates/, 'JSON保存時に文字列キーの記録が消失する配列も拒否する');
-    assert.strictEqual(manager._validateSaveDataStructure({
+    assert.strictEqual(checkSignedStructure({
         ...valid, flags: { __residentEventStates: {
             historical_miyoshi_nagayoshi_yoshioki_lifespan: { active: true }
         } }
@@ -7291,12 +7339,12 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     const invalidOperations = { ...valid, aiOperations: {
         ...valid.aiOperations, operations: { 1: { 0: null } }
     } };
-    assert.throws(() => manager._validateSaveDataStructure(invalidOperations), /aiOperations\.operations/,
+    assert.throws(() => checkSignedStructure(invalidOperations), /aiOperations\.operations/,
         '不正作戦をロード前に拒否して通常の落城経路へ持ち込ませない');
     const invalidHistory = { ...valid, aiOperations: {
         ...valid.aiOperations, historyOwnedCastles: { 1: {} }
     } };
-    assert.throws(() => manager._validateSaveDataStructure(invalidHistory), /aiOperations\.historyOwnedCastles/,
+    assert.throws(() => checkSignedStructure(invalidHistory), /aiOperations\.historyOwnedCastles/,
         '配列以外の旧所領履歴を受理せず、月初unshiftの例外を防ぐ');
     // r596: 作戦本体が辞書でも、目標リストが不正なら通常落城処理の
     // .some() / .filter() や月次AIの .shift() で例外になる。
@@ -7311,12 +7359,12 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     const invalidAttackTargets = { ...valid, aiOperations: {
         ...valid.aiOperations, operations: { 1: { 0: badAttackOperation } }
     } };
-    assert.throws(() => manager._validateSaveDataStructure(invalidAttackTargets), /attackTargets/,
+    assert.throws(() => checkSignedStructure(invalidAttackTargets), /attackTargets/,
         '外部セーブ内のnull攻撃目標はロード前に拒否する');
     const invalidSabotageTargets = { ...valid, aiOperations: {
         ...valid.aiOperations, operations: { 1: { 0: { type: '内政', sabotageTargets: { 0: { castleId: 1 }, length: 1 } } } }
     } };
-    assert.throws(() => manager._validateSaveDataStructure(invalidSabotageTargets), /sabotageTargets/,
+    assert.throws(() => checkSignedStructure(invalidSabotageTargets), /sabotageTargets/,
         '配列ではない調略目標もロード前に拒否する');
     const normalTargetLists = { ...valid, aiOperations: {
         ...valid.aiOperations, operations: { 1: { 0: {
@@ -7324,7 +7372,7 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
             sabotageTargets: [{ castleId: 2, clanId: 2 }]
         } } }
     } };
-    assert.strictEqual(manager._validateSaveDataStructure(normalTargetLists), true,
+    assert.strictEqual(checkSignedStructure(normalTargetLists), true,
         '現在のAIが生成する攻撃・調略リストの構造は従来どおり受理する');
     // r590: 進捗履歴の配列は月初に直接pushされる。辞書自体がobjectでも
     // 文字列などを履歴として持ち込むと、通常の月次AI作戦更新で例外になる。
@@ -7333,7 +7381,7 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
             type: '国内平定', turnCount: 24, prevMyCastleCount: 1, historyTargetCount: 'broken'
         } } }
     } };
-    assert.throws(() => manager._validateSaveDataStructure(invalidObjectiveHistory), /aiOperations\.grandObjectives/,
+    assert.throws(() => checkSignedStructure(invalidObjectiveHistory), /aiOperations\.grandObjectives/,
         '不正な進捗履歴を外部セーブの復元前に拒否する');
     const currentPlanning = { ...valid, aiOperations: {
         operations: { 1: { 0: { type: '内政', status: '準備中', maxTurns: 2, turnsRemaining: 1 } } },
@@ -7341,7 +7389,7 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
         grandObjectives: { 1: { 0: { type: '国攻略', targetProvId: 1, turnCount: 24, prevMyCastleCount: 1, historyTargetCount: [1] } } },
         historyOwnedCastles: { 1: [[1]] }
     } };
-    assert.strictEqual(manager._validateSaveDataStructure(currentPlanning), true,
+    assert.strictEqual(checkSignedStructure(currentPlanning), true,
         '現行仕様に従う作戦・徴兵拠点・大方針・所領履歴は受理する');
     // r595: 外部セーブに紛れ込んだ壊れた外交関係は、通常の月末処理で参照される。
     // モデルの最上位行だけでなく、外交関係の記録も復元前に検証する。
@@ -7353,25 +7401,25 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     assert.throws(() => new DiplomacyManagerForSave(diplomacyGame).processEndMonth(), /status/,
         '不正な外交関係があると、通常の月末処理でnull.statusが例外になる');
     const corruptedDiplomacy = { ...valid, clans: [{ ...valid.clans[0], diplomacyValue: { 2: null } }] };
-    assert.throws(() => manager._validateSaveDataStructure(corruptedDiplomacy), /clans\[0\]\.diplomacyValue/,
+    assert.throws(() => checkSignedStructure(corruptedDiplomacy), /clans\[0\]\.diplomacyValue/,
         '外部セーブ内のnull外交関係を復元前に拒否する');
     const corruptedHostages = { ...valid, clans: [{ ...valid.clans[0], diplomacyValue: { 2: { status: '友好', hostageIds: {} } } }] };
-    assert.throws(() => manager._validateSaveDataStructure(corruptedHostages), /hostageIds/,
+    assert.throws(() => checkSignedStructure(corruptedHostages), /hostageIds/,
         '正常な外交処理が配列と想定する人質名簿の型を確認する');
     const currentDiplomacy = { ...valid, clans: [{ ...valid.clans[0], diplomacyValue: {
         2: { status: '友好', sentiment: 70, trucePeriod: 0, isMarriage: false, isEvent: false, hostageIds: [], subordinateMonths: 0 }
     } }] };
-    assert.strictEqual(manager._validateSaveDataStructure(currentDiplomacy), true,
+    assert.strictEqual(checkSignedStructure(currentDiplomacy), true,
         '通常の大名家外交関係を持つ保存は引き続き受理する');
     // 外部.savのJSONに含まれた__proto__をモデルのObject.assignへ通さない。
     // 普通のオブジェクトリテラルは特殊キーをown propertyにしないためJSON.parseで再現する。
     const poisonedCastle = JSON.parse(JSON.stringify(valid.castles[0]).replace(/}$/, ',"__proto__":{"getConnectedCastles":null}}'));
-    assert.strictEqual(manager.isLoadableSaveData({ ...valid, castles: [poisonedCastle] }), false,
+    assert.strictEqual(isLoadableSigned({ ...valid, castles: [poisonedCastle] }), false,
         '特殊キーを含む外部セーブをモデル復元前に拒否する');
-    assert.strictEqual(manager.isLoadableSaveData({ ...valid, castles: [{ ...valid.castles[0], getConnectedCastles: null }] }), false,
+    assert.strictEqual(isLoadableSigned({ ...valid, castles: [{ ...valid.castles[0], getConnectedCastles: null }] }), false,
         'モデルの正規メソッド名を持つ外部セーブもロード前に拒否する');
     const poisonedBusho = JSON.parse(JSON.stringify(valid.bushos[0]).replace(/}$/, ',"__proto__":{"_calculateStat":null}}'));
-    assert.strictEqual(manager.isLoadableSaveData({ ...valid, bushos: [poisonedBusho] }), false,
+    assert.strictEqual(isLoadableSigned({ ...valid, bushos: [poisonedBusho] }), false,
         '武将オブジェクトのprototype差替えも拒否する');
     // 組込みObject.prototypeから継承する基本メソッドも、JSONのown propertyで
     // シャドーされる。両変換メソッドを壊した城は文字列化時にTypeErrorを起こす。
@@ -7379,52 +7427,52 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     const castledPrototype = ctx.Castle.prototype;
     const restoredInvalidCastle = Object.assign(Object.create(castledPrototype), shadowedObjectMethods);
     assert.throws(() => String(restoredInvalidCastle), TypeError, '組込みオブジェクトの基本変換メソッドが破壊されることを再現');
-    assert.strictEqual(manager.isLoadableSaveData({ ...valid, castles: [shadowedObjectMethods] }), false,
+    assert.strictEqual(isLoadableSigned({ ...valid, castles: [shadowedObjectMethods] }), false,
         '外部セーブに含まれるObject.prototype共通メソッド名を復元前に拒否する');
-    assert.strictEqual(manager.isLoadableSaveData({ ...valid, bushos: [{ ...valid.bushos[0], hasOwnProperty: null }] }), false,
+    assert.strictEqual(isLoadableSigned({ ...valid, bushos: [{ ...valid.bushos[0], hasOwnProperty: null }] }), false,
         '武将の共通メソッドを上書きする保存も拒否する');
-    assert.strictEqual(manager.isLoadableSaveData(valid), true, '現行schemaかつ厳密構造検査を通る保存だけをロード可能とする');
-    assert.strictEqual(manager.isLoadableSaveData({ ...valid, saveSchemaVersion: 1 }), false, '旧schemaはキーが存在してもロード不可');
-    assert.strictEqual(manager.isLoadableSaveData({ ...valid, month: 13 }), false, '現行schemaでも構造不正ならロード不可');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: undefined }), /非対応のセーブ形式/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: 0 }), /非対応のセーブ形式/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, saveSchemaVersion: 1 }), /非対応のセーブ形式/, '政治婚姻フラグ導入前のschema 1は読み込まない');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001 }] }), /isDiplomaticMarriageActive/, 'schema 3でも政治婚姻フラグを明示する');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, month: 13 }), /month/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 999, nemesisList: [] }] }), /castleId/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 1, nemesisIds: [] }] }), /nemesisList/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, historyEntries: ['旧文字列履歴'] }), /historyEntries/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, aiOperations: { operations: {} } }), /aiOperations/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, scenarioFolder: 'missing' }), /未登録のシナリオ/);
-    assert.strictEqual(manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, originalClanId: 999, isDiplomaticMarriageActive: true }] }), true, '姫の生家は現存しない歴史的勢力IDを許容する');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, originalClanId: -1, isDiplomaticMarriageActive: true }] }), /originalClanId/);
-    assert.strictEqual(manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, currentClanId: 999, isDiplomaticMarriageActive: true }] }), true, '姫の過去の嫁ぎ先は滅亡勢力でも保持する');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, currentClanId: -2, isDiplomaticMarriageActive: true }] }), /currentClanId/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, princesses: [{ id: 90001, husbandId: 999, isDiplomaticMarriageActive: true }] }), /husbandId/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 999, legionNo: 1, commanderId: 0, establishedTurnId: 0 }] }), /legions\[0\]\.clanId/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 1, legionNo: 1, commanderId: 999, establishedTurnId: 0 }] }), /commanderId/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [{ id: 1, clanId: 1, legionNo: 0, commanderId: 0, establishedTurnId: 0 }] }), /legionNo/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, legions: [
+    assert.strictEqual(isLoadableSigned(valid), true, '現行schemaかつ厳密構造検査を通る保存だけをロード可能とする');
+    assert.strictEqual(isLoadableSigned({ ...valid, saveSchemaVersion: 1 }), false, '旧schemaはキーが存在してもロード不可');
+    assert.strictEqual(isLoadableSigned({ ...valid, month: 13 }), false, '現行schemaでも構造不正ならロード不可');
+    assert.throws(() => checkSignedStructure({ ...valid, saveSchemaVersion: undefined }), /非対応のセーブ形式/);
+    assert.throws(() => checkSignedStructure({ ...valid, saveSchemaVersion: 0 }), /非対応のセーブ形式/);
+    assert.throws(() => checkSignedStructure({ ...valid, saveSchemaVersion: 1 }), /非対応のセーブ形式/, '政治婚姻フラグ導入前のschema 1は読み込まない');
+    assert.throws(() => checkSignedStructure({ ...valid, princesses: [{ id: 90001 }] }), /isDiplomaticMarriageActive/, 'schema 4でも政治婚姻フラグを明示する');
+    assert.throws(() => checkSignedStructure({ ...valid, month: 13 }), /month/);
+    assert.throws(() => checkSignedStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 999, nemesisList: [] }] }), /castleId/);
+    assert.throws(() => checkSignedStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 1, nemesisIds: [] }] }), /nemesisList/);
+    assert.throws(() => checkSignedStructure({ ...valid, historyEntries: ['旧文字列履歴'] }), /historyEntries/);
+    assert.throws(() => checkSignedStructure({ ...valid, aiOperations: { operations: {} } }), /aiOperations/);
+    assert.throws(() => checkSignedStructure({ ...valid, scenarioFolder: 'missing' }), /未登録のシナリオ/);
+    assert.strictEqual(checkSignedStructure({ ...valid, princesses: [{ id: 90001, originalClanId: 999, isDiplomaticMarriageActive: true }] }), true, '姫の生家は現存しない歴史的勢力IDを許容する');
+    assert.throws(() => checkSignedStructure({ ...valid, princesses: [{ id: 90001, originalClanId: -1, isDiplomaticMarriageActive: true }] }), /originalClanId/);
+    assert.strictEqual(checkSignedStructure({ ...valid, princesses: [{ id: 90001, currentClanId: 999, isDiplomaticMarriageActive: true }] }), true, '姫の過去の嫁ぎ先は滅亡勢力でも保持する');
+    assert.throws(() => checkSignedStructure({ ...valid, princesses: [{ id: 90001, currentClanId: -2, isDiplomaticMarriageActive: true }] }), /currentClanId/);
+    assert.throws(() => checkSignedStructure({ ...valid, princesses: [{ id: 90001, husbandId: 999, isDiplomaticMarriageActive: true }] }), /husbandId/);
+    assert.throws(() => checkSignedStructure({ ...valid, legions: [{ id: 1, clanId: 999, legionNo: 1, commanderId: 0, establishedTurnId: 0 }] }), /legions\[0\]\.clanId/);
+    assert.throws(() => checkSignedStructure({ ...valid, legions: [{ id: 1, clanId: 1, legionNo: 1, commanderId: 999, establishedTurnId: 0 }] }), /commanderId/);
+    assert.throws(() => checkSignedStructure({ ...valid, legions: [{ id: 1, clanId: 1, legionNo: 0, commanderId: 0, establishedTurnId: 0 }] }), /legionNo/);
+    assert.throws(() => checkSignedStructure({ ...valid, legions: [
         { id: 1, clanId: 1, legionNo: 1, commanderId: 10, establishedTurnId: 0 },
         { id: 2, clanId: 1, legionNo: 1, commanderId: 0, establishedTurnId: 0 }
     ] }), /軍団席/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [
+    assert.throws(() => checkSignedStructure({ ...valid, bushos: [
         { id: 10, clan: 1, castleId: 1, nemesisList: [] },
         { id: 11, clan: 1, castleId: 1, nemesisList: [] }
     ], legions: [
         { id: 1, clanId: 1, legionNo: 1, commanderId: 10, establishedTurnId: 0 },
         { id: 2, clanId: 1, legionNo: 2, commanderId: 10, establishedTurnId: 0 }
     ] }), /国主 10 が重複/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, clans: [{ id: 1, leaderId: 10 }, { id: 2, leaderId: 11 }], bushos: [
+    assert.throws(() => checkSignedStructure({ ...valid, clans: [{ id: 1, leaderId: 10 }, { id: 2, leaderId: 11 }], bushos: [
         { id: 10, clan: 1, castleId: 1, nemesisList: [] },
         { id: 11, clan: 2, castleId: 1, nemesisList: [] }
     ], legions: [{ id: 1, clanId: 1, legionNo: 1, commanderId: 11, establishedTurnId: 0 }] }), /所属勢力が一致/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ id: 1, ownerClan: 1, castellanId: 10, _delegatedOverride: null, _allowAttack: true, _allowMove: true }] }), /samuraiIds/, '現行セーブでは在城名簿を明示する');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ ...valid.castles[0], samuraiIds: [10, 10] }] }), /重複/, '同じ城の在城名簿へ同一武将を重複させない');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, castles: [{ ...valid.castles[0], samuraiIds: [999] }] }), /参照先/, '在城名簿の不存在武将を拒否する');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 0, nemesisList: [] }] }), /武将castleId/, '在城名簿と武将castleIdの食い違いを拒否する');
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, kunishus: [{ id: 1, castleId: 999, leaderId: 0, networkTag: '' }] }), /kunishus\[0\]\.castleId/);
-    assert.throws(() => manager._validateSaveDataStructure({ ...valid, kunishus: [{ id: 1, castleId: 1, leaderId: 999, networkTag: '' }] }), /leaderId/);
+    assert.throws(() => checkSignedStructure({ ...valid, castles: [{ id: 1, ownerClan: 1, castellanId: 10, _delegatedOverride: null, _allowAttack: true, _allowMove: true }] }), /samuraiIds/, '現行セーブでは在城名簿を明示する');
+    assert.throws(() => checkSignedStructure({ ...valid, castles: [{ ...valid.castles[0], samuraiIds: [10, 10] }] }), /重複/, '同じ城の在城名簿へ同一武将を重複させない');
+    assert.throws(() => checkSignedStructure({ ...valid, castles: [{ ...valid.castles[0], samuraiIds: [999] }] }), /参照先/, '在城名簿の不存在武将を拒否する');
+    assert.throws(() => checkSignedStructure({ ...valid, bushos: [{ id: 10, clan: 1, castleId: 0, nemesisList: [] }] }), /武将castleId/, '在城名簿と武将castleIdの食い違いを拒否する');
+    assert.throws(() => checkSignedStructure({ ...valid, kunishus: [{ id: 1, castleId: 999, leaderId: 0, networkTag: '' }] }), /kunishus\[0\]\.castleId/);
+    assert.throws(() => checkSignedStructure({ ...valid, kunishus: [{ id: 1, castleId: 1, leaderId: 999, networkTag: '' }] }), /leaderId/);
 });
 
 test('旧セーブ互換の移行処理をSaveManager・AI作戦・宿敵・諸勢力へ残さない', () => {
@@ -7436,7 +7484,7 @@ test('旧セーブ互換の移行処理をSaveManager・AI作戦・宿敵・諸�
     const mainKunishus = getRuntimeData().scenario.kunishus;
 
     assert.ok(save.includes('saveSchemaVersion: SAVE_SCHEMA_VERSION'));
-    assert.ok(save.includes('Number(data.saveSchemaVersion) !== SAVE_SCHEMA_VERSION'));
+    assert.ok(save.includes('data.saveSchemaVersion !== SAVE_SCHEMA_VERSION'));
     assert.ok(!save.includes('_syncBushoMasterFields'));
     assert.ok(!save.includes('_syncSimplePortraitAddition'));
     assert.ok(!save.includes('_syncYearBasedPortraitRules'));
@@ -16233,6 +16281,7 @@ test('r447 1560・1570年の実シナリオから作った保存はどちらも�
         };
         const saver = new ctx.SaveManager(game);
         const data = await saver._createSaveDataObj({ includeThumbnail: false });
+        assert.strictEqual(data.integrity?.algorithm, 'SHA-256', `${folder} は新規保存に照合領域がある`);
         assert.strictEqual(saver.isLoadableSaveData(data), true, `${folder} は保存直後に無効表示されない`);
         const storedPayload = saver._encryptData(data);
         assert.strictEqual(saver.isLoadableSaveData(saver.decodeStoredData(storedPayload)), true,
@@ -16261,7 +16310,7 @@ test('r447 不正な保存は上書き前に拒否し、正常な保存はスロ
     const game = { hasSaveData: false, ui: { showDialog(message) { messages.push(message); }, renderCommandMenu() {} } };
     const saver = new ctx.SaveManager(game);
     const valid = {
-        saveSchemaVersion: 3, saveTimestamp: 1770000000000, saveTime: '2026/10/11 09:00',
+        saveSchemaVersion: 4, saveTimestamp: 1770000000000, saveTime: '2026/10/11 09:00',
         year: 1570, month: 6, gameStartYear: 1570, gameStartMonth: 6,
         scenarioFolder: '1570_anegawa', scenarioName: '1570年 姉川', scenarioNo: 'シナリオ2',
         castles: [{id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [10], _delegatedOverride: null, _allowAttack: true, _allowMove: true}],
@@ -16272,12 +16321,12 @@ test('r447 不正な保存は上書き前に拒否し、正常な保存はスロ
     };
     saver.showSaveGuard = () => {};
     saver.hideSaveGuard = () => {};
-    saver._createSaveDataObj = async () => valid;
+    saver._createSaveDataObj = async () => saver._sealSaveData(valid);
     await saver.saveGameToLocal(1);
     assert.ok(messages.at(-1).includes('完了'), JSON.stringify(messages));
     assert.strictEqual((await saver.readSaveSlots('sengoku_save_slot', 1))[0].hasData, true);
     const original = stored.get('sengoku_save_slot1');
-    saver._createSaveDataObj = async () => ({...valid, castles:[{id: 1, ownerClan: 1, castellanId: 10, samuraiIds:[999]}]});
+    saver._createSaveDataObj = async () => saver._sealSaveData({...valid, castles:[{id: 1, ownerClan: 1, castellanId: 10, samuraiIds:[999]}]});
     await saver.saveGameToLocal(1);
     assert.ok(messages.at(-1).includes('失敗'));
     assert.strictEqual(stored.get('sengoku_save_slot1'), original, '検証失敗時は既存の保存バイト列を保護する');
@@ -16301,7 +16350,7 @@ test('r447 無効なオートセーブは旧スロットと巡回インデック
     const saver = new ctx.SaveManager(game);
     saver.showSaveGuard = () => {};
     saver.hideSaveGuard = () => {};
-    saver._createSaveDataObj = async () => ({saveSchemaVersion: 3, castles: [], bushos: []});
+    saver._createSaveDataObj = async () => ({saveSchemaVersion: 4, castles: [], bushos: []});
     await saver.executeAutoSave();
     assert.strictEqual(saved.get('sengoku_autosave_slot1'), 'original_valid_bytes');
     assert.strictEqual(settings.get('autoSaveIndex'), '1', '失敗時は次のスロットへ進まない');
@@ -16321,8 +16370,8 @@ test('r447 DB書込成功だけでは完了表示せず読み戻しを検証す�
     const saver = new ctx.SaveManager(game);
     saver.showSaveGuard = () => {};
     saver.hideSaveGuard = () => {};
-    saver._createSaveDataObj = async () => ({
-        saveSchemaVersion:3,saveTimestamp:1770000000000,saveTime:'2026/10/11 09:00',
+    saver._createSaveDataObj = async () => saver._sealSaveData({
+        saveSchemaVersion:4,saveTimestamp:1770000000000,saveTime:'2026/10/11 09:00',
         year:1560,month:4,gameStartYear:1560,gameStartMonth:4,scenarioFolder:'1560_okehazama',
         scenarioName:'1560年 桶狭間',scenarioNo:'シナリオ1',
         castles:[{id:1,ownerClan:1,castellanId:10,samuraiIds:[10],_delegatedOverride:null,_allowAttack:true,_allowMove:true}],
@@ -19707,7 +19756,7 @@ test('r504 現在有効なファイル保存失敗だけはエラーを案内す
 
 // r505: 同スロットの保存が完了する前の読込で古い内容を提示しない。
 test('r505 同一スロットの書込待機中は一覧読込を旧版で確定しない', async () => {
-    const stored = new Map([['sengoku_save_slot1', {saveSchemaVersion: 3, saveTimestamp: 1}]]);
+    const stored = new Map([['sengoku_save_slot1', {saveSchemaVersion: 4, saveTimestamp: 1}]]);
     let finishWrite;
     const ctx = createContext();
     loadScript(ctx, 'js/save_manager.js');
@@ -19723,10 +19772,11 @@ test('r505 同一スロットの書込待機中は一覧読込を旧版で確定
     });
     manager.showSaveGuard = () => {};
     manager.hideSaveGuard = () => {};
-    manager._createSaveDataObj = async () => ({saveSchemaVersion: 3, saveTimestamp: 2});
+    manager._createSaveDataObj = async () => ({saveSchemaVersion: 4, saveTimestamp: 2});
     manager._validateSaveDataStructure = () => true;
     manager._encryptData = data => data;
     manager.isLoadableSaveData = () => true;
+    manager.isCurrentSaveSchema = () => true;
     const saving = manager.saveGameToLocal(1);
     await new Promise(resolve => setImmediate(resolve));
     assert.strictEqual(typeof finishWrite, 'function', '同スロットの保存がDB書込中');
@@ -19741,7 +19791,7 @@ test('r505 保存失敗後も読込が再開し、他スロットの読込を妨
     const reads = [];
     const ctx = createContext();
     loadScript(ctx, 'js/save_manager.js');
-    ctx.__read = async key => { reads.push(key); return {saveSchemaVersion: 3, saveTimestamp: 10}; };
+    ctx.__read = async key => { reads.push(key); return {saveSchemaVersion: 4, saveTimestamp: 10}; };
     vm.runInContext('loadFromDB = __read;', ctx);
     const manager = new ctx.SaveManager({});
     let rejectWrite;
@@ -19758,7 +19808,7 @@ test('r505 保存失敗後も読込が再開し、他スロットの読込を妨
 });
 
 test('r505 同一スロットの書込待機中は直接ロードも書込完了を待つ', async () => {
-    const stored = new Map([['sengoku_save_slot1', {saveSchemaVersion: 3, saveTimestamp: 1}]]);
+    const stored = new Map([['sengoku_save_slot1', {saveSchemaVersion: 4, saveTimestamp: 1}]]);
     let finishWrite;
     const ctx = createContext();
     loadScript(ctx, 'js/save_manager.js');
@@ -19775,7 +19825,7 @@ test('r505 同一スロットの書込待機中は直接ロードも書込完了
     });
     manager.showSaveGuard = () => {};
     manager.hideSaveGuard = () => {};
-    manager._createSaveDataObj = async () => ({saveSchemaVersion: 3, saveTimestamp: 2});
+    manager._createSaveDataObj = async () => ({saveSchemaVersion: 4, saveTimestamp: 2});
     manager._validateSaveDataStructure = () => true;
     manager._encryptData = data => data;
     manager.isLoadableSaveData = () => true;
@@ -29403,6 +29453,183 @@ test('r669 端数米相場と残り取引枠1でも正規の兵糧売却メニ�
             assert.ok(gain > 0 && gain <= cap, `${trialRate}/${cap} 売却利益の範囲`);
         }
     }
+});
+
+// r670: 実データに基づくr669の残取引枠1・最大売却2の画面から、
+// 「半分」=兵糧1を選んでも利益0なら確定操作を許さない。
+// UIの可否判定そのものを実行し、商人割引のない通常取引で確認する。
+test('r670 売却利益が金0になる半分数量では数量画面の確定を無効にする', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/economy_rules.js');
+    const source = read('js/ui_slider.js');
+    assert.ok(source.includes('setVal(Math.floor((minVal + max) / 2))'), '半分操作は整数切捨て');
+    const start = source.indexOf('        const checkValidQuantity = () => {');
+    const end = source.indexOf('        // ★Round12：', start);
+    assert.ok(start >= 0 && end > start, '数量画面の実際の確定判定を取得');
+    const createChecker = new Function(
+        'type', 'sliderRefs', 'getSliderValue', 'hasInvalidEditableQuantity',
+        'isMultiMode', 'EconomyRules', 'c', 'daimyo', 'castellan', 'game', 'document',
+        `${source.slice(start, end)}\nreturn checkValidQuantity;`
+    );
+    const castle = {ownerClan: 1, gold: 259, rice: 8783, tradeLimit: 1, provinceId: 1};
+    const game = {provinces: [{id: 1, marketRate: 1.65}]};
+    const amountMax = ctx.EconomyRules.calcMaxTradeAmount('sell_rice', castle,
+        null, null, game.provinces, game);
+    assert.strictEqual(amountMax, 2, 'r669の正規取引状態');
+    const button = {disabled: false, style: {opacity: 1}};
+    const ui = {ui: {quantityConfirmBtn: button}, game};
+    const check = (type, amount) => {
+        const sliderRefs = new Map([['amount', {num: {value: String(amount)}}]]);
+        const fn = createChecker.call(ui, type, sliderRefs, () => amount,
+            () => false, false, ctx.EconomyRules, castle, null, null, game,
+            {getElementById: () => null});
+        fn();
+        return !button.disabled;
+    };
+    assert.strictEqual(ctx.EconomyRules.calcTradeCostAndRate('sell_rice', 1,
+        castle, null, null, game.provinces, game).cost, 0);
+    assert.strictEqual(check('sell_rice', 1), false, '最大2の半分1は金0なので確定不可');
+    assert.strictEqual(check('sell_rice', 2), true, '最大2は金1となり確定可');
+    assert.strictEqual(check('buy_rice', 1), true, '通常購入の数量判定は変えない');
+});
+
+// r674: 外部ファイルとIndexedDBの両方で、保存内容の一致検査を共有する。
+test('r674 SHA-256の標準ベクトル・UTF-8日本語を検証する', () => {
+    const ctx = createContext({TextEncoder, TextDecoder, Uint8Array});
+    loadScript(ctx, 'js/save_manager.js');
+    const saver = new ctx.SaveManager({});
+    const crypto = require('crypto');
+    for (const value of ['abc', '日本語の武将名／戦国覇道', '']) {
+        const expected = crypto.createHash('sha256').update(value, 'utf8').digest('hex');
+        assert.strictEqual(saver._sha256Hex(value), expected, value);
+    }
+});
+
+test('r674 新規セーブの照合領域は通常値の改変・欠損・形式不一致を検知する', () => {
+    const ctx = createContext({TextEncoder, TextDecoder, Uint8Array});
+    loadScript(ctx, 'js/save_manager.js');
+    const saver = new ctx.SaveManager({});
+    const data = {
+        saveSchemaVersion: 4, saveTimestamp: 1770000000000, saveTime: '2026/10/11 09:00',
+        year: 1570, month: 6, gameStartYear: 1570, gameStartMonth: 6,
+        scenarioFolder: '1570_anegawa', scenarioName: '1570年 姉川', scenarioNo: 'シナリオ2',
+        castles: [{id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [10], gold: 1000,
+            _delegatedOverride: null, _allowAttack: true, _allowMove: true}],
+        bushos: [{id: 10, clan: 1, castleId: 1, loyalty: 95, nemesisList: []}],
+        clans: [{id: 1, leaderId: 10, name: '朝倉家'}], princesses: [], provinces: [{id: 1}],
+        legions: [], kunishus: [], turnQueueIds: [1], currentIndex: 0, playerClanId: 1,
+        mapWidth: 100, mapHeight: 100,
+        aiOperations: {operations:{},draftBases:{},grandObjectives:{},historyOwnedCastles:{}},
+        flags: {}, historyEntries: []
+    };
+    assert.strictEqual(saver.isLoadableSaveData(data), false, '未署名セーブは形式番号が新しくても拒否');
+    saver._sealSaveData(data);
+    assert.strictEqual(data.integrity.algorithm, 'SHA-256');
+    assert.strictEqual(data.integrity.version, 2);
+    assert.strictEqual(saver.isLoadableSaveData(data), true, '新規保存直後の検証');
+    const restored = saver.decodeStoredData(saver._encryptData(data));
+    assert.strictEqual(saver.isLoadableSaveData(restored), true, '外部ファイル・手動セーブの暗号化往復');
+    const cloned = JSON.parse(JSON.stringify(data));
+    assert.strictEqual(saver.isLoadableSaveData(cloned), true, 'オートセーブ相当のオブジェクト往復');
+    const altered = JSON.parse(JSON.stringify(data));
+    altered.castles[0].gold = 1001;
+    assert.strictEqual(saver.isLoadableSaveData(altered), false, '構造正常でも金1000→1001の変更を検出');
+    const alteredName = JSON.parse(JSON.stringify(data));
+    alteredName.clans[0].name = '別の大名家';
+    assert.strictEqual(saver.isLoadableSaveData(alteredName), false, '名称の変更も検出');
+    for (const badIntegrity of [null, {}, {version:1,algorithm:'CRC32',digest:data.integrity.digest},
+        {version:2,algorithm:'SHA-256',digest:'0'.repeat(64)},
+        {version:2,algorithm:'SHA-256',digest:data.integrity.digest, bypass:true}]) {
+        const invalid = JSON.parse(JSON.stringify(data));
+        invalid.integrity = badIntegrity;
+        assert.strictEqual(saver.isLoadableSaveData(invalid), false, '照合情報の形式不一致は拒否');
+    }
+    const old = JSON.parse(JSON.stringify(data));
+    delete old.integrity;
+    assert.strictEqual(saver.isLoadableSaveData(old), false, '照合領域削除による旧形式偽装を拒否');
+    assert.strictEqual(saver.isLoadableSaveData({...data, saveSchemaVersion: 2}), false, '非対応schemaを受理しない');
+    assert.strictEqual(saver.isLoadableSaveData({...data, saveSchemaVersion: 3}), false, 'r674の照合領域付き保存も廃止');
+    const legacy = JSON.parse(JSON.stringify(data));
+    delete legacy.integrity;
+    legacy.saveSchemaVersion = 3;
+    legacy.integrity = {version:1, algorithm:'SHA-256', digest:saver._sha256Hex(JSON.stringify(legacy))};
+    assert.strictEqual(saver.isLoadableSaveData(legacy), false, 'r674で生成された正規SHA-256照合領域も非対応');
+    assert.strictEqual(saver.isLoadableSaveData({...data, saveSchemaVersion: '4'}), false, '文字列版番号の偽装は拒否');
+    const contextless = JSON.parse(JSON.stringify(data));
+    const payload = {...contextless}; delete payload.integrity;
+    contextless.integrity.digest = saver._sha256Hex(JSON.stringify(payload));
+    assert.strictEqual(saver.isLoadableSaveData(contextless), false, '文脈のない旧SHA-256値を流用できない');
+});
+
+// r676: 通常の手動・自動5枠を照合しても、SHA-256を10件連続実行して
+// 一覧の描画・タブ操作を占有し続けない。現行の全件照合と分類は維持する。
+test('r676 ロード一覧の照合はスロット間でイベントループへ制御を返す', async () => {
+    const seen = [];
+    let paintOpportunities = 0;
+    const ctx = createContext({
+        setTimeout(fn) { paintOpportunities++; setImmediate(fn); }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    const saveManager = new ctx.SaveManager({});
+    const fakeSlots = new Map();
+    for (let slotNo = 1; slotNo <= 5; slotNo++) {
+        fakeSlots.set(`sengoku_save_slot${slotNo}`, { saveSchemaVersion: 4, slotNo });
+    }
+    fakeSlots.set('sengoku_save_slot3', { saveSchemaVersion: 3, slotNo: 3 });
+    vm.runInContext('loadFromDB = async key => __r676Slots.get(key) ?? null;', ctx);
+    ctx.__r676Slots = fakeSlots;
+    saveManager.isLoadableSaveData = data => {
+        seen.push(data?.slotNo ?? null);
+        return data?.saveSchemaVersion === 4;
+    };
+    const slots = await saveManager.readSaveSlots('sengoku_save_slot');
+    assert.deepStrictEqual(seen, [1, 2, 3, 4, 5], '5枠を順番どおり、各1回検証する');
+    assert.strictEqual(paintOpportunities, 4, '各枠の検証間に制御を返す');
+    assert.deepStrictEqual(Array.from(slots, s => s.hasData), [true, true, false, true, true]);
+    assert.strictEqual(slots[2].invalidData, true, '旧形式は従来どおり読込不可とする');
+});
+
+// r677: ロード一覧のタブ切替・閉じ直しによって表示世代が失効したら、
+// 旧一覧の未処理スロットで重いSHA-256を続けない。データの有効性判定自体は省略しない。
+test('r677 失効したロード一覧は残りのスロット照合を打ち切る', async () => {
+    let isCurrent = true;
+    let verified = 0;
+    let yields = 0;
+    const ctx = createContext({
+        setTimeout(callback) {
+            yields++;
+            isCurrent = false; // スロット1完了後、通常のタブ操作で前一覧が失効
+            setImmediate(callback);
+        }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    const saver = new ctx.SaveManager({});
+    const slots = new Map();
+    for (let i = 1; i <= 5; i++) slots.set(`sengoku_save_slot${i}`, { saveSchemaVersion: 4, slot: i });
+    ctx.__r677Slots = slots;
+    vm.runInContext('loadFromDB = async key => __r677Slots.get(key) ?? null;', ctx);
+    saver.isLoadableSaveData = () => { verified++; return true; };
+    const stale = await saver.readSaveSlots('sengoku_save_slot', 5, { isCurrent: () => isCurrent });
+    assert.strictEqual(verified, 1, '先頭枠だけを検証し、失効後の4枠は処理しない');
+    assert.strictEqual(yields, 1, '既存のスロット間の処理機会を利用する');
+    assert.deepStrictEqual(Array.from(stale), [], '失効した一覧は結果を公開しない');
+
+    // 表示が有効な場合は既存の全件照合・順序を一切変更しない。
+    isCurrent = true;
+    const freshCtx = createContext({ setTimeout: fn => setImmediate(fn) });
+    loadScript(freshCtx, 'js/save_manager.js');
+    freshCtx.__r677Slots = slots;
+    vm.runInContext('loadFromDB = async key => __r677Slots.get(key) ?? null;', freshCtx);
+    const freshSaver = new freshCtx.SaveManager({});
+    let freshVerified = 0;
+    freshSaver.isLoadableSaveData = () => { freshVerified++; return true; };
+    const fresh = await freshSaver.readSaveSlots('sengoku_save_slot', 5, { isCurrent: () => isCurrent });
+    assert.strictEqual(freshVerified, 5, '表示中は5枠すべて検証する');
+    assert.deepStrictEqual(Array.from(fresh, item => item.originalSlotNo), [1, 2, 3, 4, 5]);
+    const viewSource = read('js/save_load_view.js');
+    assert.ok(viewSource.includes('readSaveSlots(prefix, 5, { isCurrent: isRenderCurrent })'));
+    assert.ok(viewSource.includes('readSaveSlots(otherPrefix, 5, { isCurrent: isRenderCurrent })'));
 });
 
 Promise.all(pendingTests).then(() => {

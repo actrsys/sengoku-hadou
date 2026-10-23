@@ -150,6 +150,13 @@ class UISliderManager {
             }
 
             if (hasInvalidEditableQuantity()) isValid = false;
+            // 兵糧売却は数量が正でも金1未満なら確定できない。
+            // 売却代金の正本はEconomyRules。メニュー・確定処理とは別の換算式を持たない。
+            if (isValid && type === 'sell_rice') {
+                const amount = getSliderValue('amount');
+                isValid = EconomyRules.calcTradeCostAndRate('sell_rice', amount, c,
+                    daimyo, castellan, this.game.provinces, this.game).cost > 0;
+            }
 
             if (isValid) {
                 this.ui.quantityConfirmBtn.disabled = false;

@@ -4,7 +4,11 @@
  * GameManager は公開APIの互換窓口だけを持ち、実処理はこの部署へ委譲します。
  */
 
-const SAVE_SCHEMA_VERSION = 3;
+// r675: 現行保存は全件照合必須。旧スキーマ／照合領域欠損は読み込まない。
+const SAVE_SCHEMA_VERSION = 4;
+const SAVE_INTEGRITY_VERSION = 2;
+const SAVE_INTEGRITY_ALGORITHM = 'SHA-256';
+const SAVE_INTEGRITY_CONTEXT = 'SengokuHado:SavePayload:Schema4:Integrity2\n';
 
 class SaveManager {
     constructor(game) {
@@ -81,14 +85,96 @@ class SaveManager {
         return result;
     }
 
+    // 保存内容全体のSHA-256。セーブはfile://のオフライン環境でも動く必要があり、
+    // secure contextに限定されるWebCryptoに依存しない同期実装とする。
+    // これは破損・偶発的な書換えの検出であり、秘密鍵による改ざん防止認証ではない。
+    _sha256Hex(message) {
+        const bytes = new TextEncoder().encode(message);
+        const bitLength = bytes.length * 8;
+        const totalLength = Math.ceil((bytes.length + 9) / 64) * 64;
+        const padded = new Uint8Array(totalLength);
+        padded.set(bytes);
+        padded[bytes.length] = 0x80;
+        const view = new DataView(padded.buffer);
+        view.setUint32(totalLength - 8, Math.floor(bitLength / 0x100000000), false);
+        view.setUint32(totalLength - 4, bitLength >>> 0, false);
+        const k = [
+            0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+            0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+            0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+            0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+            0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+            0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+            0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+            0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+        ];
+        const h = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+        const w = new Uint32Array(64);
+        const rotate = (v, n) => (v >>> n) | (v << (32 - n));
+        for (let offset = 0; offset < totalLength; offset += 64) {
+            for (let i = 0; i < 16; i++) w[i] = view.getUint32(offset + i * 4, false);
+            for (let i = 16; i < 64; i++) {
+                const x = w[i - 15], y = w[i - 2];
+                w[i] = (w[i - 16] + (rotate(x, 7) ^ rotate(x, 18) ^ (x >>> 3))
+                    + w[i - 7] + (rotate(y, 17) ^ rotate(y, 19) ^ (y >>> 10))) >>> 0;
+            }
+            let [a,b,c,d,e,f,g,t] = h;
+            for (let i = 0; i < 64; i++) {
+                const t1 = (t + (rotate(e, 6) ^ rotate(e, 11) ^ rotate(e, 25))
+                    + ((e & f) ^ (~e & g)) + k[i] + w[i]) >>> 0;
+                const t2 = ((rotate(a, 2) ^ rotate(a, 13) ^ rotate(a, 22))
+                    + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+                t = g; g = f; f = e; e = (d + t1) >>> 0;
+                d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+            }
+            [a,b,c,d,e,f,g,t].forEach((v, i) => { h[i] = (h[i] + v) >>> 0; });
+        }
+        return h.map(v => v.toString(16).padStart(8, '0')).join('');
+    }
+
+    // integrityフィールド自体は照合対象から外し、全保存ペイロードを照合する。
+    // ゲーム本体のオブジェクトや並び順は変更せず、トップレベルに検証領域だけを追加する。
+    _calculateSaveDigest(data) {
+        const payload = { ...data };
+        delete payload.integrity;
+        // 異用途のSHA-256値との取り違えを避け、保存形式と用途を固定した文脈で照合する。
+        return this._sha256Hex(SAVE_INTEGRITY_CONTEXT + JSON.stringify(payload));
+    }
+
+    _sealSaveData(data) {
+        data.integrity = {
+            version: SAVE_INTEGRITY_VERSION,
+            algorithm: SAVE_INTEGRITY_ALGORITHM,
+            digest: this._calculateSaveDigest(data)
+        };
+        return data;
+    }
+
+    _validateSaveIntegrity(data, fail) {
+        const integrity = data.integrity;
+        if (!Object.prototype.hasOwnProperty.call(data, 'integrity')
+            || !integrity || typeof integrity !== 'object' || Array.isArray(integrity)
+            || Object.keys(integrity).length !== 3
+            || integrity.version !== SAVE_INTEGRITY_VERSION || integrity.algorithm !== SAVE_INTEGRITY_ALGORITHM
+            || typeof integrity.digest !== 'string' || !/^[a-f0-9]{64}$/.test(integrity.digest)) {
+            fail('セーブの照合情報がありません、または形式が不正です');
+        }
+        if (integrity.digest !== this._calculateSaveDigest(data)) {
+            fail('セーブ内容と照合情報が一致しません（データ破損の可能性）');
+        }
+    }
+
     // ゲーム本体を書き換える前に、復元へ進んでよいセーブかを軽量検査する。
     // ここでは保存構造と主要ID参照だけを見る。画像decode等の実行時失敗は復元側の安全復旧で扱う。
     _validateSaveDataStructure(data) {
         const fail = message => { throw new Error(`セーブデータ検証エラー: ${message}`); };
         if (!data || typeof data !== 'object' || Array.isArray(data)) fail('ルートがオブジェクトではありません');
-        if (Number(data.saveSchemaVersion) !== SAVE_SCHEMA_VERSION) {
+        if (data.saveSchemaVersion !== SAVE_SCHEMA_VERSION) {
             fail(`非対応のセーブ形式です (schema=${data.saveSchemaVersion ?? 'none'})`);
         }
+        // 保存形式4では照合領域が必須。削除・null・旧方式への差替えも復元前に拒否。
+        // 構造検査やモデル参照検査も従来どおり適用し、照合値だけを信用しない。
+        this._validateSaveIntegrity(data, fail);
 
         const gameStartYear = Number(data.gameStartYear);
         const gameStartMonth = Number(data.gameStartMonth);
@@ -162,6 +248,28 @@ class SaveManager {
         };
 
         data.castles.forEach((castle, index) => {
+            // 外部セーブの数値がモデル復元時にNaN/Infinityへ変わると、
+            // 月初の収入・人口・兵力計算にも非数値が伝播する。
+            // 新規シナリオの初期値・通常セーブは変更せず、Castleが数値化する
+            // 主要資源・人口だけ、復元前の信頼境界で有限性を確認する。
+            for (const key of ['gold', 'rice', 'soldiers', 'population', 'ammo', 'horses', 'guns']) {
+                const value = Number(castle[key] || 0);
+                if (!Number.isFinite(value)) {
+                    fail(`castles[${index}].${key} が有限の数値ではありません`);
+                }
+                // 人口の負数はCastleでも下限補正されず、月初の平方根計算をNaNにする。
+                if (key === 'population' && value < 0) {
+                    fail(`castles[${index}].population が負数です`);
+                }
+            }
+            // 復元モデルの防御力は戦争の撤退評価、民忠は月初の人口増減へ
+            // そのまま渡るため、外部セーブでは非数値を受け入れない。
+            // 未指定時の既存モデル初期値は変更しない。
+            for (const key of ['defense', 'peoplesLoyalty']) {
+                if (!Number.isFinite(Number(castle[key] ?? 0))) {
+                    fail(`castles[${index}].${key} が有限の数値ではありません`);
+                }
+            }
             if (!(castle._delegatedOverride === null || typeof castle._delegatedOverride === 'boolean')
                 || typeof castle._allowAttack !== 'boolean' || typeof castle._allowMove !== 'boolean') {
                 fail(`castles[${index}] の委任・城攻め・武将移動設定が現行形式ではありません`);
@@ -177,6 +285,13 @@ class SaveManager {
 
         data.bushos.forEach((busho, index) => {
             if (!Array.isArray(busho.nemesisList)) fail(`bushos[${index}].nemesisList が現行形式ではありません`);
+            // 外部セーブの忠誠が負数・NaN・Infinityだと、
+            // Busho復元後のDomesticRulesがMath.sqrt(loyalty)でNaN/Infinityを返す。
+            // 未指定値はモデル従来の0扱いを維持し、入力境界だけで防ぐ。
+            const loyalty = Number(busho.loyalty || 0);
+            if (!Number.isFinite(loyalty) || loyalty < 0) {
+                fail(`bushos[${index}].loyalty が不正です`);
+            }
         });
         data.princesses.forEach((princess, index) => {
             if (typeof princess.isDiplomaticMarriageActive !== 'boolean') {
@@ -467,7 +582,7 @@ class SaveManager {
             return null; // 古いゲームの保存を成立させない。呼出元が書込を中止する。
         }
 
-        return { 
+        return this._sealSaveData({ 
             saveSchemaVersion: SAVE_SCHEMA_VERSION,
             year: this.game.year, 
             month: this.game.month, 
@@ -494,7 +609,7 @@ class SaveManager {
             currentIndex: this.game.currentIndex,
             flags: this.game.flags || {},
             historyEntries: this.game.historySystem ? this.game.historySystem.serialize() : []
-        };
+        });
     }
     
     // ==========================================
@@ -1077,7 +1192,7 @@ class SaveManager {
     }
 
     isCurrentSaveSchema(data) {
-        return !!data && Number(data.saveSchemaVersion) === SAVE_SCHEMA_VERSION;
+        return !!data && data.saveSchemaVersion === SAVE_SCHEMA_VERSION;
     }
 
     // タイトル・システム・ロード画面で共通利用する「実際に読み込めるセーブ」の正本判定。
@@ -1118,7 +1233,12 @@ class SaveManager {
      * セーブスロット表示用の復号済みデータを一括取得します。
      * 表示順やラベルはView側、保存形式/DBアクセスはSaveManager側が担当します。
      */
-    async readSaveSlots(prefix, count = 5) {
+    async readSaveSlots(prefix, count = 5, options = {}) {
+        // 保存一覧の表示世代が失効した場合は、結果を捨てるだけでなく
+        // まだ実行していない重いSHA-256照合も省略する。
+        // タブ切替／一覧終了の判断はViewが所有し、SaveManagerは通知された寿命だけ参照する。
+        const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true;
+        if (!isCurrent()) return [];
         const rows = await Promise.all(
             Array.from({ length: count }, (_, index) => {
                 const slotNo = index + 1;
@@ -1130,21 +1250,32 @@ class SaveManager {
             })
         );
 
-        return rows.map(({ slotNo, rawData, readError }) => {
+        // SHA-256は保存内容全体を読む同期計算です。実際のシナリオ保存が
+        // 5枠埋まった場合、連続した検証はメインスレッドを長時間占有します。
+        // 1件ごとの正規の照合を省略せず、枠間で描画・操作イベントへ実行機会を返します。
+        // setTimeoutによる通常のイベントループへの復帰であり、待機時間や期限の追加ではありません。
+        const slots = [];
+        for (const { slotNo, rawData, readError } of rows) {
+            if (!isCurrent()) return [];
+            if (slots.length > 0 && typeof setTimeout === 'function') {
+                await new Promise(resolve => setTimeout(resolve, 0));
+                if (!isCurrent()) return [];
+            }
             const data = readError ? null : this.decodeStoredData(rawData);
             const hasData = !readError && this.isLoadableSaveData(data);
             // 現行形式でロード不可でも、DB内に実際のレコードが存在するなら空欄とは表示しない。
             // 開発中は旧スキーマへの互換処理を持たないが、意図的な上書きは可能にする。
             const invalidData = !readError && rawData != null && !hasData;
-            return {
+            slots.push({
                 originalSlotNo: slotNo,
                 data,
                 saveTimestamp: hasData ? this.getSaveTimestamp(data) : 0,
                 hasData,
                 readError,
                 invalidData
-            };
-        });
+            });
+        }
+        return slots;
     }
 
     // ★追加：最新のセーブデータを自動で見つけて読み込む魔法 (続きから)

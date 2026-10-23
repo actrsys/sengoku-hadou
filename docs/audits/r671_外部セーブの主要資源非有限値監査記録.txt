@@ -1,0 +1,12 @@
+戦国覇道 r671 監査記録：外部セーブの主要資源が非有限値になる場合
+
+対象：r670（既存のセーブ形式 v3）
+入口：画面からの .sav ファイル読込 → SaveManager._decryptData → _validateSaveDataStructure → _restoreSaveDataObj → new Castle(c)
+
+修正前の再現：既存回帰テストの現行構造に合わせた保存データで、拠点の gold を 'not-a-number'、または JSON の極端な数値(1e400相当)にすると、構造検証が通る。実 Castle の初期化で Math.min(99999, Number(...)) の結果が NaN となることを確認。月初の収入計算は castle.gold と income を加算するため、NaN は後続にも伝播する。これは通常プレイから生成される状態ではなく、外部セーブ受入境界の安定性問題である。
+
+修正：SaveManager の既存検証で、Castle が数値化する主要な7項目について Number.isFinite(Number(value || 0)) を確認。通常値と既存の未指定値の扱いを維持し、非数値・無限大を拒否する。モデル・月次経済・コマンド・UI・スキーマに重複した防御を加えない。
+
+検証：修正前の独立実コード再現では非数値文字列と1e400相当の値が受理され、Castle初期化時にNaNが生じた。修正後は同じ保存構造を復元前に拒否。ロジック回帰1,149件成功、PC・スマホ画面回帰23項目成功、Excel/BIN全3組一致、配布元検査、シミュレーター4件成功、JavaScript構文検査成功。
+
+変更：追加 docs/audits/r671_外部セーブの主要資源非有限値監査記録.txt、更新 ARCHITECTURE.md, js/config.js, js/save_manager.js, tests/run_tests.js、削除なし。
