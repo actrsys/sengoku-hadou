@@ -1,0 +1,22 @@
+# r678 通常AI外交0番のセーブ誤拒否修正 監査記録
+
+## 実際の発生報告
+1560年4月・織田家の通常ゲーム画面でセーブすると「セーブデータ検証エラー: clans[0].diplomacyValue[0] が不正です」と表示され、保存できない。
+
+## 原因と到達経路
+AIOperationManager._countGrandObjectiveTargets(clanId, '国攻略', targetId) は当該国の未所有城(ownerClan=0)も攻略目標として評価する。
+_isNonFriendlyObjectiveOwner() → GameManager.getRelation() → DiplomacyManager.getDiplomacyData() を通り、実際の外交データ辞書にキー '0' が遅延生成される。
+SaveManager._validateSaveDataStructure() の外交辞書キー判定は正の整数文字列しか受理せず、正規のセーブ内容を不正扱いしていた。
+
+## 再現検証
+実コードのAIOperationManagerとDiplomacyManagerを使い、未所有城を含む国攻略の目標を数えると、外交辞書に '0' が生成された。保存用データにこの辞書を含めると、r677は同じ検証エラーで失敗した。
+回帰テストには実コードからの生成経路を組み込んだ。修正前は本テストのみ失敗することを確認した。
+
+## 修正
+SaveManager の外交辞書のキー判定のみ、文字列キー '0' を追加許可する。他のID検査に影響させない。関係レコード型・status型・hostageIds型の検査は維持する。
+正常なゲーム状態に手を加えず、外交管理やAIの挙動は変更しない。
+セーブ形式schema4、保存データ全体のSHA-256照合、旧セーブ拒否は変更しない。
+
+## 保証範囲
+外交辞書の '0' を持つ正常なデータを保存できること、および同じキーでも壊れたレコードを拒否することを再現テストで確認する。
+ブラウザでの長期自然進行を網羅した保証ではない。

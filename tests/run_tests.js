@@ -449,7 +449,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r677');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r678');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -7411,6 +7411,34 @@ test('SaveManager は現行スキーマだけを復元前に受理し、旧形�
     } }] };
     assert.strictEqual(checkSignedStructure(currentDiplomacy), true,
         '通常の大名家外交関係を持つ保存は引き続き受理する');
+
+    // r678: 国攻略の長期方針が空き城(ownerClan=0)を含むと、実際の
+    // AiOperationManager → DiplomacyManager が外交辞書の0番を遅延生成する。
+    // プレイ中の正常な保存がこの記録を持つため、セーブ検査で誤拒否しない。
+    ctx.GameConstants.DiplomacyStatus.NORMAL = '普通';
+    ctx.DiplomacyRules.isFriendly = () => false;
+    loadScript(ctx, 'js/ai_operation.js');
+    const NormalOperationManager = vm.runInContext('AIOperationManager', ctx);
+    const normalClan = { id: 1, diplomacyValue: {} };
+    const normalGame = {
+        getClan: id => Number(id) === 1 ? normalClan : null,
+        getProvinceCastles: () => [{ id: 2, ownerClan: 0 }]
+    };
+    const normalDiplomacyManager = new DiplomacyManagerForSave(normalGame);
+    normalGame.getRelation = (a, b) => normalDiplomacyManager.getRelation(a, b);
+    assert.strictEqual(new NormalOperationManager(normalGame)._countGrandObjectiveTargets(1, '国攻略', 1), 1);
+    assert.ok(Object.prototype.hasOwnProperty.call(normalClan.diplomacyValue, '0'),
+        '通常AIの空き城評価で外交辞書の0番が遅延生成される');
+    assert.strictEqual(checkSignedStructure({ ...valid, clans: [{ ...valid.clans[0],
+        diplomacyValue: normalClan.diplomacyValue }] }), true,
+        '通常のAI経路で生成された外交辞書0番を含むゲーム状態も保存できる');
+    assert.throws(() => checkSignedStructure({ ...valid, clans: [{ ...valid.clans[0],
+        diplomacyValue: { 0: null } }] }), /diplomacyValue\[0\]/,
+        '外交辞書0番であっても壊れたレコードは拒否する');
+    assert.throws(() => checkSignedStructure({ ...valid, clans: [{ ...valid.clans[0],
+        diplomacyValue: { '-1': { status: '普通' } } }] }), /diplomacyValue\[-1\]/,
+        '負数や文字列などの無効な外交辞書キーは引き続き拒否する');
+
     // 外部.savのJSONに含まれた__proto__をモデルのObject.assignへ通さない。
     // 普通のオブジェクトリテラルは特殊キーをown propertyにしないためJSON.parseで再現する。
     const poisonedCastle = JSON.parse(JSON.stringify(valid.castles[0]).replace(/}$/, ',"__proto__":{"getConnectedCastles":null}}'));

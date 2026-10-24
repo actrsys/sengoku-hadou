@@ -389,7 +389,10 @@ class SaveManager {
             if (Object.prototype.hasOwnProperty.call(clan, 'diplomacyValue')) {
                 if (!isRecord(clan.diplomacyValue)) fail(`clans[${index}].diplomacyValue が不正です`);
                 Object.entries(clan.diplomacyValue).forEach(([targetId, relation]) => {
-                    if (!isClanKey(targetId) || !isRecord(relation) || typeof relation.status !== 'string') {
+                    // AI長期方針が未所有城(ownerClan=0)を評価すると、外交管理の
+                    // 遅延初期化で0番の関係が生成される。通常プレイの保存として受理する。
+                    // 0以外は従来の正の勢力IDだけ許し、関係オブジェクトは同様に検査する。
+                    if (!(targetId === '0' || isClanKey(targetId)) || !isRecord(relation) || typeof relation.status !== 'string') {
                         fail(`clans[${index}].diplomacyValue[${targetId}] が不正です`);
                     }
                     if (Object.prototype.hasOwnProperty.call(relation, 'hostageIds') && !Array.isArray(relation.hostageIds)) {
