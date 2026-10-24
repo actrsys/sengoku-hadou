@@ -1,0 +1,21 @@
+# r688：初回タイトルフォントの期限とロード幕待機を一致させる
+
+基準：r687完全版。設計の正本は ARCHITECTURE.md の初回タイトル軽量フォント・本編ロード幕責務分離・実害確認後の最小改修。
+
+【再現した問題】
+タイトル用軽量Webフォントの通信が遅延すると、app_bootstrap.js は2.5秒経過時に fonts-fallback へ切り替えるが、__titleFontLoadPromise はフォント通信の完了まで未解決。r687のstartup_loader.js はタイトル公開直前にこのPromiseをawaitするため、ゲーム本体が初期化済みでも95%の初回幕がフォント通信の終わるまで表示され続ける。
+
+【再現方法と結果】
+配布版と同じHTML・JS・CSS・フォントを代替ブラウザ配信（about:blank + route応答）し、タイトル用Webフォント2つの応答を7秒遅延させる。修正前：2.5秒後にfontの表示状態はfallbackへ変わるものの幕は95%のまま、フォント応答後にようやく100%になった。修正前のNode回帰テストも未解決Promiseによって失敗（1161成功・1失敗）。
+修正後：既存2.5秒期限経過でfont fallbackと待機Promiseを同時に完了させ、ゲーム初期化完了後の初回幕は100%となる。遅延応答が到着してもfallback状態を覆さない。Node回帰1162件すべて成功。
+
+【改修】
+app_bootstrap.jsのinitializeFonts()内で、公開とPromise解決を同じfinish関数へ一本化。タイトル用の既存2.5秒期限は変更せず、追加タイマー・新規共通サービス・独立状態は設けない。通信済みの場合の通常書体、読込失敗時のfallback、低メモリ端末のOS書体、初回タップ後の本編フォントの共通ロード幕待機は維持。
+
+【検証上の制限】
+Chromiumのポリシーでlocalhostへのページ遷移が遮断されるため、代替配信の検証ではCSPメタを取り除いている。本番配信のCSP・実端末・実回線での初回起動秒数は未測定。約70本の本編JavaScript読込の総通信時間およびCPU負荷の改善を保証するものではない。
+
+【変更ファイル】
+更新：ARCHITECTURE.md、docs/audits/README.md、js/app_bootstrap.js、js/config.js、tests/run_tests.js
+追加：docs/audits/r688_初回タイトルフォント期限とロード幕待機整合監査記録.txt
+削除：なし

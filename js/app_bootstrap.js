@@ -260,20 +260,25 @@
             return;
         }
         // 大容量の元フォントを初期表示の待機対象に含めない。
-        const timer = setTimeout(() => reveal(false), TITLE_FONT_TIMEOUT_MS);
-        window.__titleFontLoadPromise = Promise.all([
+        // 字形の通信が期限を超えた場合は見た目だけでなく、初回ロード幕が待つ
+        // __titleFontLoadPromise も同時に完了させる。待機時間を二重管理しない。
+        let resolveTitleFontLoad;
+        window.__titleFontLoadPromise = new Promise(resolve => { resolveTitleFontLoad = resolve; });
+        const finish = loaded => {
+            if (revealed) return; // 期限後の遅延応答でタイトル表示状態を変更しない
+            clearTimeout(timer);
+            reveal(loaded);
+            resolveTitleFontLoad(loaded);
+        };
+        const timer = setTimeout(() => finish(false), TITLE_FONT_TIMEOUT_MS);
+        Promise.all([
             document.fonts.load('400 16px "TitleAbashiri"', '戦国覇道観戦する指南書'),
             document.fonts.load('400 16px "TitleFude"', '戦国覇道')
         ]).then(results => {
-            const loaded = results.every(faces => Array.isArray(faces) && faces.length > 0);
-            clearTimeout(timer);
-            reveal(loaded);
-            return loaded;
+            finish(results.every(faces => Array.isArray(faces) && faces.length > 0));
         }).catch(error => {
-            clearTimeout(timer);
             console.warn('【FontLoader】タイトル書体を読み込めませんでした:', error);
-            reveal(false);
-            return false;
+            finish(false);
         });
     }
 

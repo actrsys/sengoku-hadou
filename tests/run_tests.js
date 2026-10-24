@@ -396,6 +396,49 @@ test('r541 タイトル起動後のレイアウト切替では現在の軽量モ
     assert.strictEqual(fromPc.calls.length, before + 4, '通常表示への復帰後に初めて本体書体を準備する');
 });
 
+// r688: 通常の初回アクセスでタイトル用Webフォントの応答が遅い場合、
+// 2.5秒後には代替書体で公開できる必要がある。従来は見た目だけfallbackへ
+// 切り替わり、起動幕が待つPromiseは未完了のままになっていた。
+test('r688 タイトルフォントが遅延しても既存2.5秒で起動待機が解放される', async () => {
+    const timers = new Map();
+    const clearCalls = [];
+    let nextTimer = 1;
+    let finishFonts;
+    const pendingFonts = new Promise(resolve => { finishFonts = resolve; });
+    const rootClass = new FakeClassList(['fonts-loading']);
+    const context = createContext({
+        document: {
+            documentElement: { classList: rootClass },
+            readyState: 'loading',
+            fonts: { load: () => pendingFonts, ready: Promise.resolve() }
+        },
+        navigator: { userAgent: 'Desktop', maxTouchPoints: 0 },
+        setTimeout(callback, delay) {
+            const id = nextTimer++;
+            timers.set(id, { callback, delay });
+            return id;
+        },
+        clearTimeout(id) { clearCalls.push(id); timers.delete(id); }
+    });
+    context.addEventListener = () => {};
+    loadScript(context, 'js/app_bootstrap.js');
+    assert.strictEqual(timers.size, 1, 'タイトル字形の期限は既存の1本だけ');
+    const [id, timer] = timers.entries().next().value;
+    assert.strictEqual(timer.delay, 2500);
+    timer.callback(); // 初回通信が2.5秒を超える通常の遅延時
+    const result = await Promise.race([
+        context.__titleFontLoadPromise,
+        new Promise(resolve => setImmediate(() => resolve('still-waiting')))
+    ]);
+    assert.strictEqual(result, false, '代替書体へ切り替えた時点で起動ローダーの待機も解放する');
+    assert.ok(rootClass.contains('fonts-fallback'));
+    assert.ok(!rootClass.contains('fonts-loading'));
+    finishFonts([{ family: 'TitleAbashiri' }]); // タイトル公開後に通信が完了
+    await Promise.resolve();
+    assert.ok(rootClass.contains('fonts-fallback'), '遅延完了が公開済み画面の書体状態を変えない');
+    assert.ok(clearCalls.includes(id), '期限タイマーは使い終わったら解除');
+});
+
 test('r540 トップ観戦はロード後にだけ平時BGMへ切替し、通常開始とタイトルでは変更しない', () => {
     const game = read('js/game.js');
     const start = game.indexOf('async loadScenario(folder, options = {})');
@@ -451,7 +494,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r687');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r688');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
