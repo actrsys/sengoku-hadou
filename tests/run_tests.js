@@ -346,7 +346,9 @@ test('r541 タイトル起動後のレイアウト切替では現在の軽量モ
         const rootClasses = new FakeClassList(['fonts-loading']);
         const document = {
             documentElement: { classList: rootClasses },
-            head: { appendChild() {} },
+            head: { appendChild(element) {
+                if (element.rel === 'stylesheet') setImmediate(() => element.onload());
+            } },
             createElement() { return { rel: '', href: '', as: '', type: '', crossOrigin: '' }; },
             fonts: {
                 load: async (descriptor, text) => {
@@ -449,7 +451,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r680');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r682');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -29764,6 +29766,99 @@ test('r680 タイトルの保存有無確認は初めの有効枠で照合を終
     saved.set('sengoku_autosave_slot3', corrupted);
     assert.strictEqual(await saver.refreshLoadAvailability(), false);
     assert.strictEqual(validated, 10, 'すべて破損なら全10件の正規照合でロード不可');
+});
+
+
+
+// r682: 通信が遅い初回起動では先頭の圧縮ライブラリ読込がタイトルHTMLの構築を妨げ、
+// UIManager登録前の操作案内が押しても反応しない状態になることがある。
+test('r682 タイトルの早期HTML構築と操作案内の有効化時点を正本へ揃える', () => {
+    const html = read('index.html');
+    const ui = read('js/ui.js');
+    const css = read('css/style.css');
+    const headEnd = html.indexOf('</head>');
+    const title = html.indexOf('<div id="title-screen">');
+    const pako = html.indexOf('<script src="js/pako.min.js"></script>');
+    const dataManager = html.indexOf('<script src="js/data_manager.js"></script>');
+    const game = html.indexOf('<script src="js/game.js"></script>');
+    assert.ok(headEnd > 0 && title > headEnd && pako > title, 'タイトルDOMを作る前に圧縮ライブラリでHTML解析を止めない');
+    assert.ok(pako < dataManager && dataManager < game, 'シナリオBIN展開より前に圧縮ライブラリを用意する');
+    assert.strictEqual(html.match(/<script src="js\/pako\.min\.js"><\/script>/g)?.length, 1, '読み込みは一度だけ');
+    assert.ok(html.includes('id="tap-to-proceed" class="title-tap-message awaiting-init"'));
+    assert.ok(css.includes('.title-tap-message.awaiting-init { visibility: hidden; }'), '初回のタップ案内のみ非表示で、レイアウト領域は保持');
+    const start = ui.indexOf("const onTitleClick = async () => {");
+    const bind = ui.indexOf("titleScreen.addEventListener('click', onTitleClick);", start);
+    const reveal = ui.indexOf("tapMessage.classList.remove('awaiting-init');", bind);
+    assert.ok(start > 0 && bind > start && reveal > bind, '受付登録後のみ操作案内を可視化する');
+    assert.ok(html.includes('<div id="menu-buttons" class="title-menu-buttons hidden">'), '本編メニューは従来の初回タップ後に表示する');
+});
+
+// r681: 初回タイトル表示時に本編用20MBフォントの配信が始まっていた。
+// CSSの正本を遅延読込し、最初のタップ前は軽量subsetのみにする。
+test('r681 本編フォント定義は初回タイトルでは読まず初回タップの共通入口で一度だけ用意する', async () => {
+    const css = read('css/style.css');
+    const gameCss = read('css/game_fonts.css');
+    const bootstrap = read('js/app_bootstrap.js');
+    const html = read('index.html');
+    assert.ok(!css.includes("font-family: 'FudeGoshirae';"), '本編筆書体を初期CSSから除く');
+    assert.ok(!css.includes("font-family: 'abashiri-mincho';\n    src:"), '本編明朝を初期CSSから除く');
+    assert.ok(gameCss.includes("font-family: 'FudeGoshirae';"));
+    assert.ok(gameCss.includes("font-family: 'abashiri-mincho';"));
+    assert.ok(gameCss.includes("../data/fonts/fude-goshirae.woff2?v=1"));
+    assert.ok(gameCss.includes("../data/fonts/abashiri-mincho.woff2?v=1"));
+    assert.ok(!html.includes('css/game_fonts.css'), '初期HTMLで本編書体CSSを取得しない');
+    assert.ok(bootstrap.includes("'title-abashiri-mincho.woff2'"), 'タイトルの先行読込は軽量字体だけ');
+    assert.ok(bootstrap.includes("'title-fude-goshirae.woff2'"));
+    assert.ok(bootstrap.includes("stylesheet.href = 'css/game_fonts.css?v=1'"));
+    assert.ok(bootstrap.includes('const results = await Promise.all(requests.map('), '定義をロード後にゲーム字体をロードする');
+    assert.ok(bootstrap.includes('await document.fonts.ready'), '従来の本編フォント完了境界を維持');
+
+    const start = bootstrap.indexOf('    let gameFontsPromise = null;');
+    const end = bootstrap.indexOf('    window.__ensureGameFontsReady = ensureGameFontsReady;', start);
+    assert.ok(start >= 0 && end > start, '本編のフォントローダーを実ソースから取得');
+    const loaderSource = bootstrap.slice(start, end + '    window.__ensureGameFontsReady = ensureGameFontsReady;'.length);
+
+    let appended = 0;
+    const loadedFonts = [];
+    const doc = {
+        createElement: name => ({ name, href: '', rel: '', onload: null, onerror: null }),
+        head: {
+            appendChild(el) {
+                appended++;
+                assert.strictEqual(el.rel, 'stylesheet');
+                assert.strictEqual(el.href, 'css/game_fonts.css?v=1');
+                setImmediate(() => el.onload());
+            }
+        },
+        fonts: {
+            load: async (spec, characters) => {
+                assert.ok(characters.length > 0);
+                loadedFonts.push(spec);
+                return [{}];
+            },
+            ready: Promise.resolve()
+        }
+    };
+    const context = { window: { __mobileLowMemoryMode: false }, document: doc, console };
+    vm.createContext(context);
+    vm.runInContext(loaderSource, context);
+    assert.strictEqual(appended, 0, '初期化だけでは本編フォント定義を配信しない');
+    assert.strictEqual(loadedFonts.length, 0);
+
+    const first = context.window.__ensureGameFontsReady();
+    const duplicate = context.window.__ensureGameFontsReady();
+    assert.strictEqual(first, duplicate, '連打／共通UI待機は同じ処理を共有');
+    assert.strictEqual(await first, true);
+    assert.strictEqual(appended, 1, '本編CSSは一度だけ追加');
+    assert.strictEqual(loadedFonts.length, 4, '400/700の両書体を既存どおり準備');
+    assert.strictEqual(await context.window.__ensureGameFontsReady(), true);
+    assert.strictEqual(appended, 1, '準備済みなら追加読み込みなし');
+
+    const lightContext = { window: { __mobileLowMemoryMode: true }, document: doc, console };
+    vm.createContext(lightContext);
+    vm.runInContext(loaderSource, lightContext);
+    assert.strictEqual(await lightContext.window.__ensureGameFontsReady(), true);
+    assert.strictEqual(appended, 1, '軽量端末では本編書体を要求しない');
 });
 
 Promise.all(pendingTests).then(() => {

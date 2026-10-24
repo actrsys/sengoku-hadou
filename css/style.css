@@ -24,21 +24,8 @@ button, input, select, textarea, label, a, .cmd-btn, .title-btn, .zoom-btn, .sel
     touch-action: manipulation;
 }
 
-@font-face {
-    font-family: 'FudeGoshirae'; /* プログラムの中で使う「あだ名」です */
-    src: url('../data/fonts/fude-goshirae.woff2?v=1') format('woff2'); /* ファイルへの道順 */
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-}
-@font-face {
-    font-family: 'abashiri-mincho';
-    src: url('../data/fonts/abashiri-mincho.woff2?v=1') format('woff2');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-}
-
+/* 本編2書体の @font-face は初回操作後に css/game_fonts.css から読み込む。
+   タイトル画面では軽量な TitleAbashiri / TitleFude のみを利用する。 */
 /* トップ用は同じ書体の必要字形subset。ゲーム本体の元フォントを変えない。 */
 @font-face {
     font-family: 'TitleAbashiri';
@@ -5979,6 +5966,9 @@ html.mobile-low-memory .legacy-safe-mode-indicator { display: block; }
     0%, 100% { opacity: 0.48; }
     50% { opacity: 1; }
 }
+
+/* 初回パーサー待機中はタイトルの操作案内だけを隠す。領域は保持して画面を動かさない。 */
+.title-tap-message.awaiting-init { visibility: hidden; }
 
 /* ローディング：タイトル画面と同じ素材感で、表示物だけを絞ります。 */
 #global-loading-screen {

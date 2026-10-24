@@ -232,6 +232,8 @@ class UIManager {
                 await this.hideLoadingScreen();
             };
             titleScreen.addEventListener('click', onTitleClick);
+            // 初回タイトルのタップ案内は実際の操作受付が登録された後にだけ表示する。
+            tapMessage.classList.remove('awaiting-init');
         }
         
         document.addEventListener('wheel', (e) => {

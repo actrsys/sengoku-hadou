@@ -187,6 +187,25 @@
     // タイトルのfont familyは軽量な同一書体subsetを使う。ゲーム本体の完全フォントは
     // 初回タップ後に必要な時だけ呼び出す。ロード終了時点では元の全字形が揃う。
     let gameFontsPromise = null;
+    let gameFontStylesPromise = null;
+    function ensureGameFontStylesheet() {
+        if (gameFontStylesPromise) return gameFontStylesPromise;
+        // 本編用の大容量フォント定義は初回タイトルでは配信しない。
+        // 読み込み責務はここ、定義と書体の管理はCSS側に置く。
+        gameFontStylesPromise = new Promise((resolve, reject) => {
+            const stylesheet = document.createElement('link');
+            stylesheet.rel = 'stylesheet';
+            stylesheet.href = 'css/game_fonts.css?v=1';
+            stylesheet.onload = resolve;
+            stylesheet.onerror = () => {
+                stylesheet.remove();
+                gameFontStylesPromise = null;
+                reject(new Error('本編フォントのスタイルシートを取得できませんでした'));
+            };
+            document.head.appendChild(stylesheet);
+        });
+        return gameFontStylesPromise;
+    }
     function ensureGameFontsReady() {
         // 起動時の向きではなく、その時点の表示モードを正本にする。
         // タイトル表示後にタブレットを回転させた場合も、PC表示なら完全書体を
@@ -200,8 +219,10 @@
             ['400 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇'],
             ['700 16px "FudeGoshirae"', '戦国覇道決定取消攻撃内政外交軍団一二三四五六七八九〇']
         ];
-        gameFontsPromise = Promise.all(requests.map(([font, text]) => document.fonts.load(font, text)))
-            .then(async results => {
+        gameFontsPromise = ensureGameFontStylesheet()
+            .then(async () => {
+                // 定義の読み込み完了前にfonts.loadすると空配列が返るため、順序を保証する。
+                const results = await Promise.all(requests.map(([font, text]) => document.fonts.load(font, text)));
                 if (!results.every(faces => Array.isArray(faces) && faces.length > 0)) {
                     throw new Error('ゲーム本体用の書体が見つかりませんでした');
                 }

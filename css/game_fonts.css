@@ -1,0 +1,17 @@
+/* 本編フォントの定義。初回タイトルには読み込まず、app_bootstrap.js が初回操作後に追加する。
+   書体・ファイル・weight・font-displayは元のstyle.cssから変更しない。 */
+@font-face {
+    font-family: 'FudeGoshirae'; /* プログラムの中で使う「あだ名」です */
+    src: url('../data/fonts/fude-goshirae.woff2?v=1') format('woff2'); /* ファイルへの道順 */
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'abashiri-mincho';
+    src: url('../data/fonts/abashiri-mincho.woff2?v=1') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+

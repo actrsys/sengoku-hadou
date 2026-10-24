@@ -1,0 +1,36 @@
+戦国覇道 r682：初回タイトル解析の頭部圧縮ライブラリ待機と案内先行表示を整理
+
+基準版：r681
+
+【通常操作からの到達経路】
+index.htmlの<head>ではtitle DOMが存在する前にpako.min.js（約46KB）を同期取得・実行していた。
+pakoの使用箇所を全JSで確認すると、実行用BINの復号に使うDataManagerのpako.inflateだけであり、
+初回タイトルのフォント・DOM構築には使わない。通常の遅い通信環境では、
+この同期スクリプト待ちでタイトルDOM解析開始が遅れ得る。
+またタイトル用軽量フォントの読込が本編JS一式より早く完了すると、
+HTML上には「Tap or click to proceed.」が見えても、UIManagerの
+初回タイトルclick handlerがまだ登録されておらず、タップが反応しない時間帯が生じ得る。
+
+【変更】
+・pako.min.jsのscriptタグをheadから削除し、script全体の末尾群のDataManagerより前へ移動。
+  依存順序を保ち、遅延動的ロード・追加ネットワーク要求・ライブラリの複製は導入しない。
+・初回のタップ案内だけをawaiting-init状態にし、非表示中もCSS visibilityで領域を予約。
+  UIManagerが初回タイトルclick handlerを登録した直後に表示する。
+・タイトルロゴ／説明や本編メニューの表示条件、アセットとフォント待機、初回タップ後の
+  ロード幕・SE/BGM・保存可否照合は変更しない。
+・GameConfig.Meta.Versionをr682とする。
+
+【範囲と限界】
+・HTML解析先頭から46KBの同期圧縮ライブラリ要求を外すこと、初回操作案内の受付時点を
+  一致させることが目的。60本以上のゲーム本編JSの初回取得／実行自体は残る。
+・初回体感時間の短縮秒数は実回線・実端末では測定していない。
+・Chromeのページ遷移検査は実行環境ポリシーによりlocalhost／file URLが遮断されるため、
+  HTML実読み込みの速度比較は未検証。構文・Nodeロジック・既存の実ブラウザ画面回帰は
+  各テストによって別途確認する。
+・マスターデータ／BIN／セーブ形式／武将・戦闘・内政・AIロジックは変更しない。
+
+【ファイル】
+更新: index.html, css/style.css, js/ui.js, js/config.js,
+      tests/run_tests.js, ARCHITECTURE.md, docs/audits/README.md
+追加: docs/audits/r682_初回タイトル圧縮ライブラリ順と操作案内待機監査記録.txt
+削除: なし

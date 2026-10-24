@@ -1,3 +1,4 @@
+- **r682 初回タイトルのHTML構築はBIN展開用pakoに先行し、未受付の操作案内を表示しない。** `pako.min.js`の唯一の利用先は本編`DataManager`のBIN展開なので、`index.html`のheadから本編スクリプト列（`data_manager.js`より前）へ移し、タイトルDOMを先に解析できるようにする。初回タイトル用フォントが本編JS読み込みより先に揃う通信環境では、従来`Tap or click to proceed.`が表示されても`UIManager`のクリック登録前で反応しない場合があった。タップ案内だけ`awaiting-init`の`visibility:hidden`で領域を保持し、タイトルのクリック登録後に可視化する。タイトル表示書体・初回タップ後のロード幕・BGM・セーブ照合・ゲームルールは変更しない。詳細：`docs/audits/r682_初回タイトル圧縮ライブラリ順と操作案内待機監査記録.txt`。
 - **r680 タイトル画面の保存有無照合は最初の有効セーブで終了する。** タイトル初期表示とタイトル復帰では `UIManager.checkSaveDataForTitle()` から `SaveManager.refreshLoadAvailability()` により、手動5枠・オート5枠の現行スキーマ4とSHA-256を照合している。r679までは先頭に正常な保存があっても同じ手動保存の残り4枠まで全内容を照合し、メインスレッドへ不要な負担をかけていた。ロード可否は存在判定なので、`SaveManager.hasAnyLoadableSaveData()` から `readSaveSlots()` の専用オプション `stopAfterFirstLoadable` を渡し、最初の完全検証済み保存で照合を終了する。破損・旧形式・読込障害の枠は有効保存と見なさず探索を続け、手動に有効枠がなければオートを調べる。`SaveLoadView` の一覧と `continueGame()` は従来の全件照合を維持し、r677/r679の画面世代失効判定も保持。新たなキャッシュ・検証省略・保存形式変更・ゲームルール変更は行わない。詳細：`docs/audits/r680_タイトル保存有無照合の早期終了監査記録.txt`。
 - **r679 タイトル復帰中に画面が失効した場合は残りの保存照合を中止する。** タイトル復帰の `UIManager.returnToTitle()` はターン世代を取得し、`checkSaveDataForTitle({ isCurrent })` に渡しているが、`SaveManager.refreshLoadAvailability()` はこの世代確認を照合完了後にだけ行い、内部の `hasAnyLoadableSaveData()` → `readSaveSlots()` には渡していなかった。保存枠を読み出した後の `setTimeout(0)` 中に新規ゲーム／別のロードへ遷移すると、使われない旧タイトルの残りスロットにSHA-256照合が続く。既存の `isCurrent` を `refreshLoadAvailability()` から `hasAnyLoadableSaveData()`、`readSaveSlots()` へ通し、r677の各枠間の失効判定を再利用する。失効時は `hasSaveData` と画面状態を変更しない。有効なタイトル／他の呼出元では従来どおり手動・オートを確認する。スキーマ4、全内容照合、旧セーブ拒否、ゲームルール、データは変更しない。詳細：`docs/audits/r679_失効タイトル保存確認の照合中止監査記録.txt`。
 - **r678 通常AIが生成する外交辞書0番をセーブ検証が誤拒否しない。** `AIOperationManager._countGrandObjectiveTargets()` は国・地方の攻略目標に空き城（`ownerClan=0`）を含め、`_isNonFriendlyObjectiveOwner()` 経由で `GameManager.getRelation()` を呼ぶ。`DiplomacyManager` の正規の遅延初期化により `Clan.diplomacyValue[0]` が生成されるため、r677の `SaveManager` が外交辞書キーを1以上だけに制限すると、通常プレイのセーブ操作を検証段階で拒否してしまう。`SaveManager` の外交レコード検査に限り、**文字列キー `0`** を許容し、実体がオブジェクトで状態名が文字列・人質名簿が配列という従来の構造検査は維持する。負のID・非数字キーは引き続き拒否する。正常なAI外交評価結果を書き換えたり、セーブ作成時に辞書を加工したりしない。旧セーブ拒否・schema4・SHA-256・ゲームルール・マスターデータは変更しない。詳細：`docs/audits/r678_通常AI外交0番のセーブ誤拒否修正監査記録.txt`。
@@ -2156,3 +2157,10 @@ UI固有の細則、低メモリ端末対策、各Systemの正本は以下の各
 
 - PC地図のマウスドラッグは `UIManager` の地図Viewを正本とする。正常なmouse up/mouse leaveでは既存の慣性・クリック抑止を維持する。Alt+Tab等のwindow blur・document hidden・`mousemove.buttons`が左ボタン無しを示す場合は、中断として押下状態、旧rAF描画予約、grabbing表示と残留速度を解除する。
 - 中断時の操作を通常の解放と同一視して慣性を始めない。非ドラッグ時のblurでは既存の慣性や他画面の操作に干渉しない。詳細は `docs/audits/r536_PC地図ドラッグ入力中断監査記録.txt`。
+
+
+## r681：初回タイトルでの本編Webフォント定義の遅延配信
+
+- r540で採用した「最初のタイトルは軽量字形のみ、本編書体は最初のタップ後のロード幕で確実に準備する」という原則を配信時点でも維持する。初期`css/style.css`から本編用の`@font-face`を外し、定義の正本を`css/game_fonts.css`に移す。タイトル用の`TitleAbashiri`/`TitleFude`の定義、ファイル、フォールバックは従来どおり。
+- 共通`js/app_bootstrap.js`の`__ensureGameFontsReady()`は、本編フォントの定義CSSを一度だけ読み込み、CSSの`load`後に既存の`document.fonts.load`を実行する。画面ごとに個別CSS読込を置かず、並行リクエストと共通幕待ちで同じPromiseを共有する。CSS読込失敗時にはlinkを外して再試行を許容する。
+- 軽量モードの本編フォント非取得、タイトル表示開始までの字形完了待機、本編フォント完成までのロード幕、PC16:9・スマホ9:16、ゲームルール・AI・セーブ形式・元書体ファイルは変更しない。詳細は`docs/audits/r681_初回タイトル本編フォント遅延配信監査記録.txt`。
