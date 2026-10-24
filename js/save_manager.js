@@ -1215,9 +1215,16 @@ class SaveManager {
         return Number(data.saveTimestamp) || 0;
     }
 
-    async hasAnyLoadableSaveData(prefixes = ['sengoku_save_slot', 'sengoku_autosave_slot']) {
+    async hasAnyLoadableSaveData(prefixes = ['sengoku_save_slot', 'sengoku_autosave_slot'], options = {}) {
+        // タイトル画面が失効したら、まだ始めていないSHA-256照合を打ち切る。
+        // UIの世代はUI側の既存isCurrentが正本。一覧表示の全枠照合は変更しない。
+        const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true;
         for (const prefix of prefixes) {
-            const slots = await this.readSaveSlots(prefix);
+            if (!isCurrent()) return false;
+            // ロード可否の確認は存在判定なので、最初の正規セーブを見つけた時点で足りる。
+            // 一覧表示や「続きから」は従来どおり全枠を照合する。
+            const slots = await this.readSaveSlots(prefix, 5, { isCurrent, stopAfterFirstLoadable: true });
+            if (!isCurrent()) return false;
             if (slots.some(slot => slot.hasData)) return true;
         }
         return false;
@@ -1225,7 +1232,7 @@ class SaveManager {
 
     async refreshLoadAvailability(options = {}) {
         const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true;
-        const hasData = await this.hasAnyLoadableSaveData();
+        const hasData = await this.hasAnyLoadableSaveData(undefined, { isCurrent });
         // タイトルの古い確認結果で、新しく作成したセーブや別画面の状態を上書きしない。
         if (!isCurrent()) return null;
         this.game.hasSaveData = hasData;
@@ -1241,6 +1248,7 @@ class SaveManager {
         // まだ実行していない重いSHA-256照合も省略する。
         // タブ切替／一覧終了の判断はViewが所有し、SaveManagerは通知された寿命だけ参照する。
         const isCurrent = typeof options.isCurrent === 'function' ? options.isCurrent : () => true;
+        const stopAfterFirstLoadable = options.stopAfterFirstLoadable === true;
         if (!isCurrent()) return [];
         const rows = await Promise.all(
             Array.from({ length: count }, (_, index) => {
@@ -1277,6 +1285,9 @@ class SaveManager {
                 readError,
                 invalidData
             });
+            // タイトル等の存在判定に限り残りの全量SHA-256を省く。
+            // 現行スキーマ・全内容照合・構造検査を通ったものだけで判定する。
+            if (hasData && stopAfterFirstLoadable) return slots;
         }
         return slots;
     }

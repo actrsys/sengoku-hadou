@@ -449,7 +449,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r678');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r680');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -5251,7 +5251,7 @@ test('SaveManager がスロット読込・保存時刻抽出の公開窓口を�
     assert.ok(source.includes('isLoadableSaveData(data)'));
     assert.ok(source.includes('const hasData = !readError && this.isLoadableSaveData(data);'));
     assert.ok(source.includes('readError'), 'DB読込例外を空きと区別する');
-    assert.ok(source.includes("async hasAnyLoadableSaveData(prefixes = ['sengoku_save_slot', 'sengoku_autosave_slot'])"));
+    assert.ok(source.includes("async hasAnyLoadableSaveData(prefixes = ['sengoku_save_slot', 'sengoku_autosave_slot'], options = {})"));
     assert.ok(source.includes('async refreshLoadAvailability(options = {})'));
 });
 
@@ -29658,6 +29658,112 @@ test('r677 失効したロード一覧は残りのスロット照合を打ち切
     const viewSource = read('js/save_load_view.js');
     assert.ok(viewSource.includes('readSaveSlots(prefix, 5, { isCurrent: isRenderCurrent })'));
     assert.ok(viewSource.includes('readSaveSlots(otherPrefix, 5, { isCurrent: isRenderCurrent })'));
+});
+
+
+// r679: タイトル画面で保存有無を照合している途中に［新しく始める］等へ
+// 遷移したら、失効した旧タイトルの残りスロットで全量SHA-256を回さない。
+// r677と同じ、実UIから渡される表示世代 isCurrent で検証の継続を判断する。
+test('r679 失効したタイトル保存有無確認は未処理スロットの照合を中止する', async () => {
+    let current = true;
+    let verified = 0;
+    let scheduledYields = 0;
+    const ctx = createContext({
+        setTimeout(callback) {
+            scheduledYields++;
+            current = false; // 最初の照合後、タイトルから別画面へ移動した実UIの寿命失効
+            setImmediate(callback);
+        }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    const saver = new ctx.SaveManager({ hasSaveData: true });
+    const rows = new Map();
+    for (const prefix of ['sengoku_save_slot', 'sengoku_autosave_slot']) {
+        for (let i = 1; i <= 5; i++) rows.set(`${prefix}${i}`, { saveSchemaVersion: 4, slotNo: i });
+    }
+    ctx.__r679Slots = rows;
+    vm.runInContext('loadFromDB = async key => __r679Slots.get(key) ?? null;', ctx);
+    saver.isLoadableSaveData = () => { verified++; return false; };
+    assert.strictEqual(await saver.refreshLoadAvailability({ isCurrent: () => current }), null,
+        '旧タイトルの確認結果は更新しない');
+    assert.strictEqual(verified, 1, '切替後の9枠にSHA-256検証を続けない');
+    assert.strictEqual(saver.game.hasSaveData, true, '旧確認は新画面のロード可否を変更しない');
+    assert.strictEqual(scheduledYields, 1, '既存のスロット間の描画機会で失効を検知する');
+
+    // 有効なタイトル確認は従来通り手動・オートの順に全10枠を検証する。
+    const liveCtx = createContext({ setTimeout: callback => setImmediate(callback) });
+    loadScript(liveCtx, 'js/save_manager.js');
+    const liveSaver = new liveCtx.SaveManager({ hasSaveData: true });
+    liveCtx.__r679Slots = rows;
+    vm.runInContext('loadFromDB = async key => __r679Slots.get(key) ?? null;', liveCtx);
+    let liveVerified = 0;
+    liveSaver.isLoadableSaveData = () => { liveVerified++; return false; };
+    assert.strictEqual(await liveSaver.refreshLoadAvailability({ isCurrent: () => true }), false);
+    assert.strictEqual(liveVerified, 10, '最新のタイトルは全10枠を検証する');
+    assert.strictEqual(liveSaver.game.hasSaveData, false, '有効な確認結果だけゲームのフラグへ反映する');
+});
+
+
+// r680: タイトルで必要なのは「復元可能な保存が1件以上あるか」であり、
+// 初めの正常な保存を確認した後、同じ5枠の残りをSHA-256照合する必要はない。
+// 保存一覧と「続きから」は全枠の表示・最新日時が必要なので省略してはならない。
+test('r680 タイトルの保存有無確認は初めの有効枠で照合を終了し一覧は全件確認する', async () => {
+    const ctx = createContext({ TextEncoder, TextDecoder, Uint8Array,
+        setTimeout: callback => setImmediate(callback) });
+    loadScript(ctx, 'js/save_manager.js');
+    const saver = new ctx.SaveManager({hasSaveData: false});
+    const valid = saver._sealSaveData({
+        saveSchemaVersion: 4, saveTimestamp: 1770000000000, saveTime: '2026/10/24 12:00',
+        year: 1570, month: 6, gameStartYear: 1570, gameStartMonth: 6,
+        scenarioFolder: '1570_anegawa', scenarioName: '1570年 姉川', scenarioNo: 'シナリオ2',
+        castles: [{id: 1, ownerClan: 1, castellanId: 10, samuraiIds: [10],
+            _delegatedOverride: null, _allowAttack: true, _allowMove: true}],
+        bushos: [{id: 10, clan: 1, castleId: 1, nemesisList: []}],
+        clans: [{id: 1, leaderId: 10}], princesses: [], provinces: [{id: 1}], legions: [], kunishus: [],
+        turnQueueIds: [1], currentIndex: 0, playerClanId: 1, mapWidth: 100, mapHeight: 100,
+        aiOperations: {operations:{},draftBases:{},grandObjectives:{},historyOwnedCastles:{}},
+        flags: {}, historyEntries: []
+    });
+    assert.strictEqual(saver.isLoadableSaveData(valid), true, '実際の現行スキーマ検査を通る保存');
+    const corrupted = JSON.parse(JSON.stringify(valid));
+    corrupted.castles[0].gold = 999; // 整合の取れない書換えは当然ロード不可
+    const saved = new Map();
+    for (const prefix of ['sengoku_save_slot', 'sengoku_autosave_slot']) {
+        for (let i = 1; i <= 5; i++) saved.set(`${prefix}${i}`, valid);
+    }
+    // 手動スロットは実際のDB保存と同じXORバイナリ、オートはオブジェクト形式。
+    for (let i = 1; i <= 5; i++) saved.set(`sengoku_save_slot${i}`, saver._encryptData(valid));
+    ctx.__r680Saved = saved;
+    vm.runInContext('loadFromDB = async key => __r680Saved.get(key) ?? null;', ctx);
+    const realCheck = saver.isLoadableSaveData.bind(saver);
+    let validated = 0;
+    saver.isLoadableSaveData = data => { validated++; return realCheck(data); };
+
+    assert.strictEqual(await saver.refreshLoadAvailability(), true);
+    assert.strictEqual(validated, 1, '先頭が正常なら1件の照合でタイトルが有効になる');
+    assert.strictEqual(saver.game.hasSaveData, true);
+
+    validated = 0;
+    saved.set('sengoku_save_slot1', corrupted);
+    assert.strictEqual(await saver.refreshLoadAvailability(), true);
+    assert.strictEqual(validated, 2, '破損枠は無視し次の正常枠まで正規照合する');
+
+    validated = 0;
+    const list = await saver.readSaveSlots('sengoku_save_slot');
+    assert.strictEqual(validated, 5, '一覧では全5枠を今までどおり照合する');
+    assert.deepStrictEqual(Array.from(list, slot => slot.hasData), [false,true,true,true,true]);
+
+    validated = 0;
+    for (let i = 1; i <= 5; i++) saved.set(`sengoku_save_slot${i}`, corrupted);
+    for (let i = 1; i <= 5; i++) saved.set(`sengoku_autosave_slot${i}`, corrupted);
+    saved.set('sengoku_autosave_slot3', valid);
+    assert.strictEqual(await saver.refreshLoadAvailability(), true);
+    assert.strictEqual(validated, 8, '手動に正常なものがなければ自動保存を順に探す');
+
+    validated = 0;
+    saved.set('sengoku_autosave_slot3', corrupted);
+    assert.strictEqual(await saver.refreshLoadAvailability(), false);
+    assert.strictEqual(validated, 10, 'すべて破損なら全10件の正規照合でロード不可');
 });
 
 Promise.all(pendingTests).then(() => {

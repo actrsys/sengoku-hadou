@@ -1,0 +1,59 @@
+戦国覇道 r679 タイトル復帰中の失効した保存確認の照合を中止
+
+基準: r678
+変更対象: js/save_manager.js（他はテスト、版番号および監査記録）
+
+通常操作の到達経路:
+UIManager.returnToTitle() は画面をロード幕で覆い、既存の TurnManager の世代を保持して
+checkSaveDataForTitle({ isCurrent: isTitleFlowLatest }) を呼び出す。
+タイトルの保存有無確認は refreshLoadAvailability() → hasAnyLoadableSaveData() → readSaveSlots()
+と進み、手動5件・オート5件の保存内容を検証する。
+r676以降はSHA-256照合の各スロット間にsetTimeout(0)を挟むため、タイトルへ戻った後に
+新規ゲームや別ロードへ遷移すると、前のタイトルの世代が途中で失効しうる。
+旧コードは最終の hasSaveData 更新を抑止する一方、未処理の9件等の照合を続けていた。
+
+修正前再現:
+実 SaveManager を使う通常のタイトル保存確認入口で、1枠目の照合後の既存の
+setTimeout(0) の間に旧タイトルの isCurrent が false になる状況を再現。
+旧コードは失効後も次の手動・オート保存枠の照合を継続し、計10枠を検証する。
+この状態変化はUI・ターン世代の正規の画面遷移を模しており、武将・城等の
+ゲーム内部状態を人工的に矛盾させる検証ではない。
+追加した回帰テストは修正前に1件失敗することを確認した。
+
+改修:
+SaveManager.refreshLoadAvailability() が受け取る既存の isCurrent を
+hasAnyLoadableSaveData() の任意の options へ渡し、さらに各 readSaveSlots()
+の既存オプションへ渡す。タイトル画面寿命の所有者は従来どおり UIManager、
+保存の復号・検証は SaveManager に留める。
+表示世代失効後は残りのSHA-256照合へ進まず、以前の確認結果では
+this.game.hasSaveData を更新しない。
+新しいタイマー・キャッシュ・永続フィールド・二重の照合式は加えない。
+通常の呼出元（オプションなし）は全枠を従来どおり確認する。
+
+確認:
+修正後は失効の再現で先頭1枠の検証のみ行い、旧確認は null で終了し
+hasSaveDataを上書きしなかった。有効なタイトル世代では手動5枠、
+オート5枠の計10件すべてを検証して更新した。
+ロジック回帰テスト1,154件成功、PC/スマホ画面回帰23項目成功。
+管理ExcelとBINの3組の一致、数式検証、シミュレーターの4件、
+JavaScript構文検査および配布元ファイル照合は成功。
+
+保証の境界:
+読み込み済みのIndexedDBリクエストと照合中の単一スロット処理は
+途中キャンセルしない。実ブラウザを介した長時間通しプレイ、
+端末ごとのCPU負荷・体感速度を測定した保証ではない。
+SHA-256を含むセーブデータの構造、旧データの拒否、セーブ/ロードの順序、
+城主不在許容、AI/外交/戦闘/武将・シナリオ・管理ExcelとBIN、音声画像は変更しない。
+
+追加ファイル:
+- docs/audits/r679_失効タイトル保存確認の照合中止監査記録.txt
+
+更新ファイル:
+- ARCHITECTURE.md
+- docs/audits/README.md
+- js/config.js
+- js/save_manager.js
+- tests/run_tests.js
+
+削除ファイル:
+- なし
