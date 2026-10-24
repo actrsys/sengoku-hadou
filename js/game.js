@@ -134,6 +134,18 @@ class GameManager {
         }
     }
 
+    // 正常にタイトル復帰が完了したときだけ、旧ゲームの最後の実機診断を破棄する。
+    // クラッシュ・画面失効時は呼ばず、次回起動で停止位置を確認できるようにする。
+    clearSystemDiagnosticAfterCleanTitleReturn() {
+        try {
+            if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.removeItem('sengoku_ai_last_checkpoint_v1');
+            }
+        } catch (_) {
+            // 診断保存領域のアクセス可否がゲーム遷移を妨げてはならない。
+        }
+    }
+
     writeAIDiagnostic(castle, phase) {
         this.writeSystemDiagnostic(phase, castle);
     }

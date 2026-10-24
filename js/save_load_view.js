@@ -93,10 +93,11 @@ class SaveLoadView {
 
             // 1. 保存形式・復号・IndexedDBアクセスはSaveManagerへ任せます。
             const otherPrefix = prefix === 'sengoku_save_slot' ? 'sengoku_autosave_slot' : 'sengoku_save_slot';
+            // 両タブのSaveManager検証が揃った時点で確定表示する。
+            // 一覧の読込完了後に固定300msを待つ必要はない。
             const [currentSlots, otherSlots] = await Promise.all([
                 this.game.saveManager.readSaveSlots(prefix, 5, { isCurrent: isRenderCurrent }),
-                this.game.saveManager.readSaveSlots(otherPrefix, 5, { isCurrent: isRenderCurrent }),
-                new Promise(resolve => setTimeout(resolve, 300))
+                this.game.saveManager.readSaveSlots(otherPrefix, 5, { isCurrent: isRenderCurrent })
             ]);
             // 途中で別タブへ切り替えた／画面を閉じて開き直した場合、古い結果はDOMへ触れません。
             if (!isRenderCurrent()) return;

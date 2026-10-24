@@ -2802,7 +2802,13 @@ class UIManager {
         // 続けて別の画面へ移る呼出元には、タイトル復帰が有効な世代で
         // 最後まで完了したかを返す。失効した復帰からの後続画面生成を防ぐ。
         const dismissed = await this.hideLoadingScreen();
-        return isTitleFlowLatest() && dismissed !== false;
+        const completed = isTitleFlowLatest() && dismissed !== false;
+        // 画面が正常にタイトルへ戻った場合だけ、前ゲームの実機停止診断を解除する。
+        // 後発ロードや新規開始に遷移を奪われた場合は診断を消さない。
+        if (completed && typeof this.game?.clearSystemDiagnosticAfterCleanTitleReturn === 'function') {
+            this.game.clearSystemDiagnosticAfterCleanTitleReturn();
+        }
+        return completed;
     }
     
     // ★ ここをごっそり差し替え！：大名選択の確認画面を、ギュッと小さくコンパクトにする魔法です！

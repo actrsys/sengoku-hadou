@@ -451,7 +451,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r682');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r684');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -21326,6 +21326,70 @@ function makeR524SlotSelection(mode) {
     return {game, view, select};
 }
 
+// r684: 読込完了済みのロード一覧とタブ切替には固定の待機時間を追加しない。
+// 300ms timerを実際には発火させない環境でも、実データ到着後に一覧が描画できることを確認する。
+test('r684 ロード一覧の表示とタブ切替は保存検査完了後に固定300msを待たない', async () => {
+    const timers = [];
+    const elements = new Map();
+    const makeElement = id => {
+        const el = {
+            id, classList: new FakeClassList(), children: [], disabled: false,
+            style: {}, appendChild(child) { this.children.push(child); },
+            set innerHTML(value) { this._html = value; this.children = []; },
+            get innerHTML() { return this._html || ''; },
+            set innerText(value) { this._text = value; }
+        };
+        return el;
+    };
+    for (const id of ['saveload-modal', 'saveload-title', 'saveload-list',
+        'saveload-tabs', 'saveload-tab-manual', 'saveload-tab-auto']) {
+        elements.set(id, makeElement(id));
+    }
+    const ctx = createContext({
+        document: {
+            body: {classList: new FakeClassList(['is-pc'])},
+            getElementById: id => elements.get(id) || null,
+            createElement: () => makeElement('new')
+        },
+        setTimeout: (callback, delay) => { timers.push(delay); return 1; },
+        requestAnimationFrame: callback => { callback(); return 1; }
+    });
+    loadScript(ctx, 'js/save_load_view.js');
+    const prefixes = [];
+    const game = {
+        saveManager: {
+            async readSaveSlots(prefix) {
+                prefixes.push(prefix);
+                return Array.from({length: 5}, (_, i) => ({
+                    originalSlotNo: i + 1, data: null, saveTimestamp: 0,
+                    hasData: false, readError: false, invalidData: false
+                }));
+            }
+        }
+    };
+    const view = new ctx.SaveLoadView({updateCustomScrollbars() {}}, game);
+    const list = elements.get('saveload-list');
+    const finishMicrotasks = async () => {
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+    };
+    await view.open('load');
+    await finishMicrotasks();
+    assert.strictEqual(list.children.length, 5);
+    assert.ok(list.children.every(row => row.innerHTML.includes('NO DATA')),
+        '手動一覧の照合結果を固定タイマーなしで描画する');
+    elements.get('saveload-tab-auto').onclick();
+    await finishMicrotasks();
+    assert.strictEqual(list.children.length, 5);
+    assert.ok(list.children.every(row => row.innerHTML.includes('NO DATA')),
+        'オート一覧も固定タイマーなしで描画する');
+    assert.deepStrictEqual(prefixes, [
+        'sengoku_save_slot', 'sengoku_autosave_slot',
+        'sengoku_autosave_slot', 'sengoku_save_slot'
+    ]);
+    assert.ok(!timers.some(delay => Number(delay) >= 300),
+        '安全確認に使わない固定300ms待機を新たに挟まない');
+});
+
 test('r524 旧シナリオのセーブ確認は新シナリオを保存しない', async () => {
     const {game, select} = makeR524SlotSelection('save');
     const accept = await select();
@@ -29859,6 +29923,62 @@ test('r681 本編フォント定義は初回タイトルでは読まず初回タ
     vm.runInContext(loaderSource, lightContext);
     assert.strictEqual(await lightContext.window.__ensureGameFontsReady(), true);
     assert.strictEqual(appended, 1, '軽量端末では本編書体を要求しない');
+});
+
+
+test('r683 正常なタイトル復帰だけが旧ゲームの実機停止診断を消し、失効・未完了時は保持する', async () => {
+    const entries = new Map();
+    const sessionStorage = {
+        getItem(key) { return entries.has(key) ? entries.get(key) : null; },
+        setItem(key, value) { entries.set(key, String(value)); },
+        removeItem(key) { entries.delete(key); }
+    };
+    const context = createContext({
+        sessionStorage, addEventListener() {},
+        document: { body: { classList: { contains: () => false } } }
+    });
+    vm.runInContext(`${read('js/game.js')}\nwindow.__GameManager = GameManager;`, context);
+    vm.runInContext(`${read('js/ui.js')}\nwindow.__UIManager = UIManager;`, context);
+    const game = Object.create(context.__GameManager.prototype);
+    game.phase = 'game';
+    game.year = 1560;
+    game.month = 5;
+    game.currentIndex = 0;
+    game.turnQueue = [];
+    game.writeSystemDiagnostic('ui:modal:busho');
+    assert.ok(sessionStorage.getItem('sengoku_ai_last_checkpoint_v1'), '通常操作によって停止診断が記録される');
+
+    let generation = 0;
+    game.turnManager = {
+        abortForScenarioTransition() { generation++; },
+        captureTurnFlowGeneration() { return generation; },
+        isTurnFlowGenerationLatest(value) { return value === generation; }
+    };
+    const ui = Object.create(context.__UIManager.prototype);
+    ui.game = game;
+    ui.showLoadingScreen = () => {};
+    ui.updateLoadingProgress = () => {};
+    ui.waitForNextPaint = async () => {};
+    ui.forceResetModals = () => {};
+    ui.resetMapViewState = () => {};
+    ui.showTitleSurface = () => {};
+    ui.checkSaveDataForTitle = async () => {};
+    ui.hideLoadingScreen = async () => true;
+    assert.strictEqual(await ui.returnToTitle(), true);
+    assert.strictEqual(sessionStorage.getItem('sengoku_ai_last_checkpoint_v1'), null,
+        '正常にタイトルへ戻れた後のリロードでは古い停止診断が復活しない');
+
+    sessionStorage.setItem('sengoku_ai_last_checkpoint_v1', '未完了の診断');
+    ui.hideLoadingScreen = async () => false;
+    assert.strictEqual(await ui.returnToTitle(), false);
+    assert.strictEqual(sessionStorage.getItem('sengoku_ai_last_checkpoint_v1'), '未完了の診断',
+        'ロード幕が未完了なら診断を残す');
+
+    sessionStorage.setItem('sengoku_ai_last_checkpoint_v1', '失効した遷移の診断');
+    ui.hideLoadingScreen = async () => { generation++; return true; };
+    assert.strictEqual(await ui.returnToTitle(), false);
+    assert.strictEqual(sessionStorage.getItem('sengoku_ai_last_checkpoint_v1'), '失効した遷移の診断',
+        '後発遷移が開始した場合は古いタイトル復帰から診断を消さない');
 });
 
 Promise.all(pendingTests).then(() => {

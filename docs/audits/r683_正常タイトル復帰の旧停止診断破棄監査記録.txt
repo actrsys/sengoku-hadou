@@ -1,0 +1,36 @@
+戦国覇道 r683：正常タイトル復帰後の旧実機停止診断を破棄
+基準版：r682完全版
+
+【通常操作での再現】
+1. スマホで通常ゲームを開始し、武将情報などの画面を操作する。
+2. GameManager.writeSystemDiagnostic() が最後の操作位置を sessionStorage の
+   sengoku_ai_last_checkpoint_v1 に記録する。
+3. ゲーム内のシステムコマンドなど通常経路からタイトルへ正常復帰する。
+4. 同一タブでページを更新する。
+5. r682では上記キーが残っているので、GameManager._showPreviousAIDiagnostic() が
+   正常終了前の「ui:...」を前回停止位置として表示し得る。
+   保存は実際の停止・クラッシュに限られていないため、表示の意味と異なる。
+
+【改修】
+・診断書込の所有者GameManagerに、正常なタイトル復帰だけで呼ぶ
+  clearSystemDiagnosticAfterCleanTitleReturn() を設ける。
+・UIManager.returnToTitle() では既存のTurnManager世代確認と共通ロード幕の
+  正常完了が両方成立した場合だけ、この診断クリアを呼ぶ。
+・sessionStorage が無効な環境で例外が発生してもタイトル復帰は妨げない。
+・モーダル・セーブ・ゲームルールやゲーム本編の状態は変更しない。
+・Rendererが正常復帰できなかった場合の診断は残し、失効済みの旧タイトル復帰から
+  後発ロード／新規開始の診断を勝手に消さない。
+・武将一覧→詳細専用localStorageの永続診断の正本はUIInfoManagerが維持する。
+
+【テスト】
+・ゲーム本体メソッドで実際にスマホ診断をsessionStorageへ書き込み、
+  UIManager.returnToTitle() 正常完了後にキーが消えることを確認する。
+・ロード幕が未完了の場合、後発遷移で世代が失効した場合は
+  同じキーが維持されることを確認する。
+・通常時の実機停止診断記録は無変更。
+
+【変更ファイル】
+js/game.js、js/ui.js、js/config.js、tests/run_tests.js、
+ARCHITECTURE.md、docs/audits/README.md
+追加：docs/audits/r683_正常タイトル復帰の旧停止診断破棄監査記録.txt
+削除：なし
