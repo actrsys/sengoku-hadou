@@ -187,6 +187,14 @@ const CAN_EXECUTE_RULES = {
     hasGold200: (game, castle) => {
         return castle.gold >= 200;
     },
+    // 対外婚姻は、地図上の対象候補と相手家の婿候補一覧で同じ資格を使う。
+    // 家中婚姻の「非大名」条件とは異なり、相手大名本人も男性なら候補になる。
+    isForeignMarriageGroomCandidate: (b, targetLeader) => {
+        if (!window.BushoStatusRules.isActive(b) || b.female) return false;
+        const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
+        const lFamily = Array.isArray(targetLeader.familyIds) ? targetLeader.familyIds : [];
+        return b.id === targetLeader.id || bFamily.includes(targetLeader.id) || lFamily.includes(b.id);
+    },
     // 婚姻の姫選択画面と同じ「大名一門の未婚姫」だけを実行候補とする。
     // 滅亡勢力から引き取った姫が一門でなければ、名簿に載っても候補には出ない。
     hasSelectableMarriagePrincess: (game) => {

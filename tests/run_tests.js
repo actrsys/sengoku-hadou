@@ -451,7 +451,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r684');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r685');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -29979,6 +29979,89 @@ test('r683 正常なタイトル復帰だけが旧ゲームの実機停止診断
     assert.strictEqual(await ui.returnToTitle(), false);
     assert.strictEqual(sessionStorage.getItem('sengoku_ai_last_checkpoint_v1'), '失効した遷移の診断',
         '後発遷移が開始した場合は古いタイトル復帰から診断を消さない');
+});
+
+
+// r685: 1570年実シナリオの足利家では通常の死亡継承で女性当主が生まれ得る。
+// その後、登場済みの男性一門がいない時期の対外婚姻先は空候補へ進めない。
+test('r685 史実データの女性当主継承後は婿候補ゼロの婚姻先を選択不可にする', async () => {
+    const { common, scenario } = getRuntimeData('1570_anegawa');
+    const states = new Map(scenario.warriorsState.map(row => [Number(row.id), row]));
+    const princessStates = new Map(scenario.princessState.map(row => [Number(row.id), row]));
+    const bushos = common.warriorsMaster.map(master => {
+        const row = { ...master, ...(states.get(Number(master.id)) || {}) };
+        row.adoptiveFatherId = Number(row.adoptiveFather || 0);
+        row.wifeIds = String(row.wife || '').split('|').map(Number).filter(Boolean);
+        row.clan = Number(row.clan || 0);
+        row.isNotBorn = Number(row.birthYear) > 1582;
+        row.status = row.startYear > 1582 ? 'unborn' : row.endYear <= 1582 ? 'dead' : 'active';
+        return row;
+    });
+    const princesses = common.princessMaster.map(master => ({
+        ...master, ...(princessStates.get(Number(master.id)) || {}),
+        adoptiveFatherId: 0, husbandId: Number(princessStates.get(Number(master.id))?.husbandId || 0)
+    }));
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active', UNBORN: 'unborn', DEAD: 'dead', RONIN: 'ronin' } },
+        BushoStatusRules: { isActive: b => b && b.status === 'active', isRonin: b => b && b.status === 'ronin' },
+        LifeStatusRules: { isUnborn: b => b && b.status === 'unborn' },
+        StatPresenter: { getPerceivedStatValue: (b, key) => b[key] || 0 }
+    });
+    loadScript(ctx, 'js/family_system.js');
+    loadScript(ctx, 'js/life_system.js');
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/command_system.js');
+    vm.runInContext('FamilyLinker', ctx).rebuildAllFamilyIds(bushos, princesses);
+    const byId = new Map(bushos.map(b => [Number(b.id), b]));
+    const leader = byId.get(1091006); // 足利義氏（1570年シナリオ開始時の足利家当主）
+    const lifeGame = {
+        year: 1582, playerClanId: 3, bushos,
+        getClanCastles: clanId => Number(clanId) === 91 ? [{ id: 235 }] : [],
+        getClanBushos: clanId => bushos.filter(b => Number(b.clan) === Number(clanId)),
+        getClan: clanId => ({ id: clanId, name: '足利家' }),
+        getBusho: id => byId.get(Number(id)),
+        ui: { log() {}, showDialogAsync: async () => {} }
+    };
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const life = new Life(lifeGame);
+    let heiress = null;
+    // 後継者選定ロジックは本物。継承先の移動と改名はこのテストの範囲外。
+    life.setupNewDaimyo = (_former, successor) => { heiress = successor; successor.isDaimyo = true; successor.status = 'active'; };
+    await life.handleDaimyoDeath(leader);
+    assert.strictEqual(heiress && heiress.id, 1091007, '正規のAI家督継承で足利徳が選ばれる');
+
+    // 1585年までに足利輝氏が死亡し、喜連川頼氏の登場は1592年。
+    // 死亡は実際の毎月の確率判定で発生しうるため、この経過は通常進行で到達可能。
+    for (const b of bushos) {
+        if (b.id === heiress.id) continue;
+        b.status = b.startYear > 1585 ? 'unborn' : b.endYear <= 1585 ? 'dead' : 'active';
+    }
+    heiress.status = 'active';
+    const playerPrincess = princesses.find(p => Number(p.id) === 4); // 武田家の菊
+    assert.ok(playerPrincess && playerPrincess.status === 'unmarried');
+    const playerDaimyo = byId.get(1002003);
+    const ashikagaCastle = { id: 235, ownerClan: 91 };
+    const home = { id: 10, ownerClan: 3, gold: 5000, rice: 5000 };
+    const game = {
+        playerClanId: 3, castles: [home, ashikagaCastle],
+        getCastle: id => [home, ashikagaCastle].find(c => Number(c.id) === Number(id)),
+        getCurrentTurnCastle: () => home,
+        getClan: id => id === 91 ? { id: 91, leaderId: heiress.id } : { id: 3, leaderId: playerDaimyo.id, princessIds: [4] },
+        getClanDaimyo: id => Number(id) === 91 ? heiress : playerDaimyo,
+        getBusho: id => byId.get(Number(id)),
+        getClanBushos: id => bushos.filter(b => Number(b.clan) === Number(id)),
+        getPrincess: id => Number(id) === 4 ? playerPrincess : undefined,
+        getClanGunshi: () => null
+    };
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const command = new Command(game);
+    const groomIds = command.getBushoSelectorData('marriage_kinsman', 235, {}, home).bushos.map(b => b.id);
+    assert.deepStrictEqual(groomIds, [], '足利家に現役の男性一門がいないと婿候補は空');
+    assert.ok(!command.getValidTargets('marriage').includes(235), '空候補になる外交婚姻先を地図で光らせない');
+    // 対照：男性一門が実在する状態は従来どおり婚姻先として選べる。
+    byId.get(1091010).status = 'active';
+    assert.ok(command.getBushoSelectorData('marriage_kinsman', 235, {}, home).bushos.some(b => b.id === 1091010));
+    assert.ok(command.getValidTargets('marriage').includes(235));
 });
 
 Promise.all(pendingTests).then(() => {

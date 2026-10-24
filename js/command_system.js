@@ -193,13 +193,8 @@ class CommandSystem {
             const targetLeaderId = this.game.getClan(targetClanId)?.leaderId;
             const targetLeader = this.game.getBusho(targetLeaderId);
             
-            bushos = this.game.getClanBushos(targetClanId).filter(b => {
-                if (!window.BushoStatusRules.isActive(b) || b.female) return false;
-                // 大名本人か、直接の血縁（お互いのリストに直接IDが含まれている）かをチェックします
-                const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
-                const lFamily = Array.isArray(targetLeader.familyIds) ? targetLeader.familyIds : [];
-                return b.id === targetLeader.id || bFamily.includes(targetLeader.id) || lFamily.includes(b.id);
-            });
+            bushos = this.game.getClanBushos(targetClanId).filter(b =>
+                CAN_EXECUTE_RULES.isForeignMarriageGroomCandidate(b, targetLeader));
             infoHtml = "<div>姫を嫁がせる相手を選択してください</div>";
             isMulti = false;
         }
@@ -697,14 +692,9 @@ class CommandSystem {
                     const targetLeaderId = this.game.getClan(target.ownerClan)?.leaderId;
                     const targetLeader = this.game.getBusho(targetLeaderId);
                     if (targetLeader) {
-                        // 相手の家の一門武将を探します
-                        const kinsmen = this.game.getClanBushos(target.ownerClan).filter(b => {
-                            if (!window.BushoStatusRules.isActive(b)) return false;
-                            const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
-                            const lFamily = Array.isArray(targetLeader.familyIds) ? targetLeader.familyIds : [];
-                            return b.id === targetLeader.id || bFamily.includes(targetLeader.id) || lFamily.includes(b.id);
-                        });
-                        if (kinsmen.length > 0) return true; // 一門武将がいればOK（光らせる）！
+                        // 婿候補画面と同じ「現役・男性・相手当主の一門」を正本にする。
+                        if (this.game.getClanBushos(target.ownerClan).some(b =>
+                            CAN_EXECUTE_RULES.isForeignMarriageGroomCandidate(b, targetLeader))) return true;
                     }
                     return false;
                 }).map(t => t.id); // 最後にIDだけのリストにして返します
