@@ -1,0 +1,24 @@
+# 戦国覇道 r687：初回タイトル表示前の独立ロード画面監査
+
+基準：r686完全版ZIP。設計正本：ARCHITECTURE.md の責務分離、PC16:9・スマホ9:16、初回タイトルの軽量書体、本編フォントは初回タップ後に読込、ゲーム本編ロード幕はUIManagerが管理。
+
+【実際の問題】
+ページの最初の表示前に css/style.css（約300KiB）等のCSSと大量の同期<script>を読み込み、さらに html.fonts-loading body {visibility:hidden} が画面全体を非表示にする。従来の #global-loading-screen はゲーム本体DOM内にあり、タイトル初回起動時はhiddenのため、初回のフォント・スクリプト・CSS待機中に表示できない。通信やJS実行の負荷が大きい環境では、黒画面が続くか、操作できないまま固まったように見える。
+
+【修正方針・実装】
+・index.html冒頭に文字と進行表示だけの独立した #startup-loading-screen を追加し、最小限のCSSをheadに直接置く。本編CSSやWebフォントの完了を待たずに、HTML解析後すぐ描画できる。既存の本編ロード幕は変更しない。
+・index.htmlのscript一覧はtemplate内にそのまま依存順で保持し、新規js/startup_loader.jsだけをパーサー経由で実行する。最初のpaint機会を確保してから本編CSSを取得し、その後JSを順序保証(async=false)付きの小バッチでロードする。バッチ間は次のpaintへ制御を戻す。DOMContentLoaded後に読み込んだ場合は app_bootstrap / ui_settings / game の各既存初期化関数を一度だけ呼ぶ。
+・タイトル専用フォントと本編専用フォントの責務は現状維持。ロード画面はOS標準書体のみ。ゲーム本体の本編フォント（約20MiB）を初回タイトルで要求しない。
+・GameConfigが遅延ロードされた後の版番号表示もapp_bootstrap.jsの共通処理を使う。CSS/JS取得失敗時だけ再読み込みを案内し、進行不可能な黒画面を避ける。
+・ゲームデータ、AI、内政・戦闘、セーブ形式、画面寸法、タイトルの意匠は変更しない。
+
+【検証】
+・Nodeロジック自動テスト：r687初回ロード責務の回帰テストを追加し、従来の全テストとともに実行。
+・PC/スマホの既存実ブラウザ画面回帰を実行。
+・Chromiumの管理者制限でローカルURLへの直接遷移がブロックされたため、同一配布ファイルをブラウザのabout:blank上に読み込み、静的アセットをローカルから応答する代替検証を実施。この検証では実際のCSPメタを除去しており、本番サイトと完全同一条件ではない。PC/スマホ双方でCSS配信を遅延させても初回ロード幕が先に表示され、その後タイトルのタップ操作でメニューを開けた。フォント待機中のbody:hiddenでも独立幕が見えること、CSS読込失敗時に再読み込み案内が出ることも確認。
+・初回表示までの実機実回線の秒数、長い同期JSの途中の応答性、総ロード所要時間の改善量までは未測定。描画の先行と総読み込み高速化は別の問題である。
+
+【変更ファイル】
+追加：js/startup_loader.js、docs/audits/r687_初回タイトル表示前の独立ロード画面監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、index.html、js/app_bootstrap.js、js/ui_settings.js、js/game.js、js/config.js、tests/run_tests.js
+削除：なし

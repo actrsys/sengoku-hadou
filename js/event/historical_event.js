@@ -3243,6 +3243,9 @@ window.GameEvents.push({
         const nagayasuCastle = game.getCastle(nagayasu.castleId);
         if (nagayasuCastle) {
             window.EventAction.appointCastellan(game, nagayasu, nagayasuCastle);
+            // この史実イベントは通常の家督継承を経由しないため、正式な本拠移転もここで確定する。
+            // 一時在城とは区別して保持する Clan.homeCastleId のみを新当主の居城に合わせる。
+            if (miyoshiClan) miyoshiClan.homeCastleId = Number(nagayasuCastle.id);
         }
 
         // ③ 三好義継の貢献度（功績）を0にします

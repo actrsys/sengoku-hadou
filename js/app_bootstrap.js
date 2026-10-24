@@ -292,6 +292,9 @@
         element.classList.remove('hidden');
     }
 
+    // 遅延起動時、config.js 読込完了後の版表示も起動担当に委譲する。
+    window.__refreshTitleVersion = renderTitleVersion;
+
     function renderDisplayModeIndicator() {
         const element = document.getElementById('legacy-safe-mode-indicator');
         if (!element) return;
@@ -562,7 +565,8 @@
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', scheduleResizeGameScreen, { passive: true });
     }
-    window.addEventListener('DOMContentLoaded', initializeDomBindings, { once: true });
+    if (document.readyState === 'interactive' || document.readyState === 'complete') initializeDomBindings();
+    else window.addEventListener('DOMContentLoaded', initializeDomBindings, { once: true });
     window.addEventListener('beforeunload', (event) => {
         event.preventDefault();
         event.returnValue = '';

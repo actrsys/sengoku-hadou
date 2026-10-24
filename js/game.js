@@ -1602,7 +1602,7 @@ class GameManager {
 
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+function initializeGameApp() {
     // 右クリックのゲーム内操作・ネイティブ入力保護は UIManager.initContextMenu に一本化する。
     // ここで一律に抑止すると、検索欄のコピー／貼り付けメニューまで失われる。
     document.addEventListener('touchmove', (e) => {
@@ -1612,4 +1612,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }, { passive: false });
 
     window.GameApp = new GameManager();
-});
+ }
+if (typeof document !== 'undefined' && (document.readyState === 'interactive' || document.readyState === 'complete')) initializeGameApp();
+else window.addEventListener('DOMContentLoaded', initializeGameApp, { once: true });

@@ -451,7 +451,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r685');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r687');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -28124,7 +28124,7 @@ test('r642 三好義継追放は後任不足でも成立し、補充可能なら
                 { id: 14, name: '石成友通居城', ownerClan: 1, castellanId: tomomichi.id, samuraiIds: [tomomichi.id], legionId: 0 }
             ] : [])
         ];
-        const clans = [{ id: 1, name: '三好家', leaderId: yoshitsugu.id, princessIds: [] },
+        const clans = [{ id: 1, name: '三好家', leaderId: yoshitsugu.id, homeCastleId: 10, princessIds: [] },
             { id: 2, name: '松永家', leaderId: hisahide.id, princessIds: [] }];
         const game = { year: 1567, month: 7, playerClanId: 99, castles, clans, bushos, legions: [],
             ui: { log() {}, renderMap() {}, async showDialogAsync() {} },
@@ -28154,6 +28154,8 @@ test('r642 三好義継追放は後任不足でも成立し、補充可能なら
     assert.strictEqual(spare.masakatsu.castleId, 10, '正規の移動窓口で旧城へ着任');
     assert.strictEqual(spare.game.getCastle(11).castellanId, spare.nagayasu.id, '別城の新当主は引き続き城主');
     assert.strictEqual(spare.clans[0].leaderId, spare.nagayasu.id, '家督交代は成立');
+    assert.strictEqual(spare.clans[0].homeCastleId, spare.nagayasu.castleId,
+        '追放イベントの正式な当主交代では本拠も長逸の居城へ移る');
     assert.strictEqual(spare.yoshitsugu.clan, 2, '旧当主は松永家へ保護');
     const noSpare = setup('noSpare');
     assert.strictEqual(noSpare.event.checkCondition(noSpare.game), true,
@@ -30062,6 +30064,46 @@ test('r685 史実データの女性当主継承後は婿候補ゼロの婚姻先
     byId.get(1091010).status = 'active';
     assert.ok(command.getBushoSelectorData('marriage_kinsman', 235, {}, home).bushos.some(b => b.id === 1091010));
     assert.ok(command.getValidTargets('marriage').includes(235));
+});
+
+// r687: 本編を読み始める前に実描画可能なロード幕を表示する。
+// 通常のscript順はtemplateを唯一の正本とし、動的注入時に追い越させない。
+test('r687 初回ページにCSS・本編JSより前の独立ロード幕と遅延起動経路がある', () => {
+    const html = read('index.html');
+    const loader = read('js/startup_loader.js');
+    const start = html.indexOf('<template id="startup-script-manifest">');
+    const end = html.indexOf('</template>', start);
+    const splash = html.indexOf('<div id="startup-loading-screen"');
+    const screen = html.indexOf('<div id="game-screen">');
+    const activeLoader = html.lastIndexOf('<script src="js/startup_loader.js"></script>');
+    assert.ok(splash > html.indexOf('<body>') && splash < screen, '本体DOMより先に初回ロード画面を配置');
+    assert.ok(start > screen && end > start && activeLoader > end, '本体用scriptは非実行template内');
+    assert.ok(!html.includes('<link rel="stylesheet" href="css/style.css">'), '本編CSSで初回描画を止めない');
+    assert.ok(!html.includes('<link rel="stylesheet" href="css/animation.css">'));
+    assert.ok(html.includes('#startup-loading-screen { position: fixed;') && html.includes('visibility: visible !important;'),
+        'フォント待機でbodyがhiddenでも、初回ロード幕だけは可視');
+    const manifest = html.slice(start, end);
+    const files = [...manifest.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
+    assert.strictEqual(files[0], 'js/user_settings.js');
+    assert.strictEqual(files[1], 'js/app_bootstrap.js');
+    assert.ok(files.indexOf('js/config.js') < files.indexOf('js/game.js'));
+    assert.ok(files.indexOf('js/pako.min.js') < files.indexOf('js/data_manager.js'));
+    assert.strictEqual(files[files.length - 1], 'js/game.js');
+    assert.strictEqual(new Set(files).size, files.length, '起動scriptを二重読込しない');
+    assert.strictEqual(html.slice(0, start).match(/<script\s+[^>]*src=/g), null,
+        'ロード入口以外で本編スクリプトを先行実行しない');
+    assert.ok(loader.includes('await givePaintOpportunity();') && loader.includes("loadStylesheet('css/style.css')"));
+    assert.ok(loader.includes('element.async = false;'), '動的scriptの実行順序を保証する');
+    assert.ok(loader.includes('await Promise.all(batch.map(loadScript));'), '各batchが終わってから次の依存を読む');
+    assert.ok(loader.includes('await window.__titleFontLoadPromise;'), 'タイトル書体の準備完了後に公開');
+    assert.ok(loader.includes('overlay.hidden = true;'), '起動完了までは幕を保持');
+    assert.ok(loader.includes('retry.hidden = false;'), 'CSS/JS取得失敗は再読み込みへ復旧可能');
+    assert.ok(read('js/game.js').includes("document.readyState === 'complete')) initializeGameApp()"),
+        'DOMContentLoaded後の遅延script読込でもGameManagerを起動する');
+    assert.ok(read('js/ui_settings.js').includes("document.readyState === 'complete') initializeSettingsUi()"),
+        'DOMContentLoaded後でも設定UIを登録する');
+    assert.ok(read('js/app_bootstrap.js').includes('window.__refreshTitleVersion = renderTitleVersion;'),
+        '遅延のGameConfig読込完了後も版番号の正本はbootstrapが維持する');
 });
 
 Promise.all(pendingTests).then(() => {

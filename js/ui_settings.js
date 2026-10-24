@@ -4,7 +4,7 @@
  * 設定値の保存・正本は UserSettings、音量反映は AudioManager に任せる。
  */
 
-document.addEventListener('DOMContentLoaded', () => {
+function initializeSettingsUi() {
     const settings = window.UserSettings;
 
     // スマホ設定画面は表示だけを2タブに分ける。設定値の正本・保存処理は従来どおりUserSettingsに委譲する。
@@ -135,4 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         observer.observe(settingsModal, { attributes: true, attributeFilter: ['class'] });
     }
-});
+ }
+if (document.readyState === 'interactive' || document.readyState === 'complete') initializeSettingsUi();
+else document.addEventListener('DOMContentLoaded', initializeSettingsUi, { once: true });
