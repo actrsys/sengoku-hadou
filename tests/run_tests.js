@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r696');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r697');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1113,6 +1113,114 @@ test('人質の脱走は実家所属まで復元し、拘束継続時は通常�
     assert.strictEqual(capture.hostage.castleId, 22, '拘束先の城は捕虜処遇まで維持する');
     assert.strictEqual(capture.hostage.isHostage, false);
     assert.strictEqual(capture.hostage.originalClanId, undefined);
+});
+
+// r697: 月末の正規和睦期限満了は、明示的な断交と同じ処遇正本を使用する。
+// 実際の和睦status設定→正規人質受入→月末6回のメソッドを通す。
+test('r697 和睦満了で敵対へ戻ると人質は通常の断交同様に帰還し重複処遇しない', async () => {
+    const mockMath = Object.create(Math);
+    mockMath.random = () => 0; // 正規の脱走判定で帰還する経路
+    const ctx = createContext({ Math: mockMath });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    const hostage = { id: 31, name: '人質役', clan: 1, castleId: 11, status: 'active', strength: 40 };
+    const leader = { id: 32, clan: 2, castleId: 22, status: 'active' };
+    const castles = [{ id: 11, ownerClan: 1 }, { id: 22, ownerClan: 2 }];
+    const clans = [{ id: 1, diplomacyValue: {} }, { id: 2, diplomacyValue: {} }];
+    const dialogs = [];
+    const game = {
+        clans, castles, bushos: [hostage, leader], princesses: [], playerClanId: 1,
+        getClan(id) { return clans.find(c => c.id === Number(id)); },
+        getClanCastles(id) { return castles.filter(c => c.ownerClan === Number(id)); },
+        getBusho(id) { return this.bushos.find(b => b.id === Number(id)); },
+        getClanDaimyo(id) { return Number(id) === 2 ? leader : null; },
+        affiliationSystem: {
+            joinClan(b, clanId, castleId) { b.clan = clanId; b.castleId = castleId; },
+            setClanIdRaw(b, clanId) { b.clan = clanId; },
+            moveCastle(b, castleId) { b.castleId = castleId; },
+            becomeRonin(b) { b.clan = 0; b.status = 'ronin'; }
+        },
+        ui: {
+            log(msg) { dialogs.push('history:' + msg); },
+            async showDialogAsync(msg) { dialogs.push('dialog:' + msg); }
+        }
+    };
+    ctx.game = game;
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+    manager.changeStatus(1, 2, '和睦', 6);
+    manager.setSentimentAbsolute(1, 2, 20);
+    manager.applyHostageData(hostage.id, 1, 2);
+    assert.strictEqual(hostage.isHostage, true);
+    assert.strictEqual(hostage.clan, 2);
+    assert.deepStrictEqual(Array.from(manager.getRelation(1, 2).hostageIds), [31]);
+    for (let i = 0; i < 5; i++) await manager.processEndMonth();
+    assert.strictEqual(hostage.isHostage, true, '和睦期間中は人質を保持');
+    assert.strictEqual(manager.getRelation(1, 2).trucePeriod, 1);
+    await manager.processEndMonth();
+    assert.strictEqual(manager.getRelation(1, 2).status, '敵対');
+    assert.strictEqual(manager.getRelation(2, 1).status, '敵対');
+    assert.strictEqual(hostage.isHostage, false, '敵対化した時点で人質でなくなる');
+    assert.strictEqual(hostage.clan, 1, '脱走成功した人質は元の家へ帰る');
+    assert.strictEqual(hostage.castleId, 11);
+    assert.deepStrictEqual(Array.from(manager.getRelation(1, 2).hostageIds), []);
+    assert.deepStrictEqual(Array.from(manager.getRelation(2, 1).hostageIds), []);
+    const count = dialogs.length;
+    await manager.processEndMonth();
+    assert.strictEqual(dialogs.length, count, '次月は二重処遇しない');
+});
+
+test('r697 和睦満了で敵対化した人質が拘束された場合は捕虜処遇へ一度だけ移る', async () => {
+    const mockMath = Object.create(Math);
+    mockMath.random = () => 0.99; // 正規の拘束判定
+    const ctx = createContext({ Math: mockMath });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    const hostage = { id: 51, name: '人質', clan: 2, castleId: 22, originalClanId: 1, isHostage: true, strength: 30 };
+    const clans = [
+        { id: 1, diplomacyValue: { 2: { status: '和睦', sentiment: 20, trucePeriod: 1, hostageIds: [51] } } },
+        { id: 2, diplomacyValue: { 1: { status: '和睦', sentiment: 20, trucePeriod: 1, hostageIds: [51] } } }
+    ];
+    let calls = 0;
+    const game = {
+        clans, bushos: [hostage], princesses: [], playerClanId: 1,
+        getClan(id) { return clans.find(c => c.id === Number(id)); },
+        affiliationSystem: { setClanIdRaw(b, id) { b.clan = id; } },
+        ui: { log() {}, async showDialogAsync() {} },
+        warManager: { async autoResolvePrisoners(prisoners, captorId) {
+            calls++;
+            assert.strictEqual(captorId, 2);
+            assert.strictEqual(prisoners[0], hostage);
+            assert.strictEqual(hostage.clan, 1, '処遇前に元の所属へ戻す');
+            assert.strictEqual(hostage.isHostage, false);
+        } }
+    };
+    ctx.game = game;
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+    await manager.processEndMonth();
+    assert.strictEqual(manager.getRelation(1, 2).status, '敵対');
+    assert.strictEqual(calls, 1);
+    await manager.processEndMonth();
+    assert.strictEqual(calls, 1);
+});
+
+test('r697 和睦が友好または普通に戻るときは人質を勝手に処遇しない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    const hostage = { id: 71, clan: 2, originalClanId: 1, isHostage: true };
+    const clans = [
+        { id: 1, diplomacyValue: { 2: { status: '和睦', sentiment: 50, trucePeriod: 1, hostageIds: [71] } } },
+        { id: 2, diplomacyValue: { 1: { status: '和睦', sentiment: 50, trucePeriod: 1, hostageIds: [71] } } }
+    ];
+    ctx.game = { clans, bushos: [hostage], princesses: [], getClan(id) { return clans.find(c => c.id === Number(id)); } };
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+    await manager.processEndMonth();
+    assert.strictEqual(manager.getRelation(1, 2).status, '普通');
+    assert.strictEqual(hostage.isHostage, true);
+    assert.deepStrictEqual(Array.from(manager.getRelation(1, 2).hostageIds), [71]);
 });
 
 test('姫の血縁IDは現行real系だけを使い未解決文字列をNaNで保持しない', () => {

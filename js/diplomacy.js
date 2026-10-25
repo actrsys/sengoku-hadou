@@ -697,6 +697,7 @@ class DiplomacyManager {
      * ★新しく追加！：毎月末に呼ばれて、和睦の期間を減らす魔法です
      */
     processEndMonth() {
+        const expiredHostilityPairs = new Map();
         this.game.clans.forEach(clan => {
             if (!clan.diplomacyValue || clan.isDestroyed) return;
             
@@ -719,6 +720,13 @@ class DiplomacyManager {
                             data.status = window.GameConstants.DiplomacyStatus.FRIENDLY;
                         } else if (data.sentiment <= 30) {
                             data.status = window.GameConstants.DiplomacyStatus.HOSTILE;
+                            const a = Number(clan.id);
+                            const b = Number(targetId);
+                            if (a > 0 && b > 0 && a !== b) {
+                                const low = Math.min(a, b);
+                                const high = Math.max(a, b);
+                                expiredHostilityPairs.set(`${low}:${high}`, [low, high]);
+                            }
                         } else {
                             data.status = window.GameConstants.DiplomacyStatus.NORMAL;
                         }
@@ -726,6 +734,22 @@ class DiplomacyManager {
                 }
             }
         });
+        if (expiredHostilityPairs.size === 0) return;
+        const consequences = [];
+        for (const [clanAId, clanBId] of expiredHostilityPairs.values()) {
+            const relation = this.getRelation(clanAId, clanBId);
+            if (!relation || relation.status !== window.GameConstants.DiplomacyStatus.HOSTILE) continue;
+            // 敵対へ移った関係だけ、断交と同じ既存の処遇準備へ送る。
+            const result = this._collectHostilityConsequences(clanAId, clanBId);
+            if (result.escapedHostageRecords.length || result.capturedHostageRecords.length || result.atMercyPrincesses.length) {
+                consequences.push(result);
+            }
+        }
+        if (consequences.length === 0) return;
+        // 通常の月末処理は同期的なまま。処遇画面が必要な場合だけ待機を返す。
+        return (async () => {
+            for (const result of consequences) await this.resolveBreakAllianceConsequences(result);
+        })();
     }
     
     /**
@@ -1321,6 +1345,66 @@ class DiplomacyManager {
     }
 
     /**
+     * 状態が敵対に移った後の姫・人質の処遇を一度だけ準備する。
+     * 明示的な断交と和睦期限満了が同じ外交付加関係を整理する。
+     * UIを伴う最終処遇は resolveBreakAllianceConsequences() で行う。
+     */
+    _collectHostilityConsequences(doerClanId, targetClanId) {
+        // 婚姻・人質は基本statusとは別軸で保持する。
+        // 関係破棄の結果が実際の敵対に至った時だけ、人質の脱走/拘束と嫁いだ姫の処遇へ進む。
+        let atMercyPrincesses = [];
+        let capturedHostages = [];
+        let capturedHostageRecords = [];
+        let escapedHostages = [];
+        let escapedHostageRecords = [];
+
+        {
+            this.game.bushos.forEach(b => {
+                if (b.isHostage && ((Number(b.originalClanId) === Number(doerClanId) && Number(b.clan) === Number(targetClanId)) || (Number(b.originalClanId) === Number(targetClanId) && Number(b.clan) === Number(doerClanId)))) {
+                    let chance = 0.5 - ((b.strength ?? 30) * 0.002) + (Math.random() * 0.3);
+                    if (chance > 0.5) capturedHostages.push(b);
+                    else escapedHostages.push(b);
+                }
+            });
+
+            if (this.game.princesses) {
+                this.game.princesses.forEach(p => {
+                    const originClan = this._getPrincessOriginClanId(p);
+                    const isBreakerPrincessInTarget = (originClan === doerClanId && p.currentClanId === targetClanId);
+                    const isTargetPrincessInBreaker = (originClan === targetClanId && p.currentClanId === doerClanId);
+                    if (p.status === 'married' && (isBreakerPrincessInTarget || isTargetPrincessInBreaker)) {
+                        atMercyPrincesses.push(p);
+                    }
+                });
+            }
+
+            // 逃げ切った人質は、帰還前に元所属/受入側を記録してから人質関係を終了する。
+            // 人質中は一時的に受入家の clan を持つため、城だけでなく所属も実家へ戻す。
+            escapedHostageRecords = escapedHostages.map(b => this._makeCapturedHostageRecord(b));
+            escapedHostages.forEach(b => {
+                this._returnEscapedHostageHome(b);
+            });
+
+            // 捕まった人質も外交上の「人質」ではなく通常の捕虜へ移行する。
+            // 捕虜処遇は prisoner.clan を元所属として参照するため、所属を実家へ戻した上で、
+            // 捕らえた側は別レコードに保持して後続処理へ渡す。
+            capturedHostageRecords = capturedHostages.map(b => this._makeCapturedHostageRecord(b));
+
+            // 敵対化した時点で外交上の「人質」という担保関係は終了する。
+            // 婚姻フラグは姫の処遇が決まるまで維持する。
+            const dataA = this.getDiplomacyData(doerClanId, targetClanId);
+            const dataB = this.getDiplomacyData(targetClanId, doerClanId);
+            if (dataA) dataA.hostageIds = [];
+            if (dataB) dataB.hostageIds = [];
+        }
+
+        return {
+            becameHostile: true, atMercyPrincesses, capturedHostages, capturedHostageRecords,
+            escapedHostages, escapedHostageRecords
+        };
+    }
+
+    /**
      * 同盟や従属を破棄した時のペナルティを計算して適用します
      */
     applyBreakAlliancePenalty(doerClanId, targetClanId, doerBusho = null) {
@@ -1379,58 +1463,12 @@ class DiplomacyManager {
             });
         }
         
-        // 婚姻・人質は基本statusとは別軸で保持する。
-        // 関係破棄の結果が実際の敵対に至った時だけ、人質の脱走/拘束と嫁いだ姫の処遇へ進む。
-        const becameHostile = newStatus === window.GameConstants.DiplomacyStatus.HOSTILE;
-        let atMercyPrincesses = [];
-        let capturedHostages = [];
-        let capturedHostageRecords = [];
-        let escapedHostages = [];
-        let escapedHostageRecords = [];
-
-        if (becameHostile) {
-            this.game.bushos.forEach(b => {
-                if (b.isHostage && ((Number(b.originalClanId) === Number(doerClanId) && Number(b.clan) === Number(targetClanId)) || (Number(b.originalClanId) === Number(targetClanId) && Number(b.clan) === Number(doerClanId)))) {
-                    let chance = 0.5 - ((b.strength ?? 30) * 0.002) + (Math.random() * 0.3);
-                    if (chance > 0.5) capturedHostages.push(b);
-                    else escapedHostages.push(b);
-                }
-            });
-
-            if (this.game.princesses) {
-                this.game.princesses.forEach(p => {
-                    const originClan = this._getPrincessOriginClanId(p);
-                    const isBreakerPrincessInTarget = (originClan === doerClanId && p.currentClanId === targetClanId);
-                    const isTargetPrincessInBreaker = (originClan === targetClanId && p.currentClanId === doerClanId);
-                    if (p.status === 'married' && (isBreakerPrincessInTarget || isTargetPrincessInBreaker)) {
-                        atMercyPrincesses.push(p);
-                    }
-                });
-            }
-
-            // 逃げ切った人質は、帰還前に元所属/受入側を記録してから人質関係を終了する。
-            // 人質中は一時的に受入家の clan を持つため、城だけでなく所属も実家へ戻す。
-            escapedHostageRecords = escapedHostages.map(b => this._makeCapturedHostageRecord(b));
-            escapedHostages.forEach(b => {
-                this._returnEscapedHostageHome(b);
-            });
-
-            // 捕まった人質も外交上の「人質」ではなく通常の捕虜へ移行する。
-            // 捕虜処遇は prisoner.clan を元所属として参照するため、所属を実家へ戻した上で、
-            // 捕らえた側は別レコードに保持して後続処理へ渡す。
-            capturedHostageRecords = capturedHostages.map(b => this._makeCapturedHostageRecord(b));
-
-            // 敵対化した時点で外交上の「人質」という担保関係は終了する。
-            // 婚姻フラグは姫の処遇が決まるまで維持する。
-            const dataA = this.getDiplomacyData(doerClanId, targetClanId);
-            const dataB = this.getDiplomacyData(targetClanId, doerClanId);
-            if (dataA) dataA.hostageIds = [];
-            if (dataB) dataB.hostageIds = [];
-        }
+        const consequences = newStatus === window.GameConstants.DiplomacyStatus.HOSTILE
+            ? this._collectHostilityConsequences(doerClanId, targetClanId)
+            : { becameHostile: false, atMercyPrincesses: [], capturedHostages: [], capturedHostageRecords: [], escapedHostages: [], escapedHostageRecords: [] };
 
         return { 
-            oldStatus, newStatus, becameHostile, isBetrayal, isBreakDomination,
-            atMercyPrincesses, capturedHostages, capturedHostageRecords, escapedHostages, escapedHostageRecords 
+            oldStatus, newStatus, isBetrayal, isBreakDomination, ...consequences
         };
     }
     

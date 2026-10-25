@@ -1,0 +1,37 @@
+戦国覇道 r697 — 和睦期限満了時の人質・姫処遇監査・改修
+
+正本: r696完全版、ARCHITECTURE.md現行規則、既存の断交処遇と月末処理。
+
+通常ゲームで到達する経路:
+1. 敵対中の二家が通常の外交で6か月の和睦を成立させ、条件として一門武将を人質に差し出す。
+2. 人質の所属は一時的に受入家となり、isHostage=true、両家のhostageIdsにIDが入る。
+3. 和睦中の外交友好度が30以下で6か月目の月末を迎えると、従来の月末処理は両家のstatusだけ敵対へ変更する。
+4. 断交側が持つ「実際に敵対化した時の人質の脱走/捕虜化・姫処遇」へ進まず、敵対中なのに外交人質状態が残る。これは人工的な武将所属破壊ではなく、合法な和睦と期限進行による到達経路。
+
+修正:
+- DiplomacyManager._collectHostilityConsequences() に、従来applyBreakAlliancePenalty()にあった敵対化後の人質と姫の処遇準備を集約する。断交側の処罰・友好度計算は変更しない。
+- processEndMonth() は従来の和睦期間/友好度によるstatus変換をそのまま実行し、敵対になったペアを一度だけ処遇窓口へ渡す。特定の人質や姫が存在する場合にだけ非同期処遇Promiseを返す。
+- TurnManagerは月末外交処理をawaitし、世代失効後には後続の諸勢力・寿命・月送りへ進まない。
+- プレイヤー向けの帰還会話、AI捕虜処遇と既存の姫処遇はresolveBreakAllianceConsequences()をそのまま再利用する。未関係の人質・婚姻、友好または普通へ戻った関係は処遇しない。
+
+回帰:
+- r696基準の正常な断交・外交変更の全テストを維持。
+- 6か月間の和睦成立と人質受入から、満了後の自家帰還と二重処遇なしを追加。
+- 人質拘束時は既存WarManagerの捕虜処遇へ一度だけ渡し、原所属を回復するテストを追加。
+- 和睦から普通へ戻る場合は人質を維持するテストを追加。
+
+変更範囲:
+- ゲームロジック: js/diplomacy.js, js/turn_manager.js
+- テスト: tests/run_tests.js
+- 版と記録: js/config.js, ARCHITECTURE.md, docs/audits/README.md, 本記録
+- 管理Excel・実行BIN・他のデータ・保存schema・ゲームバランス値・UIの固定レイアウトは無変更。
+
+最終検証 (2026-10-25):
+- node tests/run_tests.js: 1173件成功、0件失敗。
+- node tests/run_visual_tests.js: 23項目成功 (PC/スマホを含む)。
+- python3 tools/simulation/test_player_focus_sim.py: 4件成功。
+- python3 tools/verify_excel_bin_parity.py: 共通・1560・1570の全出力フィールド一致。
+- node tools/verify_release_sources.js: 共通・1560・1570管理用Excel/BIN/主要数式検査成功。
+- node --check: js/ とjs/event/ の全JavaScript構文検査成功。
+- 元のr696との差分はゲームロジック2ファイル、テスト、版数、設計/記録のみ。全Excel/BIN、画像/音声、保存形式は変更なし。
+- 和睦期限満了後の一連の処遇について全シナリオを通した長時間観戦は未検証。

@@ -770,7 +770,8 @@ class TurnManager {
         
         // 3つ目の係員：外交
         if (game.diplomacyManager && typeof game.diplomacyManager.processEndMonth === 'function') {
-            game.diplomacyManager.processEndMonth();
+            await game.diplomacyManager.processEndMonth();
+            if (!isCurrentFlow()) return;
             game.writeSystemDiagnostic('month_end:diplomacy_done');
         }
         if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
