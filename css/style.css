@@ -41,27 +41,19 @@ button, input, select, textarea, label, a, .cmd-btn, .title-btn, .zoom-btn, .sel
     font-style: normal;
     font-display: block;
 }
-/* トップ画面の見た目は元の書体の字形・メトリクスを使用し、
-   再読み込み時もゲーム本体の完全版フォントへ差し替えない。 */
-html:not(.mobile-low-memory) #title-screen { font-family: 'TitleAbashiri', serif; }
-html:not(.mobile-low-memory) #title-screen .game-title { font-family: 'TitleFude', 'TitleAbashiri', serif; }
-html:not(.mobile-low-memory) #title-screen .title-btn,
-html:not(.mobile-low-memory) #title-screen .title-version { font-family: 'TitleAbashiri', serif; }
+/* タイトルと本編ロード幕の見出しは同じ軽量書体の設定を参照する。
+   書体を変更するときは画面個別ではなく以下の共通変数を切り替える。 */
+#title-screen { font-family: var(--font-title-ui-ja); }
+#title-screen .game-title,
+.loading-title { font-family: var(--font-title-heading-ja); }
+#title-screen .title-btn,
+#title-screen .title-version { font-family: var(--font-title-ui-ja); }
 
 /* ★Round 8: フォント明示ロード完了までは初期画面だけ隠し、
    読込失敗・タイムアウト時はフォールバックで必ず表示します。 */
 html.fonts-loading body { visibility: hidden; }
 html.fonts-ready body,
 html.fonts-fallback body { visibility: visible; }
-/* 初回書体の取得が期限切れ・失敗になった場合、代替書体をこのページの
-   タイトル用に固定する。通信の遅延完了でWebフォントへ突然差し替えない。 */
-html.fonts-fallback:not(.mobile-low-memory) #title-screen,
-html.fonts-fallback:not(.mobile-low-memory) #title-screen .game-title,
-html.fonts-fallback:not(.mobile-low-memory) #title-screen .title-btn,
-html.fonts-fallback:not(.mobile-low-memory) #title-screen .title-version {
-    font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
-}
-
 :root {
     --bg-color: #eceff1;
     --panel-bg: #ffffff;
@@ -80,13 +72,25 @@ html.fonts-fallback:not(.mobile-low-memory) #title-screen .title-version {
     --font-readable-ja: "UD Digi Kyokasho N-R", "UD Digi Kyokasho NK-R", "Yu Mincho", YuMincho, "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Noto Serif JP", "Noto Serif CJK JP", "BIZ UDPMincho Medium", serif;
     --font-readable-weight: 600;
     --font-numeric-ui: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    /* 初回タイトル・ゲーム開始ロード幕の軽量書体を一元管理する。 */
+    --font-title-ui-ja: 'TitleAbashiri', serif;
+    --font-title-heading-ja: 'TitleFude', 'TitleAbashiri', serif;
     --font-decorative-ja: 'FudeGoshirae', 'abashiri-mincho', serif;
+}
+
+/* 期限切れ・取得失敗では両画面とも同じOS書体に固定する。
+   後から軽量Webフォントが届いても、描画中の書体を切り替えない。 */
+html.fonts-fallback:not(.mobile-low-memory) {
+    --font-title-ui-ja: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+    --font-title-heading-ja: var(--font-title-ui-ja);
 }
 
 /* 古い小画面スマホではWebフォント2書体を読み込まず、OS標準の明朝系へ寄せる。
    フォント展開とglyph atlasの常駐メモリを抑え、WebKit compositorの余裕を確保する。 */
 html.mobile-low-memory {
     --font-decorative-ja: "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", serif;
+    --font-title-ui-ja: "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", serif;
+    --font-title-heading-ja: var(--font-title-ui-ja);
 }
 
 /* 古い小画面iPhone系はWebフォントを一切使わず、標準の明朝系へ寄せる。
@@ -5997,23 +6001,11 @@ html.mobile-low-memory .legacy-safe-mode-indicator { display: block; }
     color: var(--title-paper);
 }
 .loading-title {
-    /* タイトルの初回黒幕で準備した同じ4文字の軽量書体を使う。
-       タップ後に初めて届く本編用のFudeGoshiraeへ差し替えない。 */
-    font-family: 'TitleFude', 'TitleAbashiri', serif;
     font-size: clamp(2.6rem, 7vw, 4.6rem);
     line-height: 1;
     font-weight: 400;
     letter-spacing: 0.1em;
     text-shadow: 0 4px 0 #050606, 0 10px 24px rgba(0,0,0,0.72);
-}
-/* r690と同様、初回タイトルで軽量書体を取得できなかった場合は
-   ロード中も代替書体を固定する。遅れて届くWebフォントで字幅を変えない。 */
-html.fonts-fallback:not(.mobile-low-memory) .loading-title {
-    font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
-}
-/* 省メモリ端末は初回からOS標準書体を使用し、Webフォントを起動しない。 */
-html.mobile-low-memory .loading-title {
-    font-family: "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", serif;
 }
 .loading-rule {
     width: min(280px, 76%);

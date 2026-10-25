@@ -1,0 +1,35 @@
+戦国覇道 r692 タイトル／本編ロード幕の見出し書体設定一元化監査
+
+【確認した問題】
+r691はフォントの取得そのものを app_bootstrap.js に集約していたが、表示上の指定は
+#title-screen .game-title と .loading-title にそれぞれ独立して記述していた。
+さらに通信失敗・2.5秒期限時のOS代替書体、および省メモリ端末向けの代替書体も
+画面単位の上書きルールとして重複しており、将来片方だけ変更すると表示が再び不一致になる。
+今回の変更はユーザーの設計整合性確認依頼に基づき、既存r691修正の重複を整理するもの。
+実際に起こらない境界条件を想定した追加防御ではない。
+
+【設計と対応】
+タイトルとゲーム開始後のロード幕の見出しは、初回ロード幕で準備済みの
+軽量TitleFude/TitleAbashiriを共有する。
+- :root の --font-title-heading-ja（見出し）と --font-title-ui-ja（タイトルUI）を正本とする。
+- #title-screen .game-title と .loading-title は同じCSSルールで見出し書体を指定する。
+- html.fonts-fallback:not(.mobile-low-memory) は上記2変数を一括でOS代替書体へ変更する。
+- html.mobile-low-memory でも上記2変数をOS書体に変更する。
+- .loading-title 固有ルールは大きさ・余白・影など画面固有の意匠だけを扱う。
+これによりロード幕専用のフォント切替条件を作らず、見出し用途の書体選択を単一化する。
+
+初回ページ専用黒幕はCSS/JS読込前に描画する必要から既存通り別責務とする。
+本編に必要な約20MBの完全フォントは初回タップ後の共通 __ensureGameFontsReady() で取得。
+起動時の2.5秒制限、遅延到着時に表示後の字形が変わらない仕様も維持する。
+
+【検証】
+- ロジックテスト：1,164件成功。
+- ChromiumのcomputedStyle：通常、期限切れ/取得失敗、低メモリの3状態で
+  タイトルとロード見出しの font-family が完全に一致。
+- 一般画面への本編用--font-decorative-ja/完全フォントの変更なし。
+- ゲームロジック、AI、保存形式、管理Excel・BIN、アセットは変更しない。
+
+【変更ファイル】
+追加：docs/audits/r692_タイトルとロード見出し書体設定一元化監査記録.txt
+更新：ARCHITECTURE.md、css/style.css、docs/audits/README.md、js/config.js、tests/run_tests.js
+削除：なし

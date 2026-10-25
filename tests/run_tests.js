@@ -334,7 +334,8 @@ test('r540 タイトルは同じ2書体のsubsetを先に読み、ゲーム本�
     assert.ok(boot.includes("await document.fonts.ready;"), 'ゲーム本体書体の完了待ち');
     assert.ok(ui.includes('await gameFontTask;'), 'タイトル初回タップ後のロード幕でゲーム書体を待つ');
     assert.ok(ui.includes('await window.__ensureGameFontsReady();'), '直接ロード時も共通ロード幕で待つ');
-    assert.ok(css.includes("#title-screen .game-title { font-family: 'TitleFude'"));
+    assert.ok(css.includes("--font-title-heading-ja: 'TitleFude', 'TitleAbashiri', serif;"),
+        'タイトル見出しの書体は共通のフォント設定に保持');
     assert.ok(css.includes("#title-screen .title-btn,"));
     assert.ok(html.includes('class="fonts-loading"'), '最初の画面も字形が揃ってから表示する');
     assert.ok(!boot.includes('FONT_TIMEOUT_MS = 6000'), '大容量フォントをトップの白画面待機対象にしない');
@@ -449,11 +450,10 @@ test('r690 タイトルは実表示字形とFontFaceSetのレイアウト完了�
     assert.ok(boot.includes('document.fonts.check(font, text)'), '完了後に使用書体を照合');
     assert.ok(loader.includes('await givePaintOpportunity();\n        await givePaintOpportunity();\n        overlay.hidden = true;'),
         '書体状態を確定させた後、描画を二巡してから黒い幕を開ける');
-    for (const cls of ['#title-screen,', '#title-screen .game-title,',
-        '#title-screen .title-btn,', '#title-screen .title-version {']) {
-        assert.ok(css.includes('html.fonts-fallback:not(.mobile-low-memory) ' + cls),
-            '期限切れ時もタイトルのWebフォントを後から適用しない: ' + cls);
-    }
+    assert.match(css, /html\.fonts-fallback:not\(\.mobile-low-memory\)\s*\{[^}]*--font-title-ui-ja:\s*"Yu Mincho"/,
+        '期限切れではOS書体を共通のフォント設定に固定');
+    assert.match(css, /html\.fonts-fallback:not\(\.mobile-low-memory\)\s*\{[^}]*--font-title-heading-ja:\s*var\(--font-title-ui-ja\)/,
+        '期限切れでもタイトルとロード見出しの書体指定を共有');
     let finishReady;
     const fontSetReady = new Promise(resolve => { finishReady = resolve; });
     const loaded = [];
@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r691');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r692');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -30209,28 +30209,36 @@ test('r687 初回ページにCSS・本編JSより前の独立ロード幕と遅�
 });
 
 
-// r691: 初回タイトルを描画する前に準備済みの見出しフォントを、
-// タップ直後の本編ロード幕にもそのまま利用する。初回表示時に未読込の
-// 本編用13MBフォントを指定してから切り替える経路を作らない。
-test('r691 初回タップ直後のロード見出しは準備済みタイトル書体に固定される', () => {
+// r692: 同じ役割のタイトル見出しを画面ごとに上書きせず、書体定義を共通化する。
+// r691の表示直後の書体切替防止は維持する。
+test('r692 タイトル見出しとロード見出しは同一の書体設定を使用する', () => {
     const css = read('css/style.css');
     const bootstrap = read('js/app_bootstrap.js');
     const ui = read('js/ui.js');
     const loader = read('js/startup_loader.js');
-    const loadingRule = css.match(/\.loading-title\s*\{([^}]+)\}/);
-    assert.ok(loadingRule, 'ロード画面の見出しCSSがある');
-    assert.ok(/font-family:\s*'TitleFude'\s*,\s*'TitleAbashiri'\s*,\s*serif\s*;/.test(loadingRule[1]),
-        'ロード画面のタイトルは初回黒幕内で準備済みの軽量書体を使用');
-    assert.ok(css.includes('html.fonts-fallback:not(.mobile-low-memory) .loading-title'),
-        '通信2.5秒超過時は初回タイトルと同じ代替書体に固定');
-    assert.ok(css.includes('html.mobile-low-memory .loading-title'),
-        '省メモリ端末で不要なWebフォントを読み込まない');
+    assert.match(css, /--font-title-ui-ja:\s*'TitleAbashiri'\s*,\s*serif/);
+    assert.match(css, /--font-title-heading-ja:\s*'TitleFude'\s*,\s*'TitleAbashiri'\s*,\s*serif/);
+    assert.match(css, /#title-screen\s*\.game-title\s*,\s*\.loading-title\s*\{\s*font-family:\s*var\(--font-title-heading-ja\)\s*;/,
+        '両見出しは同一ルールで書体指定');
+    assert.match(css, /#title-screen\s*\{\s*font-family:\s*var\(--font-title-ui-ja\)/,
+        'タイトル本文も同じ起動書体設定から取得');
+    assert.match(css, /html\.fonts-fallback:not\(\.mobile-low-memory\)\s*\{[^}]*--font-title-heading-ja:\s*var\(--font-title-ui-ja\)/,
+        '期限切れ時の代替書体は両見出し共通');
+    assert.match(css, /html\.mobile-low-memory\s*\{[^}]*--font-title-ui-ja:[^}]*--font-title-heading-ja:\s*var\(--font-title-ui-ja\)/,
+        '軽量モードでも両見出しを共通書体へ切替');
+    const loadingRule = css.match(/(?:^|\n)\.loading-title\s*\{\s*font-size:([^}]+)\}/);
+    assert.ok(loadingRule && !/font-family:/.test(loadingRule[1]),
+        'ロード画面固有の装飾ルールには個別の書体上書きがない');
+    assert.ok(!/html\.fonts-fallback:not\(\.mobile-low-memory\)\s+\.loading-title\s*\{/.test(css),
+        'ロード画面だけの期限切れ例外を持たない');
+    assert.ok(!/html\.mobile-low-memory\s+\.loading-title\s*\{/.test(css),
+        'ロード画面だけの省メモリ例外を持たない');
     assert.ok(bootstrap.includes("['400 16px \"TitleFude\"', '戦国覇道']"),
-        '軽量見出しに必要な字形は初回タイトル表示前にロード済み');
+        '初回タイトルのフォント準備処理を共有');
     assert.ok(loader.includes('if (window.__titleFontLoadPromise) await window.__titleFontLoadPromise;')
-        && loader.includes('overlay.hidden = true;'), '初回黒幕を解除する前に軽量書体の判定を完了');
+        && loader.includes('overlay.hidden = true;'), '初回黒幕は書体の選択完了後に解除');
     assert.ok(ui.includes('this.showLoadingScreen();') && ui.includes('const gameFontTask'),
-        '通常の初回タップ→本編フォント読込の経路を維持');
+        '初回タップ後の本編フォント準備経路を維持');
 });
 
 Promise.all(pendingTests).then(() => {
