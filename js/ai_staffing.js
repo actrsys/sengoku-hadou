@@ -455,9 +455,9 @@ class AIStaffing {
         futureLegionBushoIds.add(newCommander.id);
         
         // 3. お供の武将をカウント（同じ派閥の直轄武将の1/3）。
-        // 任命前の予定と、国主転任後の実行では役職・居城が変わり得るため、
-        // 資格と人数の式だけ共有し、候補配列は各段階で取り直す。
-        const getDirectFactionEscorts = () => {
+        // 任命後に旧城の城主が変わり得るため、候補資格は再取得しつつ、
+        // 事前に確定した随伴人数は引き継いで人員見積りを維持する。
+        const getDirectFactionEscorts = (plannedCount = null) => {
             const sameFactionBushos = this.game.getClanBushos(clanId).filter(b =>
                 window.BushoStatusRules.isActive(b) &&
                 b.factionId === newCommander.factionId &&
@@ -471,10 +471,13 @@ class AIStaffing {
                 const bCastle = this.game.getCastle(b.castleId);
                 return bCastle && Number(bCastle.legionId) === 0;
             });
-            return directBushos.slice(0, Math.floor(directBushos.length / 3));
+            return directBushos.slice(0, plannedCount === null ? Math.floor(directBushos.length / 3) : plannedCount);
         };
+        let plannedEscortCount = 0;
         if (newCommander.factionId !== 0) {
-            for (const b of getDirectFactionEscorts()) {
+            const plannedEscorts = getDirectFactionEscorts();
+            plannedEscortCount = plannedEscorts.length;
+            for (const b of plannedEscorts) {
                 futureLegionBushoIds.add(b.id);
                 plannedMoverIds.add(b.id);
             }
@@ -507,7 +510,8 @@ class AIStaffing {
         // ★新国主転任後の最新の役職・在城状況で候補を再評価してから移す。
         // 見積り時の配列を使い回さず、資格・人数式だけ同じ関数を使う。
         if (newCommander.factionId !== 0) {
-            for (const b of getDirectFactionEscorts()) {
+            // 国主転任で旧城主になった候補は除外しつつ、見積り済みの随伴人数は維持する。
+            for (const b of getDirectFactionEscorts(plannedEscortCount)) {
                 this.game.affiliationSystem.moveCastle(b, baseCastle.id);
             }
         }

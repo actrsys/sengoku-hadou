@@ -1,0 +1,30 @@
+const fs=require('fs'), vm=require('vm'), assert=require('assert');
+const path=require('path'); const root=path.resolve(__dirname, '..');
+const w={BushoStatusRules:{isActive:b=>b.status==='active'},LifeStatusRules:{isPresent:b=>b.status==='active'},DiplomacyRules:{isAllianceOrVassal:()=>false},GameConstants:{BushoStatus:{ACTIVE:'active'}}};
+const ctx=vm.createContext({window:w,console,Math,Set,Map,Number,Array,Object,Legion:class Legion{constructor(d){Object.assign(this,d)}}});
+for(const f of ['affiliation_system.js','ai_staffing.js'])vm.runInContext(fs.readFileSync(`${root}/js/${f}`,'utf8'),ctx);
+const Aff=vm.runInContext('AffiliationSystem',ctx), Staff=vm.runInContext('AIStaffing',ctx);
+const castles=Array.from({length:9},(_,i)=>({id:i+1,ownerClan:i===8?2:1,legionId:0,provinceId:i===2||i===3?2:1,castellanId:0,name:`城${i+1}`,samuraiIds:[],soldiers:5000,kokudaka:i===2?900:300,defense:i===2?900:300,maxKokudaka:1000,maxDefense:1000,commerce:300}));
+const people=[];
+function person(id,castleId,o={}){const p={id,clan:1,castleId,status:'active',isCastellan:false,isDaimyo:false,isCommander:false,isGunshi:false,isFactionLeader:false,factionId:0,loyalty:95,achievementTotal:0,leadership:50,strength:50,politics:50,diplomacy:50,intelligence:50,charm:50,fullName:`武将${id}`,name:`武将${id}`,...o};people.push(p);castles[castleId-1].samuraiIds.push(id);return p}
+const lord=person(100,1,{isDaimyo:true,isCastellan:true});castles[0].castellanId=100;
+const candidate=person(101,2,{isCastellan:true,isFactionLeader:true,factionId:10,achievementTotal:2000,leadership:90});castles[1].castellanId=101;
+const firstEscort=person(102,2,{factionId:10,leadership:90,intelligence:90,politics:90,loyalty:100});
+const stays=person(103,2,{factionId:0,loyalty:55,leadership:30});
+const secondEscort=person(104,5,{factionId:10});
+const thirdEscort=person(105,6,{factionId:10});
+const map=new Map(castles.map(c=>[c.id,c])), peopleMap=new Map(people.map(p=>[p.id,p]));
+const clan={id:1,name:'仮想家',leaderId:100,homeCastleId:1};
+const game={year:1570,month:1,phase:'game',playerClanId:3,castles,bushos:people,legions:[], getBusho:id=>peopleMap.get(Number(id)),getCastle:id=>map.get(Number(id)),getClan:id=>Number(id)===1?clan:null,getClanBushos:id=>people.filter(p=>Number(p.clan)===Number(id)),getCastleBushos:id=>(map.get(Number(id))?.samuraiIds||[]).map(id=>peopleMap.get(id)).filter(Boolean),getClanCastles:id=>castles.filter(c=>c.ownerClan===Number(id)),getClanDaimyo:id=>people.find(p=>p.clan===Number(id)&&p.isDaimyo),getDaimyoHomeCastle:()=>map.get(1),getRelation:()=>null,getCurrentTurnId:()=>1570*12+1,mapGraph:{getAdjacentCastles:c=>c.id===3?[map.get(9)]:[]},aiOperationManager:{operations:{}}};
+game.affiliationSystem=new Aff(game); game.affiliationSystem.updateUI=()=>{}; game.updateCastleLord=c=>game.affiliationSystem.updateCastleLord(c);game.factionSystem={handleMove:()=>{}};
+const staff=new Staff(game);
+
+const ok=staff.createNewLegionIfNeeded(1);
+assert.strictEqual(ok,true,'実際のAI新設メソッドで軍団が成立');
+const assigned=castles.filter(c=>c.legionId>0);
+assert.strictEqual(assigned.length,2,'2拠点を新軍団に担当させる');
+assert.strictEqual(castles[1].castellanId,firstEscort.id,'旧城は新城主が留守居する');
+const staffCount=assigned.reduce((sum,c)=>sum+game.getCastleBushos(c.id).filter(p=>p.status==='active'&&p.clan===1).length,0);
+assert.ok(staffCount>=assigned.length,`新軍団の配置人数${staffCount}は担当城${assigned.length}以上`);
+assert.strictEqual(secondEscort.castleId,3,'旧城主になった家臣の代わりに別の直轄家臣が随伴');
+console.log('r702 軍団新設の随伴候補繰上げ: 合格');
