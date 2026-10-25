@@ -2244,6 +2244,8 @@ Object.assign(WarManager.prototype, {
                 // ★城の管理システムにお任せします！
                 const newLegionId = s.sourceCastle ? (s.sourceCastle.legionId || 0) : 0;
                 this.game.castleManager.changeOwner(s.defender, s.attacker.ownerClan, false, newLegionId, s.defenderCastellanIdAtBattleStart);
+                // 守備軍の自主撤退も通常の落城と同じ戦乱保護期間を設定する。
+                s.defender.immunityUntil = this.game.getCurrentTurnId() + 1;
 
                 // ★追加：色が更新されたので、メッセージの前に地図を更新します！
                 // ★今回追加：色を変える時に、かっこいいアニメーションの魔法を使います！

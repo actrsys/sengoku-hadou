@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r700');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r701');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -30646,6 +30646,79 @@ test('r695 正規の家督相続イベントでも共通履歴から自国家へ
     assert.ok(newDaimyo.isDaimyo, '家督処理に影響しない');
     assert.strictEqual(game.historySystem.getEntries('clan', 74).length, 1);
     assert.strictEqual(game.historySystem.getEntries('national', 74).length, 0);
+});
+
+// 守備側が正規の撤退コマンドで城を明け渡す場合も、落城後の戦乱保護を適用する。
+test('r701 守備軍の別城撤退で占領された城にも通常落城と同じ戦乱保護が付く', async () => {
+    const ctx = createContext({
+        console: { ...console, error() {} },
+        WarParams: { War: { RetreatResourceLossFactor: 0.2, CaptureStrFactor: 0.001,
+            DaimyoCaptureReduction: 0.2, BaseRecoveryRate: 0.2, RetreatRecoveryRate: 0.4 } },
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
+        LifeStatusRules: { isPresent: b => b.status === 'active' }
+    });
+    loadScript(ctx, 'js/war.js');
+    loadScript(ctx, 'js/war_effort.js');
+    const War = vm.runInContext('WarManager', ctx);
+    const turn = 1570 * 12 + 7;
+    const defender = { id: 1, name: '攻撃対象', ownerClan: 2, provinceId: 2,
+        soldiers: 2000, gold: 1000, rice: 3000, horses: 10, guns: 5,
+        morale: 50, training: 50, defense: 500, castellanId: 11, samuraiIds: [11], immunityUntil: 0 };
+    const destination = { id: 2, name: '守備側退避先', ownerClan: 2, provinceId: 2,
+        soldiers: 1000, gold: 500, rice: 500, horses: 0, guns: 0,
+        morale: 50, training: 50, defense: 100, castellanId: 0, samuraiIds: [] };
+    const source = { id: 3, name: '攻撃元', ownerClan: 1, provinceId: 1, legionId: 0 };
+    const guard = { id: 11, clan: 2, belongKunishuId: 0, status: 'active',
+        name: '守備将', strength: 50, leadership: 50, castleId: 1 };
+    const game = {
+        phase: 'game', year: 1570, month: 7, playerClanId: 99,
+        getCurrentTurnId: () => turn,
+        ui: { log() {}, showMapGuard() {}, hideMapGuard() {}, restoreAIGuardText() {},
+            hideAIWarThinking() {}, updateClanColors() {} },
+        getClan: () => null, getProvince: () => null,
+        getCastle: id => id === 1 ? defender : id === 2 ? destination : id === 3 ? source : null,
+        getBusho: id => id === guard.id ? guard : null,
+        getCastleBushos: id => guard.castleId === id ? [guard] : [],
+        updateCastleLord() {}, finishTurn() {},
+        factionSystem: { recordBattle() {}, updateRecognition() {} },
+        affiliationSystem: {
+            leaveCastle(b) { const old = game.getCastle(b.castleId); if (old) old.samuraiIds = old.samuraiIds.filter(id => id !== b.id); b.castleId = 0; },
+            moveCastle(b, id) { const old = game.getCastle(b.castleId); if (old) old.samuraiIds = old.samuraiIds.filter(n => n !== b.id); b.castleId = id; game.getCastle(id).samuraiIds.push(b.id); }
+        },
+        castleManager: { changeOwner(c, ownerClan) { c.ownerClan = ownerClan; } }
+    };
+    const war = new War(game);
+    game.warManager = war;
+    war._beginWarLifecycle();
+    war.canShowNotify = () => false;
+    war.recordNormalWarOutcomeHistory = () => {};
+    war.getEscapeCandidates = () => [destination];
+    war.mergeReturningArmyReadiness = (castle, _army, count) => { castle.soldiers = Math.min(99999, castle.soldiers + count); };
+    war.state = { active: true, attacker: { ownerClan: 1, isKunishu: false, name: '攻撃軍',
+        soldiers: 2500, rice: 500, horses: 10, guns: 5, morale: 50, training: 50 },
+        defender, sourceCastle: source, atkBushos: [{ id: 20, name: '攻撃将' }],
+        defBusho: guard, deadSoldiers: { attacker: 0, defender: 0 },
+        isPlayerInvolved: false, isKunishuSubjugation: false };
+    let observedImmunity = null;
+    war.finalizeCapturedCastleStaffing = () => { observedImmunity = defender.immunityUntil; throw Error('audit stop after occupied castle update'); };
+    const originalEnd = war.endWar;
+    let endTask = null;
+    war.endWar = function (...args) { endTask = originalEnd.apply(this, args); return endTask; };
+    war.executeRetreatLogic(defender);
+    assert.ok(endTask, '実際の守備側撤退処理から終戦処理が始まる');
+    await endTask;
+    assert.strictEqual(defender.ownerClan, 1, '実際の制圧処理で所有勢力が変わる');
+    assert.strictEqual(observedImmunity, turn + 1, '撤退による制圧でも翌月まで戦乱保護が付く');
+    // 別の大名家が翌月まで再攻撃できず、保護期限が過ぎれば再び候補になる。
+    game.playerClanId = 3;
+    game.clans = [{ id: 3 }];
+    game.castles = [defender];
+    game.getRelation = () => null;
+    game.diplomacyManager = { isNonAggression: () => false };
+    ctx.MapGraphService = { isReachable: () => true };
+    assert.ok(!war.getValidWarTargets(source).includes(defender.id), '戦乱中は正規の出陣先候補から除外される');
+    game.getCurrentTurnId = () => turn + 2;
+    assert.ok(war.getValidWarTargets(source).includes(defender.id), '戦乱が明ければ通常の到達条件に戻る');
 });
 
 Promise.all(pendingTests).then(() => {
