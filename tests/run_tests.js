@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r690');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r691');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -30206,6 +30206,31 @@ test('r687 初回ページにCSS・本編JSより前の独立ロード幕と遅�
         'DOMContentLoaded後でも設定UIを登録する');
     assert.ok(read('js/app_bootstrap.js').includes('window.__refreshTitleVersion = renderTitleVersion;'),
         '遅延のGameConfig読込完了後も版番号の正本はbootstrapが維持する');
+});
+
+
+// r691: 初回タイトルを描画する前に準備済みの見出しフォントを、
+// タップ直後の本編ロード幕にもそのまま利用する。初回表示時に未読込の
+// 本編用13MBフォントを指定してから切り替える経路を作らない。
+test('r691 初回タップ直後のロード見出しは準備済みタイトル書体に固定される', () => {
+    const css = read('css/style.css');
+    const bootstrap = read('js/app_bootstrap.js');
+    const ui = read('js/ui.js');
+    const loader = read('js/startup_loader.js');
+    const loadingRule = css.match(/\.loading-title\s*\{([^}]+)\}/);
+    assert.ok(loadingRule, 'ロード画面の見出しCSSがある');
+    assert.ok(/font-family:\s*'TitleFude'\s*,\s*'TitleAbashiri'\s*,\s*serif\s*;/.test(loadingRule[1]),
+        'ロード画面のタイトルは初回黒幕内で準備済みの軽量書体を使用');
+    assert.ok(css.includes('html.fonts-fallback:not(.mobile-low-memory) .loading-title'),
+        '通信2.5秒超過時は初回タイトルと同じ代替書体に固定');
+    assert.ok(css.includes('html.mobile-low-memory .loading-title'),
+        '省メモリ端末で不要なWebフォントを読み込まない');
+    assert.ok(bootstrap.includes("['400 16px \"TitleFude\"', '戦国覇道']"),
+        '軽量見出しに必要な字形は初回タイトル表示前にロード済み');
+    assert.ok(loader.includes('if (window.__titleFontLoadPromise) await window.__titleFontLoadPromise;')
+        && loader.includes('overlay.hidden = true;'), '初回黒幕を解除する前に軽量書体の判定を完了');
+    assert.ok(ui.includes('this.showLoadingScreen();') && ui.includes('const gameFontTask'),
+        '通常の初回タップ→本編フォント読込の経路を維持');
 });
 
 Promise.all(pendingTests).then(() => {
