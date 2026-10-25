@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r692');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r696');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -30239,6 +30239,209 @@ test('r692 タイトル見出しとロード見出しは同一の書体設定を
         && loader.includes('overlay.hidden = true;'), '初回黒幕は書体の選択完了後に解除');
     assert.ok(ui.includes('this.showLoadingScreen();') && ui.includes('const gameFontTask'),
         '初回タップ後の本編フォント準備経路を維持');
+});
+
+
+// r693: 歴史イベントの当事者履歴は、月初の手番ではなくイベント自身の勢力IDで分類する。
+test('r693 清洲同盟の成立・拒否・見送りが両当事者の自国履歴へ分類される', async () => {
+    const ctx = createContext({
+        LifeStatusRules: { isPresent: b => b.status === 'active', isDead: b => b.status === 'dead' },
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        MapGraphService: { isAdjacent: (a, b) => [a.id, b.id].sort().join('-') === '1-2' }
+    });
+    ctx.GameConfig.History = { MaxEntries: 500 };
+    loadScript(ctx, 'js/history_system.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    const History = vm.runInContext('HistorySystem', ctx);
+    const event = ctx.GameEvents.find(e => e.id === 'historical_kiyosu_alliance');
+    assert.ok(event);
+    const people = [
+        { id: 1004009, clan: 3, status: 'dead' },
+        { id: 1006006, clan: 1, status: 'active', isDaimyo: true, castleId: 1,
+            fullName: '織田信長', name: '信長', givenName: '信長', familyNameStr: '織田' },
+        { id: 1301006, clan: 2, status: 'active', isDaimyo: true, castleId: 2,
+            fullName: '松平元康', name: '元康', givenName: '元康', familyNameStr: '松平' },
+        { id: 1004010, clan: 3, status: 'active', isDaimyo: true, castleId: 3, fullName: '今川氏真', name: '氏真' },
+        { id: 1005003, clan: 4, status: 'active', isDaimyo: true, castleId: 4, fullName: '斎藤義龍', name: '義龍' },
+        { id: 60001, clan: 1, status: 'active', fullName: '織田家臣', achievementTotal: 0, intelligence: 60 },
+        { id: 60002, clan: 2, status: 'active', fullName: '松平家臣A', leadership: 60 },
+        { id: 60003, clan: 2, status: 'active', fullName: '松平家臣B', intelligence: 60 }
+    ];
+    const castles = [
+        { id: 1, provinceId: 23, ownerClan: 1, name: '清洲', shortName: '清洲' },
+        { id: 2, provinceId: 22, ownerClan: 2, name: '岡崎', shortName: '岡崎' },
+        { id: 3, provinceId: 21, ownerClan: 3, name: '今川城' },
+        { id: 4, provinceId: 20, ownerClan: 4, name: '斎藤城' }
+    ];
+    const clans = [{ id: 1, name: '織田家' }, { id: 2, name: '松平家' },
+        { id: 3, name: '今川家' }, { id: 4, name: '斎藤家' }];
+    for (const [playerClanId, accept, outcome] of [
+        [1, true, '同盟が成立'], [1, false, '同盟を拒否'],
+        [2, false, '使者派遣を見送り'], [2, true, '同盟が成立']
+    ]) {
+        const game = {
+            year: 1562, month: 1, playerClanId, bushos: people, castles, clans,
+            getBusho: id => people.find(p => p.id === id),
+            getCastle: id => castles.find(c => c.id === id),
+            getClan: id => clans.find(c => c.id === id),
+            getProvince: () => ({ shortName: '三河' }),
+            getClanCastles: id => castles.filter(c => c.ownerClan === id),
+            courtRankSystem: { getHighestRankName: () => 'なし' },
+            diplomacyManager: {
+                getRelation: (a, b) => ({ status: [a, b].sort().join('-') === '1-2' ? '普通' : '敵対' }),
+                changeStatus() {}, setSentimentAbsolute() {}, setEventRelationFlag() {}
+            },
+            ui: { log: null, showDialog: (_msg, _show, onOk, onCancel) => {
+                if (accept) onOk(); else onCancel();
+            }, async showDialogAsync() {} }
+        };
+        game.historySystem = new History(game);
+        game.ui.log = (msg, opts) => game.historySystem.record(msg, opts);
+        assert.strictEqual(event.checkCondition(game), true, 'イベント自体の正規発火条件を満たす');
+        await event.execute(game);
+        const matching = game.historySystem.entries.filter(e => e.text.includes('清洲同盟'));
+        assert.strictEqual(matching.length, 1, 'イベント結果は1件だけ記録');
+        assert.ok(matching[0].text.includes(outcome), outcome);
+        assert.deepStrictEqual([...matching[0].clanIds].sort((a, b) => a - b), [1, 2],
+            'イベントの両当事者へ関連付ける');
+        assert.strictEqual(game.historySystem.getEntries('clan', 1).length, 1, '織田家の自国履歴');
+        assert.strictEqual(game.historySystem.getEntries('clan', 2).length, 1, '松平家の自国履歴');
+        assert.strictEqual(game.historySystem.getEntries('national', 1).length, 0, '織田家の全国欄に混ぜない');
+        assert.strictEqual(game.historySystem.getEntries('national', 2).length, 0, '松平家の全国欄に混ぜない');
+        assert.strictEqual(game.historySystem.getEntries('national', 3).length, 1, '第三勢力では全国欄に出る');
+    }
+});
+
+// r694: 1560年シナリオの浅井家・六角家の実所属と外交から到達できる、
+// 1561年以降の浅井家家督相続。履歴の当事者は手番ではなく浅井家である。
+test('r694 浅井家史実相続の記録は浅井家の自国履歴へ登録される', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const clanRows = scenario.clansState;
+    const roleByClan = new Map(clanRows.map(c => [Number(c.id), Number(c.leaderId)]));
+    const targetIds = [1015004, 1015005, 1018003, 1018004, 1018005];
+    const people = targetIds.map(id => {
+        const master = common.warriorsMaster.find(b => Number(b.id) === id);
+        const state = scenario.warriorsState.find(b => Number(b.id) === id);
+        assert.ok(master && state, `実データの武将 ${id}`);
+        return { ...master, ...state, status: 'active',
+            fullName: master.name.replace('|', ''),
+            isDaimyo: roleByClan.get(Number(state.clan)) === id };
+    });
+    const sourceRelation = scenario.diplomacy.find(r => Number(r.sourceClanId) === 15 && Number(r.targetClanId) === 18);
+    assert.strictEqual(sourceRelation?.relationType, '敵対', '実シナリオ開始時点から浅井・六角は敵対');
+    assert.strictEqual(roleByClan.get(15), 1015004, '開始時の浅井当主は久政');
+    assert.strictEqual(roleByClan.get(18), 1018003, '開始時の六角当主は義賢');
+    const ctx = createContext({
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
+        BushoStatusRules: { isActive: b => b.status === 'active' }
+    });
+    ctx.GameConfig.History = { MaxEntries: 500 };
+    loadScript(ctx, 'js/history_system.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    const History = vm.runInContext('HistorySystem', ctx);
+    const event = ctx.GameEvents.find(e => e.id === 'historical_nagamasa_succession');
+    assert.ok(event);
+    const game = {
+        year: 1561, month: 1, playerClanId: 1, bushos: people,
+        getBusho: id => people.find(b => b.id === id),
+        diplomacyManager: { getRelation: () => ({ status: sourceRelation.relationType }) },
+        lifeSystem: { setupNewDaimyo: (oldDaimyo, successor) => {
+            oldDaimyo.isDaimyo = false;
+            successor.isDaimyo = true;
+        } },
+        ui: { focusMapOnCastle: async () => {}, showDialogAsync: async () => {} }
+    };
+    game.historySystem = new History(game);
+    game.ui.log = (text, opts) => game.historySystem.record(text, opts);
+    assert.strictEqual(event.checkCondition(game), true, 'イベントの正規条件が成立する');
+    await event.execute(game);
+    assert.strictEqual(game.getBusho(1015005).isDaimyo, true, '正式イベントの家督交代処理を経る');
+    const records = game.historySystem.entries.filter(e => e.text.includes('浅井家家督相続'));
+    assert.strictEqual(records.length, 1, 'イベント結果を1件記録');
+    assert.deepStrictEqual([...records[0].clanIds], [15], '当事者は浅井家のみ');
+    assert.strictEqual(game.historySystem.getEntries('clan', 15).length, 1, '浅井家の自国履歴に掲載');
+    assert.strictEqual(game.historySystem.getEntries('national', 15).length, 0, '浅井家の全国履歴には重複しない');
+    assert.strictEqual(game.historySystem.getEntries('national', 1).length, 1, '無関係の織田家では全国欄へ掲載');
+});
+
+// r695: 履歴当事者は各イベントの定義から一度だけ確定し、登録自体は共通正本へ。
+test('r695 歴史イベントの記録19経路は共通履歴登録を使用し、当事者宣言はイベント定義へ集約する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/event/historical_event.js');
+    const logged = ctx.GameEvents.filter(e => e.history);
+    assert.strictEqual(logged.length, 17, '結果を直接ログ登録する有効な歴史イベント17件');
+    assert.ok(logged.every(e => typeof e.execute === 'function' && e.history), 'すべてに当事者定義がある');
+    const source = read('js/event/historical_event.js');
+    const direct = source.split('\n').filter(line => !line.trimStart().startsWith('//') && line.includes('game.ui.log('));
+    assert.strictEqual(direct.length, 1, '直接のgame.ui.logは共通履歴登録関数内だけ');
+    assert.strictEqual((source.match(/const logHistory = window\.EventAction\.createHistoryLogger/g) || []).length, logged.length,
+        '各イベントの実行開始時にだけ当事者を確定');
+    assert.strictEqual(source.split('\n').filter(line => !line.trimStart().startsWith('//') && line.includes('logHistory(')).length, 19,
+        '分岐ごとの履歴呼出しは共通登録関数のみ');
+});
+
+test('r695 当事者はイベント開始時の所属で固定し、所属変更や他ログへ影響しない', () => {
+    const ctx = createContext();
+    ctx.GameConfig.History = { MaxEntries: 100 };
+    loadScript(ctx, 'js/history_system.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    const History = vm.runInContext('HistorySystem', ctx);
+    const people = [ { id: 1, clan: 11 }, { id: 2, clan: 22 } ];
+    const game = { year: 1570, month: 4, playerClanId: 11, getBusho: id => people.find(b => b.id === id) };
+    game.historySystem = new History(game);
+    game.ui = { log: (text, opts) => game.historySystem.record(text, opts) };
+    const event = { history: { bushoIds: [1, 2], category: 'diplomacy' } };
+    const log = ctx.EventAction.createHistoryLogger(game, event);
+    people[0].clan = 33;
+    people[1].clan = 33;
+    game.ui.log('別部署の記録', {clanIds: [33]});
+    log('旧両家の合意');
+    assert.deepStrictEqual([...game.historySystem.entries[1].clanIds], [11, 22], '事後所属に依存しない');
+    assert.strictEqual(game.historySystem.entries[1].category, 'diplomacy');
+    assert.deepStrictEqual([...game.historySystem.entries[0].clanIds], [33], 'ほかの履歴に伝播しない');
+    assert.strictEqual(game.historySystem.getEntries('clan', 11).length, 1);
+    assert.strictEqual(game.historySystem.getEntries('national', 11).length, 1);
+    assert.strictEqual(game.historySystem.getEntries('clan', 33).length, 1);
+});
+
+test('r695 同じ歴史イベント中でも記録ごとに当事者が異なる場合だけ明示的に差し替える', () => {
+    const ctx = createContext();
+    ctx.GameConfig.History = { MaxEntries: 100 };
+    loadScript(ctx, 'js/history_system.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    const History = vm.runInContext('HistorySystem', ctx);
+    const game = { year: 1560, month: 5, playerClanId: 1, getBusho: id => ({ clan: id }) };
+    game.historySystem = new History(game);
+    game.ui = { log: (text, opts) => game.historySystem.record(text, opts) };
+    const log = ctx.EventAction.createHistoryLogger(game, { history: { bushoIds: [1,2] } });
+    log('一方の武将が討死', { clanIds: [2] });
+    log('両勢力に関わる結末');
+    assert.deepStrictEqual([...game.historySystem.entries[0].clanIds], [2]);
+    assert.deepStrictEqual([...game.historySystem.entries[1].clanIds], [1,2]);
+});
+
+test('r695 正規の家督相続イベントでも共通履歴から自国家へ帰属させる', async () => {
+    const ctx = createContext();
+    ctx.GameConfig.History = { MaxEntries: 100 };
+    loadScript(ctx, 'js/history_system.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    const History = vm.runInContext('HistorySystem', ctx);
+    const oldDaimyo = { id: 1074004, clan: 74, fullName: '伊達晴宗' };
+    const newDaimyo = { id: 1074008, clan: 74, fullName: '伊達輝宗' };
+    const game = {
+        year: 1570, month: 1, playerClanId: 74,
+        getBusho: id => [oldDaimyo, newDaimyo].find(b => b.id === id),
+        getClan: id => ({id, name: '伊達家'}),
+        lifeSystem: { setupNewDaimyo() { oldDaimyo.isDaimyo = false; newDaimyo.isDaimyo = true; } },
+        ui: { log: null, async showDialogAsync() {} }
+    };
+    game.historySystem = new History(game);
+    game.ui.log = (text, opts) => game.historySystem.record(text, opts);
+    const ev = ctx.GameEvents.find(e => e.id === 'historical_idate_succession');
+    await ev.execute(game);
+    assert.ok(newDaimyo.isDaimyo, '家督処理に影響しない');
+    assert.strictEqual(game.historySystem.getEntries('clan', 74).length, 1);
+    assert.strictEqual(game.historySystem.getEntries('national', 74).length, 0);
 });
 
 Promise.all(pendingTests).then(() => {

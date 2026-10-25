@@ -212,6 +212,32 @@ window.EventCheck = {
 // ★ イベント実行用の便利な魔法（新しく追加します）
 // ==========================================
 window.EventAction = {
+    // 歴史イベントの履歴は、定義側の history（当事者）を実行開始時に確定する。
+    // 各分岐でclanIdsを再列挙しない。人物の移籍・勢力吸収・死亡後も当時の所属を保持する。
+    // HistorySystem/UIManagerが履歴の保存と表示の正本。グローバルな「現在のイベント」は持たない。
+    createHistoryLogger: function(game, event, context = null) {
+        const definition = event && event.history;
+        const readIds = value => {
+            const result = typeof value === 'function' ? value(game, context) : value;
+            return Array.isArray(result) ? result : (result === undefined || result === null ? [] : [result]);
+        };
+        const ids = [];
+        if (definition) {
+            ids.push(...readIds(definition.clanIds));
+            for (const bushoId of readIds(definition.bushoIds)) {
+                const busho = game.getBusho(Number(bushoId));
+                if (busho) ids.push(busho.clan);
+            }
+        }
+        const clanIds = [...new Set(ids.map(Number).filter(id => Number.isInteger(id) && id > 0))];
+        const category = definition && definition.category ? definition.category : 'general';
+        return (text, override = null) => {
+            // 例外: 桶狭間の個別討死のように、一つの出来事でも各記録の当事者が違う場合。
+            // 本文の文字列から勢力は推測せず、必要な場合だけ明示情報を優先する。
+            const recordClanIds = override && override.clanIds !== undefined ? override.clanIds : clanIds;
+            game.ui.log(text, { clanIds: recordClanIds, category: override?.category || category, inferCurrentTurn: false });
+        };
+    },
     // ① 画面の見た目や情報を最新の状態に描き直します（お片付け）
     refreshScreen: async function(game) {
         const flowGeneration = window.EventFlowGuard ? window.EventFlowGuard.capture(game) : null;
@@ -494,6 +520,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_okehazama",
+    history: { bushoIds: [1004009, 1006006] },
     timing: "startMonth_before",     // 月初の処理前に発生するかチェックします
     isOneTime: true,                 // 一度発生したら二度と起きません
     
@@ -592,6 +619,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const yoshimoto = game.getBusho(1004009);
         const imagawaClanId = yoshimoto.clan;
         const nobunaga = game.getBusho(1006006);
@@ -844,7 +872,7 @@ window.GameEvents.push({
                         const prefix = (game.playerClanId === target.clanId) ? "当家" : target.clanName;
                         const msg = `${prefix}の${bushoName}が討死しました。`;
                         
-                        game.ui.log(msg); // ログにも残します
+                        logHistory(msg, { clanIds: [target.clanId] }); // 個別討死は各勢力だけの記録
                         await _historicalEventShowDialogAsync(game, msg, false, 0); // 画面に出して「OK」を押すまで待ちます
                     }
                 }
@@ -1055,6 +1083,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_kiyosu_alliance",
+    history: { bushoIds: [1006006, 1301006], category: 'diplomacy' },
     timing: "startMonth_before", // 月初の処理前に発生します
     isOneTime: true,             // 一度きりの歴史イベントです
     
@@ -1104,6 +1133,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         // ★ 1. 今流れているBGMを「後で戻す用」にメモしておきます
         if (window.AudioManager) {
             window.AudioManager.memorizeCurrentBgm();
@@ -1245,7 +1275,7 @@ window.GameEvents.push({
             if (window.EventTextManager && window.EventTextManager.kiyosu_alliance_matsudaira_reject) {
                 await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_matsudaira_reject(args));
             }
-            game.ui.log(`【イベント】清洲同盟：${args.matsudairaClanName}は${args.odaClanName}への使者派遣を見送りました。`);
+            logHistory(`【イベント】清洲同盟：${args.matsudairaClanName}は${args.odaClanName}への使者派遣を見送りました。`);
             
             // BGMを戻してイベントを終了します
             if (window.AudioManager) {
@@ -1299,7 +1329,7 @@ window.GameEvents.push({
             }
 
             // ログ出力
-            game.ui.log(`【イベント】清洲同盟：${args.matsudairaClanName}と${args.odaClanName}の同盟が成立しました。`);
+            logHistory(`【イベント】清洲同盟：${args.matsudairaClanName}と${args.odaClanName}の同盟が成立しました。`);
 
             // 外交システムを使って、強制的に「同盟」状態にします
             if (game.diplomacyManager) {
@@ -1320,7 +1350,7 @@ window.GameEvents.push({
                 await window.EventTextManager.playSequence(game, window.EventTextManager.kiyosu_alliance_reject(args));
             }
             // ログ出力
-            game.ui.log(`【イベント】清洲同盟：${args.odaFamilyName}家は${args.matsudairaFamilyName}家との同盟を拒否しました。`);
+            logHistory(`【イベント】清洲同盟：${args.odaFamilyName}家は${args.matsudairaFamilyName}家との同盟を拒否しました。`);
         }
 
         // ★ 3. イベントが全て終わったので、メモしておいた元のBGMに戻します
@@ -1390,6 +1420,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_nagamasa_succession",
+    history: { bushoIds: [1015004], category: 'succession' },
     timing: "startMonth_before", 
     isOneTime: true,             
     
@@ -1425,6 +1456,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const oldDaimyo = game.getBusho(1015004);
         const successor = game.getBusho(1015005);
         const clanId = oldDaimyo.clan;
@@ -1438,7 +1470,7 @@ window.GameEvents.push({
         const nagamasaName = successor.fullName;
         const mainMsg = `浅井家の${hisamasaName}が隠居し、\n${nagamasaName}が新たな当主として家督を継ぎました！`;
         
-        game.ui.log(`【イベント】浅井家家督相続：${mainMsg}`);
+        logHistory(`【イベント】浅井家家督相続：${mainMsg}`);
         messages.unshift(mainMsg); // 一番最初にメインのメッセージを入れます
 
         // 溜めておいたメッセージを順番に出します
@@ -1453,6 +1485,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_oda_azai_marriage",
+    history: { bushoIds: [1006006, 1015005], category: 'diplomacy' },
     timing: "startMonth_before", // 月初の処理前にチェックします
     isOneTime: true,             // 一度発生したら二度と起きません
     
@@ -1507,6 +1540,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const nobunaga = game.getBusho(1006006);
         const nagamasa = game.getBusho(1015005);
         const oichiId = 2;
@@ -1544,7 +1578,7 @@ window.GameEvents.push({
         // ★変更：ご希望の文章に変更します
         const msg = `亡き将軍の後継者である${candidateName}公の要請に応じ、${azaiName}が${odaName}に従属しました。\n${odaName}の${oichiName}が${nagamasaName}に輿入れしました。`;
         
-        game.ui.log(`【イベント】織田・浅井婚姻：${msg}`);
+        logHistory(`【イベント】織田・浅井婚姻：${msg}`);
         await _historicalEventShowDialogAsync(game, msg, false, 0);
     }
 });
@@ -1554,6 +1588,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_toyama_takeover",
+    history: { bushoIds: [1006006], clanIds: (game, context) => [context?.deadBusho?.clan], category: 'succession' },
     timing: "busho_death", // ★ 武将が死亡した瞬間にチェックします
     isOneTime: true,       // 一度だけ発生します
     
@@ -1605,6 +1640,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game, context) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const deadBusho = context.deadBusho;
         const nobunaga = game.getBusho(1006006);
         const katsunaga = game.getBusho(1006013);
@@ -1680,7 +1716,7 @@ window.GameEvents.push({
         const toyamaClanName = toyamaClan ? toyamaClan.name : "遠山家";
         const msg = `${toyamaClanName}の${deadName}が死亡し、${odaName}の${katsunagaName}が養子入りして家督を継ぎました。`;
         
-        game.ui.log(`【当主交代】${msg}`);
+        logHistory(`【当主交代】${msg}`);
         await _historicalEventShowDialogAsync(game, msg, false, 0);
     }
 });
@@ -1690,6 +1726,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_rename_gifu_castle",
+    history: { bushoIds: [1006006] },
     timing: "startMonth_before", // 毎月の初めに条件を満たしているかチェックします
     isOneTime: true,             // このイベントは一度発生したら二度と起きません
     
@@ -1737,6 +1774,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         // ここからが、イベントが起きた時に実際に実行される処理（結果）です
         const nobunaga = game.getBusho(1006006);
         const inabayama = game.getCastle(3);
@@ -1851,7 +1889,7 @@ window.GameEvents.push({
         }
 
         // ⑧ 画面にイベントが起きたことのメッセージを出してお知らせします
-        game.ui.log(`【イベント】${nobunagaName}が${oldCastleName}を「岐阜城」と改称しました。`);
+        logHistory(`【イベント】${nobunagaName}が${oldCastleName}を「岐阜城」と改称しました。`);
     }
 });
 
@@ -1860,6 +1898,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_rename_hamamatsu_castle",
+    history: { bushoIds: [1301006] },
     timing: "startMonth_before", // 毎月の初めに条件を満たしているかチェックします
     isOneTime: true,             // このイベントは一度発生したら二度と起きません
     
@@ -1886,6 +1925,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         // ここからが、イベントが起きた時に実際に実行される処理です
         const motoyasu = game.getBusho(1301006);
         const hikuma = game.getCastle(12);
@@ -1970,7 +2010,7 @@ window.GameEvents.push({
 
         // ⑧ 画面にイベントが起きたことのメッセージを出してお知らせします
         const msg = `${motoyasuName}が居城を${oldCastleName}に移し、「浜松城」と改称しました！`;
-        game.ui.log(`【イベント】${motoyasuName}が${oldCastleName}を「浜松城」と改称しました。`);
+        logHistory(`【イベント】${motoyasuName}が${oldCastleName}を「浜松城」と改称しました。`);
         await _historicalEventShowDialogAsync(game, msg, false, 0);
     }
 });
@@ -2013,6 +2053,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_eiroku_no_hen",
+    history: { bushoIds: [1017003, 1020014] },
     timing: "startMonth_before", // 月初の処理前に発生します
     isOneTime: true,             // 一度きりの歴史イベントです
     // 永禄8年5月。これより後から始まるシナリオでは本編を再演せず、発生済みとして扱います。
@@ -2083,6 +2124,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const yoshiteru = game.getBusho(1017003);
         const yoshitsugu = game.getBusho(1020014);
         const nagayasu = game.getBusho(1020021);
@@ -2214,7 +2256,7 @@ window.GameEvents.push({
 
         // ⑦ メッセージ表示（動的な名前を使用）
         const msg = `${yoshitsuguName}が二条御所を襲撃、${yoshiteruName}は討死し、${ashikagaClanName}の旧領はすべて${miyoshiClanName}の手に落ちました。`;
-        game.ui.log(`【イベント】永禄の変：${msg}`);
+        logHistory(`【イベント】永禄の変：${msg}`);
         await _historicalEventShowDialogAsync(game, msg, false, 0);
         
     }
@@ -2224,7 +2266,8 @@ window.GameEvents.push({
 // ★ 将軍庇護第１段階 足利義昭が朝倉家を頼る
 // ==========================================
 window.GameEvents.push({
-    id: "historical_shogun_protection_1", 
+    id: "historical_shogun_protection_1",
+    history: { bushoIds: [1007008, 1017004] }, 
     timing: "startMonth_before",
     isOneTime: true,
     
@@ -2295,6 +2338,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const yoshiaki = game.getBusho(1017004);
         const fujitaka = game.getBusho(1017029);
         const wada = game.getBusho(1017035);
@@ -2461,7 +2505,7 @@ window.GameEvents.push({
         const asakuraClanName = game.getClan(asakuraClanId)?.name || "朝倉家";
         const msg = `${yoshiakiName}は幕府再興のため、${asakuraNameDisplay}を頼り${asakuraClanName}の庇護下に入りました。`;
         
-        game.ui.log(`【イベント】${msg}`);
+        logHistory(`【イベント】${msg}`);
     }
 });
 
@@ -2471,6 +2515,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_shogun_protection_2",
+    history: { bushoIds: [1007008, 1006006, 1017004] },
     timing: "startMonth_before",
     isOneTime: true,
     
@@ -2542,6 +2587,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const yoshiaki = game.getBusho(1017004);
         const mitsuhide = game.getBusho(1201003);
         const fujitaka = game.getBusho(1017029);
@@ -2780,7 +2826,7 @@ window.GameEvents.push({
 
         const msg = `${yoshiakiName}は上洛のため、${nobunagaName}を頼りその庇護下に入りました。`;
         
-        game.ui.log(`【イベント】${msg}`);
+        logHistory(`【イベント】${msg}`);
     }
 });
 
@@ -2788,7 +2834,8 @@ window.GameEvents.push({
 // ★ 将軍入城イベント（予備イベント）
 // ==========================================
 window.GameEvents.push({
-    id: "historical_shogun_setup", 
+    id: "historical_shogun_setup",
+    history: { clanIds: game => [window.EventCheck.getCandidateBusho(game)?.clan] }, 
     timing: "startMonth_before",     
     isOneTime: false, // 条件を満たしている間は、何度でも（毎月）チェックします
     
@@ -2823,6 +2870,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         // 1. 将軍候補を特定します
         const candidate = window.EventCheck.getCandidateBusho(game);
         if (!candidate) return;
@@ -2853,7 +2901,7 @@ window.GameEvents.push({
 
         // 何が起きたか後でわかるように、履歴（ログ）にこっそり記録しておきます
         const name = candidate.fullName;
-        game.ui.log(`(将軍候補の${name}が、幕府再興のため二条城へ入城しました)`);
+        logHistory(`(将軍候補の${name}が、幕府再興のため二条城へ入城しました)`);
         
     }
 });
@@ -3172,6 +3220,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_yoshitsugu_exile",
+    history: { bushoIds: [1020014, 1202004] },
     timing: "startMonth_before", // 月初の処理前に発生します
     isOneTime: true,             // 一度きりの歴史イベントです
     
@@ -3206,6 +3255,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const yoshitsugu = game.getBusho(1020014);
         const hisahide = game.getBusho(1202004);
         const nagayasu = game.getBusho(1020021);
@@ -3275,7 +3325,7 @@ window.GameEvents.push({
         });
 
         // ⑤ 画面にメッセージを出してお知らせします
-        game.ui.log(`【イベント】三好当主・三好義継が出奔し、松永久秀の元へ逃れました。`);
+        logHistory(`【イベント】三好当主・三好義継が出奔し、松永久秀の元へ逃れました。`);
         await _historicalEventShowDialogAsync(game, `三好義継が悪逆無道の三好三人衆に愛想をつかし、三好家の忠臣・松永久秀の元へ逃れました。三好家は三好長逸が新たな当主となります。`, false, 0);
         
     }
@@ -3286,6 +3336,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_hisahide_submission",
+    history: { bushoIds: [1202004], clanIds: game => [window.EventCheck.getShogunInfo(game)?.sponsorClanId], category: 'diplomacy' },
     timing: "startMonth_before", 
     isOneTime: true,             
     
@@ -3349,6 +3400,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const hisahide = game.getBusho(1202004);
         const matsunagaClanId = hisahide.clan;
         const matsunagaClan = game.getClan(matsunagaClanId);
@@ -3413,7 +3465,7 @@ window.GameEvents.push({
         // ④ メッセージ表示
         const msg = `${hisahideName}が${sponsorName}の上洛に同調し臣従しました！`;
         
-        game.ui.log(`【イベント】${msg}`);
+        logHistory(`【イベント】${msg}`);
         await _historicalEventShowDialogAsync(game, msg, false, 0);
     }
 });
@@ -3810,6 +3862,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_hatakeyama_submission",
+    history: { clanIds: game => [window.EventCheck.getDaimyo(game, [1041012, 1041013, 1041016])?.clan, window.EventCheck.getShogunInfo(game)?.sponsorClanId], category: 'diplomacy' },
     timing: "startMonth_before", 
     isOneTime: true,             
     
@@ -3869,6 +3922,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         // 対象の畠山大名をもう一度特定します
         const hatakeyamaDaimyo = window.EventCheck.getDaimyo(game, [1041012, 1041013, 1041016]);
         if (!hatakeyamaDaimyo) return;
@@ -3902,7 +3956,7 @@ window.GameEvents.push({
         // ⑤ 画面に何が起きたかメッセージを出してお知らせします
         const msg = `${hatakeyamaName}が${sponsorName}の上洛に同調し臣従しました！`;
         
-        game.ui.log(`【イベント】${msg}`);
+        logHistory(`【イベント】${msg}`);
         await _historicalEventShowDialogAsync(game, msg, false, 0);
     }
 });
@@ -3912,6 +3966,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_mogami_succession",
+    history: { bushoIds: [1089011], category: 'succession' },
     timing: "startMonth_before", // 毎月の初めに条件を満たしているかチェックします
     isOneTime: true,             // 一度発生したら二度と起きません
     
@@ -3937,6 +3992,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const oldDaimyo = game.getBusho(1089011);
         const successor = game.getBusho(1089012);
         const clanId = oldDaimyo.clan;
@@ -3964,7 +4020,7 @@ window.GameEvents.push({
 
         const mainMsg = `${clanName}の${oldNameStr}が隠居し、\n${yoshiakiName}が新たな当主として家督を継ぎました！`;
         
-        game.ui.log(`【イベント】最上家家督相続：${mainMsg}`);
+        logHistory(`【イベント】最上家家督相続：${mainMsg}`);
         messages.unshift(mainMsg); // 一番最初にメインのメッセージを入れます
 
         // 溜めておいたメッセージを順番に出します
@@ -4031,6 +4087,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_kitabatake_succession",
+    history: { bushoIds: [1024004], category: 'succession' },
     timing: "startMonth_before", 
     isOneTime: true,             
     
@@ -4054,6 +4111,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const oldDaimyo = game.getBusho(1024004);
         const successor = game.getBusho(1024005);
         const clanId = oldDaimyo.clan;
@@ -4070,7 +4128,7 @@ window.GameEvents.push({
 
         const mainMsg = `${clanName}の${tomonoriName}が隠居し、\n${tomofusaName}が新たな当主として家督を継ぎました！`;
         
-        game.ui.log(`【イベント】北畠家家督相続：${mainMsg}`);
+        logHistory(`【イベント】北畠家家督相続：${mainMsg}`);
         messages.unshift(mainMsg);
 
         for (const msg of messages) {
@@ -4084,6 +4142,7 @@ window.GameEvents.push({
 // ==========================================
 window.GameEvents.push({
     id: "historical_idate_succession",
+    history: { bushoIds: [1074004], category: 'succession' },
     timing: "startMonth_before", 
     isOneTime: true,             
     
@@ -4107,6 +4166,7 @@ window.GameEvents.push({
     },
     
     execute: async function(game) {
+        const logHistory = window.EventAction.createHistoryLogger(game, this, arguments[1]);
         const oldDaimyo = game.getBusho(1074004);
         const successor = game.getBusho(1074008);
         const clanId = oldDaimyo.clan;
@@ -4123,7 +4183,7 @@ window.GameEvents.push({
 
         const mainMsg = `${clanName}の${harumuneName}が隠居し、\n${terumuneName}が新たな当主として家督を継ぎました！`;
         
-        game.ui.log(`【イベント】伊達家家督相続：${mainMsg}`);
+        logHistory(`【イベント】伊達家家督相続：${mainMsg}`);
         messages.unshift(mainMsg);
 
         for (const msg of messages) {
