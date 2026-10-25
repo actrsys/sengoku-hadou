@@ -7,18 +7,11 @@
 (function startInitialPageLoading() {
     'use strict';
     const overlay = document.getElementById('startup-loading-screen');
-    const progress = document.getElementById('startup-progress-bar');
-    const counter = document.getElementById('startup-progress');
-    const status = document.getElementById('startup-status');
+    const errorPanel = document.getElementById('startup-error');
     const retry = document.getElementById('startup-retry');
     const manifest = document.getElementById('startup-script-manifest');
     if (!overlay || !manifest) return;
 
-    const report = (percent, message) => {
-        if (progress) progress.style.width = `${percent}%`;
-        if (counter) counter.textContent = `${percent}%`;
-        if (status) status.textContent = message;
-    };
     if (retry) retry.addEventListener('click', () => window.location.reload());
 
     // requestAnimationFrame 内で大量の同期処理を始めない。少なくとも最初の
@@ -59,12 +52,10 @@
         }
         // 最初のpaint。ゲーム用font-faceや複雑なCSSはまだ存在しない。
         await givePaintOpportunity();
-        report(5, '画面を準備しています');
         await Promise.all([
             loadStylesheet('css/style.css'),
             loadStylesheet('css/animation.css')
         ]);
-        report(14, 'ゲームプログラムを読み込んでいます');
         await givePaintOpportunity();
 
         // 連続で約70本を実行すると低速端末の描画が長く停止する。
@@ -74,25 +65,22 @@
         for (let start = 0; start < sources.length; start += batchSize) {
             const batch = sources.slice(start, start + batchSize);
             await Promise.all(batch.map(loadScript));
-            const completed = Math.min(sources.length, start + batch.length);
-            report(14 + Math.floor(78 * completed / sources.length), 'ゲームプログラムを読み込んでいます');
             await givePaintOpportunity();
         }
         if (typeof window.__refreshTitleVersion === 'function') window.__refreshTitleVersion();
         if (!window.GameApp || !window.GameApp.ui) {
             throw new Error('ゲーム本体の初期化が完了していません');
         }
-        report(95, 'タイトル画面を準備しています');
         if (window.__titleFontLoadPromise) await window.__titleFontLoadPromise;
         // タイトル書体の失敗時は app_bootstrap の既存fallbackが公開責務を持つ。
-        report(100, '完了');
         await givePaintOpportunity();
         overlay.hidden = true;
     }
 
     run().catch(error => {
         console.error('【StartupLoader】初回起動に失敗:', error);
-        report(0, '起動に失敗しました。再読み込みしてください。');
-        if (retry) retry.hidden = false;
+        overlay.classList.add('is-error');
+        overlay.setAttribute('aria-label', '起動に失敗しました');
+        if (errorPanel) errorPanel.hidden = false;
     });
 })();

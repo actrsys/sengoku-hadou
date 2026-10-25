@@ -494,7 +494,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r688');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r689');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -30140,7 +30140,19 @@ test('r687 初回ページにCSS・本編JSより前の独立ロード幕と遅�
     assert.ok(loader.includes('await Promise.all(batch.map(loadScript));'), '各batchが終わってから次の依存を読む');
     assert.ok(loader.includes('await window.__titleFontLoadPromise;'), 'タイトル書体の準備完了後に公開');
     assert.ok(loader.includes('overlay.hidden = true;'), '起動完了までは幕を保持');
-    assert.ok(loader.includes('retry.hidden = false;'), 'CSS/JS取得失敗は再読み込みへ復旧可能');
+    assert.ok(loader.includes("overlay.classList.add('is-error')") && loader.includes('errorPanel.hidden = false;'),
+        'CSS/JS取得失敗は再読み込みへ復旧可能');
+    // r689：初回幕の通常表示は黒地と右下の回転表示だけ。エラー案内は失敗時だけ。
+    const splashMarkup = html.slice(splash, screen);
+    assert.ok(html.includes('background: #000; visibility: visible !important;'), '初回幕は真っ黒で表示');
+    assert.ok(html.includes('right: calc(20px + env(safe-area-inset-right, 0px));'), '回転表示は右端');
+    assert.ok(html.includes('bottom: calc(20px + env(safe-area-inset-bottom, 0px));'), '回転表示は下端');
+    assert.ok(splashMarkup.includes('class="startup-spinner"') && splashMarkup.includes('aria-hidden="true"'));
+    assert.ok(!splashMarkup.includes('NOW LOADING') && !splashMarkup.includes('startup-progress')
+        && !splashMarkup.includes('startup-title') && !splashMarkup.includes('startup-track'),
+        '初回幕には文字・進捗率・飾りを常時表示しない');
+    assert.ok(splashMarkup.includes('id="startup-error" role="alert" hidden'), '失敗時の案内は初期非表示');
+    assert.ok(splashMarkup.includes('id="startup-retry"'), '初回失敗時の再試行を維持');
     assert.ok(read('js/game.js').includes("document.readyState === 'complete')) initializeGameApp()"),
         'DOMContentLoaded後の遅延script読込でもGameManagerを起動する');
     assert.ok(read('js/ui_settings.js').includes("document.readyState === 'complete') initializeSettingsUi()"),

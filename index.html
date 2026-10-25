@@ -18,40 +18,38 @@
     <title>戦国覇道</title>
     <!-- 最初の一画面だけは本編CSS・JS・Webフォントを待たずに表示する。 -->
     <style>
-        html, body { margin: 0; min-height: 100%; background: #0b0e0f; }
-        #startup-loading-screen { position: fixed; inset: 0; z-index: 2147483000; box-sizing: border-box;
-            display: flex; align-items: center; justify-content: center; background: #263238;
-            color: #eee8d6; font-family: Georgia, "Times New Roman", serif; text-align: center;
-            padding: 24px; visibility: visible !important; }
+        /* 初回の一画面だけは本編CSSを待たずに黒地と小さな待機表示を描画する。 */
+        html, body { margin: 0; min-height: 100%; background: #000; }
+        #startup-loading-screen { position: fixed; inset: 0; z-index: 2147483000;
+            background: #000; visibility: visible !important; }
         #startup-loading-screen[hidden] { display: none !important; }
-        #startup-loading-screen .startup-inner { width: min(400px, 88vw); }
-        #startup-loading-screen .startup-title { font-size: clamp(30px, 6vw, 54px); letter-spacing: .11em; }
-        #startup-loading-screen .startup-rule { width: 66%; height: 1px; margin: 22px auto;
-            background: #a58a51; }
-        #startup-loading-screen .startup-text { font-size: 12px; letter-spacing: .32em; color: #c8bfa9; }
-        #startup-loading-screen .startup-status { font-size: 13px; line-height: 1.65;
-            margin-top: 20px; min-height: 1.65em; color: #d9d2c0; }
-        #startup-loading-screen .startup-track { height: 3px; width: 68%; margin: 18px auto 0;
-            background: #48504d; border-radius: 999px; overflow: hidden; }
-        #startup-loading-screen .startup-track > span { display: block; width: 0; height: 100%;
-            background: #c7aa66; transition: width .16s linear; }
-        #startup-loading-screen .startup-progress { font-size: 11px; margin-top: 10px; color: #b8ae93; }
-        #startup-retry { margin-top: 22px; padding: 10px 20px; border: 1px solid #c7aa66;
-            background: #263238; color: #f2e8d0; font: inherit; cursor: pointer; }
-        #startup-retry[hidden] { display: none !important; }
-        @media (prefers-reduced-motion: reduce) { #startup-loading-screen .startup-track > span { transition: none; } }
+        #startup-loading-screen .startup-spinner { position: absolute;
+            right: calc(20px + env(safe-area-inset-right, 0px));
+            bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+            box-sizing: border-box; width: 18px; height: 18px;
+            border: 2px solid rgba(255, 255, 255, .18);
+            border-top-color: rgba(255, 255, 255, .7);
+            border-radius: 50%; animation: startup-spin .85s linear infinite; }
+        @keyframes startup-spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) {
+            #startup-loading-screen .startup-spinner { animation: none; }
+        }
+        /* 読込失敗時だけ、再試行できる最小限の案内を出す。 */
+        #startup-error { position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 16px; padding: 24px;
+            box-sizing: border-box; color: #ddd; font: 14px/1.6 sans-serif; text-align: center; }
+        #startup-error[hidden] { display: none !important; }
+        #startup-retry { padding: 9px 20px; border: 1px solid #777;
+            border-radius: 4px; background: #111; color: #eee; font: inherit; cursor: pointer; }
+        #startup-loading-screen.is-error .startup-spinner { display: none; }
     </style>
 </head>
 <body>
-    <div id="startup-loading-screen" role="status" aria-live="polite" aria-label="起動中">
-        <div class="startup-inner">
-            <div class="startup-title">戦国覇道</div>
-            <div class="startup-rule" aria-hidden="true"></div>
-            <div class="startup-text">NOW LOADING</div>
-            <div id="startup-status" class="startup-status">起動準備中</div>
-            <div class="startup-track" aria-hidden="true"><span id="startup-progress-bar"></span></div>
-            <div id="startup-progress" class="startup-progress">0%</div>
-            <button type="button" id="startup-retry" hidden>再読み込み</button>
+    <div id="startup-loading-screen" role="status" aria-label="起動中">
+        <div class="startup-spinner" aria-hidden="true"></div>
+        <div id="startup-error" role="alert" hidden>
+            <span>起動に失敗しました。</span>
+            <button type="button" id="startup-retry">再読み込み</button>
         </div>
     </div>
     <div id="game-screen">
