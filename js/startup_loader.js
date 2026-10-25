@@ -72,7 +72,9 @@
             throw new Error('ゲーム本体の初期化が完了していません');
         }
         if (window.__titleFontLoadPromise) await window.__titleFontLoadPromise;
-        // タイトル書体の失敗時は app_bootstrap の既存fallbackが公開責務を持つ。
+        // 専用フォントの配置確定（または固定した代替書体への移行）後に
+        // 2回の描画機会を渡す。表示後のフォント切替を起こさない。
+        await givePaintOpportunity();
         await givePaintOpportunity();
         overlay.hidden = true;
     }

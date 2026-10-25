@@ -1,0 +1,25 @@
+# r690 初回タイトル公開後の書体差替え防止
+
+基準：r689完全版。正本：ARCHITECTURE.md の初回タイトル専用フォント／ロード画面分離方針。
+
+【通常起動で起きる問題】
+- r688の2.5秒期限でタイトル専用フォントの通信が完了しない場合、fonts-fallbackへ遷移し、初回黒幕は解除される。
+- しかし CSS の #title-screen にTitleFude／TitleAbashiri指定が残り、通信が後から成功すると CSS Font Loading により代替字形が専用字形へ自動差替えされる。JavaScript側のclassesだけ固定しても描画字体は固定されず、タイトル公開後に一瞬見た目が変わる。
+- 初回タイトルのフォント明示ロード用の短い文言は、実際の画面で表示する字幕・操作案内・メニュー文字全体ではない。追加字形が初回paint後に読み込まれ得る。
+
+【必要な修正】
+- app_bootstrap.js は #title-screen の実際の文字列をTitleAbashiriの明示ロード対象とし、TitleFudeはタイトル文字の4字形を対象とする。document.fonts.ready と document.fonts.check の後に fonts-ready を確定し、2.5秒期限は変更しない。
+- css/style.css はフォント取得失敗・時間切れの fonts-fallback 状態で、タイトルの本体・大見出し・ボタン・版番号へ安定したOS明朝系を優先指定し、後でTitle書体の通信が完了しても差し替わらないようにする。軽量モードの指定には干渉しない。
+- startup_loader.js は初回書体の成功／固定fallback判定を待ち、描画機会を二巡してから黒い幕を解除する。表示構造・右下18pxのスピナー・エラー再試行は変更しない。
+- 本編用の約20MB書体は従来どおり最初のタップ後だけ読み、ゲーム中の共通ロード幕の責務は変更しない。
+
+【検証】
+- 新規Node回帰テストを追加し、タイトルの実文字列、FontFaceSet.ready待ち、check確認、fallbackのCSS固定、最終描画機会を確認。
+- Nodeロジック1,163件すべて成功、PC・スマホ画面回帰は正常終了。
+- 代替ChromiumブラウザでCSPメタを外しURLを仮想配信して、専用書体を即時返す経路と5秒遅延させる経路を実測。通常経路では専用2書体loadedかつfonts-readyの段階で黒幕が閉じた。5秒遅延時は2.5秒経過後にfonts-fallbackで閉じ、遅延受信後もタイトルのcomputed font-familyと版番号文字幅が一定であることを確認。代替配信は実公開サイトへの起動試験ではない。
+- 1560・1570・共通Excel/BINの一致、数式チェック、シミュレーション4件成功。JavaScript構文確認、ZIP CRC照合を実施。
+
+【変更範囲】
+追加：docs/audits/r690_初回タイトル公開後の書体差替え防止監査記録.txt
+更新：ARCHITECTURE.md、docs/audits/README.md、css/style.css、js/app_bootstrap.js、js/startup_loader.js、js/config.js、tests/run_tests.js
+削除：なし

@@ -53,6 +53,14 @@ html:not(.mobile-low-memory) #title-screen .title-version { font-family: 'TitleA
 html.fonts-loading body { visibility: hidden; }
 html.fonts-ready body,
 html.fonts-fallback body { visibility: visible; }
+/* 初回書体の取得が期限切れ・失敗になった場合、代替書体をこのページの
+   タイトル用に固定する。通信の遅延完了でWebフォントへ突然差し替えない。 */
+html.fonts-fallback:not(.mobile-low-memory) #title-screen,
+html.fonts-fallback:not(.mobile-low-memory) #title-screen .game-title,
+html.fonts-fallback:not(.mobile-low-memory) #title-screen .title-btn,
+html.fonts-fallback:not(.mobile-low-memory) #title-screen .title-version {
+    font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+}
 
 :root {
     --bg-color: #eceff1;

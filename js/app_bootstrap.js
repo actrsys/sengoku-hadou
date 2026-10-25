@@ -271,12 +271,27 @@
             resolveTitleFontLoad(loaded);
         };
         const timer = setTimeout(() => finish(false), TITLE_FONT_TIMEOUT_MS);
-        Promise.all([
-            document.fonts.load('400 16px "TitleAbashiri"', '戦国覇道観戦する指南書'),
-            document.fonts.load('400 16px "TitleFude"', '戦国覇道')
-        ]).then(results => {
-            finish(results.every(faces => Array.isArray(faces) && faces.length > 0));
-        }).catch(error => {
+        // タイトル内の実際の表示文字を揃えてから公開する。数文字だけの
+        // font.loadでは、残りの字形を初回paint後に取得する余地が残る。
+        const titleElement = typeof document.getElementById === 'function'
+            ? document.getElementById('title-screen') : null;
+        const titleGlyphs = titleElement ? titleElement.textContent : '戦国覇道';
+        const titleFaceChecks = [
+            ['400 16px "TitleAbashiri"', titleGlyphs],
+            ['400 16px "TitleFude"', '戦国覇道']
+        ];
+        Promise.all(titleFaceChecks.map(([font, text]) => document.fonts.load(font, text)))
+            .then(async results => {
+                if (!results.every(faces => Array.isArray(faces) && faces.length > 0)) {
+                    finish(false);
+                    return;
+                }
+                // Webフォントのload完了と、レイアウトで使える状態を区別する。
+                await document.fonts.ready;
+                const loaded = typeof document.fonts.check !== 'function'
+                    || titleFaceChecks.every(([font, text]) => document.fonts.check(font, text));
+                finish(loaded);
+            }).catch(error => {
             console.warn('【FontLoader】タイトル書体を読み込めませんでした:', error);
             finish(false);
         });

@@ -439,6 +439,53 @@ test('r688 タイトルフォントが遅延しても既存2.5秒で起動待機
     assert.ok(clearCalls.includes(id), '期限タイマーは使い終わったら解除');
 });
 
+// r690: ロード幕解除後のタイトルWebフォントの後入りによる字形ジャンプを防ぐ。
+test('r690 タイトルは実表示字形とFontFaceSetのレイアウト完了後にだけ公開する', async () => {
+    const css = read('css/style.css');
+    const loader = read('js/startup_loader.js');
+    const boot = read('js/app_bootstrap.js');
+    assert.ok(boot.includes("document.getElementById('title-screen')"), 'タイトルで実際に使う文字を待つ');
+    assert.ok(boot.includes('await document.fonts.ready;'), '表示前にFontFaceSet完了を待つ');
+    assert.ok(boot.includes('document.fonts.check(font, text)'), '完了後に使用書体を照合');
+    assert.ok(loader.includes('await givePaintOpportunity();\n        await givePaintOpportunity();\n        overlay.hidden = true;'),
+        '書体状態を確定させた後、描画を二巡してから黒い幕を開ける');
+    for (const cls of ['#title-screen,', '#title-screen .game-title,',
+        '#title-screen .title-btn,', '#title-screen .title-version {']) {
+        assert.ok(css.includes('html.fonts-fallback:not(.mobile-low-memory) ' + cls),
+            '期限切れ時もタイトルのWebフォントを後から適用しない: ' + cls);
+    }
+    let finishReady;
+    const fontSetReady = new Promise(resolve => { finishReady = resolve; });
+    const loaded = [];
+    const timers = new Map();
+    const classes = new FakeClassList(['fonts-loading']);
+    const fakeDocument = {
+        documentElement: { classList: classes },
+        readyState: 'loading',
+        getElementById(id) { return id === 'title-screen' ? { textContent: '戦国覇道・乱世を駆け天下への道' } : null; },
+        fonts: {
+            load: async (font, text) => { loaded.push([font, text]); return [{ family: font }]; },
+            ready: fontSetReady,
+            check: (font, text) => font.includes('TitleFude') ? text === '戦国覇道' : text.includes('乱世を駆け')
+        }
+    };
+    const context = createContext({
+        document: fakeDocument, navigator: { userAgent: 'Desktop', maxTouchPoints: 0 },
+        setTimeout(callback, delay) { const id = timers.size + 1; timers.set(id, {callback, delay}); return id; },
+        clearTimeout(id) { timers.delete(id); }
+    });
+    context.addEventListener = () => {};
+    loadScript(context, 'js/app_bootstrap.js');
+    await Promise.resolve(); await Promise.resolve();
+    assert.ok(classes.contains('fonts-loading'), 'FontFaceSetが確定するまでは画面を公開しない');
+    assert.strictEqual(loaded.length, 2);
+    assert.ok(loaded[0][1].includes('乱世を駆け'), '実際のタイトル字形を読み込む');
+    finishReady();
+    assert.strictEqual(await context.__titleFontLoadPromise, true);
+    assert.ok(classes.contains('fonts-ready'));
+    assert.ok(!classes.contains('fonts-loading'));
+});
+
 test('r540 トップ観戦はロード後にだけ平時BGMへ切替し、通常開始とタイトルでは変更しない', () => {
     const game = read('js/game.js');
     const start = game.indexOf('async loadScenario(folder, options = {})');
@@ -494,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r689');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r690');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
