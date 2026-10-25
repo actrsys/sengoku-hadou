@@ -697,7 +697,15 @@ class DiplomacyManager {
      * ★新しく追加！：毎月末に呼ばれて、和睦の期間を減らす魔法です
      */
     processEndMonth() {
-        const expiredHostilityPairs = new Map();
+        const hostilityPairsNeedingResolution = new Map();
+        const recordHostilePair = (clanId, targetId) => {
+            const a = Number(clanId);
+            const b = Number(targetId);
+            if (a <= 0 || b <= 0 || a === b) return;
+            const low = Math.min(a, b);
+            const high = Math.max(a, b);
+            hostilityPairsNeedingResolution.set(`${low}:${high}`, [low, high]);
+        };
         this.game.clans.forEach(clan => {
             if (!clan.diplomacyValue || clan.isDestroyed) return;
             
@@ -720,23 +728,24 @@ class DiplomacyManager {
                             data.status = window.GameConstants.DiplomacyStatus.FRIENDLY;
                         } else if (data.sentiment <= 30) {
                             data.status = window.GameConstants.DiplomacyStatus.HOSTILE;
-                            const a = Number(clan.id);
-                            const b = Number(targetId);
-                            if (a > 0 && b > 0 && a !== b) {
-                                const low = Math.min(a, b);
-                                const high = Math.max(a, b);
-                                expiredHostilityPairs.set(`${low}:${high}`, [low, high]);
-                            }
+                            recordHostilePair(clan.id, targetId);
                         } else {
                             data.status = window.GameConstants.DiplomacyStatus.NORMAL;
                         }
                     }
                 }
+                // 和睦が「普通」に戻った後、通常の計略・援軍・開戦などによる
+                // 友好度低下で敵対へ移った場合も、残った外交人質を月末に処遇する。
+                // 即時処遇が必要な明示断交は既存の窓口で処理済み（hostageIdsは空）。
+                if (data.status === window.GameConstants.DiplomacyStatus.HOSTILE
+                    && Array.isArray(data.hostageIds) && data.hostageIds.length > 0) {
+                    recordHostilePair(clan.id, targetId);
+                }
             }
         });
-        if (expiredHostilityPairs.size === 0) return;
+        if (hostilityPairsNeedingResolution.size === 0) return;
         const consequences = [];
-        for (const [clanAId, clanBId] of expiredHostilityPairs.values()) {
+        for (const [clanAId, clanBId] of hostilityPairsNeedingResolution.values()) {
             const relation = this.getRelation(clanAId, clanBId);
             if (!relation || relation.status !== window.GameConstants.DiplomacyStatus.HOSTILE) continue;
             // 敵対へ移った関係だけ、断交と同じ既存の処遇準備へ送る。

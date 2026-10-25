@@ -161,18 +161,7 @@ def make_common(book):
         'generic_princess': 'genericPrincessProfiles'
     }
     for sheet, field_name in mapping.items():
-        if sheet == 'clans_master':
-            result[field_name] = []
-            for row in row_objects(book, sheet, COMMON_FIELDS[sheet]):
-                if row['id'] == '':
-                    continue
-                obj = {key: row.get(key, '') for key in COMMON_FIELDS[sheet]}
-                note = str(row.get('備考') or '').strip()
-                if note:
-                    obj['note'] = note
-                result[field_name].append(obj)
-        else:
-            result[field_name] = picked(book, sheet, COMMON_FIELDS[sheet], None if sheet == 'generic_princess' else 'id')
+        result[field_name] = picked(book, sheet, COMMON_FIELDS[sheet], None if sheet == 'generic_princess' else 'id')
     return result
 
 

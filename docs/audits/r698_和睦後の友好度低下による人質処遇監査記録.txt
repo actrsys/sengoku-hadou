@@ -1,0 +1,31 @@
+戦国覇道 r698 — 和睦後の「普通」から敵対へ変化した際の外交人質処遇
+
+監査基準：r697完全版、ARCHITECTURE.md現行規則、r697の人質・姫処遇共通化と既存の正規外交API。
+
+確認した通常経路：
+1. 正規の和睦交渉で6か月の和睦を結び、条件として一門武将を外交人質として受け渡す。
+2. 和睦満了時の友好度が50なら「普通」に移るが、人質はそのまま残る（r697の意図した正常仕様）。
+3. 通常の計略発覚・援軍対応などで呼ばれる `DiplomacyManager.updateSentiment()` により、友好度が30以下になった場合は状態が「敵対」に移る。
+4. r697では和睦期限の満了と同時に「敵対」になった組だけが処遇対象であり、「普通」を経由した人質は以後の月末でも帰還・捕虜化されず、両家の人質名簿と isHostage が残存していた。
+
+再現：和睦設定→正規人質受入→月末6回→`updateSentiment(-25)`→月末の順序で検証。コード変更前のr697に追加回帰テストを実施したところ1173件成功・新規1件失敗（人質残存）。テストから武将所属・status等の内部状態を直接破壊していない。
+
+修正内容：
+- `DiplomacyManager.processEndMonth()` の既存の敵対化当事者ペア集合へ、「現在敵対で、外交人質名簿がまだ残る」ペアを追加する。相互の処遇は重複しないよう既存のMapキーで一本化。
+- 人質の脱走・捕虜化・所属復元・姫の処遇は既存の `_collectHostilityConsequences()` / `resolveBreakAllianceConsequences()` を変更せず再利用。人質の存在しない、既に敵対中の婚姻を機械的に処遇する処理は追加しない。
+- 通常の断交では名簿が同時に空になるため二重処遇しない。普通・友好・和睦の人質は保持する。
+- 月末処遇による会話や捕虜化はTurnManagerの従来のawait経路で完了してから翌月へ進む。
+
+改修対象：js/diplomacy.js／tests/run_tests.js／js/config.js／ARCHITECTURE.md／docs/audits/README.md／本監査記録。
+その他のゲームロジック、登録データ、管理用Excel/BIN、セーブschema・キャッシュ・UIレイアウトは無変更。
+
+検証記録 (2026-10-25)：
+- 修正前：正規和睦→人質→6か月月末→通常外交の友好度低下→月末を模擬した新規回帰1件が失敗（残存）。既存1173件成功。
+- 修正後：node tests/run_tests.js: 1174件成功・失敗0件。
+- node tests/run_visual_tests.js: PC/スマホ等の実ブラウザ23項目成功。
+- python3 tools/simulation/test_player_focus_sim.py: 4件成功。
+- python3 tools/verify_excel_bin_parity.py: 共通／1560／1570の管理Excelと実行用BINが全出力フィールド一致。
+- node tools/verify_release_sources.js: 3組の管理Excel/BINと主要数式を正常検証。
+- node --check: ゲーム用JS全ファイル構文正常。
+- 元版のExcel・BIN・画像音声などはそのまま保持。月初外交立案・AI交渉・他のゲーム機構は無変更。
+- 実機の長期観戦で、全ての勢力間和平と戦争の組み合わせを自然進行させる試験は未実施。

@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r697');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r700');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1203,6 +1203,53 @@ test('r697 和睦満了で敵対化した人質が拘束された場合は捕虜
     assert.strictEqual(calls, 1);
     await manager.processEndMonth();
     assert.strictEqual(calls, 1);
+});
+
+// r698: 和睦期限満了で「普通」に戻った後、正規の友好度変動で敵対になった場合も
+// 次の月末に外交人質を処遇する。状態をテストから直接破壊せず、共通外交APIを通す。
+test('r698 和睦から普通に復帰した後の正規友好度低下で敵対化した人質を月末に処遇する', async () => {
+    const mockMath = Object.create(Math);
+    mockMath.random = () => 0;
+    const ctx = createContext({ Math: mockMath });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    const hostage = { id: 81, name: '人質役', clan: 1, castleId: 11, status: 'active', strength: 40 };
+    const castles = [{ id: 11, ownerClan: 1 }, { id: 22, ownerClan: 2 }];
+    const clans = [{ id: 1, diplomacyValue: {} }, { id: 2, diplomacyValue: {} }];
+    let returnDialogs = 0;
+    const game = {
+        clans, castles, bushos: [hostage], princesses: [], playerClanId: 1,
+        getClan(id) { return clans.find(c => c.id === Number(id)); },
+        getClanCastles(id) { return castles.filter(c => c.ownerClan === Number(id)); },
+        getBusho(id) { return this.bushos.find(b => b.id === Number(id)); },
+        getClanDaimyo(id) { return Number(id) === 2 ? { id: 82, castleId: 22, clan: 2 } : null; },
+        affiliationSystem: {
+            joinClan(b, clanId, castleId) { b.clan = clanId; b.castleId = castleId; },
+            setClanIdRaw(b, clanId) { b.clan = clanId; },
+            moveCastle(b, castleId) { b.castleId = castleId; },
+            becomeRonin(b) { b.clan = 0; b.status = 'ronin'; }
+        },
+        ui: { log() {}, async showDialogAsync() { returnDialogs++; } }
+    };
+    ctx.game = game;
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+    manager.changeStatus(1, 2, '和睦', 6);
+    manager.setSentimentAbsolute(1, 2, 50);
+    manager.applyHostageData(81, 1, 2);
+    for (let month = 0; month < 6; month++) await manager.processEndMonth();
+    assert.strictEqual(manager.getRelation(1, 2).status, '普通');
+    assert.strictEqual(hostage.isHostage, true, '普通になっただけでは人質を残す');
+    manager.updateSentiment(1, 2, -25); // 計略発覚等と同じ共通APIによる友好度低下
+    assert.strictEqual(manager.getRelation(1, 2).status, '敵対');
+    await manager.processEndMonth();
+    assert.strictEqual(hostage.isHostage, false, '敵対化した人質は処遇される');
+    assert.strictEqual(hostage.clan, 1, '脱走した人質は元の勢力に戻る');
+    assert.deepStrictEqual(Array.from(manager.getRelation(1, 2).hostageIds), []);
+    assert.deepStrictEqual(Array.from(manager.getRelation(2, 1).hostageIds), []);
+    const dialogs = returnDialogs;
+    await manager.processEndMonth();
+    assert.strictEqual(returnDialogs, dialogs, '翌月に再処遇されない');
 });
 
 test('r697 和睦が友好または普通に戻るときは人質を勝手に処遇しない', async () => {
@@ -14943,7 +14990,7 @@ test('r384では同名大名家の優先順位は威信、大名家と諸勢力�
     ]);
     const clans = [
         { id: 3, leaderId: 1, name: '武田家', yomi: 'たけだけ', baseName: '武田家', baseYomi: 'たけだけ', daimyoPrestige: 500, isDestroyed: false, note: '' },
-        { id: 38, leaderId: 2, name: '武田家', yomi: 'たけだけ', baseName: '武田家', baseYomi: 'たけだけ', daimyoPrestige: 100, isDestroyed: false, note: '若狭武田家' }
+        { id: 38, leaderId: 2, name: '武田家', yomi: 'たけだけ', baseName: '武田家', baseYomi: 'たけだけ', daimyoPrestige: 100, isDestroyed: false, note: '武田家の由来を記した備考（表示名ではない）' }
     ];
     const kunishu = {
         id: 99, name: '武田家', yomi: 'たけだけ', baseName: '武田家', baseYomi: 'たけだけ', castleId: 3, isDestroyed: false,
@@ -14957,21 +15004,70 @@ test('r384では同名大名家の優先順位は威信、大名家と諸勢力�
     };
     updateNames.call(fakeGame);
     assert.strictEqual(clans[0].name, '武田家', '最高威信の大名家だけが無修飾名を保持する');
-    assert.strictEqual(clans[1].name, '若狭武田家', '低位の大名家は共通データ備考の識別名を使う');
+    assert.strictEqual(clans[1].name, '若狭武田家', '大名家の同名解消は備考を読まず所在地の国名で行う');
     assert.strictEqual(kunishu.getName(), '安芸武田家', '諸勢力は大名家より優先されず必ず識別名を付ける');
 });
 
-test('r384 common.bin は clans_master 備考を表示ヒントとして保持する', () => {
+test('r700 共通データの備考は実行用BINに持ち込まない', () => {
     const { common } = getRuntimeData('1570_anegawa');
     const akiTakeda = common.clansMaster.find(row => Number(row.id) === 221);
     const noshimaMurakami = common.clansMaster.find(row => Number(row.id) === 212);
     assert.ok(akiTakeda && noshimaMurakami);
     assert.strictEqual(akiTakeda.name, '武田家');
-    assert.strictEqual(akiTakeda.note, '安芸武田家');
+    assert.strictEqual(Object.hasOwn(akiTakeda, 'note'), false, '備考はゲーム実行用BINに含めない');
     assert.strictEqual(noshimaMurakami.name, '村上家');
-    assert.strictEqual(noshimaMurakami.note, '能島村上家。瀬戸内水軍');
+    assert.strictEqual(Object.hasOwn(noshimaMurakami, 'note'), false, '他勢力の備考も変換対象外');
     const converter = read('tools/data_converter.html');
-    assert.ok(converter.includes("const note=String(r['備考']??'').trim()"), 'データ変換でも備考をcommon.binへ保持する');
+    assert.ok(converter.includes("clansMaster:pickRows(book,'clans_master',COMMON_FIELDS.clans_master)"), '表示名と無関係な備考を変換しない');
+    assert.ok(!converter.includes("row.note="), '変換時の備考転送経路を削除');
+});
+
+// r700: ユーザーの備考原文を保持したまま、実在する足利家2家を所在地のみで識別する。
+test('r700 両シナリオの足利家は備考を無視して所在地から表示する', () => {
+    for (const folder of ['1560_okehazama', '1570_anegawa']) {
+    const { common, scenario } = getRuntimeData(folder);
+    const clansMaster = new Map(common.clansMaster.map(c => [Number(c.id), c]));
+    const warriorMaster = new Map(common.warriorsMaster.map(w => [Number(w.id), w]));
+    const clanState = new Map(scenario.clansState.map(c => [Number(c.id), c]));
+    const warriorsState = new Map(scenario.warriorsState.map(w => [Number(w.id), w]));
+    const castles = new Map(common.castlesMaster.map(c => [Number(c.id), {
+        id: Number(c.id), provinceId: Number(c.provinceId), shortName: ''
+    }]));
+    const provinces = new Map(common.provinces.map(p => [Number(p.id), {
+        id: Number(p.id), shortName: p.province.replace(/国$/, ''),
+        shortYomi: p.provinceYomi.replace(/のくに$/, '')
+    }]));
+    const clans = [17, 91].map(id => ({
+        ...clansMaster.get(id), ...clanState.get(id),
+        daimyoPrestige: id === 17 ? 500 : 100,
+        isDestroyed: false
+    }));
+    assert.strictEqual(Object.hasOwn(clansMaster.get(91), 'note'), false, '備考は実行用BINへ入力しない');
+    assert.strictEqual(provinces.get(14).shortName, '下総');
+    const ctx = createContext({ document: { getElementById() { return null; }, addEventListener() {} } });
+    ctx.window.addEventListener = () => {};
+    vm.runInContext(read('js/game.js') + '\nthis.__GameManager = GameManager;', ctx, { filename: 'js/game.js' });
+    const game = {
+        provinces: [...provinces.values()], clans,
+        getBusho(id) {
+            const master = warriorMaster.get(Number(id));
+            const state = warriorsState.get(Number(id));
+            if (!master || !state) return null;
+            return { id, familyName: master.name.split('|')[0],
+                familyYomi: master.yomi.split('|')[0], castleId: Number(state.castleId) };
+        },
+        getCastle(id) { return castles.get(Number(id)); },
+        getProvince(id) { return provinces.get(Number(id)); },
+        kunishuSystem: { getAliveKunishus() { return []; } }
+    };
+    ctx.__GameManager.prototype.updateClanDisplayNames.call(game);
+    assert.strictEqual(clans[0].name, folder === '1560_okehazama' ? '足利家' : '一乗院家', '将軍家の当主姓からの名前を変更しない');
+    assert.strictEqual(clans[1].name, folder === '1560_okehazama' ? '下総足利家' : '足利家', '同名解消の必要な場合だけ所在地から識別する');
+    assert.strictEqual(clans[1].yomi, folder === '1560_okehazama' ? 'しもうさあしかがけ' : 'あしかがけ');
+    clans[1].note = '古河家公方'; // 旧セーブなどに備考が残っていても名前には使用しない
+    ctx.__GameManager.prototype.updateClanDisplayNames.call(game);
+    assert.strictEqual(clans[1].name, folder === '1560_okehazama' ? '下総足利家' : '足利家', '備考を変更しても表示名は変化しない');
+    }
 });
 
 test('r383では服部党への手修正を戻し、諸勢力の正本名を保持する', () => {

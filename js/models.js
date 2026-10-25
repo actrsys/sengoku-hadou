@@ -26,10 +26,6 @@ class Clan {
         
         // ★元々の大名家の名前を覚える箱を用意します（同名被り回避用）
         this.baseName = data.baseName || data.name || "";
-        // 共通データ clans_master の「備考」は、同名勢力の識別用表示ヒントとしてだけ使います。
-        // 正本名そのものは書き換えません。複数用途の備考に備え、先頭の文だけを識別名候補として扱います。
-        this.note = data.note || data.remarks || "";
-        this.displayHint = data.displayHint || "";
         
         // ★大名家の読み仮名を覚える箱を用意します
         this.yomi = data.yomi || "";

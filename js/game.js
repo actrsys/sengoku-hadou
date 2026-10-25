@@ -1153,15 +1153,6 @@ class GameManager {
             entry.displayYomi = yomi;
         };
 
-        // 共通データの「備考」に移した識別用名称は、同名解消が必要な時だけ使います。
-        // 「能島村上家。瀬戸内水軍」のような補足付き備考は先頭文だけを識別名候補にします。
-        const getDisplayHint = entry => {
-            if (entry.type !== 'clan') return '';
-            const raw = String(entry.force.displayHint || entry.force.note || '').trim();
-            if (!raw) return '';
-            return raw.split(/[。\r\n]/, 1)[0].trim();
-        };
-
         const entries = [];
         activeClans.forEach(clan => entries.push({
             type: 'clan', force: clan, baseName: clan.baseName || clan.name || '', baseYomi: clan.baseYomi || clan.yomi || ''
@@ -1246,14 +1237,11 @@ class GameManager {
                     autoYomi = castleYomi + entry.baseYomi;
                 }
 
-                // 大名家の管理表に識別用備考があれば名称だけそれを優先します。
-                // 読みは位置情報から安全に生成できる場合の従来値を使い、備考から無理に推測しません。
-                const hint = getDisplayHint(entry);
-                if (hint) setDisplay(entry, hint, autoYomi || entry.baseYomi);
-                else if (autoName) setDisplay(entry, autoName, autoYomi);
+                // 同名勢力の識別名は国名・拠点名のみから作る。備考は表示名に使わない。
+                if (autoName) setDisplay(entry, autoName, autoYomi);
             }
 
-            // 位置情報・備考を使っても衝突が残った場合だけ、城名へ寄せ直します。
+            // 位置情報による識別後も衝突が残った場合だけ、城名へ寄せ直します。
             // 同一城に同名勢力が複数残る場合は、表示上も同名のまま許容します。
             // 内部IDは処理用の識別子であり、プレイヤー向けの勢力名へ露出させません。
             const resolveRemainingDuplicates = () => {
