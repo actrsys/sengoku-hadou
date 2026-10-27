@@ -1132,7 +1132,7 @@ class LifeSystem {
 
             // ★修正：イベントで「通常の家督相続をしない」指示がなければ、後継ぎを決めます
             if (!context.skipDaimyoSuccession) {
-                await this.handleDaimyoDeath(busho);
+                await this.handleDaimyoDeath(busho, context.excludedSuccessionCandidateIds);
             } else {
                 busho.isDaimyo = false; // イベントで乗っ取られた場合でも、大名バッジはしっかり外しておきます
             }
@@ -1154,7 +1154,7 @@ class LifeSystem {
     }
 
     // 大名が亡くなった時の後継ぎ選びです
-    async handleDaimyoDeath(daimyo) {
+    async handleDaimyoDeath(daimyo, excludedSuccessionCandidateIds = []) {
         // ==========================================
         // ★すでにすべてのお城を失って「滅亡」している場合は、後継ぎは選びません！
         const clanCastles = this.game.getClanCastles(daimyo.clan);
@@ -1170,7 +1170,13 @@ class LifeSystem {
         const currentYear = this.game.year;
 
         // 1. 今活躍している家臣たちを集めます！
-        const activeBushos = this.game.getClanBushos(daimyo.clan).filter(b => b.id !== daimyo.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
+        // 合戦中に捕縛された家臣は、処遇確定前に死亡当主の後継者へ任命しない。
+        // WarManager が当該捕虜だけを渡す。捕虜状態の第二正本を LifeSystem へ増設しない。
+        const excludedSuccessionIds = new Set((Array.isArray(excludedSuccessionCandidateIds)
+            ? excludedSuccessionCandidateIds : []).map(Number));
+        const activeBushos = this.game.getClanBushos(daimyo.clan).filter(b =>
+            b.id !== daimyo.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo
+            && !excludedSuccessionIds.has(Number(b.id)));
         
         // その中で「一門」の武将だけを抽出します！
         const activeFamily = activeBushos.filter(b => daimyo.familyIds.some(fId => b.familyIds.includes(fId)));

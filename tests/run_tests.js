@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r702');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r703');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -30723,6 +30723,10 @@ test('r701 守備軍の別城撤退で占領された城にも通常落城と同
 
 test('r702 AI国主の旧城で随伴予定者が城主に就いても、新軍団の人数が不足しない', () => {
     require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'legion_escort_regression.js')], { stdio: 'pipe' });
+});
+
+test('r703 捕虜処遇中の一門家臣は当主処断後の後継者に選ばれない', () => {
+    require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'prisoner_succession_regression.js')], { stdio: 'pipe' });
 });
 
 Promise.all(pendingTests).then(() => {

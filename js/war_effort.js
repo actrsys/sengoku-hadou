@@ -2670,7 +2670,10 @@ Object.assign(WarManager.prototype, {
                 const skipSuccession = this._prisonerPhaseContext?.skipWarCleanup === true
                     ? false
                     : this.isTotalTakeoverPending();
-                await this.game.lifeSystem.executeDeath(prisoner, { skipDaimyoSuccession: skipSuccession });
+                await this.game.lifeSystem.executeDeath(prisoner, {
+                    skipDaimyoSuccession: skipSuccession,
+                    excludedSuccessionCandidateIds: [...this.pendingPrisoners, ...(this.pendingKills || [])].map(p => p.id)
+                });
                 if (!this._isPrisonerPhaseCurrent(actionSession)) {
                     if (this._prisonerPhaseFlow === actionSession) this._invalidatePrisonerPhase();
                     return;
@@ -2922,6 +2925,8 @@ Object.assign(WarManager.prototype, {
         if (!this._isPrisonerPhaseCurrent(session) || session.finishing) return;
         session.finishing = true;
         const prisonerPhaseContext = this._prisonerPhaseContext;
+        // 処遇中の捕虜は、当主処断に伴う後継者選定の候補にならない。
+        const excludedSuccessionCandidateIds = [...(this.pendingPrisoners || []), ...(this.pendingKills || [])].map(p => p.id);
         // 予定通りに処断を実行します
         if (this.pendingKills && this.pendingKills.length > 0) {
             const skipSuccession = prisonerPhaseContext?.skipWarCleanup === true
@@ -2929,7 +2934,7 @@ Object.assign(WarManager.prototype, {
                 : this.isTotalTakeoverPending(); // ★追加：総取りの事前確認
             for (let p of this.pendingKills) {
                 this.registerNemesisForExecuted(p, this.game.playerClanId);
-                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: skipSuccession });
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: skipSuccession, excludedSuccessionCandidateIds });
                 if (!this._isPrisonerPhaseCurrent(session)) {
                     if (this._prisonerPhaseFlow === session) this._invalidatePrisonerPhase();
                     return;
@@ -3003,6 +3008,8 @@ Object.assign(WarManager.prototype, {
     },
     
     async autoResolvePrisoners(captives, winnerClanId) { // ★ async を追加
+        // AI処遇の各人を順番に処理する間、同時に捕縛された家臣を後継当主に任命しない。
+        const excludedSuccessionCandidateIds = captives.map(p => p.id);
         // ★軽量化：勝者勢力の全武将を毎回filterせず、既存の大名索引を使います。
         // 大名が存在しない特殊ケースだけ従来相当の代表者検索へフォールバックします。
         const recruiter = this.game.getClanDaimyo(winnerClanId) ||
@@ -3021,14 +3028,14 @@ Object.assign(WarManager.prototype, {
             // ★討死フラグがあり、本来の寿命を過ぎている武将は必ず処断します！
             if (p.isKilledInBattle && this.game.year >= p.originalEndYear) {
                 this.registerNemesisForExecuted(p, winnerClanId);
-                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending() });
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending(), excludedSuccessionCandidateIds });
                 continue; 
             }
 
             // ★変更：fe_system.js の魔法にお任せします！
             if (p.isDaimyo && !isExtinct) { 
                 this.registerNemesisForExecuted(p, winnerClanId);
-                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending() });
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending(), excludedSuccessionCandidateIds });
                 continue; 
             }
             
@@ -3090,7 +3097,7 @@ Object.assign(WarManager.prototype, {
                 // ==========================================
                 // ★処断される場合も、life_system.js の魔法にお任せします！
                 this.registerNemesisForExecuted(p, winnerClanId);
-                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending() });
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending(), excludedSuccessionCandidateIds });
                 // ==========================================
             } else {
                 // ★大名が解放される場合、滅亡していたら看板を下ろします
