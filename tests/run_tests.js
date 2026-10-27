@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r703');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r704');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -11088,7 +11088,7 @@ test('未登場武将が一門を頼る時は諸勢力ではなく通常の大�
 
 test('勢力滅亡時の撃破勢力は過去の失城履歴から推測せず最後の戦争結果を渡す', () => {
     const life = read('js/life_system.js');
-    assert.ok(life.includes("async checkClanExtinction(clanId, reason = 'no_castle', killerClanId = 0)"));
+    assert.match(life, /async checkClanExtinction\(clanId, reason = 'no_castle', killerClanId = 0(?:, [^)]+)?\)/);
     assert.ok(!life.includes('this.game.castles.find(c => c.lastAttackedOwnerId === clan.id'));
     assert.ok(life.includes("killerClanId = reason === 'no_castle' ? (Number(killerClanId) || 0) : 0;"));
 
@@ -30727,6 +30727,10 @@ test('r702 AI国主の旧城で随伴予定者が城主に就いても、新軍�
 
 test('r703 捕虜処遇中の一門家臣は当主処断後の後継者に選ばれない', () => {
     require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'prisoner_succession_regression.js')], { stdio: 'pipe' });
+});
+
+test('r704 後継者不在の滅亡で未処遇捕虜を第三勢力の城へ移さない', () => {
+    require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'prisoner_extinction_placement_regression.js')], { stdio: 'pipe' });
 });
 
 Promise.all(pendingTests).then(() => {

@@ -1333,7 +1333,7 @@ class LifeSystem {
         } else {
             // ★誰もいなかったら、新しく作った滅亡チェックの魔法にバトンタッチします！
             daimyo.isDaimyo = false;
-            await this.checkClanExtinction(daimyo.clan, 'no_heir');
+            await this.checkClanExtinction(daimyo.clan, 'no_heir', 0, excludedSuccessionCandidateIds);
         }
     }
     
@@ -1755,7 +1755,7 @@ class LifeSystem {
     }
 
     // ★大名家の滅亡を処理する魔法です！
-    async checkClanExtinction(clanId, reason = 'no_castle', killerClanId = 0) {
+    async checkClanExtinction(clanId, reason = 'no_castle', killerClanId = 0, pendingCaptiveIds = []) {
         if (!clanId || clanId === 0) return;
         // 滅亡に伴う所属・拠点処理は会話前に確定するが、会話終了後の
         // ゲームオーバーや旧当主の処分は同じゲーム状態にだけ適用する。
@@ -1835,7 +1835,12 @@ class LifeSystem {
             }
 
             // もし残っている武将がいたら、全員「浪人」にします
-            this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b)).forEach(b => {
+            // 捕虜当主の処断中に後継者不在で滅亡した場合も、処遇待ちの捕虜は
+            // WarManager が引き続き管理する。通常の浪人移動を先取りしない。
+            const pendingCaptives = reason === 'no_heir' && Array.isArray(pendingCaptiveIds)
+                ? new Set(pendingCaptiveIds.map(Number)) : null;
+            this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b)
+                && !(pendingCaptives && pendingCaptives.has(Number(b.id)))).forEach(b => {
                 // 功績半減は AffiliationSystem.becomeRonin() が一度だけ担当する。
                 // ここで先に半減すると、通常浪人化と残党合流のどちらも二重減少する。
                 this.game.affiliationSystem.becomeRonin(b);
