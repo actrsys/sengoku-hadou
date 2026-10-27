@@ -1,0 +1,31 @@
+戦国覇道 r707 コード監査記録：夫死亡時の旧妻姻戚キャッシュ解除
+日付：2026-10-27 (JST)
+基準正本：sengoku-hadou-main-r706-full.zip
+正本SHA-256：ba43dfd6398ed271dbb8ce89bc8253f4601c9a8fd94b36cab0cfd545ce067ca0
+累積台帳：A-005（A-004の姫死亡とは逆向きの夫死亡経路）
+
+【到達経路と再現】
+ゲームの月末LifeSystem.checkDeath→executeDeath→既婚妻の帰還・婚姻解除→FamilyLinker再構築→当主死亡時の家督継承。
+実シナリオ1560年の織田信長（ID1006006、織田家当主）・胡蝶（ID1、夫1006006）・胡蝶の父（ID1005002）の正本データを使用。通常の死亡処理executeDeathを走らせる結合試験。
+元実装は夫を死亡にして各姫を未亡人としFamilyLinker.rebuildAllFamilyIdsするが、死亡した夫のwifeIdsはループ末尾で初めて空になる。再構築時に旧wifeIdsを読むため夫のfamilyIdsには元妻ID1・元岳父ID1005002が残り、直後のhandleDaimyoDeathへそのまま渡る。
+ゲームの死亡確率による発生は実装上到達可能。ただし何十年も進行させて乱数による死亡を自然に観測したE2Eではない。試験は正規executeDeath本体・実シナリオの婚姻レコードを使い、家督後続のみ観測用に置き換えた。
+
+【修正・責務】
+LifeSystem.executeDeath内で妻IDの走査用コピーを取ってから、夫の正本wifeIdsを先に空にする。その後の各姫の婚姻解除、外交婚姻の再判定、FamilyLinker再構築、家督選定・死亡イベントは既存のまま。
+妻名簿の書き換え責務は既存LifeSystemに留め、家系計算をLifeSystemへ重複実装しない。死亡確率・当主候補資格・血縁・セーブ形式・管理BINは維持。
+
+【回帰検証】
+- 修正前専用結合テスト: FAIL（死亡した夫familyIdsに旧妻・旧岳父、家督選定境界でも保持）。
+- 修正後同一テスト: PASS（旧妻・旧岳父を排除。夫死亡/未亡人化/実父ID保持）。
+- tests/run_tests.jsに実BINを参照する専用回帰を1件追加。
+- node tests/run_tests.js: 1,182成功・0失敗（追加1）。
+- node tests/run_visual_tests.js: 23項目成功（PC/スマホを含む実ブラウザ回帰）。
+- node tools/verify_release_sources.js: 共通、1560、1570の管理Excel/BIN/数式検査成功。
+- python tools/verify_excel_bin_parity.py: 3組一致。
+- python tools/simulation/test_player_focus_sim.py: 4件成功。
+- 実ブラウザでの長期自然死亡観測は行っていない。
+
+【変更ファイル】
+更新: ARCHITECTURE.md, docs/audits/README.md, js/config.js, js/life_system.js, tests/run_tests.js
+追加: docs/audits/r707_夫死亡時の旧妻姻戚キャッシュ解除監査記録.txt
+削除: なし

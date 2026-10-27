@@ -964,11 +964,18 @@ class LifeSystem {
         
         // 夫が死亡したことによる姫の帰還処理と婚姻関係の再評価
         if (busho.wifeIds && busho.wifeIds.length > 0) {
-            for (const wifeId of busho.wifeIds) {
+            // 旧名簿を走査用に保持し、正本は先に空にする。各姫の婚姻解除後に
+            // FamilyLinker が再構築するとき、亡くなった夫の旧妻名簿を参照させない。
+            const formerWifeIds = busho.wifeIds.slice();
+            busho.wifeIds = [];
+            for (const wifeId of formerWifeIds) {
                 const princess = this.game.getPrincess(wifeId);
                 if (princess && princess.status === 'married') {
                     princess.husbandId = 0; // 未亡人になります
-                    
+                    // 帰還先の一門探索より先に婚姻解消を派生キャッシュへ反映する。
+                    // 遺族側のfamilyIdsに亡夫の姻戚が残ると、実家滅亡時に誤った帰還先を選ぶ。
+                    FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
+
                     // 1. 婚姻関係の再評価。夫IDを外した後なので、他の婚姻がなければここでだけフラグが落ちる。
                     const clanA = princess.originalClanId;
                     const clanB = busho.clan;
@@ -1066,12 +1073,8 @@ class LifeSystem {
                         }
                     }
                     
-                    // ★修正：夫が死亡したので、司令塔を使って姫本人や、
-                    // 婿を失ったお父さん（大名）の親戚リストもまとめて最新に更新します！
-                    FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
                 }
             }
-            busho.wifeIds = []; // リストを空にします
         }
         
         // ★ここを追加：官位を持っていたら朝廷に返す魔法！

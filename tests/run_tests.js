@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r706');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r708');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -30811,6 +30811,135 @@ test('r706 自然寿命で既婚姫が死亡した月に古い姻戚一門が残
     assert.ok(!father.familyIds.includes(husband.id), '父からの姻戚リンクも同月に解除する');
     assert.ok(!husband.familyIds.includes(princess.id), '夫の一門に死亡した妻の旧婚姻リンクを残さない');
     assert.strictEqual(princess.realFatherId, father.id, '実血縁の正本は維持する');
+});
+
+// r707: 夫の通常死亡処理で、一門の再構築より先に夫の旧妻名簿を解消する。
+test('r707 夫当主の死亡で旧妻と岳父の姻戚は後継者選定へ持ち越されない', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const makeBusho = id => {
+        const master = common.warriorsMaster.find(b => Number(b.id) === id);
+        const state = scenario.warriorsState.find(b => Number(b.id) === id);
+        const busho = { ...master, ...state, status: 'active', adoptiveFatherId: Number(state.adoptiveFather || 0), courtRankIds: [] };
+        busho.wifeIds = String(state.wife || '').split('|').map(Number).filter(Boolean);
+        busho.isDaimyo = scenario.clansState.some(c => Number(c.leaderId) === id);
+        return busho;
+    };
+    const husband = makeBusho(1006006); // 織田信長。1560年の勢力当主。
+    const father = makeBusho(1005002); // 胡蝶の実父。
+    const princessMaster = common.princessMaster.find(p => Number(p.id) === 1);
+    const princessState = scenario.princessState.find(p => Number(p.id) === 1);
+    const wife = { ...princessMaster, ...princessState, adoptiveFatherId: 0 };
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/family_system.js');
+    loadScript(ctx, 'js/life_system.js');
+    const Family = vm.runInContext('FamilyLinker', ctx);
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const bushos = [husband, father];
+    const clans = [{ id: 1, name: '織田家', princessIds: [wife.id] }, { id: 6, name: '斎藤家', princessIds: [] }];
+    const castle = { id: husband.castleId, samuraiIds: [husband.id] };
+    const game = {
+        year: 1581, month: 5, playerClanId: 999,
+        bushos, princesses: [wife], legions: [], clans,
+        getBusho: id => bushos.find(b => Number(b.id) === Number(id)),
+        getPrincess: id => Number(id) === wife.id ? wife : null,
+        getClan: id => clans.find(c => c.id === Number(id)),
+        getCastle: id => Number(id) === castle.id ? castle : null,
+        getClanCastles: id => [1, 6].includes(Number(id)) ? [castle] : [],
+        ui: { log() {}, showDialogAsync: async () => {} },
+        historySystem: { record() {} },
+        diplomacyManager: { refreshMarriageRelation: () => false },
+        affiliationSystem: {
+            setClanIdRaw(busho, id) { busho.clan = id; },
+            setCastleIdRaw(busho, id) { busho.castleId = id; }
+        },
+        factionSystem: { updateFactions() {} },
+        courtRankSystem: { RANK_ID_SHOGUN: 1, returnRank() {} }
+    };
+    Family.rebuildAllFamilyIds(bushos, game.princesses);
+    assert.ok(husband.familyIds.includes(wife.id), '婚姻時は妻が一門に属する');
+    assert.ok(husband.familyIds.includes(father.id), '婚姻時は岳父も姻戚に属する');
+    let familyAtSuccession = null;
+    const life = new Life(game);
+    life.handleDaimyoDeath = async daimyo => { familyAtSuccession = daimyo.familyIds.slice(); };
+    await life.executeDeath(husband, { deferFactionUpdate: true }); // 月末から呼ばれる正規死亡処理。
+    assert.strictEqual(husband.status, 'dead');
+    assert.strictEqual(wife.status, 'unmarried');
+    assert.strictEqual(wife.husbandId, 0);
+    assert.strictEqual(husband.wifeIds.length, 0);
+    assert.ok(!husband.familyIds.includes(wife.id), '旧妻は死亡した夫の派生一門に残さない');
+    assert.ok(!husband.familyIds.includes(father.id), '旧岳父は死亡した夫の派生一門に残さない');
+    assert.ok(familyAtSuccession && !familyAtSuccession.includes(wife.id) && !familyAtSuccession.includes(father.id),
+        '家督継承には婚姻解消後の一門が渡る');
+    assert.strictEqual(wife.realFatherId, father.id, '実親子関係は維持する');
+});
+
+
+// r708: 実家が滅亡した未亡人は、解消前の姻戚を帰還先の親族と誤認しない。
+test('r708 実家滅亡時の未亡人帰還は死亡夫の旧姻戚キャッシュを参照しない', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const makeBusho = id => {
+        const master = common.warriorsMaster.find(b => Number(b.id) === id);
+        const state = scenario.warriorsState.find(b => Number(b.id) === id);
+        assert.ok(master && state);
+        return { ...master, ...state, status: 'active',
+            adoptiveFatherId: Number(state.adoptiveFather || 0),
+            courtRankIds: [], fullName: master.name,
+            wifeIds: String(state.wife || '').split('|').map(Number).filter(Boolean),
+            isDaimyo: scenario.clansState.some(c => Number(c.leaderId) === id) };
+    };
+    const makePrincess = id => {
+        const master = common.princessMaster.find(p => Number(p.id) === id);
+        const state = scenario.princessState.find(p => Number(p.id) === id);
+        assert.ok(master && state);
+        return { ...master, ...state, adoptiveFatherId: 0 };
+    };
+    const husband = makeBusho(1006006); // 織田信長
+    const fatherA = makeBusho(1005002), fatherB = makeBusho(1002002);
+    const odasSon = makeBusho(1006007), takedasSon = makeBusho(1002007);
+    const wifeA = makePrincess(1), wifeB = makePrincess(4); // 胡蝶と菊
+    const bushos = [husband, fatherA, fatherB, odasSon, takedasSon];
+    const princesses = [wifeA, wifeB];
+    // 正規に起こる戦国期の状態を局所fixtureで構成: 武田家は滅亡し、実子は別家へ仕官。
+    // 亡夫の実子は織田家に存続し功績が高い。両父は死亡済み。
+    fatherA.status = fatherB.status = 'dead';
+    odasSon.clan = 1; odasSon.achievementTotal = 9000;
+    takedasSon.clan = 6; takedasSon.achievementTotal = 10;
+    const clans = [{ id: 1, name: '織田家', princessIds: [1] },
+        { id: 3, name: '武田家', princessIds: [4] },
+        { id: 6, name: '斎藤家', princessIds: [] }];
+    const castles = [{ id: husband.castleId, ownerClan: 1, samuraiIds: [husband.id, odasSon.id] },
+        { id: 102, ownerClan: 6, samuraiIds: [takedasSon.id] }];
+    const ctx = createContext();
+    for (const script of ['js/constants.js', 'js/family_system.js', 'js/diplomacy.js', 'js/life_system.js']) loadScript(ctx, script);
+    const Family = vm.runInContext('FamilyLinker', ctx);
+    const Diplomacy = vm.runInContext('DiplomacyManager', ctx);
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const game = {
+        year: 1573, month: 5, playerClanId: 999, bushos, princesses, legions: [], clans,
+        getBusho: id => bushos.find(b => Number(b.id) === Number(id)),
+        getPrincess: id => princesses.find(p => Number(p.id) === Number(id)),
+        getClan: id => clans.find(c => Number(c.id) === Number(id)),
+        getCastle: id => castles.find(c => Number(c.id) === Number(id)),
+        getClanCastles: id => castles.filter(c => Number(c.ownerClan) === Number(id)),
+        ui: { log() {}, showDialogAsync: async () => {} }, historySystem: { record() {} },
+        affiliationSystem: { setClanIdRaw(p, id) { p.clan = id; }, setCastleIdRaw(p, id) { p.castleId = id; } },
+        factionSystem: { updateFactions() {} }, courtRankSystem: { RANK_ID_SHOGUN: 1, returnRank() {} }
+    };
+    game.diplomacyManager = new Diplomacy(game);
+    Family.rebuildAllFamilyIds(bushos, princesses);
+    assert.ok(game.diplomacyManager.applyMarriageLinkData(wifeB.id, husband.id, 3, 1, { boostSentiment: false }));
+    assert.strictEqual(husband.wifeIds.length, 2, '正規婚姻APIで複数妻状態を成立');
+    assert.strictEqual(game.getClanCastles(3).length, 0, '妻の実家は滅亡済み');
+    assert.ok(fatherB.familyIds.includes(husband.id), '旧姻戚キャッシュが誤帰還を誘発し得る');
+    const life = new Life(game);
+    life.handleDaimyoDeath = async () => {}; // 帰還先判定まで実装本体、家督境界の後は対象外。
+    await life.executeDeath(husband, { deferFactionUpdate: true });
+    assert.strictEqual(wifeA.currentClanId, 6, '実家が現存する妻は実家へ戻る');
+    assert.strictEqual(wifeB.currentClanId, 6, '滅亡した実家の生存父系親族を頼る');
+    assert.strictEqual(wifeB.husbandId, 0);
+    assert.strictEqual(wifeB.status, 'unmarried');
+    assert.ok(!fatherB.familyIds.includes(husband.id), '解消済み姻戚は帰還先探索前に失効');
 });
 
 Promise.all(pendingTests).then(() => {
