@@ -1,0 +1,33 @@
+戦国覇道 r706 コード監査記録：自然寿命で死亡した姫の姻戚一門キャッシュ
+日付：2026-10-27 (JST)
+基準正本：sengoku-hadou-main-r705-manual-policy-update-full.zip
+正本SHA-256：1fe33b6ec4e91e19478c6e74dd625eae63e7e9072aff087ff8a90107c474a480
+
+【対象・到達性】
+前回の累積台帳A-003（対外婚姻/敵対時離縁）では未検証だった自然寿命による姫死亡を調査。
+ゲームの月末からLifeSystem.checkDeath()が呼ばれ、没年の前年から正の死亡確率が存在。
+1560年シナリオの管理BINに実在する姫「梅」（ID=5、endYear=1569）、実父（1002002）、夫（1003004、wifeIdsに5を保持）を使用。
+1568年10月の月末処理で死亡乱数が当選した場合、従来は姫.status=dead、夫.wifeIdsから5を除去し外交婚姻は再評価したが、父のfamilyIdsに元婿のIDが残り、夫のfamilyIdsにも元妻IDが残る。
+婚姻一門キャッシュはコマンド資格・家督候補にも利用される。次の偶発的な再構築が起こるまで、解消済みの姻戚関係が一門判定へ影響し得る。
+このテストは月末死亡本体を実行し、ランダム値のみ当選側に固定した条件再現。長時間の自然プレイによる発生頻度は測っていない。
+
+【責務・修正】
+正本はPrincess.husbandId、Busho.wifeIds と親子ID。派生familyIdsはFamilyLinkerが再構築する。
+LifeSystem.checkDeathで姫死亡と婚姻解消を処理した場合のみ再構築が必要であり、毎月無条件に再構築しない。
+その月に複数の姫が死亡しても全件終了後に一度だけFamilyLinker.rebuildAllFamilyIds(bushos, princesses)を呼ぶ。独自の親族算出・姫専用の第2キャッシュを追加しない。
+死亡イベントの順序、確率、メッセージ、外交婚姻の再評価、正本血縁・セーブ形式・管理用Excel/BINは変更しない。
+
+【回帰テスト】
+- 修正前：実1560年マスターとシナリオ婚姻を使いcheckDeath本体の月末死亡後、父.familyIdsに元婿が残るため専用assert失敗。
+- 修正後：同条件で旧姻戚の除去・夫の妻名簿・姫の死亡状態・実父IDの保持がすべて成功。
+- tests/run_tests.jsへ同じ実BINとLifeSystem/FamilyLinkerを使う検証を追加。
+- 既存の広いテストで家督・外交・画面など変更外の回帰を確認する。
+
+【制約】
+実ブラウザの長期観戦で確率当選を待ったテストではない。
+修正範囲は姫の寿命死亡による婚姻一門のキャッシュ失効であり、他の死亡・離縁・救援等の完全監査を意味しない。
+
+【ファイル区分】
+追加：docs/audits/r706_姫自然死亡時の姻戚派生一門更新監査記録.txt
+更新：ARCHITECTURE.md, docs/audits/README.md, js/config.js, js/life_system.js, tests/run_tests.js
+削除：なし

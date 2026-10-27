@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r705');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r706');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -30769,6 +30769,48 @@ test('r703 捕虜処遇中の一門家臣は当主処断後の後継者に選ば
 
 test('r704 後継者不在の滅亡で未処遇捕虜を第三勢力の城へ移さない', () => {
     require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'prisoner_extinction_placement_regression.js')], { stdio: 'pipe' });
+});
+
+// r706: 1560年の実データで姫の自然寿命による死亡は婚姻一門の派生値を同月に更新する。
+test('r706 自然寿命で既婚姫が死亡した月に古い姻戚一門が残らない', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const princessMaster = common.princessMaster.find(p => Number(p.id) === 5); // 梅
+    const princessState = scenario.princessState.find(p => Number(p.id) === 5);
+    const princess = { ...princessMaster, ...princessState, adoptiveFatherId: 0 };
+    const makeBusho = id => {
+        const master = common.warriorsMaster.find(b => Number(b.id) === id);
+        const state = scenario.warriorsState.find(b => Number(b.id) === id);
+        const busho = { ...master, ...state, status: 'active', adoptiveFatherId: Number(state.adoptiveFather || 0) };
+        busho.wifeIds = String(state.wife || '').split('|').map(Number).filter(Boolean);
+        return busho;
+    };
+    const father = makeBusho(Number(princess.realFatherId));
+    const husband = makeBusho(Number(princess.husbandId));
+    const random = Object.create(Math);
+    random.random = () => 0; // 没年の1年前にも2%で発生する死亡の当選側を固定する。
+    const ctx = createContext({ Math: random });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/family_system.js');
+    loadScript(ctx, 'js/life_system.js');
+    const Family = vm.runInContext('FamilyLinker', ctx);
+    const game = {
+        year: 1568, month: 10, gameStartYear: 1560, gameStartMonth: 5,
+        playerClanId: 999, bushos: [father, husband], princesses: [princess],
+        getBusho: id => [father, husband].find(b => Number(b.id) === Number(id)),
+        getClan: id => ({ id, name: '勢力' }),
+        ui: { log() {}, showDialogAsync: async () => {} },
+        diplomacyManager: { refreshMarriageRelation: () => false }
+    };
+    Family.rebuildAllFamilyIds(game.bushos, game.princesses);
+    assert.ok(father.familyIds.includes(husband.id), '婚姻中は父と夫が姻戚として扱われる');
+    assert.ok(husband.familyIds.includes(princess.id), '婚姻中は妻が夫の一門に入る');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    await new Life(game).checkDeath(); // 毎月の通常死亡処理本体。
+    assert.strictEqual(princess.status, 'dead');
+    assert.ok(!husband.wifeIds.includes(princess.id), '夫の妻名簿から除去される');
+    assert.ok(!father.familyIds.includes(husband.id), '父からの姻戚リンクも同月に解除する');
+    assert.ok(!husband.familyIds.includes(princess.id), '夫の一門に死亡した妻の旧婚姻リンクを残さない');
+    assert.strictEqual(princess.realFatherId, father.id, '実血縁の正本は維持する');
 });
 
 Promise.all(pendingTests).then(() => {

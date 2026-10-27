@@ -886,6 +886,8 @@ class LifeSystem {
         const targetPrincesses = this.game.princesses.filter(p =>
             !window.LifeStatusRules.isDead(p) && currentYear >= (p.endYear - 1) // ★変更：未登場（unborn）を除外しないようにしました
         );
+        // 婚姻解除で変わる派生一門は、月末の姫死亡判定を終えてから一度だけ再構築する。
+        let marriageFamilyRebuildNeeded = false;
 
         for (const p of targetPrincesses) {
             if (!isCurrentFlow()) return;
@@ -898,6 +900,7 @@ class LifeSystem {
                 
                 // もし結婚していたら、旦那さんの奥さんリストから外します
                 if (p.husbandId > 0) {
+                    marriageFamilyRebuildNeeded = true;
                     const husband = this.game.getBusho(p.husbandId);
                     if (husband) {
                         husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
@@ -927,6 +930,9 @@ class LifeSystem {
                     if (!isCurrentFlow()) return;
                 }
             }
+        }
+        if (marriageFamilyRebuildNeeded && isCurrentFlow()) {
+            FamilyLinker.rebuildAllFamilyIds(this.game.bushos, this.game.princesses);
         }
         // ★追加ここまで！
     }
