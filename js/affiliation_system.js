@@ -739,17 +739,23 @@ class AffiliationSystem {
                 );
 
                 if (candidates.length > 0) {
-                    candidates.sort((a, b) => {
-                        if (b.intelligence !== a.intelligence) return b.intelligence - a.intelligence; 
+                    const compareCandidates = (a, b) => {
+                        if (b.intelligence !== a.intelligence) return b.intelligence - a.intelligence;
                         const aDiff = PersonnelRules.calcAffinityDiff(a.affinity, castellan.affinity);
                         const bDiff = PersonnelRules.calcAffinityDiff(b.affinity, castellan.affinity);
-                        if (aDiff !== bDiff) return aDiff - bDiff; 
+                        if (aDiff !== bDiff) return aDiff - bDiff;
                         const aAchieve = a.achievementTotal || 0;
                         const bAchieve = b.achievementTotal || 0;
-                        if (bAchieve !== aAchieve) return bAchieve - aAchieve; 
-                        return Math.random() - 0.5;
-                    });
-                    const newGunshi = candidates[0];
+                        if (bAchieve !== aAchieve) return bAchieve - aAchieve;
+                        return 0;
+                    };
+                    candidates.sort(compareCandidates);
+                    // 同順位者だけを等確率で抽選。sort比較器の途中で乱数を使わない。
+                    let tiedCount = 1;
+                    while (tiedCount < candidates.length && compareCandidates(candidates[0], candidates[tiedCount]) === 0) {
+                        tiedCount++;
+                    }
+                    const newGunshi = candidates[tiedCount > 1 ? Math.floor(Math.random() * tiedCount) : 0];
                     this.appointClanGunshi(castle.ownerClan, newGunshi);
                 }
             }

@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r704');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r705');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -4765,6 +4765,44 @@ test('残党諸勢力化も妻婚姻同期の共通窓口を通す', () => {
     assert.ok(join.includes('const oldClanId = Number(busho.clan) || 0;'));
     assert.ok(join.includes('this.syncSpousesForClanChange(busho, oldClanId, 0'));
     assert.ok(join.includes('refreshDiplomacy: busho.isHostage !== true'));
+});
+
+test('r705 AI軍師の同順位3候補は並び順に偏らず選択でき、順位差は優先する', () => {
+    // 実際のAffiliationSystem任命経路を使用。等順位は智謀・相性差・功績が同じ状態。
+    // 1560/1570の開始配置には2名同順位の候補が存在し、訓練・経験値の変化で3名も成立し得る。
+    const run = (roll, withClearWinner = false) => {
+        let randomCalls = 0;
+        const controlledMath = Object.create(Math);
+        controlledMath.random = () => { randomCalls++; return roll; };
+        const ctx = createContext({ Math: controlledMath,
+            PersonnelRules: { calcAffinityDiff: (a, b) => Math.min(Math.abs(a - b), 100 - Math.abs(a - b)) },
+            BushoStatusRules: { isActive: b => b.status === 'active' }
+        });
+        loadScript(ctx, 'js/affiliation_system.js');
+        const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
+        const tied = [101, 102, 103].map(id => ({ id, clan: 1, status: 'active',
+            isDaimyo: false, isCommander: false, isCastellan: false, isGunshi: false,
+            factionId: 0, intelligence: 78, affinity: 50, achievementTotal: 0 }));
+        const lesser = { id: 104, clan: 1, status: 'active',
+            isDaimyo: false, isCommander: false, isCastellan: false, isGunshi: false,
+            factionId: 0, intelligence: 77, affinity: 50, achievementTotal: 0 };
+        const winner = { ...lesser, id: 105, intelligence: 79 };
+        const members = [...tied, lesser, ...(withClearWinner ? [winner] : [])];
+        const game = { playerClanId: 99, bushos: members,
+            getClanGunshi: () => null, getClanCastles: () => [{ id: 10 }],
+            getCastleBushos: () => members, getClanBushos: () => members };
+        new AffiliationSystem(game).appointAIGunshi({ id: 10, ownerClan: 1 },
+            { id: 1, clan: 1, isDaimyo: true, factionId: 0, affinity: 50 });
+        return { selected: members.find(b => b.isGunshi)?.id, randomCalls };
+    };
+    for (const [roll, expected] of [[0.01, 101], [0.34, 102], [0.67, 103], [0.99, 103]]) {
+        const result = run(roll);
+        assert.strictEqual(result.selected, expected, `同順位3名、乱数${roll}の選択先`);
+        assert.strictEqual(result.randomCalls, 1, '同点3名は比較器ではなく、最後の抽選で乱数を1回だけ使う');
+    }
+    const clear = run(0.5, true);
+    assert.strictEqual(clear.selected, 105, '智謀の高い候補が存在すれば同点抽選を行わない');
+    assert.strictEqual(clear.randomCalls, 0, '順位差がある場合に不要な乱数消費を増やさない');
 });
 
 test('AI軍師候補は国主を除外し旧大名移動fallbackを残さない', () => {
