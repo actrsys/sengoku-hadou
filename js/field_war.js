@@ -1117,6 +1117,12 @@ class FieldWarManager {
         }
     }
 
+    // 戦場に残る部隊だけが、継戦判定と軍勢情報に兵糧を持ち込める。
+    // 撤退・壊滅した援軍のgroupStats自体は、戦後処理のため破棄しない。
+    getActiveBattleGroupIds() {
+        return new Set(this.units.map(unit => unit.groupId));
+    }
+
     updateStatus() {
         // ターン・年月・天候は常時更新するが、非表示の軍勢詳細DOMは「情報」表示時だけ構築する。
         this._updateFieldWarHeader();
@@ -1152,9 +1158,10 @@ class FieldWarManager {
             def: { main: {rice:0, mSum:0, mCount:0, tSum:0, tCount:0}, self: {rice:0, mSum:0, mCount:0, tSum:0, tCount:0}, ally: {rice:0, mSum:0, mCount:0, tSum:0, tCount:0} }
         };
 
-        // 専用の箱から兵糧・士気・訓練を取り出します
+        // 戦線離脱済みの部隊が保持していた兵糧を、現在の軍勢情報へ混ぜない。
+        const activeGroupIds = this.getActiveBattleGroupIds();
         for (let key in this.groupStats) {
-            if (!this.groupStats[key]) continue;
+            if (!this.groupStats[key] || !activeGroupIds.has(key)) continue;
             let side = key.startsWith('atk_') ? 'atk' : 'def';
             let tab = 'main';
             if (key.includes('_self')) tab = 'self';
@@ -2684,8 +2691,9 @@ class FieldWarManager {
         }
         else {
             let atkTotalRice = 0, defTotalRice = 0;
+            const activeGroupIds = this.getActiveBattleGroupIds();
             for (let key in this.groupStats) {
-                if (!this.groupStats[key]) continue;
+                if (!this.groupStats[key] || !activeGroupIds.has(key)) continue;
                 if (key.startsWith('atk_')) atkTotalRice += this.groupStats[key].rice;
                 else if (key.startsWith('def_')) defTotalRice += this.groupStats[key].rice;
             }
@@ -3886,7 +3894,7 @@ class FieldWarManager {
             const winPrefix = attacker.isAttacker ? 'atk_' : 'def_';
             for (let key in this.groupStats) {
                 if (key.startsWith(winPrefix) && this.groupStats[key]) {
-                    let rise = (key === defender.groupId) ? 3 : 1;
+                    let rise = (key === attacker.groupId) ? 3 : 1;
                     const maxMorale = window.WarParams.Military.MaxMoraleInternal;
                     this.groupStats[key].morale = Math.min(maxMorale, this.groupStats[key].morale + rise);
                 }

@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r708');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r710');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -18389,7 +18389,7 @@ test('r477 野戦部隊の軍勢名と部隊情報の表示では保存名をHTM
         ui: { _getCompressedTextHtml: UI._getCompressedTextHtml }
     };
     const unit = { id: 9, bushoId: 77, name: leaderName, isGeneral: true, isAttacker: true, groupId: 'atk_main', stats: { ldr: 70, str: 60, int: 50 }, soldiers: 500, troopType: 'ashigaru' };
-    field.updateStatus.call({ game, isInfoMode: true, units: [unit], groupStats: {}, activeAtkTab: 'main', activeDefTab: 'main', warState: { attacker: { ownerClan: 1 }, defender: { ownerClan: 2 } }, _updateFieldWarHeader() {} });
+    field.updateStatus.call({ game, isInfoMode: true, units: [unit], groupStats: {}, activeAtkTab: 'main', activeDefTab: 'main', warState: { attacker: { ownerClan: 1 }, defender: { ownerClan: 2 } }, _updateFieldWarHeader() {}, getActiveBattleGroupIds: field.getActiveBattleGroupIds });
     const armyHtml = getEl('fw-atk-status').innerHTML;
     assert.ok(armyHtml.includes('&lt;img'));
     assert.ok(armyHtml.includes('&lt;svg'));
@@ -30940,6 +30940,118 @@ test('r708 実家滅亡時の未亡人帰還は死亡夫の旧姻戚キャッシ
     assert.strictEqual(wifeB.husbandId, 0);
     assert.strictEqual(wifeB.status, 'unmarried');
     assert.ok(!fatherB.familyIds.includes(husband.id), '解消済み姻戚は帰還先探索前に失効');
+});
+
+
+// r709: 全滅・士気崩壊で戦場から消えた部隊の兵糧は、戦場に残る軍の兵糧切れを防げない。
+test('r709 野戦で全滅した援軍の兵糧は陣営の継戦判定に含めない', () => {
+    const ctx = createContext({ addEventListener() {}, document: { getElementById() { return null; } } });
+    loadScript(ctx, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', ctx);
+    const create = (missingSide) => {
+        const war = new Field({ playerClanId: 1 });
+        war.active = true;
+        war.playerWasInvolved = false;
+        war.warState = { attacker: { ownerClan: 1, name: '攻撃' }, defender: { ownerClan: 2, name: '守備' } };
+        war.maxTurns = 100;
+        war.turnCount = 1;
+        war.retreatedUnits = [];
+        war.isHeavySnowBattle = false;
+        war.log = () => {};
+        war.units = [
+            { id: 1, groupId: 'atk_main', isAttacker: true, isGeneral: true, soldiers: 1000 },
+            { id: 2, groupId: 'def_main', isAttacker: false, isGeneral: true, soldiers: 1000 },
+            { id: 3, groupId: missingSide + '_ally', isAttacker: missingSide === 'atk', isGeneral: false, soldiers: 1000 }
+        ];
+        war.groupStats = {
+            atk_main: { rice: missingSide === 'atk' ? 0 : 200, morale: 50, training: 50 },
+            atk_ally: { rice: 100, morale: missingSide === 'atk' ? 0 : 50, training: 50 },
+            def_main: { rice: missingSide === 'def' ? 0 : 200, morale: 50, training: 50 },
+            def_ally: { rice: 100, morale: missingSide === 'def' ? 0 : 50, training: 50 }
+        };
+        war.finishFieldWarWithNotice = (result, message) => { war.result = result; war.message = message; };
+        return war;
+    };
+    for (const side of ['atk', 'def']) {
+        const war = create(side);
+        assert.strictEqual(war.checkMoraleCollapse(), true, '士気0の援軍が正規処理で戦線離脱');
+        assert.strictEqual(war.units.some(u => u.groupId === side + '_ally'), false);
+        assert.strictEqual(war.groupStats[side + '_ally'].rice, 100, '部隊消滅時点では兵糧箱は残る');
+        assert.strictEqual(war.checkEndCondition(), true, '生存隊の兵糧が尽きれば決着する');
+        assert.strictEqual(war.result, side === 'atk' ? 'attacker_lose' : 'attacker_win_fatal');
+    }
+    for (const side of ['atk', 'def']) {
+        const war = create(side);
+        war.groupStats[side + '_ally'].morale = 50; // 残存援軍が兵糧を保持している正常系。
+        assert.strictEqual(war.checkEndCondition(), false);
+        assert.strictEqual(war.result, undefined);
+    }
+});
+
+
+// r710: 野戦の撃破士気は、実際に敵を倒したグループに+3、他の味方グループに+1。
+// 片方の総大将が残存する通常の攻撃で、攻防どちらの陣営でも同じ規則を確認する。
+test('r710 野戦で敵部隊を壊滅させたグループの士気+3が他グループと区別される', async () => {
+    const skill = {
+        calcFieldWeatherAtkModifier: () => 1, calcFieldWeatherDefModifier: () => 1,
+        ignoresFlankRearPenalty: () => false,
+        getCriticalResult: () => ({ isCritical: false, atkMult: 1, defMult: 1, finalDmgMult: 1 }),
+        getUnderdogSkillModifiers: () => ({ atkMult: 1, defMult: 1, isKabukimono: false, isChinzei: false }),
+        calcSkillDamageModifier: () => 1, calcSkillDefenseModifier: () => 1,
+        calcAptitudeDamageModifier: () => 1, calcAptitudeDefenseModifier: () => 1,
+        calcFieldDeathProbModifier: () => 0
+    };
+    const ctx = createContext({
+        addEventListener() {}, document: { getElementById() { return null; } },
+        WarParams: { War: { AutoWarDamageRate: 1 }, Military: { MaxTrainingInternal: 120, MaxMoraleInternal: 120 } },
+        WarSystem: { calcLoyaltyBattleBonus: () => 0, calcHomeBonusMultiplier: () => 1 },
+        SkillManager: skill
+    });
+    loadScript(ctx, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', ctx);
+    const make = (id, isAttacker, groupId, soldiers, isGeneral, x) => ({
+        id, bushoId: id, name: `武将${id}`, isAttacker, isGeneral, groupId,
+        soldiers, initialSoldiers: soldiers, troopType: 'kiba', direction: 0,
+        x, y: 0, stats: { ldr: 85, str: 90, int: 70, charm: 70 }, isPlayer: false, hasActionDone: false
+    });
+    for (const attackingArmy of [true, false]) {
+        const game = { playerClanId: 99, year: 1570,
+            getBusho(id) { return { id, clan: id % 2 ? 1 : 2, factionId: 0, originalEndYear: 1600, strength: 60 }; }
+        };
+        const field = new Field(game);
+        field.active = true;
+        field.log = () => {};
+        field.nextPhaseTurn = () => {};
+        field.updateMap = () => {};
+        field.isNightTurn = () => false;
+        field.getDistance = () => 1;
+        field.getDirection = () => 0;
+        field.grid = [];
+        field.weather = 'sunny';
+        field.isHeavySnowBattle = false;
+        field.warState = { attacker: { ownerClan: 1 }, defender: { ownerClan: 2 }, sourceCastle: { id: 1 },
+            deadSoldiers: { attacker: 0, defender: 0 } };
+        const winnerGroup = attackingArmy ? 'atk_main' : 'def_main';
+        const otherWinnerGroup = attackingArmy ? 'atk_ally' : 'def_ally';
+        const loserGroup = attackingArmy ? 'def_main' : 'atk_main';
+        const winner = make(1, attackingArmy, winnerGroup, 6000, true, 0);
+        const losingUnit = make(2, !attackingArmy, loserGroup, 1, false, 1);
+        const losingGeneral = make(3, !attackingArmy, loserGroup, 6000, true, 3);
+        const winnerAlly = make(4, attackingArmy, otherWinnerGroup, 1000, false, 4);
+        field.units = [winner, losingUnit, losingGeneral, winnerAlly];
+        field.retreatedUnits = [];
+        field.groupStats = Object.fromEntries(['atk_main', 'atk_ally', 'def_main', 'def_ally'].map(k =>
+            [k, { rice: 1000, morale: 50, training: 50 }]));
+        await field.executeAttack(winner, losingUnit); // 本番のダメージと壊滅・士気更新を使用。
+        assert.strictEqual(losingUnit.soldiers, 0, '通常攻撃で相手部隊を壊滅');
+        assert.strictEqual(field.units.includes(losingUnit), false, '壊滅部隊は戦場から除去');
+        assert.strictEqual(field.groupStats[winnerGroup].morale, 56,
+            `${winnerGroup}の戦闘優勢+3に加え撃破当事者ボーナス+3`);
+        assert.strictEqual(field.groupStats[otherWinnerGroup].morale, 51,
+            `${otherWinnerGroup}には他グループ撃破支援として+1のみ`);
+        assert.strictEqual(field.groupStats[loserGroup].morale, 44,
+            `${loserGroup}は戦闘劣勢-3および被撃破グループ-3`);
+    }
 });
 
 Promise.all(pendingTests).then(() => {
