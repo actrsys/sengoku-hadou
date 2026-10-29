@@ -2050,6 +2050,53 @@ async function validateBreakAllianceResultTransition(cdp) {
   }
 }
 
+
+// A-038: PC/スマホ/低メモリ端末の実DOMで、終端会話のcoverが2paintまで維持されるか。
+async function validateTerminalDialogCoveredPaint(cdp) {
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css.replace(/<\/style/gi, '<\\/style')}</style></head><body>
+        <div id="map-container" style="position:absolute;width:100%;height:100%;background:#496248"></div>
+        <div id="dialog-modal" class="modal hidden"><div class="modal-content modal-small"><div class="dialog-body-container">
+          <div class="dialog-face-column"><div id="dialog-left-name" class="dialog-name-label hidden"></div><div id="dialog-left-face" class="dialog-face-space"></div></div>
+          <div id="dialog-message" class="message-area"></div>
+          <div class="dialog-face-column"><div id="dialog-right-name" class="dialog-name-label hidden"></div><div id="dialog-right-face" class="dialog-face-space"></div></div>
+        </div><div class="modal-footer"><button id="dialog-btn-ok">閉じる</button></div></div></div>
+        </body></html>`;
+    for (const [width,height,pc,lowmem] of [[1280,720,true,false],[390,844,false,false],[360,640,false,true]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !pc });
+        await cdp.call('Runtime.evaluate', {
+            expression: `document.open();document.write(${JSON.stringify(html)});document.close();document.body.classList.toggle('is-pc',${pc});document.documentElement.classList.toggle('mobile-low-memory',${lowmem});window.__testDialogUI=(new Function(${JSON.stringify(uiSource+'\nreturn UIManager;')}))();true`,
+            returnByValue: true
+        });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(async()=>{
+                const ui=Object.create(window.__testDialogUI.prototype);
+                ui.game={isWatchMode:false,phase:'game'};ui.dialogQueue=[];ui.isDialogShowing=false;ui._dialogGeneration=0;
+                ui._dialogGuardHeld=false;ui.hideAIGuardTemporarily=()=>{};ui.restoreAIGuard=()=>{};
+                ui._prepareDialogFaces=()=>Promise.resolve({leftImg:null,rightImg:null});
+                const modal=document.getElementById('dialog-modal');
+                let frame=0,coverStarted=-1,coverEnded=-1,watch=true;
+                const original=ui.closeCoveredViewAfterRecovery.bind(ui);
+                ui.closeCoveredViewAfterRecovery=(el,opts)=>{coverStarted=frame;return original(el,opts);};
+                const sample=()=>{frame++;if(coverStarted>=0&&modal.classList.contains('hidden')&&coverEnded<0)coverEnded=frame;if(watch)requestAnimationFrame(sample);};
+                requestAnimationFrame(sample);
+                const done=ui.showDialogAsync('謀反の決着');
+                await new Promise(r=>setTimeout(r,40));
+                const visibleBefore=!modal.classList.contains('hidden');
+                document.getElementById('dialog-btn-ok').click();await done;
+                await new Promise(r=>setTimeout(r,280));watch=false;
+                return {visibleBefore,coverStarted,coverEnded,hiddenAfter:modal.classList.contains('hidden'),frames:coverEnded-coverStarted};
+            })()`, returnByValue:true, awaitPromise:true
+        });
+        if (result.exceptionDetails) throw Error(result.exceptionDetails.text + ' ' + JSON.stringify(result.exceptionDetails.exception));
+        const data = result.result?.value;
+        assert.ok(data && data.visibleBefore && data.hiddenAfter, '会話表示と終了の状態が正しい');
+        assert.ok(data.coverStarted >= 0 && data.frames >= 2, `最終会話の背景描画は2フレーム待つ: ${JSON.stringify(data)}`);
+    }
+    console.log('✓ r720 終端会話のcoverをPC・スマホ・低メモリスマホで2描画境界まで保持 (実ブラウザ)');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -2126,6 +2173,7 @@ async function main() {
         await validateDialogPortraitReuse(cdp);
         await validateDiplomacyQuantityHandoff(cdp);
         await validateBreakAllianceResultTransition(cdp);
+        await validateTerminalDialogCoveredPaint(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

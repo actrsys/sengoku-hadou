@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r718');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r720');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -31620,6 +31620,180 @@ test('r718 途中観戦へ移る際は操作勢力の当主現在地をAI継続�
     assert.strictEqual(clan.homeCastleId, 12, 'プレイヤーからAIへ切り替える前に現在地を継続本拠へ確定');
     daimyo.castleId = 11;
     assert.strictEqual(game.getDaimyoHomeCastle(1).id, 12, 'AIになった後は移動だけでは継続本拠を変えない');
+});
+
+
+// r719: 生前家督相続の直前に当主を移動しても、後継者は旧継続記録ではなく
+// 現在の大名がいる拠点で家督を継ぐ。通常の所属移動と本番の家督セットアップを連結する。
+test('r719 プレイヤーの生前家督相続は移動直後の当主所在を継承する', () => {
+    const ctx = createContext({
+        addEventListener: () => {},
+        GameConstants: { BushoStatus: { ACTIVE: 'active' } },
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
+        BushoStatusRules: { isRonin: () => false, isActive: b => b.status === 'active' }
+    });
+    loadScript(ctx, 'js/game.js');
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/life_system.js');
+    const { GameManager, AffiliationSystem, LifeSystem } = vm.runInContext(
+        '({ GameManager, AffiliationSystem, LifeSystem })', ctx);
+    const clan = { id: 1, leaderId: 101, homeCastleId: 11 };
+    const castles = [
+        { id: 11, ownerClan: 1, legionId: 0, castellanId: 101, samuraiIds: [101] },
+        { id: 12, ownerClan: 1, legionId: 0, castellanId: 102, samuraiIds: [102] }
+    ];
+    const former = { id: 101, clan: 1, castleId: 11, status: 'active', isDaimyo: true,
+        isCastellan: true, isRetired: false, familyIds: [], achievementTotal: 90 };
+    const successor = { id: 102, clan: 1, castleId: 12, status: 'active', isDaimyo: false,
+        isCastellan: true, isRetired: false, isGunshi: false, familyIds: [], achievementTotal: 20 };
+    const game = { phase: 'game', isWatchMode: false, playerClanId: 1,
+        clans: [clan], castles, bushos: [former, successor], legions: [],
+        getClan: id => Number(id) === 1 ? clan : null,
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getBusho: id => [former, successor].find(b => b.id === Number(id)),
+        getClanCastles: id => castles.filter(c => c.ownerClan === Number(id)),
+        getClanBushos: id => [former, successor].filter(b => b.clan === Number(id)),
+        getCastleBushos: id => [former, successor].filter(b => b.castleId === Number(id)),
+        updateAllCastlesLords() {}, ui: { renderMap() {} }
+    };
+    game.getClanDaimyo = GameManager.prototype.getClanDaimyo;
+    game.getDaimyoHomeCastle = GameManager.prototype.getDaimyoHomeCastle;
+    game.changeLeader = GameManager.prototype.changeLeader;
+    game.affiliationSystem = new AffiliationSystem(game);
+    game.affiliationSystem.updateCastleLord = () => {};
+    game.affiliationSystem.updateUI = () => {};
+    const life = new LifeSystem(game);
+    life.applyDaimyoNameAndFaceChange = () => {};
+    life.applyDaimyoChangeEffects = () => {};
+
+    // 正規の武将移動だけを行う。途中に本拠getterを呼ばない（他の画面の副作用に依存しない）。
+    game.affiliationSystem.moveCastle(former, 12);
+    assert.strictEqual(former.castleId, 12);
+    assert.strictEqual(clan.homeCastleId, 11);
+    life.setupNewDaimyo(former, successor, [], true);
+    assert.strictEqual(successor.castleId, 12, '後継者は家督相続時の先代所在地に入城');
+    assert.strictEqual(clan.homeCastleId, 12, '新当主の継承地を記録');
+    assert.strictEqual(clan.leaderId, 102);
+    assert.strictEqual(former.isRetired, true);
+    assert.strictEqual(former.isDaimyo, false);
+});
+
+
+// A-038: 災害イベント地図の暗幕は、復旧Promiseが描画境界を完了するまで残す。
+test('イベント地図を閉じる時は通常地図の2フレーム復旧完了を暗幕で覆う', async () => {
+    const source = read('js/event/common_events.js');
+    const start = source.indexOf('    const cleanupOverlay = async (mapOverlay) => {');
+    const end = source.indexOf('\n    return {', start);
+    assert.ok(start >= 0 && end > start);
+    const frames = [];
+    const ctx = vm.createContext({
+        console, setTimeout,
+        nextPaint: () => new Promise(resolve => frames.push(resolve))
+    });
+    vm.runInContext(source.slice(start, end) + '\nthis.cleanupOverlay = cleanupOverlay;', ctx);
+    let backgroundReady = false;
+    const parent = { removed: false, removeChild(node) {
+        assert.strictEqual(backgroundReady, true, '背景の描画境界が未完了の状態でイベント暗幕を除去しない');
+        this.removed = true; node.parentNode = null;
+    } };
+    let resumeCount = 0;
+    const ui = {
+        resumeBackgroundUpdates() {
+            resumeCount++;
+            // UIManager.resumeBackgroundUpdatesの実際の2rAF契約をモデル化。
+            return new Promise(resolve => frames.push(() => frames.push(() => { backgroundReady = true; resolve(); })));
+        },
+        waitForCoveredMapPaint: () => new Promise(resolve => frames.push(() => frames.push(resolve)))
+    };
+    const scroll = { style: { display: 'none' } };
+    const overlay = {
+        parentNode: parent,
+        querySelectorAll: () => [],
+        _eventMapRestoreState: { ui, scroll, oldDisplay: '', isPC: false, pausedByUs: true }
+    };
+    const pending = ctx.cleanupOverlay(overlay);
+    const tick = async () => { assert.ok(frames.length > 0, '次の描画境界を待つ'); frames.shift()(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); };
+    await tick(); // イベントの巨大canvas解放後の描画
+    assert.strictEqual(resumeCount, 1);
+    assert.strictEqual(parent.removed, false);
+    await tick(); // 背景復旧の第1rAF
+    assert.strictEqual(parent.removed, false, '背景compositor未復帰の時点で暗幕を除去しない');
+    await tick(); // 背景復旧の第2rAF
+    await pending;
+    assert.strictEqual(parent.removed, true);
+    assert.strictEqual(scroll.style.display, '');
+});
+
+// A-038: 通常会話の終端だけ共通cover閉鎖を使い、次の会話には古い閉鎖を持ち越さない。
+test('謀反結果など終端メッセージは背景の2フレーム描画後に閉じる', async () => {
+    const source = read('js/ui.js');
+    const startHandoff = source.indexOf('    beginVisualHandoff(closeFn) {');
+    const endHandoff = source.indexOf('    _renderPlainMessage(', startHandoff);
+    const startCover = source.indexOf('    waitForCoveredMapPaint() {');
+    const endCover = source.indexOf('    hideLoadingScreen()', startCover);
+    const startDialog = source.indexOf('    async processDialogQueue() {');
+    const endDialog = source.indexOf('    getStatusBarHTML(', startDialog);
+    assert.ok(startHandoff >= 0 && startCover >= 0 && startDialog >= 0);
+    const frames = [], timers = [];
+    const footer = {
+        children: [], style: {}, classList: new FakeClassList(),
+        set innerHTML(value) { this.children.length = 0; },
+        appendChild(child) { this.children.push(child); }
+    };
+    const content = { style: {}, removeEventListener() {}, addEventListener() {} };
+    const modal = {
+        classList: new FakeClassList(['hidden']), style: {},
+        querySelector(sel) { return sel === '.modal-footer' ? footer : (sel === '.modal-content' ? content : null); },
+        addEventListener() {}, removeEventListener() {}
+    };
+    const fakeDocument = {
+        body: { classList: { contains: () => true } },
+        getElementById(id) { return id === 'dialog-modal' ? modal : null; },
+        createElement() { return { classList: new FakeClassList(), dataset: {}, style: {}, textContent: '', onclick: null }; }
+    };
+    const ctx = vm.createContext({
+        console, document: fakeDocument, window: {},
+        setTimeout: callback => { timers.push(callback); return timers.length; },
+        clearTimeout: () => {}, queueMicrotask, Promise,
+        requestAnimationFrame: callback => { frames.push(callback); return frames.length; }
+    });
+    vm.runInContext('class TestUI {\n' + source.slice(startHandoff, endHandoff) + '\n'
+        + source.slice(startCover, endCover) + '\n' + source.slice(startDialog, endDialog)
+        + '\n} this.TestUI = TestUI;', ctx);
+    const ui = new ctx.TestUI();
+    ui.dialogQueue = [{ msg: '謀反の決着', isConfirm: false, onOk() {}, autoCloseTime: 0, customOpts: null,
+        faceLoadPromise: Promise.resolve({ leftImg: null, rightImg: null }) }];
+    ui.game = { isWatchMode: false };
+    ui._renderPlainMessage = () => {};
+    ui.hideAIGuardTemporarily = () => {};
+    ui.restoreAIGuard = () => {};
+    await ui.processDialogQueue();
+    assert.strictEqual(modal.classList.contains('hidden'), false, 'メッセージを表示');
+    assert.strictEqual(footer.children.length, 1);
+    footer.children[0].onclick({ stopPropagation() {} });
+    await Promise.resolve(); await Promise.resolve();
+    assert.ok(timers.length > 0);
+    timers.shift()(); // handoff終了猶予が尽きた
+    assert.strictEqual(modal.classList.contains('hidden'), false, '最終coverをすぐ外さない');
+    assert.strictEqual(frames.length, 1);
+    frames.shift()(); await Promise.resolve();
+    assert.strictEqual(modal.classList.contains('hidden'), false, '第1rAFでは覆いを維持');
+    frames.shift()(); await Promise.resolve(); await Promise.resolve();
+    assert.strictEqual(modal.classList.contains('hidden'), true, '第2rAF後にだけ閉鎖');
+
+    // 最終cover待機の途中に次の会話が来ても、旧closeから新しい会話を隠さない。
+    ui.dialogQueue.push({ msg: '続く報告', isConfirm: false, onOk() {}, autoCloseTime: 0,
+        customOpts: null, faceLoadPromise: Promise.resolve({ leftImg: null, rightImg: null }) });
+    await ui.processDialogQueue();
+    footer.children[0].onclick({ stopPropagation() {} });
+    await Promise.resolve(); await Promise.resolve();
+    timers.shift()();
+    frames.shift()(); await Promise.resolve();
+    ui.dialogQueue.push({ msg: '次の報告', isConfirm: false, onOk() {}, autoCloseTime: 0,
+        customOpts: null, faceLoadPromise: Promise.resolve({ leftImg: null, rightImg: null }) });
+    await ui.processDialogQueue();
+    frames.shift()(); await Promise.resolve(); await Promise.resolve();
+    assert.strictEqual(modal.classList.contains('hidden'), false, '旧会話の予約閉鎖は再利用中のDOMを隠さない');
 });
 
 Promise.all(pendingTests).then(() => {

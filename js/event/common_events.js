@@ -581,18 +581,28 @@ window.EventMapEffects = window.EventMapEffects || (() => {
 
         // 重いイベント地図の解放を暗幕の下で1回paintしてから通常マップを戻す。
         if (mapOverlay && mapOverlay.parentNode) await nextPaint();
+        let backgroundRecovery = null;
         if (restoreState) {
             if (!restoreState.isPC && restoreState.scroll) {
                 restoreState.scroll.style.display = restoreState.oldDisplay;
             }
             if (restoreState.pausedByUs && restoreState.ui && typeof restoreState.ui.resumeBackgroundUpdates === 'function') {
-                restoreState.ui.resumeBackgroundUpdates('event_map_close');
+                backgroundRecovery = restoreState.ui.resumeBackgroundUpdates('event_map_close');
             }
         }
 
-        // 通常地図のcompositor復帰も暗幕で覆ったままpaintし、その後で初めて暗幕を外す。
+        // r437の最終coverと同様、復帰処理が返す2フレームの完了までイベント地図の
+        // 暗幕を保持する。1回のrAF直後にshellを外すと、display:noneから戻した
+        // 地図のcompositor commitより暗幕除去が先行する端末がある。
         if (mapOverlay && mapOverlay.parentNode) {
-            await nextPaint();
+            if (backgroundRecovery && typeof backgroundRecovery.then === 'function') {
+                await backgroundRecovery;
+            } else if (restoreState && restoreState.ui && typeof restoreState.ui.waitForCoveredMapPaint === 'function') {
+                await restoreState.ui.waitForCoveredMapPaint();
+            } else {
+                await nextPaint();
+                await nextPaint();
+            }
             if (mapOverlay.parentNode) mapOverlay.parentNode.removeChild(mapOverlay);
         }
         await new Promise(resolve => setTimeout(resolve, 0));

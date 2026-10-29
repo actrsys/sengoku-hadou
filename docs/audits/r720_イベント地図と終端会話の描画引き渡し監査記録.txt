@@ -1,0 +1,38 @@
+# r720 / A-038 イベント地図と終端会話の描画引き渡し
+
+## 症状と通常到達経路
+ユーザー報告：台風などのイベント地図を閉じる際、謀反のメッセージウインドウを閉じる際にちらつく。その他の共通UIにも同種の現象がある可能性。
+- 台風は `GameEvents.typhoon_event_01.execute` → `EventMapEffects.createOverlay()` → `waitForDismiss()` → `cleanupOverlay()` → 通常マップ復帰 → 結果 `showDialogAsync()` に至る。凶作/豊作/大雪なども `common_events.js` の共通overlayを使う。
+- 謀反は `IndependenceSystem.executeRebellion()` 内の会話 `showDialogAsync()`、地図演出/所有色更新/`renderMap()`、続く結果会話を通る。終端会話の閉鎖はUIManager `processDialogQueue()` の共通 `closeCompletely()` に到達する。
+- 終戦・共通一覧・結果画面・指南書・面談・国主評定・野戦などの全画面復帰経路も参照した。すでに共通 `closeCoveredViewAfterRecovery()` を使う画面は変更不要と判断した。
+
+## 原因の再現と修正の必要性
+1. イベント地図 `cleanupOverlay()` は背景復帰処理 `resumeBackgroundUpdates()` を呼びっぱなしにし、イベント用暗幕shellを次の1回だけのrequestAnimationFrameで除去。背景復帰側は2回のrequestAnimationFrameまでを完了契約にしており、暗幕除去が背景の合成commitに先行し得る。低メモリスマホではmain mapのdisplay:none復帰が重なりリスクが高い。
+2. 最後の会話は次の会話を待つ短いhandoff猶予の後に `modal.classList.add('hidden')` を直接実行。謀反・独立のように直前に地図/拠点が変更された通常経路では、全面cover解除と背景compositor再提示が同一フレームへ重なる。r437で別種のモーダルに採用した最終coverの2フレーム引き渡しに未接続だった。
+3. 上記の描画順序を実コードから抽出したテストに落とし、r719では両方失敗（1件は復旧Promise未完了の状態で暗幕除去、1件は描画待ち前に会話を非表示）。r720では両方成功。
+これは表示順序のロジックを本番メソッドで再現した検査であり、ユーザー端末固有の物理的な白抜けを録画して検出したものではない。
+
+## 改修
+- `js/event/common_events.js`: イベント画像Canvas解放・通常マップ表示復旧の順序は維持し、背景復帰Promiseがある時はその完了を暗幕の下で待つ。背景が別の理由で停止済みなど復帰Promiseがない場合も、共通 `waitForCoveredMapPaint()` （なければ2回のnextPaint）で最終coverを維持する。
+- `js/ui.js`: 終端会話の遅延終了だけを既存 `closeCoveredViewAfterRecovery(modal,{waitForPaint:true,afterHide:...})` へ委譲する。`closeBeforeAction` / `closeBeforeOk` / `closeBeforeCancel` の明示的な別画面への遷移は旧来の即時閉鎖を維持。次の会話表示時に `prepareCoveredViewForOpen(modal)` で古い閉鎖を無効化する。顔画像、ガードの解放は実際の閉鎖後に行う。
+- 新しい全画面暗幕、固定待機ミリ秒、DOM/Canvasの再生成、保存状態フラグ、画面固有の例外を追加しない。台風の乱数、被害計算、結果通知、他のゲームルールは触らない。
+
+## 検証
+- 修正前r719へ新規2回帰を適用：1196成功/2失敗。修正後r720：1198成功/0失敗。
+- イベント地図は復旧Promiseの2描画境界が終わる前にoverlay.removeChildを呼ばないことを検証。
+- 終端会話は1描画境界で隠れず2描画境界後に閉鎖し、その間に新しい会話が入れば旧closeで新会話を隠さないことを検証。
+- 実ChromiumのPC 1280×720、スマホ390×844、低メモリスマホ360×640で終端会話の2描画境界を検証。既存の表示回帰もすべて成功。
+- `node tools/verify_release_sources.js`：共通/1560/1570の管理データと主要数式の照合成功。
+- `python tools/verify_excel_bin_parity.py`：共通/1560/1570のExcel/BIN出力全フィールド一致。
+- `python tools/simulation/test_player_focus_sim.py`：4件成功。
+
+## マニュアル適合性と限界
+- モーダル背景復旧・paint待ちの正本は既存UIManager。イベント地図の正本はEventMapEffects。描画だけの変更にとどめ、イベント効果/ゲーム進行と分離。
+- r437/r438/r603等の「背景復旧中はcover維持」「連続会話は次画面まで保持」「別画面への遷移は先に閉じる」という区分を維持。
+- r437で既にcover経由の標準モーダルは触らない。全モーダルを機械的に固定遅延で覆ったり、巨大Canvas再生成で隠したりしない。
+- 画面のちらつきは端末ごとのGPU・WebView・OS復帰など別要因でも起こり得る。今回の2経路の描画順序を改善したが、全機種・全場面での完全解消や長時間自然プレイの実機記録は未検証。
+
+## 変更範囲
+追加: docs/audits/r720_イベント地図と終端会話の描画引き渡し監査記録.txt
+更新: ARCHITECTURE.md, docs/audits/README.md, js/config.js, js/event/common_events.js, js/ui.js, tests/run_tests.js, tests/run_visual_tests.js
+削除: なし

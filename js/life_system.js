@@ -1644,9 +1644,6 @@ class LifeSystem {
             successor.achievementTotal = (successor.achievementTotal || 0) + meritTransfer;
             oldDaimyo.achievementTotal = (oldDaimyo.achievementTotal || 0) - meritTransfer;
 
-            // 先代大名の役職を外し、隠居状態にします
-            oldDaimyo.isDaimyo = false;
-            oldDaimyo.isRetired = true;
         }
 
         // 2. 新当主が国主の席を占めている場合、その軍団を正規解散する。
@@ -1659,9 +1656,14 @@ class LifeSystem {
         }
         successor.isCommander = false;
 
-        // 3. 家督継承先は先代の一時的な出陣先ではなく、記録された居城。
-        // 本拠が失陥していた場合は正本による直轄拠点の再選定に従う。
+        // 3. プレイヤーなら先代の現在地、AIなら継続本拠を共通窓口で確定する。
+        // 生前相続では旧当主の大名フラグを外す前に問い合わせる。
+        // 本拠が失陥していた場合は従来の直轄拠点再選定に従う。
         const baseCastle = this.game.getDaimyoHomeCastle(oldDaimyo.clan);
+        if (isAliveSuccession) {
+            oldDaimyo.isDaimyo = false;
+            oldDaimyo.isRetired = true;
+        }
         if (baseCastle) {
             // 生前譲位・死亡継承とも、実際に別城へ着任すれば着任月を更新する。
             // 在職家臣の転任は旧城の滞在歴を記録するが、浪人・諸勢力・未登場者を

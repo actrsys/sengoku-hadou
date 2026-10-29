@@ -1,0 +1,36 @@
+# r719 / A-037 生前家督相続で当主の現在地を継承する
+
+## 今回の監査対象と根拠
+r718の定義「操作中プレイヤー大名の直轄本拠は、移動契機を問わず当主の実際の在城地で決まる」を、通常の武将移動後に実行する「家督相続」コマンドへ接続して点検した。
+正常操作経路は CommandSystem.executeSuccession（家督相続）→ LifeSystem.executeSuccessionCommand() → setupNewDaimyo()。当主の通常移動は AffiliationSystem.moveCastle() を通る。
+
+## 修正前の再現
+r718では moveCastle() が homeCastleId の先行同期を行わない（参照時に当主現在地で決めるという設計）。一方、setupNewDaimyo() の生前譲位分岐は先に oldDaimyo.isDaimyo=false としてから GameManager.getDaimyoHomeCastle() を呼んでいた。これにより、共通getterが現当主を見つけられず、記録に残る古い homeCastleId を採用し得た。
+同じ勢力に属する直轄城A(11)・B(12)、当主101、後継者102の構造を使用し、実 AffiliationSystem.moveCastle() で当主をA→Bへ転任、途中に本拠問い合わせを挟まず実 LifeSystem.setupNewDaimyo(..., true) で生前家督を実行。r718で後継者は旧Aに移り、新規回帰1件が失敗した（期待B、実際A）。
+なお長期自然プレイで自動的に同局面へ到達した実機記録ではなく、到達可能な正規操作・実クラスをつないだfixtureによる再現である。
+
+## 必要な改修（局所の処理順序だけ）
+js/life_system.js の setupNewDaimyo() において、生前家督の先代 isDaimyo=false / isRetired=true 代入を、共通 GameManager.getDaimyoHomeCastle() で先代の本拠を解決した直後に移した。功績の1/3移転、国主予定後継者の既存軍団解散、後継者の所属・所在変更、城主任命、改名・顔変更、朝廷官位・家督効果、changeLeaderの順序・仕様は維持。新規の本拠保存処理や関数は追加していない。
+AI大名は既存の固定 homeCastleId を使う。国主軍団は既存の担当システムで解散・継承し、参照getterが独断で軍団を変更しない。
+
+## 検証
+- 修正前、追加した実クラス結合回帰で 1失敗（後継者の在城地 11 ≠ 12）。
+- 修正後、同回帰で後継者所在地12、先代の引退/大名フラグ解除、新当主ID102、本拠記録12を確認。
+- node tests/run_tests.js: 1,196 passed / 0 failed。
+- node tests/run_visual_tests.js: 成功（PC/スマホ等の既存表示回帰）。
+- node tools/verify_release_sources.js: 共通12126件、1560・1570各26259件の主要数式とソース照合成功。
+- python tools/verify_excel_bin_parity.py: 共通・1560・1570の管理Excel/BIN出力フィールド完全一致。
+- python tools/simulation/test_player_focus_sim.py: 4 tests OK。
+- 差分パッチ適用・逆適用によるファイル完全一致は別途パッケージ作成時に検証。
+
+## マニュアル適合性の事後監査
+- 設計正本は「武将の所在」Busho.castleIdと共通の本拠取得 GameManager.getDaimyoHomeCastle() を維持。
+- 意味ある正常経路で旧版の誤継承を再現。防御的条件追加、マスター修正、セーブ項目・AI判断の変更は行わない。
+- 正規の所属変更はAffiliationSystem、国主軍団解散はCastleManager、家督の効果はLifeSystemに維持。重複Setterなし。
+- プレイヤー大名のみ現在地、AI大名は継続本拠、国主は軍団本拠というr718の区分を保持。
+- 長期自然プレイの家督コマンドUI操作・全史実イベントや全滅亡分岐のE2Eは未実施であり保証しない。
+
+## 変更区分
+追加: docs/audits/r719_生前家督相続の当主所在本拠優先監査記録.txt
+更新: ARCHITECTURE.md, docs/audits/README.md, js/config.js, js/life_system.js, tests/run_tests.js
+削除: なし

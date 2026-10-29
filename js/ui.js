@@ -1380,15 +1380,26 @@ class UIManager {
                 currentContent.style.cursor = '';
             }
 
-            const closeCompletely = () => {
-                modal.classList.add('hidden');
-                if (leftFaceEl) leftFaceEl.replaceChildren();
-                if (rightFaceEl) rightFaceEl.replaceChildren();
-                if (this._dialogGuardHeld) {
-                    this.restoreAIGuard();
-                    this._dialogGuardHeld = false;
+            const closeCompletely = (immediate = false) => {
+                const finishClose = () => {
+                    if (leftFaceEl) leftFaceEl.replaceChildren();
+                    if (rightFaceEl) rightFaceEl.replaceChildren();
+                    if (this._dialogGuardHeld) {
+                        this.restoreAIGuard();
+                        this._dialogGuardHeld = false;
+                    }
+                    this.isDialogShowing = false;
+                };
+                // 終端会話は画面全体のcoverでもある。結果会話の直前に地図・拠点色が
+                // 更新された場合、会話を即座に隠すと背景のcompositor再合成が同じ
+                // commitに重なってちらつく。共通cover窓口でpaintまで表示を維持する。
+                // 別画面への明示的な遷移(closeBeforeAction)は従来どおり即時閉鎖する。
+                if (!immediate && typeof this.closeCoveredViewAfterRecovery === 'function') {
+                    this.closeCoveredViewAfterRecovery(modal, { waitForPaint: true, afterHide: finishClose });
+                } else {
+                    modal.classList.add('hidden');
+                    finishClose();
                 }
-                this.isDialogShowing = false;
             };
 
             const continueOrClose = () => {
@@ -1421,7 +1432,7 @@ class UIManager {
             // これにより、次画面が動き始めた後まで古い選択ボタンだけ残る状態を防ぎます。
             if (closeBeforeAction) {
                 this._cancelDialogHandoffClose();
-                closeCompletely();
+                closeCompletely(true);
             }
 
             try {
@@ -1614,7 +1625,8 @@ class UIManager {
         }
 
         // 引き渡し先の会話を先に可視化してから、使者選択など直前の画面を閉じます。
-        modal.classList.remove('hidden');
+        if (typeof this.prepareCoveredViewForOpen === 'function') this.prepareCoveredViewForOpen(modal);
+        else modal.classList.remove('hidden');
         this.completeVisualHandoff();
         const diagnosticPrefix = dialog.customOpts?.diagnosticPrefix || '';
         if (diagnosticPrefix && this.game && typeof this.game.writeSystemDiagnostic === 'function') {
