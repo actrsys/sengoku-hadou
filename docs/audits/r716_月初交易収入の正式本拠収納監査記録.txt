@@ -1,0 +1,28 @@
+# r716 / A-034 月初交易収入の正式本拠収納
+
+## 監査基準
+r715完全版ZIP（575件、SHA-256 b4a709c6e8b8adcdc01dfb6019a8707875a8f9ec4473f738fa118906034761b8）。
+`ARCHITECTURE.md` の「監査の目的と改修判断」「AI改修時の必須ルール」ならびに r445・r446 の本拠地と一時所在の分離規則、r570 の購入価格責務、A-029〜A-033 を照合。前回の外交旧主家の参照とは独立した月初金収納先を新規監査。
+
+## 正規操作からの到達性と修正前実害
+プレイヤーが本拠Aと接続した別の自領拠点Bを持つ場合、通常の「移動」→地図でB選択→`CommandSystem.getBushoSelectorData('move_deploy')` は在城中の当主を有効候補へ含める。`AffiliationSystem.moveCastle(daimyo, B)` は当主の `castleId` をBへ変更するが、正式な `Clan.homeCastleId=A` は変えない（r445の仕様）。
+毎月 `trade_income_monthly`（`startMonth_after`）が実行され、`EconomyRules.calcTradeIncomeWithTarget`で同盟国・隣接拠点などの交易収入を計算する。r715では入金先に `game.getCastle(leader.castleId)` を使うため、実際には当主の一時滞在先Bへ入金し、正式本拠Aには入金されない。これは収入を「大名の居城に入れる」という同イベントの意味およびr445の本拠正本と矛盾する。
+
+## 修正前・修正後実行確認
+同一Node VMに本番の`js/map_graph.js`、`js/affiliation_system.js`、`js/game.js`、`js/economy_rules.js`、`js/event/common_events.js`を読み込み、当主・家臣・自領2拠点・同盟他家1拠点の正常構造を与えた。実`AffiliationSystem.moveCastle`で当主を移動し、実`trade_income_monthly.execute`を発火。城主再選任・UIの描画だけ局所検証から除外した。
+AとBに金1,000ずつ、交易相手を人口10,000・友好100・隣接としたとき、収入50を計算。
+- 移動前：本拠A=1,050、B=1,000（正常）。
+- r715で当主をBへ通常移動後：本拠A=1,000、B=1,050（誤収納を再現）。
+- r716同条件：本拠A=1,050、B=1,000（解決）。
+`tests/run_tests.js`には同一系統の実メソッド連結回帰を1件追加。通常時／一時移動／正式居城変更／本拠落城後の再選定／入庫上限で成功。
+
+## 最小改修・影響範囲
+`js/event/common_events.js`の入金対象1行を`game.getDaimyoHomeCastle(clan.id)`へ置換。算出済み金額、上限処理、城主・国主処遇、`getClanCastles`、外交・交易status、正式本拠の選定規則は変更しない。`js/config.js`の版更新、ロジック回帰、設計契約と索引のみ追記。ユーザー管理のExcel、派生BIN、セーブスキーマ、UIの経済表記、AI判断には触れない。
+
+## 回帰と限界
+`node tests/run_tests.js`: 1,191 passed / 0 failed。
+`node tests/run_visual_tests.js`: 終了コード0、PC/スマホ/低メモリ表示回帰成功。
+`node tools/verify_release_sources.js`: 共通/1560/1570の正本Excel・派生BINと主要数式検証成功。
+`python tools/verify_excel_bin_parity.py`: 共通/1560/1570の出力フィールド一致。
+`python tools/simulation/test_player_focus_sim.py`: 4 tests OK。
+テストは本番の移動・交易実メソッドへ正常構造fixtureを与えた結合検査であり、実シナリオの多月数自然プレイ・全画面操作を通したE2Eではない。本拠喪失の結果は正常な所有変化をfixtureに与え、落城戦の一連の戦闘を再現していない。

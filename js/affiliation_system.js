@@ -512,9 +512,20 @@ class AffiliationSystem {
             busho.isCommander = false; // 席のない古い表示状態だけ解消
         }
 
+        // プレイヤー当主が国主の所領へ入る場合は、既存の撤退時と同じく
+        // 該当軍団だけを正規窓口で解散して、当主の居城を直轄にする。
+        if (busho.isDaimyo && this.game.phase === 'game' && !this.game.isWatchMode
+            && Number(busho.clan) === Number(this.game.playerClanId)) {
+            const targetCastle = this.game.getCastle(newCastleId);
+            if (targetCastle && Number(targetCastle.ownerClan) === Number(busho.clan)
+                && Number(targetCastle.legionId) > 0) {
+                const legion = this.game.getLegionByClanNo(busho.clan, targetCastle.legionId);
+                if (legion) this.game.castleManager.disbandLegion(legion.id);
+            }
+        }
+
         // 3. 新しいお城に入ります
         this.enterCastle(busho, newCastleId, options);
-
         // ★ここから追加：画面の絵をすぐに描き直す魔法！
         if (options.deferUI !== true) this.updateUI();
     }

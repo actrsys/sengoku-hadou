@@ -1286,19 +1286,24 @@ class GameManager {
     async endMonth() { return this.turnManager.endMonth(); }
     checkAllActionsDone() { return this.turnManager.checkAllActionsDone(); }
 
-    // 大名の本拠地の正本。現在の所在とは異なる場合がある。
-    // 本拠地が失われた時だけ、現在地の直轄拠点→他の直轄拠点の順で再選定する。
-    // 軍団領を勝手に直轄化したり、国主を解任したりはしない。
+    // AI大名は継続本拠を保持する。プレイヤー本拠は移動経路によらず参照時の当主所在から求める。
+    // 国主の軍団本拠は別管理し、軍団領を単なる参照で直轄へ変更しない。
     getDaimyoHomeCastle(clanId) {
         const clan = this.getClan(clanId);
         if (!clan) return null;
         const isOwnedDirect = castle => castle
             && Number(castle.ownerClan) === Number(clanId)
             && Number(castle.legionId) === 0;
-        const stored = this.getCastle(clan.homeCastleId);
-        if (isOwnedDirect(stored)) return stored;
         const daimyo = this.getClanDaimyo(clanId);
         const present = daimyo ? this.getCastle(daimyo.castleId) : null;
+        // 選択画面・観戦中はAIの継続本拠を優先。プレイヤーは移動処理の副作用に依存せず現在地を正本とする。
+        if (this.phase === 'game' && !this.isWatchMode
+            && Number(clanId) === Number(this.playerClanId) && isOwnedDirect(present)) {
+            clan.homeCastleId = Number(present.id);
+            return present;
+        }
+        const stored = this.getCastle(clan.homeCastleId);
+        if (isOwnedDirect(stored)) return stored;
         const replacement = isOwnedDirect(present) ? present
             : this.getClanCastles(clanId).find(isOwnedDirect);
         clan.homeCastleId = replacement ? Number(replacement.id) : 0;
@@ -1381,6 +1386,9 @@ class GameManager {
             ? this.turnQueue[expectedIndex] || null
             : null;
 
+        // 操作中の本拠は常に当主の現在地から求める。AIへ引き渡す直前に
+        // 継続記録を確定し、観戦開始後のAIが古い本拠を参照しないようにする。
+        this.getDaimyoHomeCastle(previousPlayerClanId);
         this._prepareFreshWatchMode(previousPlayerClanId);
         const prepare = this.aiOperationManager && typeof this.aiOperationManager.onClanBecameAIControlled === 'function'
             ? this.aiOperationManager.onClanBecameAIControlled(previousPlayerClanId)

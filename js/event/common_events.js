@@ -1791,7 +1791,7 @@ window.GameEvents.push({
             if (totalTradeIncome > 0) {
                 const leader = game.getBusho(clan.leaderId);
                 if (leader) {
-                    const daimyoCastle = game.getCastle(leader.castleId);
+                    const daimyoCastle = game.getDaimyoHomeCastle(clan.id);
                     if (daimyoCastle) {
                         daimyoCastle.gold = Math.min(GameConfig.Limits.CastleStock, daimyoCastle.gold + totalTradeIncome);
                     }

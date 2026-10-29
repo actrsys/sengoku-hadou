@@ -911,10 +911,11 @@ class AIOperationManager {
             return;
         }
         
-        // 親大名がいるか探します
+        // 親大名は存続勢力だけから探す。滅亡した旧主への外交記録は
+        // 履歴として残り得るが、現在の主家による不戦判定に使わない。
         let myBossId = 0;
         for (const c of this.game.clans) {
-            if (c.id !== clanId) {
+            if (c && c.id !== clanId && !c.isDestroyed) {
                 const r = this.game.getRelation(clanId, c.id);
                 if (r && r.status === '従属') {
                     myBossId = c.id;

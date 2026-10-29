@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r713');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r718');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -31250,6 +31250,376 @@ test('r713 常陸の不死鳥の空城旗揚げで改名と兵士合流を正規
         assert.strictEqual(kunishu.soldiers, 0);
         assert.strictEqual(game.clans.length, 2);
     }
+});
+
+// r714: 消滅した主家の外交履歴を作戦の現役主家資格へ混入させない。
+test('r714 AI作戦は滅亡旧宗主を除外し現存主家の不戦関係だけを参照する',async()=>{
+const context={console,Math:Object.create(Math),setTimeout,clearTimeout};
+context.Math.random=()=>0;context.window=context;
+context.MainParams={StartYear:1560,StartMonth:1};
+context.DiplomacyRules={isProtectedFromImmediateAttack:s=>['同盟','支配','従属','和睦'].includes(s)};
+vm.createContext(context);
+vm.runInContext(read('js/ai_operation.js'),context,{filename:'js/ai_operation.js'});
+async function run({deadFormerLord=true,oldLordRelation='同盟',livingBoss=false,livingBossRelation='同盟',oldRelation=true}){
+ const clans=[{id:1,isDestroyed:deadFormerLord,name:'B'}, {id:2,name:'A'}, {id:3,name:'C'}, {id:4,name:'D'}];
+ const castleA={id:20,name:'A城',ownerClan:2,legionId:0,castellanId:200,provinceId:30,adjacentCastleIds:[40],soldiers:5000,kokudaka:10,isDelegated:false};
+ const castleD={id:40,name:'D城',ownerClan:4,legionId:0,provinceId:30,adjacentCastleIds:[20],soldiers:200,defense:100};
+ const relations={'2:4':'敵対','4:2':'敵対','1:4':oldLordRelation,'4:1':oldLordRelation,
+  '3:4':livingBossRelation,'4:3':livingBossRelation};
+ if(oldRelation)relations['2:1']='従属';
+ if(livingBoss)relations['2:3']='従属';
+ const game={clans,provinces:[],month:4,year:1561,gameStartYear:1560,gameStartMonth:1,playerClanId:99,
+  getClan:id=>clans.find(c=>c.id===id),getClanCastles:id=>[castleA,castleD].filter(c=>c.ownerClan===id),
+  getCastle:id=>[castleA,castleD].find(c=>c.id===id),getBusho:id=>id===200?{id:200,isActionDone:false}:null,
+  getClanDaimyo:id=>({intelligence:50}), getRelation:(a,b)=>({status:relations[a+':'+b]||'普通'}),
+  getCurrentTurnId:()=>100, aiEngine:{decideAttackTarget:(base,general,valid)=>valid.length?{target:valid[0],score:90,sendSoldiers:2000,sendRice:1200}:null},
+  diplomacyManager:{isNonAggression:s=>['同盟','支配','従属','和睦'].includes(s)},
+  kunishuSystem:{getKunishusInCastle:()=>[]}
+ };
+ context.game=game;
+ const mgr=vm.runInContext('new AIOperationManager(game)',context);
+ mgr.operations[2]={};mgr.grandObjectives[2]={0:{type:'大名攻略',targetClanId:4}};
+ mgr._getAdjacentIds=c=>c.adjacentCastleIds;
+ mgr.getOperationLogInfo=()=>({clanName:'A',commanderName:'当主',grandObjStr:'大名攻略'});
+ await mgr.generateOperation(2,0);
+ return mgr.operations[2][0]?.type;
+}
+ const cases=[
+  ['dead former lord allied with target',{deadFormerLord:true,oldRelation:true,oldLordRelation:'同盟'},'攻撃'],
+  ['dead former lord hostile target',{deadFormerLord:true,oldRelation:true,oldLordRelation:'敵対'},'攻撃'],
+  ['live lord allied with target',{deadFormerLord:false,oldRelation:true,oldLordRelation:'同盟'},'内政'],
+  ['no lord',{oldRelation:false},'攻撃'],
+  ['dead former lord plus living lord allied target',{deadFormerLord:true,oldRelation:true,oldLordRelation:'敵対',livingBoss:true,livingBossRelation:'同盟'},'内政']
+ ];
+ for(const [name,input,expected] of cases){
+  const actual=await run(input);
+  assert.strictEqual(actual,expected,`主家の存続状態と攻撃計画: ${name}`);
+ }
+
+
+});
+
+
+// r715: 正規の出陣候補画面は、消滅旧主家の外交履歴で対象を消さず、現主家の不戦制限だけを守る。
+test('r715 出陣対象は滅亡旧宗主を除外し現存宗主の外交保護を維持する', () => {
+    const context = createContext({ COMMAND_SPECS: { war: { targetType: 'enemy_valid' } } });
+    loadScript(context, 'js/constants.js');
+    loadScript(context, 'js/map_graph.js');
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    loadScript(context, 'js/command_system.js');
+
+    const cases = [
+        { name: '滅亡旧主家の同盟は出陣を止めない', dead: true, former: '同盟', wanted: true },
+        { name: '存続主家の同盟は出陣を止める', dead: false, former: '同盟', wanted: false },
+        { name: '滅亡旧主家の敵対は出陣可能', dead: true, former: '敵対', wanted: true },
+        { name: '滅亡旧主家より存続主家の同盟が優先', dead: true, former: '敵対', living: true, current: '同盟', wanted: false },
+        { name: '滅亡旧主家の同盟は存続主家の敵対を妨げない', dead: true, former: '同盟', living: true, current: '敵対', wanted: true },
+        { name: '従属なしの出陣を維持', dead: true, former: '同盟', oldRelation: false, wanted: true },
+        { name: '自家と対象の同盟は出陣不可のまま', dead: true, former: '敵対', selfAllied: true, wanted: false }
+    ];
+
+    for (const item of cases) {
+        const home = { id: 20, ownerClan: 2, adjacentCastleIds: [40] };
+        const target = { id: 40, ownerClan: 4, adjacentCastleIds: [20] };
+        const relations = { '2:4': item.selfAllied ? '同盟' : '敵対', '1:4': item.former, '3:4': item.current || '敵対' };
+        if (item.oldRelation !== false) relations['2:1'] = '従属';
+        if (item.living) relations['2:3'] = '従属';
+        const game = {
+            playerClanId: 2, clans: [{ id: 1, isDestroyed: item.dead }, { id: 2 }, { id: 3 }, { id: 4 }],
+            castles: [home, target], getCurrentTurnCastle: () => home, getCurrentTurnId: () => 100,
+            getCastle: id => id === 20 ? home : id === 40 ? target : null,
+            getClanCastles: id => [home, target].filter(c => c.ownerClan === id),
+            getRelation: (from, to) => ({ status: relations[`${from}:${to}`] || '敵対' }),
+            diplomacyManager: { isNonAggression: status => ['同盟', '支配', '従属', '和睦'].includes(status) }
+        };
+        context.game = game;
+        game.warManager = vm.runInContext('new WarManager(game)', context);
+        const command = vm.runInContext('new CommandSystem(game)', context);
+        const isSelectable = command.getValidTargets('war').includes(40);
+        assert.strictEqual(isSelectable, item.wanted, item.name);
+    }
+});
+
+
+// r717: プレイヤーの直轄本拠は当主の在城地に追従し、
+// AI大名の継続的な本拠地と国主の軍団本拠は別に扱う。
+test('r717 月初交易収入はプレイヤー当主の現在地へ収納する', async () => {
+    const context = createContext({
+        GameEvents: [],
+        document: { readyState: 'loading' },
+        addEventListener: () => {},
+        COMMAND_SPECS: { move: { isMulti: true, sortKey: 'strength', msg: '移動' } },
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        DiplomacyRules: { isFriendly: s => ['同盟', '支配', '従属', '友好'].includes(s) },
+        StatPresenter: { getPerceivedStatValue: b => b.strength || 0 }
+    });
+    loadScript(context, 'js/map_graph.js');
+    loadScript(context, 'js/affiliation_system.js');
+    loadScript(context, 'js/game.js');
+    loadScript(context, 'js/economy_rules.js');
+    loadScript(context, 'js/command_system.js');
+    loadScript(context, 'js/event/common_events.js');
+    const event = context.GameEvents.find(entry => entry.id === 'trade_income_monthly');
+    assert.ok(event, '月初の正規交易イベントが存在する');
+    const { AffiliationSystem, GameManager, EconomyRules, CommandSystem } = vm.runInContext(
+        '({ AffiliationSystem, GameManager, EconomyRules, CommandSystem })', context);
+
+    const makeGame = () => {
+        const clans = [
+            { id: 1, leaderId: 101, homeCastleId: 11, isDestroyed: false },
+            { id: 2, leaderId: 202, homeCastleId: 21, isDestroyed: false }
+        ];
+        const castles = [
+            { id: 11, name: '本拠', ownerClan: 1, legionId: 0, gold: 1000, provinceId: 1, population: 10000,
+                samuraiIds: [101], castellanId: 101, adjacentCastleIds: [12, 21] },
+            { id: 12, name: '一時滞在先', ownerClan: 1, legionId: 0, gold: 1000, provinceId: 1, population: 10000,
+                samuraiIds: [102], castellanId: 102, adjacentCastleIds: [11, 21] },
+            { id: 21, name: '交易相手', ownerClan: 2, legionId: 0, gold: 1000, provinceId: 1, population: 10000,
+                samuraiIds: [202], castellanId: 202, adjacentCastleIds: [11, 12] }
+        ];
+        const bushos = [
+            { id: 101, name: '当主', clan: 1, isDaimyo: true, status: 'active', castleId: 11, strength: 80, isActionDone: false },
+            { id: 102, name: '家臣', clan: 1, isDaimyo: false, status: 'active', castleId: 12, strength: 50, isActionDone: false },
+            { id: 202, name: '他家当主', clan: 2, isDaimyo: true, status: 'active', castleId: 21, strength: 60, isActionDone: false }
+        ];
+        const game = {
+            clans, castles, bushos, playerClanId: 1, phase: 'game', legions: [],
+            ui: { renderMap: () => {}, log: () => {} },
+            getClan: id => clans.find(c => c.id === Number(id)),
+            getCastle: id => castles.find(c => c.id === Number(id)),
+            getBusho: id => bushos.find(b => b.id === Number(id)),
+            getClanCastles: id => castles.filter(c => c.ownerClan === Number(id)),
+            getCastleBushos: id => bushos.filter(b => b.castleId === Number(id)),
+            getClanDaimyo: id => bushos.find(b => b.clan === Number(id) && b.isDaimyo),
+            getClanGunshi: () => null,
+            getRelation: (a, b) => (a === 1 && b === 2) || (a === 2 && b === 1)
+                ? { status: '同盟', sentiment: 100 } : null
+        };
+        game.getDaimyoHomeCastle = GameManager.prototype.getDaimyoHomeCastle;
+        const affiliation = new AffiliationSystem(game);
+        // 城主再選任の順位や描画は本検証に影響しないため除外する。
+        // 移動と名簿の更新には本番の moveCastle/leaveCastle/enterCastle を使用。
+        affiliation.updateCastleLord = () => {};
+        affiliation.updateUI = () => {};
+        return { game, castles, bushos, affiliation };
+    };
+
+    const a = makeGame();
+    const expectedIncome = EconomyRules.calcTradeIncomeWithTarget(1, 2, a.game);
+    assert.ok(expectedIncome > 0, '実際の同盟・隣接拠点間で交易収入が発生する');
+    await event.execute(a.game);
+    assert.strictEqual(a.castles[0].gold, 1000 + expectedIncome, '通常時は本拠へ納入');
+
+    const b = makeGame();
+    const selector = new CommandSystem(b.game).getBushoSelectorData('move_deploy', 12, null, b.castles[0]);
+    assert.ok(selector.bushos.some(v => v.id === 101), '正規の移動選択で当主は選択可能');
+    b.affiliation.moveCastle(b.bushos[0], 12);
+    assert.strictEqual(b.bushos[0].castleId, 12, '通常移動により当主の現在地は変わる');
+    assert.strictEqual(b.game.clans[0].homeCastleId, 11, '移動処理は本拠地を確定せず、問い合わせで当主現在地から求める');
+    assert.strictEqual(b.game.getDaimyoHomeCastle(1).id, 12, 'プレイヤー直轄本拠は当主現在地へ追従');
+    assert.strictEqual(b.game.clans[0].homeCastleId, 12, '保存対象の本拠IDも現在地へ同期');
+    await event.execute(b.game);
+    assert.strictEqual(b.castles[0].gold, 1000, '旧本拠へは入金しない');
+    assert.strictEqual(b.castles[1].gold, 1000 + expectedIncome, '当主の現在地へ交易収入を納める');
+
+    const c = makeGame();
+    c.affiliation.moveCastle(c.bushos[0], 12);
+    c.affiliation.moveCastle(c.bushos[0], 11);
+    c.affiliation.moveCastle(c.bushos[0], 12);
+    await event.execute(c.game);
+    assert.strictEqual(c.castles[1].gold, 1000 + expectedIncome, '何度移動しても現在地へ納入');
+    assert.strictEqual(c.castles[0].gold, 1000, '旧本拠へ誤入庫しない');
+
+    const d = makeGame();
+    d.affiliation.moveCastle(d.bushos[0], 12);
+    d.castles[0].ownerClan = 2; // 落城による旧本拠喪失後の正常な所有結果
+    const replacement = d.game.getDaimyoHomeCastle(1);
+    assert.strictEqual(replacement.id, 12, '旧本拠を失ったとき既存窓口が直轄地を選び直す');
+    const incomeAfterLoss = EconomyRules.calcTradeIncomeWithTarget(1, 2, d.game);
+    await event.execute(d.game);
+    assert.strictEqual(d.castles[1].gold, Math.min(99999, 1000 + incomeAfterLoss), '本拠喪失後は再選定先へ納入');
+
+    const e = makeGame();
+    e.castles[0].gold = 99990;
+    await event.execute(e.game);
+    assert.strictEqual(e.castles[0].gold, 99999, '収容上限は従来どおり維持');
+});
+
+
+// r717: プレイヤーの当主が国主の軍団領へ移動した場合、
+// 既存の撤退時と同じ正式な軍団解散窓口で直轄へ戻す。
+test('r717 当主の国主領への通常移動で直轄本拠を確定し無関係な軍団を維持する', () => {
+    const context = createContext({
+        addEventListener: () => {},
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
+        BushoStatusRules: { isActive: b => b.status === 'active' }
+    });
+    loadScript(context, 'js/game.js');
+    loadScript(context, 'js/affiliation_system.js');
+    loadScript(context, 'js/castle_manager.js');
+    const { GameManager, AffiliationSystem, CastleManager } = vm.runInContext(
+        '({ GameManager, AffiliationSystem, CastleManager })', context);
+    const clan = { id: 1, leaderId: 100, homeCastleId: 10 };
+    const castles = [
+        { id: 10, name: '旧直轄', ownerClan: 1, legionId: 0, isDelegated: false, samuraiIds: [100], castellanId: 100 },
+        { id: 11, name: '国主本拠', ownerClan: 1, legionId: 1, isDelegated: true, samuraiIds: [110], castellanId: 110 },
+        { id: 12, name: '国主所領', ownerClan: 1, legionId: 1, isDelegated: true, samuraiIds: [120], castellanId: 120 },
+        { id: 13, name: '別国主領', ownerClan: 1, legionId: 2, isDelegated: true, samuraiIds: [130], castellanId: 130 }
+    ];
+    const bushos = [
+        { id: 100, name: '当主', clan: 1, isDaimyo: true, isCastellan: true, status: 'active', castleId: 10 },
+        { id: 110, name: '国主', clan: 1, isCommander: true, isCastellan: true, status: 'active', castleId: 11 },
+        { id: 120, name: '家臣', clan: 1, isCastellan: true, status: 'active', castleId: 12 },
+        { id: 130, name: '別国主', clan: 1, isCommander: true, isCastellan: true, status: 'active', castleId: 13 }
+    ];
+    const legions = [
+        { id: 101, clanId: 1, legionNo: 1, commanderId: 110 },
+        { id: 102, clanId: 1, legionNo: 2, commanderId: 130 }
+    ];
+    const game = {
+        phase: 'game', playerClanId: 1, isWatchMode: false, clans: [clan], castles, bushos, legions,
+        getClan: id => Number(id) === 1 ? clan : null,
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getBusho: id => bushos.find(b => b.id === Number(id)),
+        getClanBushos: () => bushos,
+        getClanCastles: id => castles.filter(c => c.ownerClan === Number(id)),
+        getCastleBushos: id => bushos.filter(b => b.castleId === Number(id)),
+        getClanDaimyo: id => Number(id) === 1 ? bushos[0] : null,
+        getLegionByClanNo: (clanId, number) => legions.find(l => l.clanId === Number(clanId) && l.legionNo === Number(number)),
+        aiOperationManager: { clearLegionPlanning: () => {} },
+        ui: { renderMap: () => {} }
+    };
+    game.getDaimyoHomeCastle = GameManager.prototype.getDaimyoHomeCastle;
+    game.castleManager = new CastleManager(game);
+    game.affiliationSystem = new AffiliationSystem(game);
+    game.affiliationSystem.updateUI = () => {};
+    game.affiliationSystem.moveCastle(bushos[0], 11);
+    assert.strictEqual(bushos[0].castleId, 11);
+    assert.strictEqual(game.getDaimyoHomeCastle(1).id, 11, '国主領だった移動先が直轄本拠になる');
+    assert.strictEqual(clan.homeCastleId, 11);
+    assert.strictEqual(legions[0].commanderId, 0, '占有した国主の軍団だけ解散');
+    assert.strictEqual(bushos[1].isCommander, false);
+    assert.strictEqual(castles[1].legionId, 0);
+    assert.strictEqual(castles[2].legionId, 0);
+    assert.strictEqual(castles[1].isDelegated, false);
+    assert.strictEqual(legions[1].commanderId, 130, '別国主の席次は保持');
+    assert.strictEqual(castles[3].legionId, 2, '別国主の所領は保持');
+});
+
+test('r717 AI本拠の継続記録と観戦中のAI処理をプレイヤー追従と混同しない', () => {
+    const context = createContext({ addEventListener: () => {} });
+    loadScript(context, 'js/game.js');
+    const Manager = vm.runInContext('GameManager', context);
+    const clan = { id: 9, homeCastleId: 31, leaderId: 900 };
+    const castles = [
+        { id: 31, ownerClan: 9, legionId: 0 },
+        { id: 32, ownerClan: 9, legionId: 0 }
+    ];
+    const leader = { id: 900, clan: 9, castleId: 32, isDaimyo: true };
+    const game = { playerClanId: 9, phase: 'game', isWatchMode: true,
+        getClan: () => clan, getCastle: id => castles.find(c => c.id === Number(id)),
+        getClanDaimyo: () => leader, getClanCastles: () => castles };
+    assert.strictEqual(Manager.prototype.getDaimyoHomeCastle.call(game, 9).id, 31, '観戦中はAIの正式居城を維持');
+    assert.strictEqual(clan.homeCastleId, 31);
+    game.isWatchMode = false;
+    assert.strictEqual(Manager.prototype.getDaimyoHomeCastle.call(game, 9).id, 32, '操作再開時は当主現在地へ追従');
+    assert.strictEqual(clan.homeCastleId, 32);
+    game.playerClanId = 4;
+    leader.castleId = 31;
+    assert.strictEqual(Manager.prototype.getDaimyoHomeCastle.call(game, 9).id, 32, 'AI操作勢力では旧来の正式本拠を維持');
+    game.phase = 'title';
+    game.playerClanId = 9;
+    assert.strictEqual(Manager.prototype.getDaimyoHomeCastle.call(game, 9).id, 32, 'タイトル／選択中にプレイヤー用ルールを適用しない');
+});
+
+
+// r718: 攻城戦の通常の「攻略軍入城」は本番WarManager経由で武将を動かす。
+// 以後の本拠参照が当主の在城地から直接導出され、移動の種類に依存しないことを確認する。
+test('r718 戦後の攻略軍入城でも本拠地は問い合わせ時の大名現在地から確定する', () => {
+    const context = createContext({
+        addEventListener: () => {},
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
+        BushoStatusRules: { isActive: b => b.status === 'active' }
+    });
+    loadScript(context, 'js/game.js');
+    loadScript(context, 'js/affiliation_system.js');
+    loadScript(context, 'js/war.js');
+    loadScript(context, 'js/war_effort.js');
+    const { GameManager, AffiliationSystem, WarManager } = vm.runInContext(
+        '({ GameManager, AffiliationSystem, WarManager })', context);
+    const clan = { id: 1, leaderId: 101, homeCastleId: 11 };
+    const castles = [
+        { id: 11, name: '出陣元', ownerClan: 1, legionId: 0, castellanId: 101, samuraiIds: [101] },
+        { id: 12, name: '攻略先', ownerClan: 1, legionId: 0, castellanId: 202, samuraiIds: [] }
+    ];
+    const daimyo = { id: 101, name: '大名', clan: 1, isDaimyo: true, isCastellan: true,
+        status: 'active', castleId: 11 };
+    const game = {
+        phase: 'game', playerClanId: 1, isWatchMode: false,
+        clans: [clan], castles, bushos: [daimyo], legions: [],
+        getClan: id => Number(id) === 1 ? clan : null,
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getBusho: id => Number(id) === 101 ? daimyo : null,
+        getClanDaimyo: id => Number(id) === 1 ? daimyo : null,
+        getClanCastles: id => castles.filter(c => c.ownerClan === Number(id)),
+        getCastleBushos: id => daimyo.castleId === Number(id) ? [daimyo] : [],
+        ui: { renderMap: () => {} }
+    };
+    game.getDaimyoHomeCastle = GameManager.prototype.getDaimyoHomeCastle;
+    const affiliation = new AffiliationSystem(game);
+    affiliation.updateCastleLord = () => {};
+    affiliation.updateUI = () => {};
+    game.affiliationSystem = affiliation;
+    const war = new WarManager(game);
+    war.finalizeCapturedCastleStaffing({ sourceCastle: castles[0], defender: castles[1], atkBushos: [daimyo] });
+    assert.strictEqual(daimyo.castleId, 12, '戦後の正規攻略軍入城で大名の所在が変わる');
+    assert.strictEqual(clan.homeCastleId, 11, '戦争移動処理では本拠地IDを確定しない');
+    assert.strictEqual(game.getDaimyoHomeCastle(1).id, 12, '戦後も大名の現在地そのものを本拠地として判定');
+    assert.strictEqual(clan.homeCastleId, 12, '共通問い合わせ時に保存値も同期');
+});
+
+
+// r718: 途中観戦は今までのプレイヤー勢力をAIへ引き渡す正規の入口。
+// プレイヤー操作中の本拠値は移動操作では更新せず、AIへの引き渡し直前に現在地から確定する。
+test('r718 途中観戦へ移る際は操作勢力の当主現在地をAI継続本拠へ引き継ぐ', () => {
+    const context = createContext({ addEventListener: () => {},
+        LifeStatusRules: { isPresent: b => b.status === 'active' } });
+    loadScript(context, 'js/game.js');
+    loadScript(context, 'js/affiliation_system.js');
+    const { GameManager: Manager, AffiliationSystem } = vm.runInContext(
+        '({ GameManager, AffiliationSystem })', context);
+    const clan = { id: 1, leaderId: 101, homeCastleId: 11 };
+    const castles = [
+        { id: 11, ownerClan: 1, legionId: 0, samuraiIds: [101], castellanId: 101 },
+        { id: 12, ownerClan: 1, legionId: 0, samuraiIds: [], castellanId: 0 }
+    ];
+    const daimyo = { id: 101, clan: 1, isDaimyo: true, castleId: 11,
+        status: 'active', isCastellan: true };
+    const game = { phase: 'game', playerClanId: 1, isWatchMode: false,
+        currentIndex: 0, turnQueue: [],
+        getClan: () => clan,
+        getClanDaimyo: () => daimyo,
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getClanCastles: () => castles,
+        turnManager: { captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: () => false },
+        aiOperationManager: { onClanBecameAIControlled: () => {} },
+        ui: { hideWatchReturnReserved: () => {}, clearCommandMenu: () => {} }
+    };
+    game.getDaimyoHomeCastle = Manager.prototype.getDaimyoHomeCastle;
+    game._prepareFreshWatchMode = Manager.prototype._prepareFreshWatchMode;
+    const affiliation = new AffiliationSystem(game);
+    affiliation.updateCastleLord = () => {};
+    affiliation.updateUI = () => {};
+    affiliation.moveCastle(daimyo, 12);
+    assert.strictEqual(clan.homeCastleId, 11, '正規の移動直後にはAI用の継続値を直接書き換えない');
+    Manager.prototype.startWatchMode.call(game);
+    assert.strictEqual(game.isWatchMode, true);
+    assert.strictEqual(game.playerClanId, -100);
+    assert.strictEqual(clan.homeCastleId, 12, 'プレイヤーからAIへ切り替える前に現在地を継続本拠へ確定');
+    daimyo.castleId = 11;
+    assert.strictEqual(game.getDaimyoHomeCastle(1).id, 12, 'AIになった後は移動だけでは継続本拠を変えない');
 });
 
 Promise.all(pendingTests).then(() => {

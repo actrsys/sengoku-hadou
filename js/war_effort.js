@@ -602,7 +602,8 @@ Object.assign(WarManager.prototype, {
         let myBossId = 0;
         for (const c of this.game.clans) {
             // ★バリア追加：中立(0)を除外します
-            if (c.id !== myClanId && c.id !== 0) {
+            // 滅亡した旧宗主への従属履歴は現在の主家の出陣制限に使わない。
+            if (c.id !== myClanId && c.id !== 0 && !c.isDestroyed) {
                 const r = this.game.getRelation(myClanId, c.id);
                 if (r && r.status === '従属') {
                     myBossId = c.id;
