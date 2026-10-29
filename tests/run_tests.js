@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r710');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r713');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -31051,6 +31051,204 @@ test('r710 野戦で敵部隊を壊滅させたグループの士気+3が他グ�
             `${otherWinnerGroup}には他グループ撃破支援として+1のみ`);
         assert.strictEqual(field.groupStats[loserGroup].morale, 44,
             `${loserGroup}は戦闘劣勢-3および被撃破グループ-3`);
+    }
+});
+
+// r711: 諸勢力親善の地図候補と城内対象一覧を同一の友好度上限条件で絞る。
+// 複数勢力が同じ城にいるとき、既に100の対象が選択画面に混入しないこと。
+test('r711 同城の諸勢力親善で友好度100の対象を一覧から除外する', () => {
+    const ctx = createContext();
+    ctx.COMMAND_SPECS = { kunishu_goodwill: { targetType: 'kunishu_valid' } };
+    loadScript(ctx, 'js/kunishu_system.js');
+    loadScript(ctx, 'js/command_system.js');
+    const KunishuSystem = vm.runInContext('KunishuSystem', ctx);
+    const CommandSystem = vm.runInContext('CommandSystem', ctx);
+    const castle = { id: 7, ownerClan: 1, gold: 500 };
+    const actors = [{ id: 51, isActionDone: false, diplomacy: 70, achievementTotal: 0 }];
+    const makeKunishu = (id, relation) => ({
+        id, castleId: 7, ideology: '地縁', isDestroyed: false,
+        relation,
+        getRelation() { return this.relation; },
+        setRelation(_clanId, value) { this.relation = Math.min(100, Math.max(0, value)); },
+        getName() { return '諸勢力' + id; }
+    });
+    const kunishus = [makeKunishu(1, 100), makeKunishu(2, 50)];
+    let presented = null;
+    const game = {
+        playerClanId: 1, selectionMode: 'kunishu_goodwill', validTargets: [],
+        getCurrentTurnCastle: () => castle,
+        getCastle: id => Number(id) === 7 ? castle : null,
+        getBusho: id => actors.find(b => b.id === Number(id)) || null,
+        diplomacyManager: { calcGoodwillIncrease: () => 12 },
+        factionSystem: { updateRecognition() {} },
+        ui: {
+            cancelMapSelection() {},
+            info: { showKunishuSelector(list, _castle, callback) { presented = { ids: Array.from(list, k => k.id), callback }; } },
+            openBushoSelector() {},
+            showDialog() {},
+            showResultModal() {},
+            updatePanelHeader() {}, renderCommandMenu() {}
+        }
+    };
+    game.kunishuSystem = new KunishuSystem(game);
+    game.kunishuSystem.setKunishuData(kunishus);
+    const cmd = new CommandSystem(game);
+    game.validTargets = cmd.getValidTargets('kunishu_goodwill');
+    assert.deepStrictEqual(Array.from(game.validTargets), [7], '友好度50の対象がいる城は地図で選択可能');
+    cmd.resolveMapSelection(castle);
+    assert.deepStrictEqual(presented.ids, [2], '同城の友好度100の対象は一覧に表示しない');
+
+    kunishus[1].relation = 100;
+    assert.deepStrictEqual(Array.from(cmd.getValidTargets('kunishu_goodwill')), [],
+        '全諸勢力が友好度100ならその城は地図からも除外');
+    kunishus[0].relation = 95;
+    kunishus[1].relation = 50;
+    game.validTargets = cmd.getValidTargets('kunishu_goodwill');
+    cmd.resolveMapSelection(castle);
+    assert.deepStrictEqual(presented.ids, [1, 2], '上限未満なら複数の諸勢力を選択できる');
+});
+
+// r712: 諸勢力取込の兵士合流は受入数だけで士気・訓練度を加重平均する。
+test('r712 諸勢力取込で兵士と士気・訓練度を実受入人数で合流する', () => {
+    const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('assert');
+    const ROOT=path.resolve(__dirname, '..');
+    const ctx=vm.createContext({console,window:{},Math,Set,Map});
+    const load=f=>vm.runInContext(fs.readFileSync(path.join(ROOT,'js',f),'utf8'),ctx,{filename:f});
+    for(const f of ['config.js','constants.js','game_math.js','personnel_rules.js','affiliation_system.js','kunishu_system.js'])load(f);
+    ctx.GameConfig=ctx.window.GameConfig;
+    const AffiliationSystem=vm.runInContext('AffiliationSystem',ctx),KunishuSystem=vm.runInContext('KunishuSystem',ctx);
+    const avg=(x,a,y,b)=>Math.floor((x*a+y*b)/(a+b));
+    let asserts=0;
+    function check(a,b,label){assert.strictEqual(a,b,label);asserts++}
+    function exercise(existingSoldiers,incomingSoldiers){
+      const castle={id:7,name:'城',ownerClan:1,gold:800, soldiers:existingSoldiers,horses:100,guns:40,morale:90,training:80,castellanId:10,samuraiIds:[10,21,22]};
+      const clan={id:1,name:'甲家',daimyoPrestige:10000,princessIds:[]};
+      const daimyo={id:10,name:'当主',clan:1,castleId:7,status:'active',isDaimyo:true,isCastellan:true,affinity:50,isActionDone:false};
+      const doer={id:21,name:'使者',clan:1,castleId:7,status:'active',diplomacy:100,affinity:50,achievementTotal:0,isActionDone:false};
+      const leader={id:22,name:'旧頭領',clan:0,castleId:7,status:'active',diplomacy:60,affinity:50,belongKunishuId:55,achievementTotal:600,isActionDone:false};
+      const member={id:23,name:'家臣',clan:0,castleId:7,status:'active',diplomacy:60,affinity:50,belongKunishuId:55,achievementTotal:500,isActionDone:false};
+      const persons=[daimyo,doer,leader,member];
+      let history=[],msg='';
+      const game={playerClanId:1,phase:'game',bushos:persons,legions:[],castles:[castle],
+        getCastle:id=>Number(id)===castle.id?castle:null,getClan:id=>Number(id)===1?clan:null,
+        getClanDaimyo:id=>Number(id)===1?daimyo:null,getBusho:id=>persons.find(b=>b.id===Number(id)),
+        getClanBushos:id=>persons.filter(b=>b.clan===Number(id)),
+        getCastleBushos:id=>persons.filter(b=>Number(b.castleId)===Number(id)&&castle.samuraiIds.includes(b.id)),
+        factionSystem:{updateRecognition(){},updateFactions(){}},historySystem:{record(t){history.push(t);}},
+        ui:{showDialog(){},showResultModal(t,a,b,cb){msg=t;cb?.();},updatePanelHeader(){},renderCommandMenu(){},renderMap(){}}
+      };
+      const k={id:55,castleId:7,isDestroyed:false,ideology:'地縁',soldiers:incomingSoldiers,horses:70,guns:22,morale:30,training:40,leaderId:22,
+         getRelation:()=>100, getName:()=> '地縁衆'};
+      game.affiliationSystem=new AffiliationSystem(game);
+      game.kunishuSystem=new KunishuSystem(game);
+      game.kunishuSystem.setKunishuData([k]);
+      const expectedAccepted=Math.min(incomingSoldiers,Math.max(0,99999-existingSoldiers));
+      check(game.kunishuSystem.getIncorporateEligibility(k,1).eligible,true,'legal incorporation');
+      game.kunishuSystem.executeKunishuIncorporate(21,7,55);
+      check(k.isDestroyed,true,'destroyed');
+      check(k.soldiers,0,'force soldiers transferred');
+      check(castle.soldiers,existingSoldiers+expectedAccepted,'actual accepted');
+      check(castle.horses,170,'horses');
+      check(castle.guns,62,'guns');
+      check(leader.clan,1,'leader incorporated');
+      check(member.clan,1,'member incorporated');
+      check(leader.belongKunishuId,0,'leader cleared');
+      check(member.belongKunishuId,0,'member cleared');
+      check(castle.samuraiIds.filter(id=>id===22).length,1,'single roster leader');
+      check(castle.samuraiIds.filter(id=>id===23).length,1,'single roster member');
+      check(castle.castellanId,10,'existing lord preserved');
+      check(doer.isActionDone,true,'doer spent');
+      check(history.length,1,'history recorded');
+      if(expectedAccepted>0){
+         check(castle.morale,avg(90,existingSoldiers,30,expectedAccepted),'morale weighted using actually accepted people');
+         check(castle.training,avg(80,existingSoldiers,40,expectedAccepted),'training weighted using actually accepted people');
+      } else {
+         check(castle.morale,90,'no transfer morale unchanged');
+         check(castle.training,80,'no transfer training unchanged');
+      }
+      return {garrison:castle.soldiers,accepted:expectedAccepted,morale:castle.morale,training:castle.training};
+    }
+    const out=[exercise(200,300),exercise(99950,300),exercise(99999,300)];
+    assert.strictEqual(asserts, 51);
+    assert.strictEqual(out[0].morale, 54);
+    assert.strictEqual(out[1].accepted, 49);
+    assert.strictEqual(out[2].accepted, 0);
+});
+
+
+// r713: 諸勢力の常陸の不死鳥による空城旗揚げはLifeSystemの改名窓口を使い、
+// 同時に受入兵士の士気・訓練度を実収容人数で統合する。
+test('r713 常陸の不死鳥の空城旗揚げで改名と兵士合流を正規Systemへ委譲する', async () => {
+    const context = vm.createContext({ console, Math, Set, Map, window: {} });
+    const load = filename => vm.runInContext(read('js/' + filename), context, { filename });
+    for (const filename of ['config.js', 'constants.js', 'game_math.js', 'models.js',
+        'skill_manager.js', 'life_system.js', 'kunishu_system.js']) load(filename);
+    context.GameConfig = context.window.GameConfig;
+    const { Clan, SkillManager, KunishuSystem, LifeSystem } = vm.runInContext(
+        '({Clan,SkillManager,KunishuSystem,LifeSystem})', context);
+    assert.strictEqual(typeof LifeSystem.prototype.applyDaimyoNameAndFaceChange, 'function');
+    const oda = getRuntimeData().common.warriorsMaster.find(busho => busho.id === 1035010);
+    assert.ok(oda && oda.skill === '常陸の不死鳥', '小田氏治の実データに旗揚げ技能がある');
+    for (const [existingSoldiers, incomingSoldiers] of [[200, 300], [99950, 300], [99999, 300]]) {
+        const castle = { id: 25, name: '空白地', ownerClan: 0, castellanId: 0, legionId: 0,
+            samuraiIds: [1035010], soldiers: existingSoldiers, horses: 200, guns: 100,
+            morale: 90, training: 80 };
+        const leader = { ...oda, name: '小田氏治', familyName: '小田', familyYomi: 'おだ',
+            clan: 0, castleId: 25, status: 'active', belongKunishuId: 55, isDaimyo: false, isCastellan: false };
+        const member = { id: 4035001, name: '家臣', clan: 0, castleId: 25,
+            status: 'active', belongKunishuId: 55 };
+        const members = [leader, member];
+        const kunishu = { id: 55, leaderId: leader.id, castleId: 25, ideology: '地縁', isDestroyed: false,
+            soldiers: incomingSoldiers, morale: 30, training: 40, horses: 300, guns: 125,
+            getName: () => '小田衆' };
+        const calls = [];
+        const game = {
+            year: 1571, month: 8, castles: [castle],
+            clans: [new Clan({ id: 1, name: '甲家', yomi: 'こうけ', color: '#111111', leaderId: 10001 })],
+            bushos: members, playerClanId: 1,
+            getCastle: id => Number(id) === castle.id ? castle : null,
+            getBusho: id => members.find(b => Number(b.id) === Number(id)),
+            getClan: id => game.clans.find(clan => Number(clan.id) === Number(id)),
+            getClanDaimyo: id => game.getBusho(game.getClan(id)?.leaderId),
+            castleManager: { changeOwner(c, id, isEvent) {
+                assert.strictEqual(isEvent, true);
+                c.ownerClan = id;
+            } },
+            independenceSystem: { generateDistinctColor: () => '#123456' },
+            lifeSystem: { applyDaimyoNameAndFaceChange(b) {
+                calls.push('rename');
+                return { isNameChanged: false, oldNameStr: b.name, newNameStr: b.name };
+            } },
+            diplomacyManager: { changeStatus() {}, setSentimentAbsolute() {} },
+            affiliationSystem: { joinClan(b, id, targetCastleId) {
+                b.clan = id; b.castleId = targetCastleId; b.status = 'active';
+                if (!castle.samuraiIds.includes(b.id)) castle.samuraiIds.push(b.id);
+            } },
+            updateCastleLord(c) { c.castellanId = leader.id; leader.isCastellan = true; },
+            updateAllClanPrestige() {},
+            ui: { log() {}, async showDialogAsync() {}, updateClanColors() {} }
+        };
+        const system = new KunishuSystem(game);
+        game.kunishuSystem = system;
+        system.setKunishuData([kunishu]);
+        assert.strictEqual(SkillManager.canKunishuRise(leader, castle, game).canRise, true);
+        await system.executeIndependentRise(kunishu, leader, castle, '常陸の不死鳥');
+        const accepted = Math.min(incomingSoldiers, Math.max(0, 99999 - existingSoldiers));
+        assert.strictEqual(calls.length, 1, '改名はLifeSystemを1回使用');
+        assert.strictEqual(castle.ownerClan, 2);
+        assert.strictEqual(castle.soldiers, existingSoldiers + accepted);
+        assert.strictEqual(castle.morale, accepted
+            ? Math.floor((existingSoldiers * 90 + accepted * 30) / (existingSoldiers + accepted)) : 90);
+        assert.strictEqual(castle.training, accepted
+            ? Math.floor((existingSoldiers * 80 + accepted * 40) / (existingSoldiers + accepted)) : 80);
+        assert.strictEqual(castle.horses, 500);
+        assert.strictEqual(castle.guns, 225);
+        assert.strictEqual(leader.clan, 2);
+        assert.strictEqual(member.clan, 2);
+        assert.strictEqual(leader.isDaimyo, true);
+        assert.strictEqual(kunishu.isDestroyed, true);
+        assert.strictEqual(kunishu.soldiers, 0);
+        assert.strictEqual(game.clans.length, 2);
     }
 });
 

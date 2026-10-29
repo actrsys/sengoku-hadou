@@ -893,7 +893,9 @@ class KunishuSystem {
         const indepSys = this.game.independenceSystem;
         const newColor = indepSys ? indepSys.generateDistinctColor(castle) : "#ff0000";
 
-        const nameChangeInfo = indepSys ? indepSys.applyDaimyoNameChange(leader) : null;
+        // 大名就任時の改名・顔変更は独立演出ではなくLifeSystemの正規窓口へ委譲する。
+        const nameChangeInfo = this.game.lifeSystem
+            ? this.game.lifeSystem.applyDaimyoNameAndFaceChange(leader) : null;
 
         const familyName = leader.familyName || leader.name.split('|')[0] || leader.name;
         const newClanName = `${familyName}家`;
@@ -915,7 +917,14 @@ class KunishuSystem {
 
         this.game.castleManager.changeOwner(castle, newClanId, true); 
         
-        castle.soldiers = Math.min(GameConfig.Limits.CastleStock, castle.soldiers + kunishu.soldiers);
+        // 空城の既存兵と旗揚げする諸勢力の兵を、実際に収容できる人数で合流させる。
+        const acceptedSoldiers = Math.min(kunishu.soldiers,
+            Math.max(0, GameConfig.Limits.CastleStock - castle.soldiers));
+        if (acceptedSoldiers > 0) {
+            castle.morale = GameMath.weightedAverageFloor(castle.morale, castle.soldiers, kunishu.morale, acceptedSoldiers);
+            castle.training = GameMath.weightedAverageFloor(castle.training, castle.soldiers, kunishu.training, acceptedSoldiers);
+        }
+        castle.soldiers += acceptedSoldiers;
         castle.horses = Math.min(GameConfig.Limits.CastleStock, (castle.horses || 0) + (kunishu.horses || 0));
         castle.guns = Math.min(GameConfig.Limits.CastleStock, (castle.guns || 0) + (kunishu.guns || 0));
 
@@ -1033,7 +1042,15 @@ class KunishuSystem {
         
         let resultMsg = '';
         if (isSuccess) {
-            castle.soldiers = Math.min(GameConfig.Limits.CastleStock, castle.soldiers + kunishu.soldiers);
+            // 取込によって実際に収容した兵士だけで士気・訓練度を統合する。
+            // 受入上限を超えて失われた兵士は加重平均の人数へ含めない。
+            const acceptedSoldiers = Math.min(kunishu.soldiers,
+                Math.max(0, GameConfig.Limits.CastleStock - castle.soldiers));
+            if (acceptedSoldiers > 0) {
+                castle.morale = GameMath.weightedAverageFloor(castle.morale, castle.soldiers, kunishu.morale, acceptedSoldiers);
+                castle.training = GameMath.weightedAverageFloor(castle.training, castle.soldiers, kunishu.training, acceptedSoldiers);
+            }
+            castle.soldiers += acceptedSoldiers;
             castle.horses = Math.min(GameConfig.Limits.CastleStock, (castle.horses || 0) + (kunishu.horses || 0));
             castle.guns = Math.min(GameConfig.Limits.CastleStock, (castle.guns || 0) + (kunishu.guns || 0));
             

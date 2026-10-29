@@ -2239,7 +2239,11 @@ class CommandSystem {
         if (['kunishu_subjugate', 'kunishu_goodwill', 'kunishu_incorporate'].includes(mode)) {
             let kunishus = this.game.kunishuSystem.getKunishusInCastle(targetCastle.id);
 
-            if (mode === 'kunishu_incorporate') {
+            if (mode === 'kunishu_goodwill') {
+                // 地図の親善候補と同じ条件で対象一覧も絞る。
+                // 同じ城に複数勢力がいる場合、友好度100の相手へ無意味な金と行動を消費させない。
+                kunishus = kunishus.filter(k => k.getRelation(this.game.playerClanId) < 100);
+            } else if (mode === 'kunishu_incorporate') {
                 const myClanId = this.game.playerClanId;
                 kunishus = kunishus.filter(k =>
                     this.game.kunishuSystem.getIncorporateEligibility(k, myClanId).eligible

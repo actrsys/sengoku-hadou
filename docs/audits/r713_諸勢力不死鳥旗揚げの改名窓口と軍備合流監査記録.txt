@@ -1,0 +1,49 @@
+戦国覇道 r713 — 諸勢力「常陸の不死鳥」旗揚げ時の改名窓口と兵士合流
+対象: KunishuSystem.processEndMonth → SkillManager.canKunishuRise → executeIndependentRise
+基準: r712正本（ZIP 572ファイル・CRC正常）/ 累積監査台帳A-001〜A-026
+
+【通常プレイでの到達性】
+共通マスター内の小田氏治（ID 1035010）は技能「常陸の不死鳥」を保有する。
+既存SkillManager.canKunishuRise()は頭領がその技能を持ち、諸勢力の居城が空城（ownerClan=0）であるとき合法として返す。
+月末KunishuSystem.processEndMonth()はこの資格判定からexecuteIndependentRise()を呼ぶ。
+
+【問題1：未定義の改名関数】
+旧executeIndependentRise()は game.independenceSystem.applyDaimyoNameChange(leader) を呼んでいたが、
+IndependenceSystemには同名の公開メソッドは存在しない。
+ゲーム本体には通常independenceSystemが存在するため、技能発動条件が満たされると
+TypeError: indepSys.applyDaimyoNameChange is not a function で月末処理が停止する。
+小田氏治の実スキルと空城を使う局所結合fixtureで修正前の例外を再現した。
+修正: 改名・顔変更の既存正規窓口 LifeSystem.applyDaimyoNameAndFaceChange を使用。
+新しい改名処理を独立側に作らず、軍団・人事・所属管理へ改名責務を移さない。
+
+【問題2：旗揚げ時の兵士合流と士気訓練度】
+旧旗揚げでは城兵へ諸勢力の兵数だけを加算して、士気・訓練度は旧城値のまま。
+r712の諸勢力取込、r649の汎用兵士合流算術と結果が一致しない。
+修正: 受入数 = min(諸勢力兵数, max(0, CastleStock上限-旧城兵))。
+受入数が正のときのみ、GameMath.weightedAverageFloor()に旧城兵数と実受入数を渡す。
+0人受入の場合は士気・訓練度をそのまま保つ。
+
+【追加の実装テスト】
+小田氏治の共通BINマスターに設定された技能を実SkillManagerで検証し、
+実KunishuSystem.executeIndependentRiseを3条件で実行。
+- 城200（士気90/訓練80）＋諸勢力300（士気30/訓練40）→城500、士気54、訓練56。
+- 城99950＋諸勢力300→受入49、城99999、士気89、訓練79。
+- 城99999＋諸勢力300→受入0、士気90、訓練80を維持。
+実モデルClanの追加、旧諸勢力壊滅と軍備0、頭領・家臣の所属変更、城所有者、
+軍馬・鉄砲の移管、既存のLifeSystem改名窓口への委譲を確認。
+専用probeは3条件・42 assertion成功。製品tests/run_tests.jsには専用回帰1件を追加。
+
+【設計適合性・非変更箇所】
+技能資格はSkillManager、改名・顔変更はLifeSystem、兵士合流算術はGameMath、
+受入量調整はKunishuSystem、城主・所属は既存Affiliation/城処理、外交は外交Systemのまま。
+新しい状態・セーブ項目・独自ルールはない。官位・功績・城軍団・戦争・城資源・装備計算も無変更。
+管理Excel/BINや歴史開始値は改変しない。
+本検証は条件が成立した時の局所結合テストで、長期間の自然プレイ全過程や新規ブラウザ操作E2Eではない。
+
+【全体検証】
+node tests/run_tests.js: 1188 passed / 0 failed。
+node tests/run_visual_tests.js: 終了コード0、既存PC/スマホ表示回帰成功。
+node tools/verify_release_sources.js: 共通/1560/1570のExcel/BIN/主要数式成功。
+python tools/verify_excel_bin_parity.py: 3組一致。
+python tools/simulation/test_player_focus_sim.py: 4件成功。
+製品ZIP全件CRCと変更外ファイルの一致・差分パッチの適用/逆適用は出荷段階で検証。
