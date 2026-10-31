@@ -1198,9 +1198,9 @@ class InterviewSystem {
 
     _getRumorLoyaltyText(target) {
         if (!target) return '';
-        if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) {
-            return '今は仕える主を持たず、浪々の身だそうです。';
-        }
+        // 冒頭の人物紹介で既に「○○という浪人」と明示している。
+        // 忠誠所見として同じ身分情報を三段目に重複させない。
+        if (window.BushoStatusRules && window.BushoStatusRules.isRonin(target)) return '';
         if (Number(target.belongKunishuId || 0) > 0) return '';
 
         const band = this._getConcealmentProfile(target).perceivedBand;

@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r731');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r733');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -9258,6 +9258,71 @@ test('武将の噂は適性名を会話上の自然な意味へ言い換え、�
     );
     assert.strictEqual(ninjaFamily, '忍びの者を用いることもあります。');
     assert.ok(!/聞き|噂|そうです/.test(ninjaFamily), '話者自身の親族は忍術でも伝聞調に戻さない');
+});
+
+// A-054: 1560年の正規シナリオの所属・所在と地図隣接から到達できる浪人の噂。
+// 冒頭で「浪人」と紹介した後、同じ事実だけの末尾発言を重ねない。
+test('A-054 1560年の木下秀吉が前田玄以を噂するとき浪人の立場を重複説明しない', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const year = 1560;
+    const createScenarioBusho = masterName => {
+        const master = common.warriorsMaster.find(row => row.name === masterName);
+        assert.ok(master, `${masterName}は共通武将マスターに存在する`);
+        const state = scenario.warriorsState.find(row => Number(row.id) === Number(master.id));
+        assert.ok(state, `${masterName}のシナリオ所属データが存在する`);
+        const names = String(master.name).split('|');
+        return { ...master, ...state,
+            id: Number(master.id), name: names.join(''), fullName: names.join(''),
+            familyNameStr: names[0], givenName: names[1] || '',
+            clan: Number(state.clan || 0), castleId: Number(state.castleId || 0),
+            belongKunishuId: Number(state.belongKunishuId || 0),
+            status: Number(master.startYear) <= year && Number(master.endYear) >= year
+                ? (Number(state.clan || 0) > 0 || Number(state.belongKunishuId || 0) > 0 ? 'active' : 'ronin')
+                : 'unborn',
+            isDaimyo: false, courtRankIds: []
+        };
+    };
+    const interviewer = createScenarioBusho('木下|秀吉');
+    const target = createScenarioBusho('前田|玄以');
+    assert.strictEqual(interviewer.status, 'active');
+    assert.strictEqual(interviewer.clan, 1, '織田家の現役武将から噂を聞ける');
+    assert.strictEqual(target.status, 'ronin', '前田玄以は1560年では浪人である');
+
+    const castleStates = new Map(scenario.castlesState.map(row => [Number(row.id), row]));
+    const castles = common.castlesMaster.map(master => {
+        const state = castleStates.get(Number(master.id)) || {};
+        return { ...master, ...state, id: Number(master.id),
+            ownerClan: Number(state.ownerClan || 0),
+            adjacentCastleIds: String(master.adjacentCastle || '')
+                .split('|').map(text => parseInt(text, 10)).filter(Number.isFinite)
+        };
+    });
+    const castleIndex = new Map(castles.map(row => [row.id, row]));
+    const ctx = createContext();
+    for (const file of ['js/config.js', 'js/constants.js', 'js/busho_list_sort_rules.js',
+        'js/conversation_standing_rules.js', 'js/map_graph.js', 'js/interview_system.js']) loadScript(ctx, file);
+    const GameMap = vm.runInContext('MapGraphService', ctx);
+    const game = {
+        playerClanId: 1, castles, bushos: [interviewer, target],
+        getCastle: id => castleIndex.get(Number(id)) || null,
+        getClanDaimyo: () => null,
+        getClan: id => common.clansMaster.find(row => Number(row.id) === Number(id)) || null,
+        getBusho: id => [interviewer, target].find(row => row.id === Number(id)) || null,
+        kunishuSystem: { getKunishu: () => null },
+        courtRankSystem: { RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [], getHighestRankData: () => null }
+    };
+    game.mapGraph = new GameMap(game);
+    const interview = new ctx.InterviewSystem(game);
+    const nearby = interview._getRumorRegionalCandidates(interview._getRumorRegionCastleIds(2), interviewer);
+    assert.ok(nearby.some(row => row.id === target.id), '正規の2リンク周辺探索で候補に含まれる');
+    const row = interview._buildRumorCandidateRow(target, interview._getRumorExpertDomain(interviewer), 2);
+    assert.ok(row, '能力・適性条件でも噂候補になる');
+    interview.activeInterviewAttitude = 'friendly';
+    const messages = interview._getRumorMessages(interviewer, row);
+    assert.strictEqual(messages.length, 2, 'すでに浪人と説明したため追加の所属説明は不要');
+    assert.ok(messages[0].includes('前田玄以という浪人'), '人物の身分情報は冒頭に残す');
+    assert.ok(messages[1].includes('秀でた') || messages[1].includes('腕前'), '人物の能力・適性情報は維持する');
+    assert.ok(!messages.join('').includes('浪々の身'), '同一情報を重ねない');
 });
 
 test('武将の噂は諸勢力を能力評で終え、他家武将は不満が見える時だけ忠誠所見を足す', () => {
