@@ -958,6 +958,11 @@ class LifeSystem {
             });
         }
         this.setLifeStatusRaw(busho, window.GameConstants.BushoStatus.DEAD); // ステータスを「死亡」にします
+        // 人質の担保関係は死亡時に終了。外交の人質名簿は正本である外交担当へ委譲する。
+        // 妻の未亡人処理と帰還先はこの後の既存死亡処理が判断する。
+        if (busho.isHostage === true && this.game.diplomacyManager) {
+            this.game.diplomacyManager.settleHostageOnDeath(busho);
+        }
         
         // ★追加：自分が死んだ年より後に生まれる予定だった子供（実父としている武将・姫）を連鎖的に死亡させます
         this.cascadeDeathToUnbornChildren(busho.id, this.game.year);

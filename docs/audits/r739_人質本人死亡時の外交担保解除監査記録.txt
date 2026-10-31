@@ -1,0 +1,20 @@
+戦国覇道 r739 継続監査 A-066
+基準：r738 完全版ZIP（598ファイル）
+対象：外交人質本人が死亡した時の人質印・双方向外交名簿と未亡人の帰還
+
+【通常進行の再現条件】
+- 1560年「桶狭間」の武田義信（ID1002003、没年1567）と妻・嶺（姫ID10）を実マスターから採用。
+- DiplomacyManager.applyHostageData() により、武田家（ID3）から北条家（ID4）へ正規の人質受入を実行。妻も北条家へ移籍。
+- 人質に年齢・寿命の制限はなく、月次の寿命・戦傷死亡判定は人質も対象に含む。死亡が成立した場合の正規 LifeSystem.executeDeath() に接続。
+- r738では死亡して所属0になっても isHostage が true、originalClanId が元家IDのままで、武田・北条双方の hostageIds に死亡者が残る。追加回帰は既存1213件成功、追加1件失敗。
+
+【修正と責務】
+- LifeSystem.executeDeath() は死亡を確定した際、当該武将が人質なら DiplomacyManager.settleHostageOnDeath() に委譲する。
+- DiplomacyManager._finishHostage() の担保だけを解除する既存共通分岐へ died を加え、isHostage・originalClanId・双方向の hostageIds を解除する。人質用の別フラグや移動処理は新設しない。
+- 姫・未亡人の帰還は従来の LifeSystem.executeDeath() に任せる。嶺の実家は武田家ではなくマスターの originalClanId=5。実家存続fixtureでは元家5へ帰還する。
+- 基本外交statusは変更しない。通常の脱走/捕虜化/実家滅亡/預かり家滅亡の結末、武将寿命の確率、セーブ形式、マスターExcel/BIN、画像は維持。
+
+【検証と限界】
+- r738＋追加回帰：1,213成功・1失敗。
+- r739＋追加回帰：1,214成功・0失敗。
+- 追加回帰は実データ・本番の人質受入と死亡処理を接続した局所検証。寿命抽選を含む長期自然プレイのすべての分岐を網羅したものではない。

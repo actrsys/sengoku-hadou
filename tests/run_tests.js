@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r738');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r739');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -32639,6 +32639,85 @@ test('r738 預かり家の滅亡で人質印・双方名簿を解消し、所属
     assert.deepStrictEqual(holderClan.princessIds, []);
     assert.strictEqual(sourceClan.isDestroyed, undefined, '実家の存続・外交statusを変えない');
     assert.strictEqual(diplomacy.getRelation(3, 4).status, '和睦');
+});
+
+// A-066: 人質本人が寿命で死亡した場合も、外交担保は終了する。
+// 1560年の武田義信と妻・嶺を正規受入→LifeSystem.executeDeath()に接続する。
+test('r739 既婚人質の死亡で担保と双方の人質名簿を解消し、通常の死亡処理を保つ', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const getMaster = id => common.warriorsMaster.find(b => Number(b.id) === id);
+    const getState = id => scenario.warriorsState.find(b => Number(b.id) === id);
+    const m = getMaster(1002003), bs = getState(1002003);
+    const pm = common.princessMaster.find(p => Number(p.id) === 10);
+    const ps = scenario.princessState.find(p => Number(p.id) === 10);
+    const sourceMaster = getMaster(1002002), sourceState = getState(1002002);
+    const holderMaster = getMaster(1003002), holderState = getState(1003002);
+    assert.ok(m && bs && pm && ps && sourceMaster && sourceState && holderMaster && holderState);
+    assert.strictEqual(Number(m.endYear), 1567, '人質になり得る義信は通常の寿命判定の対象');
+    const ctx = createContext({
+        FamilyLinker: { rebuildAllFamilyIds() {} },
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        LifeStatusRules: {
+            isDead: b => b?.status === 'dead', isUnborn: b => b?.status === 'unborn',
+            isPresent: b => b?.status !== 'dead' && b?.status !== 'unborn'
+        }
+    });
+    for (const file of ['js/config.js', 'js/constants.js', 'js/affiliation_system.js', 'js/diplomacy.js', 'js/life_system.js']) loadScript(ctx, file);
+    const hostage = { ...m, ...bs, status: 'active', isHostage: false, isDaimyo: false,
+        isCommander: false, isCastellan: false, isGunshi: false, wifeIds: [10],
+        courtRankIds: [], belongKunishuId: 0, nemesisIds: [], nemesisList: [] };
+    const wife = { ...pm, ...ps };
+    const sourceDaimyo = { ...sourceMaster, ...sourceState, status: 'active', isDaimyo: true, wifeIds: [] };
+    const holderDaimyo = { ...holderMaster, ...holderState, status: 'active', isDaimyo: true, wifeIds: [] };
+    const sourceClan = { id: 3, name: '武田家', leaderId: sourceDaimyo.id, princessIds: [10], diplomacyValue: {} };
+    const holderClan = { id: 4, name: '北条家', leaderId: holderDaimyo.id, princessIds: [], diplomacyValue: {} };
+    const wifeBirthClan = { id: Number(pm.originalClanId), name: '嶺の実家', princessIds: [], diplomacyValue: {} };
+    const sourceCastle = { id: Number(sourceState.castleId), ownerClan: 3, samuraiIds: [sourceDaimyo.id, hostage.id] };
+    const holderCastle = { id: Number(holderState.castleId), ownerClan: 4, samuraiIds: [holderDaimyo.id] };
+    const wifeBirthCastle = { id: 99999, ownerClan: wifeBirthClan.id, samuraiIds: [] };
+    const game = {
+        playerClanId: 1, year: 1567, month: 5,
+        clans: [sourceClan, holderClan, wifeBirthClan], castles: [sourceCastle, holderCastle, wifeBirthCastle],
+        bushos: [hostage, sourceDaimyo, holderDaimyo], princesses: [wife], legions: [],
+        getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)); },
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); },
+        getPrincess(id) { return this.princesses.find(p => Number(p.id) === Number(id)); },
+        getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)); },
+        getClanCastles(id) { return this.castles.filter(c => Number(c.ownerClan) === Number(id)); },
+        getClanDaimyo(id) { return Number(id) === 4 ? holderDaimyo : sourceDaimyo; },
+        ui: { log() {}, async showDialogAsync() {} },
+        factionSystem: { updateFactions() {}, handleMove() {} }
+    };
+    ctx.game = game;
+    const affiliation = vm.runInContext('new AffiliationSystem(game)', ctx);
+    game.affiliationSystem = affiliation;
+    ['leaveCastle', 'resetFactionData', 'updateUI'].forEach(method => { affiliation[method] = () => {}; });
+    affiliation.enterCastle = (b, id) => { b.castleId = Number(id); };
+    const diplomacy = vm.runInContext('new DiplomacyManager(game)', ctx);
+    game.diplomacyManager = diplomacy;
+    const life = vm.runInContext('new LifeSystem(game)', ctx);
+    game.lifeSystem = life;
+    diplomacy.changeStatus(3, 4, '和睦', 6);
+    diplomacy.applyHostageData(hostage.id, 3, 4);
+    assert.strictEqual(hostage.isHostage, true);
+    assert.strictEqual(hostage.clan, 4);
+    assert.strictEqual(wife.currentClanId, 4);
+    assert.deepStrictEqual(Array.from(diplomacy.getRelation(3, 4).hostageIds), [hostage.id]);
+    // 同月の戦傷・寿命死亡でも通る本番の武将死亡窓口。
+    await life.executeDeath(hostage, { deferFactionUpdate: true });
+    assert.strictEqual(hostage.status, 'dead');
+    assert.strictEqual(hostage.clan, 0, '死亡後の武将所属は従来どおり解除');
+    assert.strictEqual(hostage.isHostage, false, '死亡後は担保資格を持たない');
+    assert.strictEqual(hostage.originalClanId, undefined);
+    assert.deepStrictEqual(Array.from(diplomacy.getRelation(3, 4).hostageIds), [], '実家側の名簿を解除');
+    assert.deepStrictEqual(Array.from(diplomacy.getRelation(4, 3).hostageIds), [], '預かり家側の名簿を解除');
+    assert.strictEqual(wife.husbandId, 0, '死亡後の婚姻解消を維持');
+    assert.strictEqual(wife.currentClanId, wifeBirthClan.id, '未亡人の帰還先は妻自身の実家。従来の死亡処理に委譲');
+    assert.strictEqual(wife.status, 'unmarried');
+    assert.deepStrictEqual(sourceClan.princessIds, []);
+    assert.deepStrictEqual(holderClan.princessIds, []);
+    assert.deepStrictEqual(wifeBirthClan.princessIds, [10]);
+    assert.strictEqual(diplomacy.getRelation(3, 4).status, '和睦', '基本外交状態は維持');
 });
 
 Promise.all(pendingTests).then(() => {

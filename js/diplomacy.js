@@ -1326,9 +1326,9 @@ class DiplomacyManager {
         hostage.isHostage = false;
         hostage.originalClanId = undefined;
 
-        if (outcome === 'origin_extinct' || outcome === 'holder_extinct') {
-            // 実家滅亡では所属を維持。預かり家滅亡でも担保だけ解除し、
-            // 武将と妻の退去・浪人化は既存の滅亡所属処理へ委譲する。
+        if (outcome === 'origin_extinct' || outcome === 'holder_extinct' || outcome === 'died') {
+            // 実家・預かり家の滅亡や本人死亡では担保だけ解除する。
+            // 武将・妻の所属と未亡人処理は各結果の専門システムへ委譲する。
             const originClan = this.game.getClan(originClanId);
             const holderClan = this.game.getClan(holderClanId);
             const relationA = originClan && originClan.diplomacyValue && originClan.diplomacyValue[holderClanId];
@@ -1358,6 +1358,12 @@ class DiplomacyManager {
             this.game.affiliationSystem.moveCastle(hostage, escapeCastle.id);
         }
         return hostage;
+    }
+
+    /** 人質本人の死亡では担保関係だけを終え、死去・未亡人処理はLifeSystemに任せる。 */
+    settleHostageOnDeath(hostage) {
+        if (!hostage || hostage.isHostage !== true) return;
+        this._finishHostage(hostage, 'died');
     }
 
     /** 実家・預かり家いずれの滅亡時も、人質の担保関係だけを共通解除する。 */
