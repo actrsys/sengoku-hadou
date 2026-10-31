@@ -1313,26 +1313,69 @@ class DiplomacyManager {
         return (Math.random() * 100) < prob;
     }
     
-    _returnEscapedHostageHome(hostage) {
-        if (!hostage) return false;
-        const originClanId = Number(hostage.originalClanId) || 0;
-        const captorClanId = Number(hostage.clan) || 0;
+    /**
+     * 外交人質が終了したときの共通窓口。
+     * 「脱走」「通常捕虜化」「実家滅亡」の違いは引渡し先だけで、
+     * 人質印の解除と、所属変更に伴う妻・姫名簿の同期はここで一度だけ行う。
+     * 通常捕虜化は後続の捕虜処遇が参照する拘束先の拠点を維持する。
+     */
+    _finishHostage(hostage, outcome, record = null) {
+        if (!hostage) return null;
+        const originClanId = Number(record ? record.originClanId : hostage.originalClanId) || 0;
+        const holderClanId = Number(record ? record.captorClanId : hostage.clan) || 0;
         hostage.isHostage = false;
         hostage.originalClanId = undefined;
 
-        const friendlyCastles = this.game.getClanCastles(originClanId);
-        if (originClanId > 0 && friendlyCastles.length > 0) {
-            const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
-            // joinClan は人質受け渡し時の功績・派閥処理をもう一度発生させるため使わない。
-            this.game.affiliationSystem.setClanIdRaw(hostage, originClanId);
-            // 人質受入時に夫へ追従していた妻も、帰還時には旧所属の名簿から戻す。
-            // 人質中に保留した外交婚姻フラグは、この所属復元では変更しない。
-            this.game.affiliationSystem.syncSpousesForClanChange(hostage, captorClanId, originClanId, { refreshDiplomacy: false });
-            this.game.affiliationSystem.moveCastle(hostage, escapeCastle.id);
-        } else {
-            this.game.affiliationSystem.becomeRonin(hostage);
+        if (outcome === 'origin_extinct' || outcome === 'holder_extinct') {
+            // 実家滅亡では所属を維持。預かり家滅亡でも担保だけ解除し、
+            // 武将と妻の退去・浪人化は既存の滅亡所属処理へ委譲する。
+            const originClan = this.game.getClan(originClanId);
+            const holderClan = this.game.getClan(holderClanId);
+            const relationA = originClan && originClan.diplomacyValue && originClan.diplomacyValue[holderClanId];
+            const relationB = holderClan && holderClan.diplomacyValue && holderClan.diplomacyValue[originClanId];
+            [relationA, relationB].forEach(relation => {
+                if (relation && Array.isArray(relation.hostageIds)) {
+                    relation.hostageIds = relation.hostageIds.filter(id => Number(id) !== Number(hostage.id));
+                }
+            });
+            return hostage;
         }
-        return true;
+
+        const friendlyCastles = outcome === 'escaped' && originClanId > 0
+            ? this.game.getClanCastles(originClanId) : [];
+        if (outcome === 'escaped' && friendlyCastles.length === 0) {
+            // 実家の拠点がない脱走者は、従来どおり浪人化の専門窓口を使う。
+            this.game.affiliationSystem.becomeRonin(hostage);
+            return hostage;
+        }
+        if (originClanId > 0) {
+            // 人質の受入時の功績・派閥処理をもう一度実行しない。
+            this.game.affiliationSystem.setClanIdRaw(hostage, originClanId);
+            this.game.affiliationSystem.syncSpousesForClanChange(hostage, holderClanId, originClanId, { refreshDiplomacy: false });
+        }
+        if (outcome === 'escaped') {
+            const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
+            this.game.affiliationSystem.moveCastle(hostage, escapeCastle.id);
+        }
+        return hostage;
+    }
+
+    /** 実家・預かり家いずれの滅亡時も、人質の担保関係だけを共通解除する。 */
+    settleHostagesFromExtinctClan(extinctClanId) {
+        const originClanId = Number(extinctClanId) || 0;
+        if (originClanId <= 0 || !Array.isArray(this.game.bushos)) return;
+        this.game.bushos.forEach(hostage => {
+            if (!hostage || hostage.isHostage !== true) return;
+            const originExtinct = Number(hostage.originalClanId) === originClanId;
+            const holderExtinct = Number(hostage.clan) === originClanId;
+            if (originExtinct || holderExtinct) {
+                this._finishHostage(hostage, originExtinct ? 'origin_extinct' : 'holder_extinct');
+            }
+        });
+    }
+
+    _returnEscapedHostageHome(hostage) {
+        return this._finishHostage(hostage, 'escaped') !== null;
     }
 
     _makeCapturedHostageRecord(hostage) {
@@ -1345,19 +1388,7 @@ class DiplomacyManager {
     }
 
     _convertCapturedHostageToPrisoner(record) {
-        const hostage = record && record.busho;
-        if (!hostage) return null;
-        const originClanId = Number(record.originClanId) || 0;
-        const captorClanId = Number(record.captorClanId) || 0;
-        hostage.isHostage = false;
-        hostage.originalClanId = undefined;
-        if (originClanId > 0) {
-            // 物理的な拘束先（castleId）はそのままに、通常捕虜が期待する元所属だけ復元する。
-            this.game.affiliationSystem.setClanIdRaw(hostage, originClanId);
-            // 捕虜処遇で解放・登用される前に、妻の所属・姫名簿も夫の元所属へ戻す。
-            this.game.affiliationSystem.syncSpousesForClanChange(hostage, captorClanId, originClanId, { refreshDiplomacy: false });
-        }
-        return hostage;
+        return this._finishHostage(record && record.busho, 'captured', record);
     }
 
     /**

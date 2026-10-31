@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r735');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r738');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -1197,6 +1197,121 @@ test('r735 1560年武田義信の人質脱走・捕虜移行で妻の嶺を旧�
     };
     run(0, false);
     run(0.99, true);
+});
+
+// A-063: 人質の実家が第三勢力に滅ぼされた場合、和睦担保は失効する。
+// 実マスターの既婚人質を正規受入し、別勢力による拠点喪失→滅亡処理まで接続する。
+test('r736 実家滅亡で既婚人質の担保印と双方の人質名簿を解消する', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const m = common.warriorsMaster.find(b => Number(b.id) === 1002003);
+    const bs = scenario.warriorsState.find(b => Number(b.id) === 1002003);
+    const pm = common.princessMaster.find(p => Number(p.id) === 10);
+    const ps = scenario.princessState.find(p => Number(p.id) === 10);
+    const sourceMaster = common.warriorsMaster.find(b => Number(b.id) === 1002002);
+    const sourceState = scenario.warriorsState.find(b => Number(b.id) === 1002002);
+    const captorMaster = common.warriorsMaster.find(b => Number(b.id) === 1003002);
+    const captorState = scenario.warriorsState.find(b => Number(b.id) === 1003002);
+    assert.ok(m && bs && pm && ps && sourceMaster && sourceState && captorMaster && captorState);
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        LifeStatusRules: { isDead: b => b?.status === 'dead', isUnavailable: b => b?.status === 'dead' }
+    });
+    for (const file of ['js/config.js', 'js/constants.js', 'js/affiliation_system.js', 'js/diplomacy.js', 'js/life_system.js']) loadScript(ctx, file);
+    const hostage = { ...m, ...bs, status: 'active', wifeIds: [10],
+        isHostage: false, isDaimyo: false, belongKunishuId: 0, nemesisIds: [], nemesisList: [] };
+    const wife = { ...pm, ...ps };
+    const sourceDaimyo = { ...sourceMaster, ...sourceState, status: 'active', isDaimyo: true, wifeIds: [] };
+    const captorDaimyo = { ...captorMaster, ...captorState, status: 'active', isDaimyo: true, wifeIds: [] };
+    const sourceClan = { id: 3, name: '武田家', leaderId: sourceDaimyo.id, princessIds: [10], diplomacyValue: {} };
+    const captorClan = { id: 4, name: '北条家', leaderId: captorDaimyo.id, princessIds: [], diplomacyValue: {} };
+    const victorClan = { id: 1, name: '第三勢力', leaderId: 0, princessIds: [], diplomacyValue: {} };
+    const sourceCastle = { id: Number(sourceState.castleId), ownerClan: 3, samuraiIds: [sourceDaimyo.id, hostage.id], castellanId: sourceDaimyo.id };
+    const captorCastle = { id: Number(captorState.castleId), ownerClan: 4, samuraiIds: [captorDaimyo.id], castellanId: captorDaimyo.id };
+    const game = {
+        playerClanId: 1, year: 1560, month: 5, isProcessingAI: false,
+        clans: [sourceClan, captorClan, victorClan], castles: [sourceCastle, captorCastle],
+        bushos: [hostage, sourceDaimyo, captorDaimyo], princesses: [wife], legions: [],
+        getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)); },
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); },
+        getPrincess(id) { return this.princesses.find(p => Number(p.id) === Number(id)); },
+        getClanCastles(id) { return this.castles.filter(c => Number(c.ownerClan) === Number(id)); },
+        getClanBushos(id) { return this.bushos.filter(b => Number(b.clan) === Number(id) && b.status === 'active'); },
+        getCastleBushos(id) { return this.bushos.filter(b => Number(b.castleId) === Number(id) && b.status === 'active'); },
+        getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)); },
+        getClanDaimyo(id) { return Number(id) === 4 ? captorDaimyo : null; },
+        ui: { log() {}, renderMap() {}, async showDialogAsync() {} },
+        factionSystem: { updateFactions() {}, handleMove() {} }
+    };
+    ctx.game = game;
+    const affiliation = vm.runInContext('new AffiliationSystem(game)', ctx);
+    game.affiliationSystem = affiliation;
+    ['leaveCastle', 'resetFactionData', 'updateUI'].forEach(method => { affiliation[method] = () => {}; });
+    affiliation.enterCastle = (b, id) => { b.castleId = Number(id); };
+    affiliation.becomeRonin = b => { b.clan = 0; b.status = 'ronin'; };
+    game.castleManager = { changeOwner(c, id) { c.ownerClan = id; } };
+    const diplomacy = vm.runInContext('new DiplomacyManager(game)', ctx);
+    game.diplomacyManager = diplomacy;
+    const life = vm.runInContext('new LifeSystem(game)', ctx);
+    game.lifeSystem = life;
+    life._captureLifeFlowContext = () => ({});
+    life._isLifeFlowCurrent = () => true;
+    diplomacy.changeStatus(3, 4, '和睦', 6);
+    diplomacy.applyHostageData(hostage.id, 3, 4);
+    assert.strictEqual(hostage.clan, 4);
+    assert.strictEqual(hostage.isHostage, true);
+    assert.strictEqual(wife.currentClanId, 4);
+    assert.deepStrictEqual(Array.from(diplomacy.getRelation(3, 4).hostageIds), [hostage.id]);
+    // 和睦相手とは別の勢力に最後の拠点を奪われる通常の滅亡入口。
+    game.castleManager.changeOwner(sourceCastle, 1);
+    await life.checkClanExtinction(3, 'no_castle', 1);
+    assert.strictEqual(sourceClan.isDestroyed, true);
+    assert.strictEqual(hostage.clan, 4, '元家滅亡後も現在の所属を不用意に変更しない');
+    assert.strictEqual(hostage.isHostage, false, '存在しない元家の人質状態を残さない');
+    assert.strictEqual(hostage.originalClanId, undefined);
+    assert.deepStrictEqual(Array.from(diplomacy.getRelation(3, 4).hostageIds), []);
+    assert.deepStrictEqual(Array.from(diplomacy.getRelation(4, 3).hostageIds), []);
+    assert.strictEqual(wife.currentClanId, 4);
+    assert.deepStrictEqual(captorClan.princessIds, [10], '既婚姫は現所属に残す');
+    assert.strictEqual(diplomacy.getRelation(3, 4).status, '和睦', '外交statusと婚姻は別軸で変更しない');
+});
+
+// r737: 人質の終了は外交担当の共通窓口に集約する。
+// 実家滅亡では他家の人質を巻き込まず、複数人質と双方向名簿を一括で整理する。
+test('r737 実家滅亡の人質終了は同一家の複数人質を整理し、別家の人質は維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    const first = { id: 101, clan: 4, originalClanId: 1, isHostage: true };
+    const second = { id: 102, clan: 4, originalClanId: 1, isHostage: true };
+    const other = { id: 201, clan: 4, originalClanId: 2, isHostage: true };
+    const pair = (hostageIds) => ({ status: '和睦', isMarriage: true, hostageIds: [...hostageIds] });
+    const clans = [
+        { id: 1, diplomacyValue: { 4: pair([101, 102]) } },
+        { id: 2, diplomacyValue: { 4: pair([201]) } },
+        { id: 4, diplomacyValue: { 1: pair([101, 102]), 2: pair([201]) } }
+    ];
+    ctx.game = {
+        bushos: [first, second, other], clans,
+        getClan(id) { return clans.find(clan => Number(clan.id) === Number(id)); }
+    };
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+    manager.settleHostagesFromExtinctClan(1);
+    for (const hostage of [first, second]) {
+        assert.strictEqual(hostage.isHostage, false);
+        assert.strictEqual(hostage.originalClanId, undefined);
+        assert.strictEqual(hostage.clan, 4, '実家滅亡時は受入家所属を維持する');
+    }
+    assert.deepStrictEqual(Array.from(clans[0].diplomacyValue[4].hostageIds), []);
+    assert.deepStrictEqual(Array.from(clans[2].diplomacyValue[1].hostageIds), []);
+    assert.strictEqual(other.isHostage, true, '滅亡していない家の人質を解除しない');
+    assert.strictEqual(other.originalClanId, 2);
+    assert.deepStrictEqual(Array.from(clans[1].diplomacyValue[4].hostageIds), [201]);
+    assert.deepStrictEqual(Array.from(clans[2].diplomacyValue[2].hostageIds), [201]);
+    assert.strictEqual(clans[0].diplomacyValue[4].status, '和睦');
+    assert.strictEqual(clans[0].diplomacyValue[4].isMarriage, true);
+    manager.settleHostagesFromExtinctClan(1);
+    assert.deepStrictEqual(Array.from(clans[2].diplomacyValue[2].hostageIds), [201], '再呼出しでも別家の人質を維持');
 });
 
 // r697: 月末の正規和睦期限満了は、明示的な断交と同じ処遇正本を使用する。
@@ -32443,6 +32558,87 @@ test('攻城戦の地図カメラ補正は全画面coverを外す前に確定す
     assert.ok(typeof allowHide === 'function');
     allowHide();
     assert.deepStrictEqual(order, ['resume', 'focus', 'hide', 'cleanup'], '画面解放後はカード等の不可視資源だけ整理する');
+});
+
+
+// A-065: 実家は存続しているが「人質の預かり家」が通常滅亡した場合。
+// 1560年実マスターの武田義信と妻・嶺を、正規外交受入→北条家拠点喪失→正規滅亡処理へ接続する。
+test('r738 預かり家の滅亡で人質印・双方名簿を解消し、所属と妻は通常の滅亡整理に委譲する', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const m = common.warriorsMaster.find(b => Number(b.id) === 1002003);
+    const bs = scenario.warriorsState.find(b => Number(b.id) === 1002003);
+    const pm = common.princessMaster.find(p => Number(p.id) === 10);
+    const ps = scenario.princessState.find(p => Number(p.id) === 10);
+    const sourceMaster = common.warriorsMaster.find(b => Number(b.id) === 1002002);
+    const sourceState = scenario.warriorsState.find(b => Number(b.id) === 1002002);
+    const holderMaster = common.warriorsMaster.find(b => Number(b.id) === 1003002);
+    const holderState = scenario.warriorsState.find(b => Number(b.id) === 1003002);
+    assert.ok(m && bs && pm && ps && sourceMaster && sourceState && holderMaster && holderState);
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        LifeStatusRules: {
+            isDead: b => b?.status === 'dead', isUnavailable: b => b?.status === 'dead',
+            isPresent: b => b?.status !== 'dead' && b?.status !== 'unborn'
+        }
+    });
+    for (const file of ['js/config.js', 'js/constants.js', 'js/affiliation_system.js', 'js/diplomacy.js', 'js/life_system.js']) loadScript(ctx, file);
+    const hostage = { ...m, ...bs, status: 'active', wifeIds: [10],
+        isHostage: false, isDaimyo: false, belongKunishuId: 0, nemesisIds: [], nemesisList: [] };
+    const wife = { ...pm, ...ps };
+    const sourceDaimyo = { ...sourceMaster, ...sourceState, status: 'active', isDaimyo: true, wifeIds: [] };
+    const holderDaimyo = { ...holderMaster, ...holderState, status: 'active', isDaimyo: true, wifeIds: [], nemesisIds: [], nemesisList: [] };
+    const sourceClan = { id: 3, name: '武田家', leaderId: sourceDaimyo.id, princessIds: [10], diplomacyValue: {} };
+    const holderClan = { id: 4, name: '北条家', leaderId: holderDaimyo.id, princessIds: [], diplomacyValue: {} };
+    const victorClan = { id: 1, name: '第三勢力', leaderId: 0, princessIds: [], diplomacyValue: {} };
+    const sourceCastle = { id: Number(sourceState.castleId), ownerClan: 3, samuraiIds: [sourceDaimyo.id, hostage.id], castellanId: sourceDaimyo.id };
+    const holderCastle = { id: Number(holderState.castleId), ownerClan: 4, samuraiIds: [holderDaimyo.id], castellanId: holderDaimyo.id };
+    const game = {
+        playerClanId: 1, year: 1560, month: 5, isProcessingAI: false,
+        clans: [sourceClan, holderClan, victorClan], castles: [sourceCastle, holderCastle],
+        bushos: [hostage, sourceDaimyo, holderDaimyo], princesses: [wife], legions: [],
+        getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)); },
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); },
+        getPrincess(id) { return this.princesses.find(p => Number(p.id) === Number(id)); },
+        getClanCastles(id) { return this.castles.filter(c => Number(c.ownerClan) === Number(id)); },
+        getClanBushos(id) { return this.bushos.filter(b => Number(b.clan) === Number(id) && b.status === 'active'); },
+        getCastleBushos(id) { return this.bushos.filter(b => Number(b.castleId) === Number(id) && b.status === 'active'); },
+        getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)); },
+        getClanDaimyo(id) { return Number(id) === 4 ? holderDaimyo : sourceDaimyo; },
+        ui: { log() {}, renderMap() {}, async showDialogAsync() {} },
+        factionSystem: { updateFactions() {}, handleMove() {} }
+    };
+    ctx.game = game;
+    const affiliation = vm.runInContext('new AffiliationSystem(game)', ctx);
+    game.affiliationSystem = affiliation;
+    ['leaveCastle', 'resetFactionData', 'updateUI', 'updateCastleLord'].forEach(method => { affiliation[method] = () => {}; });
+    affiliation.enterCastle = (b, id) => { b.castleId = Number(id); };
+    game.castleManager = { changeOwner(c, id) { c.ownerClan = id; } };
+    const diplomacy = vm.runInContext('new DiplomacyManager(game)', ctx);
+    game.diplomacyManager = diplomacy;
+    const life = vm.runInContext('new LifeSystem(game)', ctx);
+    game.lifeSystem = life;
+    life._captureLifeFlowContext = () => ({});
+    life._isLifeFlowCurrent = () => true;
+    diplomacy.changeStatus(3, 4, '和睦', 6);
+    diplomacy.applyHostageData(hostage.id, 3, 4);
+    assert.strictEqual(hostage.clan, 4);
+    assert.strictEqual(hostage.isHostage, true);
+    assert.strictEqual(wife.currentClanId, 4);
+    assert.deepStrictEqual(Array.from(diplomacy.getRelation(3, 4).hostageIds), [hostage.id]);
+    // 人質の実家は残したまま、受入家の最後の拠点を通常戦争の所有権変更で失う。
+    game.castleManager.changeOwner(holderCastle, 1);
+    await life.checkClanExtinction(4, 'no_castle', 1);
+    assert.strictEqual(holderClan.isDestroyed, true);
+    assert.strictEqual(hostage.isHostage, false, '滅亡した預かり家との人質状態は終了する');
+    assert.strictEqual(hostage.originalClanId, undefined);
+    assert.deepStrictEqual(Array.from(diplomacy.getRelation(3, 4).hostageIds), []);
+    assert.deepStrictEqual(Array.from(diplomacy.getRelation(4, 3).hostageIds), []);
+    assert.strictEqual(hostage.status, 'ronin', '滅亡家の通常の浪人化を維持');
+    assert.strictEqual(hostage.clan, 0, '人質専用の転属ではなく滅亡側の所属整理を維持');
+    assert.strictEqual(wife.currentClanId, 0, '妻は既存のAffiliationSystemにより同期する');
+    assert.deepStrictEqual(holderClan.princessIds, []);
+    assert.strictEqual(sourceClan.isDestroyed, undefined, '実家の存続・外交statusを変えない');
+    assert.strictEqual(diplomacy.getRelation(3, 4).status, '和睦');
 });
 
 Promise.all(pendingTests).then(() => {

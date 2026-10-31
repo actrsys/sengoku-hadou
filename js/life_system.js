@@ -1782,7 +1782,13 @@ class LifeSystem {
         
         // 滅亡の条件：お城が0個になった、または後継ぎがいない場合です
         if (clanCastles.length === 0 || reason === 'no_heir') {
-            
+            // 実家・預かり家のいずれが滅亡しても人質の担保関係は終了する。
+            // 外交担当で人質印と名簿を解除し、預かり家側の武将・妻の
+            // 浪人化はこの後の通常の所属整理へ委譲する。
+            if (this.game.diplomacyManager) {
+                this.game.diplomacyManager.settleHostagesFromExtinctClan(clanId);
+            }
+
             // 滅ぼした勢力は、最後の戦争を処理している呼出元が持つ確定値を使う。
             // 過去に奪われた城を配列先頭から探すと、複数勢力に領地を失った家で
             // 「最後の一城を落とした家」と別の勢力を誤認するため、履歴から推測しない。
