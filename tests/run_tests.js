@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r720');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r731');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -2129,6 +2129,348 @@ test('面談の実父系呼称は話者本人・質問者との関係を分け�
     assert.strictEqual(interview._applyFamilyReferenceText('あのお方は肝心な胸中をほとんど見せませぬ。', true), '肝心な胸中をほとんど見せませぬ。');
 });
 
+
+test('1570年浅井久政の面談で保守的な心境説明は自然な常体とし、一般家臣の敬体を維持する', () => {
+    const runtime = getRuntimeData('1570_anegawa');
+    const masters = runtime.common.warriorsMaster;
+    const states = runtime.scenario.warriorsState;
+    const getBushoData = id => {
+        const master = masters.find(row => Number(row.id) === id);
+        const state = states.find(row => Number(row.id) === id);
+        assert.ok(master && state, `武将ID${id}の1570年正規マスター・状態が存在する`);
+        const [familyNameStr, givenName] = String(master.name).split('|');
+        return {
+            ...master, ...state, familyNameStr, givenName,
+            realFatherId: Number(master.realFatherId) || 0,
+            courtRankIds: state.courtRank ? [Number(state.courtRank)] : [],
+            innovation: Number(master.innovation),
+            loyalty: Number(state.loyalty),
+            clan: Number(state.clan)
+        };
+    };
+    const lord = getBushoData(1015005);   // 浅井賢政
+    lord.isDaimyo = true;
+    const father = getBushoData(1015004); // 浅井久政（同家所属・1570年生存）
+    const retainer = getBushoData(1015028); // 磯野員昌（非親族）
+    const game = {
+        playerClanId: 15, bushos: [lord, father, retainer],
+        getClanDaimyo() { return lord; },
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)) || null; }
+    };
+    const ctx = createContext();
+    for (const script of ['js/config.js', 'js/busho_list_sort_rules.js',
+        'js/conversation_standing_rules.js', 'js/loyalty_insight_rules.js', 'js/interview_system.js']) {
+        loadScript(ctx, script);
+    }
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+    const interview = new ctx.InterviewSystem(game);
+    let speech = [];
+    game.ui = { interviewView: { showMessages(_speaker, messages) { speech = messages; } } };
+
+    assert.strictEqual(interview._getInterviewSpeakerPosture(father).key, 'senior_close');
+    interview.startInterview(father);
+    assert.ok(speech.join('').includes('賢政'), '最初の挨拶の当主名は変更しない');
+    interview.executeInterviewStatus(father);
+    assert.ok(speech.join('').includes('守ることが肝要であろう'), `年長親族の助言が「肝要であろう」となる: ${speech.join('')}`);
+    assert.ok(!/肝要(?:と思う|だと思う)/.test(speech.join('')), '旧来の助詞抜けと不採用の語尾を残さない');
+
+    interview.startInterview(retainer);
+    interview.executeInterviewStatus(retainer);
+    assert.ok(speech.join('').includes('肝要かと存じます'), '通常家臣の丁寧な元台詞は保持する');
+});
+
+test('r731 1560年島津忠良の他者評は本文内の「だが」と冒頭の「ただ」を重ねない', () => {
+    const runtime = getRuntimeData('1560_okehazama');
+    const masters = new Map(runtime.common.warriorsMaster.map(row => [Number(row.id), row]));
+    const states = new Map(runtime.scenario.warriorsState.map(row => [Number(row.id), row]));
+    const makeBusho = id => {
+        const master = masters.get(id);
+        const state = states.get(id);
+        assert.ok(master && state, `1560年実データに武将${id}が存在する`);
+        const [familyNameStr, givenName] = String(master.name).split('|');
+        return {
+            ...master, ...state, familyNameStr, givenName,
+            name: `${familyNameStr}${givenName}`, fullName: `${familyNameStr}${givenName}`,
+            realFatherId: Number(master.realFatherId) || 0,
+            courtRankIds: state.courtRank ? [Number(state.courtRank)] : [],
+            loyalty: Number(state.loyalty), clan: Number(state.clan)
+        };
+    };
+    const lord = makeBusho(1026011); // 島津貴久
+    lord.isDaimyo = true;
+    const father = makeBusho(1026010); // 島津忠良
+    const target = makeBusho(1026026); // 島津義虎
+    assert.strictEqual(father.clan, lord.clan);
+    assert.strictEqual(target.clan, lord.clan);
+    const game = {
+        playerClanId: lord.clan, bushos: [lord, father, target],
+        getClanDaimyo() { return lord; },
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)) || null; }
+    };
+    const ctx = createContext();
+    for (const script of ['js/config.js', 'js/busho_list_sort_rules.js',
+        'js/conversation_standing_rules.js', 'js/loyalty_insight_rules.js',
+        'js/personnel_rules.js', 'js/interview_system.js']) loadScript(ctx, script);
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+    let messages = [];
+    game.ui = { interviewView: { showMessages(_speaker, rows) { messages = Array.from(rows); } } };
+    const interview = new ctx.InterviewSystem(game);
+    interview.startInterview(father);
+    interview.executeInterviewTopic(father, target);
+    assert.strictEqual(messages.length, 3, '他者所見の3段は変えない');
+    assert.ok(messages[2].includes('大きな不満はないようだが、少し思うところはあるようだ'), '本文内の自然な逆接は維持する');
+    assert.ok(!messages[2].startsWith('「ただ、'), '本文中の逆接の前に二重の「ただ」を付けない');
+});
+
+test('r729 1570年浅井久政の他者評で本文に「だが」がある時は次段に二度目の逆接を付けない', () => {
+    const runtime = getRuntimeData('1570_anegawa');
+    const masters = new Map(runtime.common.warriorsMaster.map(row => [Number(row.id), row]));
+    const states = new Map(runtime.scenario.warriorsState.map(row => [Number(row.id), row]));
+    const makeBusho = id => {
+        const master = masters.get(id);
+        const state = states.get(id);
+        assert.ok(master && state, `実在の武将ID ${id} を使用する`);
+        const [familyNameStr, givenName] = String(master.name).split('|');
+        return {
+            ...master, ...state, familyNameStr, givenName,
+            name: `${familyNameStr}${givenName}`,
+            fullName: `${familyNameStr}${givenName}`,
+            realFatherId: Number(master.realFatherId) || 0,
+            courtRankIds: state.courtRank ? [Number(state.courtRank)] : [],
+            loyalty: Number(state.loyalty), clan: Number(state.clan)
+        };
+    };
+    const lord = makeBusho(1015005); // 浅井賢政
+    lord.isDaimyo = true;
+    const father = makeBusho(1015004); // 浅井久政
+    const target = makeBusho(1005035); // 日根野弘就
+    const game = {
+        playerClanId: 15, bushos: [lord, father, target],
+        getClanDaimyo() { return lord; },
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)) || null; }
+    };
+    const ctx = createContext();
+    for (const script of ['js/config.js', 'js/busho_list_sort_rules.js',
+        'js/conversation_standing_rules.js', 'js/loyalty_insight_rules.js',
+        'js/personnel_rules.js', 'js/interview_system.js']) loadScript(ctx, script);
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+    let messages = [];
+    game.ui = { interviewView: { showMessages(_speaker, rows) { messages = Array.from(rows); } } };
+    const interview = new ctx.InterviewSystem(game);
+    interview.startInterview(father);
+    interview.executeInterviewTopic(father, target);
+    assert.strictEqual(messages.length, 3, '通常の三段会話が成立する');
+    assert.ok(messages[0].includes('だが、務めは果たしておる'), '最初の逆接は人物評に必要なので残す');
+    assert.ok(!messages[1].includes('もっとも、'), '接触説明に二度目の逆接を付けない');
+    assert.ok(!messages[2].includes('もっとも、') && !messages[2].includes('ただ、'), '最後の忠誠所見も追加逆接しない');
+    assert.ok(messages.join('').includes('おぬしへの'), '当主への二人称は維持する');
+});
+
+test('面談の他者所見は父・祖父・伯父から当主への呼び方だけを常体にし、話題の高格式者への敬意は維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/busho_list_sort_rules.js');
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/interview_system.js');
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+
+    const daimyo = { id: 1, clan: 1, isDaimyo: true, realFatherId: 2, birthYear: 1534,
+        familyNameStr: '織田', givenName: '信長', fullName: '織田信長', familyIds: [1, 2, 3, 4, 6], courtRankIds: [] };
+    const father = { id: 2, clan: 1, realFatherId: 3, birthYear: 1511,
+        familyNameStr: '織田', givenName: '信秀', fullName: '織田信秀', courtRankIds: [] };
+    const grandfather = { id: 3, clan: 1, birthYear: 1480,
+        familyNameStr: '織田', givenName: '信定', fullName: '織田信定', courtRankIds: [] };
+    const uncle = { id: 4, clan: 1, realFatherId: 3, birthYear: 1510,
+        familyNameStr: '織田', givenName: '信康', fullName: '織田信康', courtRankIds: [] };
+    const courtier = { id: 5, clan: 1, birthYear: 1510,
+        familyNameStr: '近衛', givenName: '前久', fullName: '近衛前久', courtRankIds: [5] };
+    const familyTarget = { id: 6, clan: 1, birthYear: 1550,
+        familyNameStr: '織田', givenName: '信忠', fullName: '織田信忠', familyIds: [1, 6], courtRankIds: [] };
+    const game = { playerClanId: 1, bushos: [daimyo, father, grandfather, uncle, courtier, familyTarget],
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)) || null; },
+        getClanDaimyo() { return daimyo; },
+        courtRankSystem: { RANK_ID_SHOGUN: 98, RANK_IDS_CANDIDATE: [],
+            getRankData(id) { return Number(id) === 5 ? { rankNo: 2, rankName2: '大納言' } : null; },
+            getHighestRankData(busho) { return (busho.courtRankIds || []).length ? this.getRankData(busho.courtRankIds[0]) : null; }
+        }
+    };
+    ctx.PersonnelRules = {
+        calcRelationshipProfile: () => ({ compatibilityScore: 75, contactScore: 70, affinityDiff: 0 }),
+        calcOtherAssessmentBias: () => ({ protectionShift: 0, loyaltyPenalty: 0 })
+    };
+    const system = new ctx.InterviewSystem(game);
+    system.activeInterviewAttitude = 'friendly';
+    system._getConcealmentProfile = () => ({ perceivedLoyalty: 90 });
+    let rendered = [];
+    game.ui = { interviewView: { showMessages: (_speaker, messages) => { rendered = messages; } } };
+
+    // 本番の忠誠所見文を使い、面談→他者選択→3段発言の正規経路で検査する。
+    const assess = (band, uncertain = false, style = 'family') => {
+        system._getTargetLoyaltyAssessment = () => ({ text: system._getTargetLoyaltyBandText(band, uncertain, style), direction: 'positive' });
+    };
+    for (const elder of [father, grandfather, uncle]) {
+        assert.ok(['senior_close', 'senior_extended'].includes(system._getInterviewSpeakerPosture(elder).key));
+        for (const band of ['stable', 'warning', 'danger', 'dissatisfied', 'serious', 'critical']) {
+            assess(band, false, 'family');
+            system.executeInterviewTopic(elder, familyTarget);
+            const text = rendered.join('');
+            assert.ok(text.includes('おぬしの考え'), `年長者→子孫の ${band} は当主への敬語でなく常体にする: ${text}`);
+            assert.ok(!text.includes('おぬしのお考え'), `年長者→子孫の ${band} に当主への過剰敬語を残さない: ${text}`);
+        }
+        assess('stable', false, 'authority');
+        system.executeInterviewTopic(elder, familyTarget);
+        const text = rendered.join('');
+        assert.ok(text.includes('おぬしの考え'), `高格式者の忠誠所見でも当主への呼び方は常体: ${text}`);
+        // 第三者自身への敬意は混同して消さない。
+        assert.ok(text.includes('示しておられる'), '話題の高格式者に向けた敬意は維持する');
+        assess('danger', false, 'authority');
+        system.executeInterviewTopic(elder, familyTarget);
+        assert.ok(rendered.join('').includes('気を配った方がよい'), '子孫への忠告で「気を配られた」を残さない');
+        assert.ok(!rendered.join('').includes('気を配られた'), '子孫への敬語混入はない');
+        assess('critical', false, 'authority');
+        system.executeInterviewTopic(elder, familyTarget);
+        assert.ok(rendered.join('').includes('去就には注意した方がよい'), '子孫への忠告で「ご注意を」を残さない');
+
+        // 偽装看破・情報不足の専用文も、同じ第三段の本番経路へ流れる。
+        for (const blindText of [
+            system._getDetectedConcealmentText('danger', 'family'),
+            system._getBlindTargetText(elder, familyTarget, { contactScore: 60 }, { isConcealing: false }, 'authority')
+        ]) {
+            system._getTargetLoyaltyAssessment = () => ({ text: blindText, direction: 'unknown' });
+            system.executeInterviewTopic(elder, familyTarget);
+            assert.ok(rendered.join('').includes('おぬしの考え'), '偽装看破・情報不足でも聞き手への常体を保つ');
+            assert.ok(!rendered.join('').includes('おぬしのお考え'), '専用文で敬語が復活しない');
+        }
+    }
+    const blindBias = system._getBlindBiasedTargetText({ loyaltyPenalty: 99 });
+    assert.ok(!system._applyIndependentInterviewRegister(blindBias, father).includes('思えます'), '低精度の偏見文も最後だけ敬体へ戻らない');
+    assess('stable', false, 'family');
+    system.executeInterviewTopic(courtier, familyTarget);
+    assert.ok(rendered.join('').includes('お考え'), '血縁でない高格式の話者は公的な言い方を維持する');
+});
+
+
+test('年長親族の他者忠誠所見は偽装看破時も敬体の接続詞が混ざらない', () => {
+    const ctx = createContext();
+    for (const script of [
+        'js/config.js', 'js/busho_list_sort_rules.js', 'js/conversation_standing_rules.js',
+        'js/loyalty_insight_rules.js', 'js/personnel_rules.js', 'js/interview_system.js'
+    ]) loadScript(ctx, script);
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+
+    // 大名の父が家臣として面談し、その孫が智謀で忠誠の低さを隠す通常成立し得る構成。
+    const daimyo = { id: 1, clan: 1, isDaimyo: true, realFatherId: 2, birthYear: 1535,
+        givenName: '信長', familyNameStr: '織田', familyIds: [1, 2, 3], courtRankIds: [], affinity: 50, innovation: 50 };
+    const father = { id: 2, clan: 1, birthYear: 1510,
+        givenName: '信秀', familyNameStr: '織田', familyIds: [1, 2, 3], courtRankIds: [],
+        intelligence: 95, loyalty: 95, duty: 85, ambition: 30, affinity: 50, innovation: 50 };
+    const son = { id: 3, clan: 1, realFatherId: 1, birthYear: 1555,
+        givenName: '信忠', familyNameStr: '織田', familyIds: [1, 2, 3], courtRankIds: [],
+        intelligence: 80, loyalty: 65, duty: 60, ambition: 50, affinity: 50, innovation: 50 };
+    const game = { playerClanId: 1, bushos: [daimyo, father, son],
+        getClanDaimyo() { return daimyo; },
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)) || null; } };
+    const interview = new ctx.InterviewSystem(game);
+    interview.activeInterviewAttitude = 'friendly';
+    let messages = [];
+    game.ui = { interviewView: { showMessages(_speaker, text) { messages = text; } } };
+    const relation = ctx.PersonnelRules.calcRelationshipProfile(father, son);
+    assert.ok(interview._getConcealmentProfile(son).isConcealing, '実ルールにより忠誠を偽装している');
+    assert.ok(interview._canDetectConcealment(father, son,
+        interview._calcTargetKnowledge(father, son, relation), interview._getConcealmentProfile(son)),
+    '父の能力により偽装を見抜ける');
+    assert.ok(interview._getTargetLoyaltyAssessment(father, son, relation).text.startsWith('表向きは平静ですが'),
+        '変換前の本番所見には敬体の接続詞がある');
+    interview.executeInterviewTopic(father, son);
+    const speech = messages.join('');
+    assert.ok(speech.includes('表向きは平静だが'), `父から子への所見は接続も常体: ${speech}`);
+    assert.ok(!speech.includes('平静ですが'), `一文内に敬体の接続を残さない: ${speech}`);
+    assert.ok(speech.includes('おぬしの考え') && speech.includes('隠しておられる'),
+        '主君への呼称は親しい常体にし、話題の人物への敬意は維持する');
+
+    // 親族以外の通常家臣は従来どおりの丁寧な接続を用いる。
+    const retainer = { ...father, id: 4, realFatherId: 0, familyIds: [4] };
+    game.bushos.push(retainer);
+    interview.executeInterviewTopic(retainer, son);
+    assert.ok(messages.join('').includes('表向きは平静ですが'), '通常家臣の敬体は維持する');
+});
+
+test('年長親族の面談・深い偽装看破でも話題人物への敬意と聞き手への常体を両立する', () => {
+    const ctx = createContext();
+    for (const script of [
+        'js/config.js', 'js/busho_list_sort_rules.js', 'js/conversation_standing_rules.js',
+        'js/loyalty_insight_rules.js', 'js/personnel_rules.js', 'js/interview_system.js'
+    ]) loadScript(ctx, script);
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+    const daimyo = { id: 1, clan: 1, isDaimyo: true, realFatherId: 2, birthYear: 1535,
+        givenName: '信長', familyNameStr: '織田', familyIds: [1,2,3], courtRankIds: [], affinity: 50, innovation: 50 };
+    const father = { id: 2, clan: 1, birthYear: 1510,
+        givenName: '信秀', familyNameStr: '織田', familyIds: [1,2,3], courtRankIds: [],
+        intelligence: 100, loyalty: 95, duty: 100, ambition: 30, affinity: 50, innovation: 50 };
+    const son = { id: 3, clan: 1, realFatherId: 1, birthYear: 1555,
+        givenName: '信忠', familyNameStr: '織田', familyIds: [1,2,3], courtRankIds: [],
+        intelligence: 90, loyalty: 50, duty: 60, ambition: 50, affinity: 50, innovation: 50 };
+    const game = { playerClanId: 1, bushos: [daimyo, father, son],
+        getClanDaimyo() { return daimyo; },
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)) || null; } };
+    const interview = new ctx.InterviewSystem(game);
+    interview.activeInterviewAttitude = 'friendly';
+    let messages = [];
+    game.ui = { interviewView: { showMessages(_speaker, text) { messages = text; } } };
+    for (const [loyalty, band] of [[50, 'dissatisfied'], [20, 'critical']]) {
+        son.loyalty = loyalty;
+        const relation = ctx.PersonnelRules.calcRelationshipProfile(father, son);
+        const profile = interview._getConcealmentProfile(son);
+        assert.strictEqual(profile.actualBand, band);
+        assert.ok(profile.isConcealing && interview._canDetectConcealment(father, son,
+            interview._calcTargetKnowledge(father, son, relation), profile), '通常の面談判定で偽装を看破できる');
+        const assessment = interview._getTargetLoyaltyAssessment(father, son, relation);
+        assert.ok(assessment.text.includes('出しておられませぬ'), `本番の高敬意素材を使用: ${assessment.text}`);
+        interview.executeInterviewTopic(father, son);
+        const speech = messages.join('');
+        assert.ok(speech.includes('おぬしの考え'), `聞き手への呼称は親族の常体: ${speech}`);
+        assert.ok(speech.includes('おられぬが'), `話題人物への敬意を保ち、一般家臣の「おられませぬ」を残さない: ${speech}`);
+        assert.ok(!speech.includes('おられませぬ'), `敬体の混入なし: ${speech}`);
+    }
+    const retainer = { ...father, id: 4, realFatherId: 0, familyIds: [4] };
+    game.bushos.push(retainer);
+    interview.executeInterviewTopic(retainer, son);
+    assert.ok(messages.join('').includes('おられませぬ'), '通常家臣の元の丁寧語は維持する');
+});
+
+test('面談の年長親族は初回挨拶だけ名で呼び、その後はおぬしと話しかける', () => {
+    const ctx = createContext();
+    for (const script of ['js/config.js', 'js/busho_list_sort_rules.js',
+        'js/conversation_standing_rules.js', 'js/loyalty_insight_rules.js',
+        'js/personnel_rules.js', 'js/interview_system.js']) loadScript(ctx, script);
+    vm.runInContext('this.InterviewSystem = InterviewSystem;', ctx);
+    const daimyo = { id: 1, clan: 1, isDaimyo: true, realFatherId: 2, birthYear: 1535,
+        familyNameStr: '織田', givenName: '信長', fullName: '織田信長', courtRankIds: [], familyIds: [1, 2, 3, 4, 5] };
+    const father = { id: 2, clan: 1, birthYear: 1511, realFatherId: 3,
+        familyNameStr: '織田', givenName: '信秀', fullName: '織田信秀', courtRankIds: [],
+        loyalty: 90, duty: 80, intelligence: 90, innovation: 50, familyIds: [1, 2, 3] };
+    const grandfather = { id: 3, clan: 1, birthYear: 1485,
+        familyNameStr: '織田', givenName: '信定', fullName: '織田信定', courtRankIds: [], familyIds: [1, 2, 3] };
+    const uncle = { id: 4, clan: 1, birthYear: 1508, realFatherId: 3,
+        familyNameStr: '織田', givenName: '信康', fullName: '織田信康', courtRankIds: [], familyIds: [1, 4] };
+    const retainer = { id: 5, clan: 1, familyNameStr: '柴田', givenName: '勝家',
+        fullName: '柴田勝家', courtRankIds: [], familyIds: [5] };
+    const game = { playerClanId: 1, bushos: [daimyo, father, grandfather, uncle, retainer],
+        getClanDaimyo() { return daimyo; },
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)) || null; } };
+    const interview = new ctx.InterviewSystem(game);
+    // 導入時の呼称は歴史人物の識別に必要なので従来の氏名・官位呼称を守る。
+    for (const elder of [father, grandfather, uncle]) {
+        assert.ok(interview._getGreetingText(elder, 'friendly').includes('信長'), '面談初回は年少当主を名で迎える');
+        assert.strictEqual(interview._applyDirectAddress('殿の考えと殿への忠義。', elder),
+            'おぬしの考えとおぬしへの忠義。', '面談途中の年長親族から当主への直接言及は二人称とする');
+    }
+    assert.strictEqual(interview._applyDirectAddress('殿への忠義。', retainer), '殿への忠義。',
+        '通常家臣の殿呼びは変えない');
+    // 年少者が父を呼ぶ場合の「父上」等は従来の家族呼称を保持する。
+    game.getClanDaimyo = () => father;
+    assert.strictEqual(interview._applyDirectAddress('殿への忠義。', daimyo), '父上への忠義。');
+});
 
 test('外交の直接親族呼称は面談と共通化し、敵対中でも血縁呼称を保つ', () => {
     const ctx = createContext();
@@ -31794,6 +32136,100 @@ test('謀反結果など終端メッセージは背景の2フレーム描画後�
     await ui.processDialogQueue();
     frames.shift()(); await Promise.resolve(); await Promise.resolve();
     assert.strictEqual(modal.classList.contains('hidden'), false, '旧会話の予約閉鎖は再利用中のDOMを隠さない');
+});
+
+test('A-041 顔画像decode中に古い閉鎖処理が会話を消さない', async () => {
+    const source = read('js/ui.js');
+    const startHandoff = source.indexOf('    beginVisualHandoff(closeFn) {');
+    const endHandoff = source.indexOf('    _renderPlainMessage(', startHandoff);
+    const startCover = source.indexOf('    waitForCoveredMapPaint() {');
+    const endCover = source.indexOf('    hideLoadingScreen()', startCover);
+    const startDialog = source.indexOf('    showDialog(msg, isConfirm, onOk, onCancel = null, customOpts = null) {');
+    const endDialog = source.indexOf('    getStatusBarHTML(', startDialog);
+    assert.ok(startHandoff >= 0 && startCover >= 0 && startDialog >= 0);
+    const frames = [], timers = [];
+    const footer = {
+        children: [], style: {}, classList: new FakeClassList(),
+        set innerHTML(value) { this.children.length = 0; },
+        appendChild(child) { this.children.push(child); }
+    };
+    const content = { style: {}, removeEventListener() {}, addEventListener() {} };
+    const modal = {
+        classList: new FakeClassList(['hidden']), style: {},
+        querySelector(sel) { return sel === '.modal-footer' ? footer : (sel === '.modal-content' ? content : null); },
+        addEventListener() {}, removeEventListener() {}
+    };
+    const fakeDocument = {
+        body: { classList: { contains: () => true } },
+        getElementById(id) { return id === 'dialog-modal' ? modal : null; },
+        createElement() { return { classList: new FakeClassList(), dataset: {}, style: {}, textContent: '', onclick: null }; }
+    };
+    const ctx = vm.createContext({
+        console, document: fakeDocument, window: {},
+        setTimeout: callback => { timers.push(callback); return timers.length; },
+        clearTimeout: () => {}, queueMicrotask, Promise,
+        requestAnimationFrame: callback => { frames.push(callback); return frames.length; }
+    });
+    vm.runInContext('class TestUI {\n' + source.slice(startHandoff, endHandoff) + '\n'
+        + source.slice(startCover, endCover) + '\n' + source.slice(startDialog, endDialog)
+        + '\n} this.TestUI = TestUI;', ctx);
+    const ui = new ctx.TestUI();
+    ui.dialogQueue = [{ msg: '謀反の決着', isConfirm: false, onOk() {}, autoCloseTime: 0, customOpts: null,
+        faceLoadPromise: Promise.resolve({ leftImg: null, rightImg: null }) }];
+    ui.game = { isWatchMode: false };
+    ui._renderPlainMessage = () => {};
+    ui.hideAIGuardTemporarily = () => {};
+    ui.restoreAIGuard = () => {};
+    await ui.processDialogQueue();
+    assert.strictEqual(modal.classList.contains('hidden'), false, 'メッセージを表示');
+    assert.strictEqual(footer.children.length, 1);
+    footer.children[0].onclick({ stopPropagation() {} });
+    await Promise.resolve(); await Promise.resolve();
+    assert.ok(timers.length > 0);
+    timers.shift()(); // handoff終了猶予が尽きた
+    assert.strictEqual(modal.classList.contains('hidden'), false, '最終coverをすぐ外さない');
+    assert.strictEqual(frames.length, 1);
+    let resolveFace;
+    ui._prepareDialogFaces = () => new Promise(resolve => { resolveFace = resolve; });
+    ui.showDialog('読み込みが遅い次の報告', false, () => {});
+    assert.strictEqual(modal.classList.contains('hidden'), false, '顔の準備中は旧会話を残す');
+    frames.shift()(); await Promise.resolve();
+    frames.shift()(); await Promise.resolve(); await Promise.resolve();
+    assert.strictEqual(modal.classList.contains('hidden'), false, '旧閉鎖予約は新しい会話が読み込み中の間もcoverを消してはいけない');
+    resolveFace({leftImg:null,rightImg:null});
+    await Promise.resolve(); await Promise.resolve();
+});
+
+test('攻城戦の地図カメラ補正は全画面coverを外す前に確定する', async () => {
+    const source = read('js/ui.js');
+    const start = source.indexOf('    setWarModalVisible(visible) {');
+    const end = source.indexOf('\n    clearWarLog()', start);
+    assert.ok(start > 0 && end > start);
+    const context = createContext({ document: {
+        querySelectorAll() { return [{ dataset: {}, querySelectorAll() { return []; } }]; }
+    }});
+    vm.runInContext('class WarCoverView {\n' + source.slice(start, end) + '\n}; this.WarCoverView = WarCoverView;', context);
+    const view = new context.WarCoverView();
+    const order = [];
+    let allowHide;
+    view.warModal = { classList: {
+        contains: name => name === 'hidden' ? order.includes('hide') : false,
+        add(name) { if (name === 'hidden') order.push('hide'); }
+    }};
+    view.game = { warManager: { state: { battleCameraLocked: true, battleFocusCastleId: 12 } } };
+    view._warActionMessageGeneration = 0;
+    view.resumeMainMapAfterBattle = () => order.push('resume');
+    view.focusMapOnCastle = () => { order.push('focus'); return Promise.resolve(true); };
+    view._cancelEmptyCardAnimation = () => order.push('cleanup');
+    view.closeCoveredViewAfterRecovery = (_cover, options) => {
+        options.recoverUnderCover();
+        return new Promise(resolve => { allowHide = () => { order.push('hide'); options.afterHide(); resolve(true); }; });
+    };
+    view.setWarModalVisible(false);
+    assert.deepStrictEqual(order.slice(0, 2), ['resume', 'focus'], '復旧時に暗幕内でカメラ補正する');
+    assert.ok(typeof allowHide === 'function');
+    allowHide();
+    assert.deepStrictEqual(order, ['resume', 'focus', 'hide', 'cleanup'], '画面解放後はカード等の不可視資源だけ整理する');
 });
 
 Promise.all(pendingTests).then(() => {

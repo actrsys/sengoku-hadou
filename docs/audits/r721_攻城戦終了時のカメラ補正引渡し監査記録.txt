@@ -1,0 +1,35 @@
+# r721 / A-039 攻城戦終了時のカメラ補正引渡し監査記録
+
+## ユーザー報告・実際の経路
+ユーザーから、台風・謀反などの画面終了に加え、ほかの画面にもちらつきがあるかもしれないとの報告。r720の2件の描画引渡し修正後、共通モーダル、野戦、攻城戦、結果画面の終了処理を再監査した。
+正規経路: WarManagerの攻城戦終了→war_effort.js の isPlayerInvolved 分岐→UIManager.setWarModalVisible(false)→地図復旧→結果会話等。setWarModalVisible(false) は全画面war-modalの最終coverを共通 closeCoveredViewAfterRecovery() で保持する。
+
+## 原因と改修が必要な理由
+r720以前は recoverUnderCover に地図復帰のみを置き、afterHide 内で戦場中心へ focusMapOnCastle(transition:'instant') を呼んでいた。focusMapOnCastleはスクロール位置を実際に書き換えるため、当該拠点が画面中央からずれていた場合、coverがhiddenとなった後に地図カメラを移動する。これは共通の「最後のcoverで背景復旧と合成を待ってから露出する」というr437/r720の方針と順序が逆で、戦争終了時に画面が跳ねる条件になる。
+修正前の正規メソッド実装から取り出した回帰は、地図resume後に暗幕が外れるまでfocusが一度も呼ばれないことで失敗した（r720:1198成功/1失敗）。これは操作経路に到達可能な描画順序の検証であり、物理端末で白抜けを撮影した検証ではない。
+
+## 最小改修
+- js/ui.jsの setWarModalVisible(false) 内に局所のfocusWarMapUnderCoverを配置。
+- resumeMainMapAfterBattle('siege-war') の直後、暗幕が可視のうちに従来と同じ focusMapOnCastle(..., transition:'instant', reason:'battle_modal_close', anchor:'territory', lockInteraction:false) を呼ぶ。
+- afterHideは戦闘のカードアニメーション/補助フラグの片付けに限定する。
+- すでに非表示の場合の従来フォールバックも「背景復旧→カメラ補正→非表示」の順序に揃える。
+- 戦場中心IDとbattleCameraLocked、既存の二段描画境界、戦闘結果会話、通常の戦闘演出、ゲームルール、操作、保存形式、ユーザーExcel・BINは変更しない。
+
+## 検証結果と監査後の設計適合
+- r720に同じ回帰1件追加：1198 passed / 1 failed。カメラ補正がcover解除後であることを再現。
+- r721：node tests/run_tests.js は1199 passed / 0 failed。復旧→カメラ→暗幕解除→カード解放の順序を正規setWarModalVisible()で検査。
+- node tests/run_visual_tests.js：PC・スマホ・低メモリスマホ等の既存実Chromium表示回帰成功。
+- node tools/verify_release_sources.js：共通・1560・1570 正本Excel/BINおよび主要数式検査成功。
+- python tools/verify_excel_bin_parity.py：共通・1560・1570の実行用BIN全出力フィールドがExcelと一致。
+- python tools/simulation/test_player_focus_sim.py：4件成功。
+- 共通UIの暗幕引渡しを再利用し、画面独自の固定待機・Canvas再生成・新しい状態正本を追加していない。r720のイベント地図・終端会話、一般会話・画面間handoff等は無変更。
+
+## 未検証と留保
+- この追加テストは本番メソッドの順序検証であり、端末固有のGPU合成の一瞬のちらつきを全機種で実測したものではない。
+- 長期の自然プレイを全シナリオ・全合戦分岐で実行したものではない。
+- 他の即時画面遷移を機械的に2フレーム待ちへ変えることは、マニュアルの「別画面へ進む前に閉じる」との整合を欠くため行わない。
+
+## 変更ファイル
+追加: docs/audits/r721_攻城戦終了時のカメラ補正引渡し監査記録.txt
+更新: ARCHITECTURE.md, docs/audits/README.md, js/config.js, js/ui.js, tests/run_tests.js
+削除: なし

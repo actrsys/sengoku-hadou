@@ -1,0 +1,14 @@
+戦国覇道 r730 藤堂高虎顔画像差し替え記録
+
+対象
+- data/images/faceicons/toudou_takatora.webp
+- data/images/faceicons/toudou_takatora2.webp
+
+内容
+- ユーザー提供ZIP「2件のWebP.zip」に含まれる同名画像2枚へ差し替え。
+- 画像以外の製品コード、ゲームデータ、セーブ形式、判定ロジックには変更なし。
+
+確認
+- 差し替え後、対象2ファイルの存在を確認。
+- アップロード画像とのSHA-256一致を確認。
+- js/config.js の版番号を r730 へ更新。

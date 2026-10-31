@@ -1,0 +1,28 @@
+# r723 面談「他者について聞く」の聞き手と話題対象の敬語分離監査
+
+## 修正が必要な理由
+- プレイヤー当主が父・祖父・伯父等の年長親族と面談し、他家臣について「他者について聞く」を選ぶ通常操作で発生する。
+- 人物評価と接触説明は年長者らしい常体になる一方、第三段の忠誠所見に「殿のお考えには、よく理解を示しておられます」等が残る。`applyIndependentDaimyoRegister()` は文末の敬体を直しても、当主への「お考え」自体までは区別できない。
+- 第三者への尊敬語「示しておられる」を一律に外すと話題人物への格式表現まで失うため、それは行わない。
+
+## 実装上の根拠
+- 正規経路は `InterviewSystem.executeInterviewTopic(interviewer, target)` → `_getTargetLoyaltyAssessment()` → `_getTargetLoyaltyBandText()` / `_getDetectedConcealmentText()` / `_getBlindTargetText()` → `_applyDirectAddress()` → `_applyIndependentInterviewRegister()` → `InterviewView.showMessages()`。
+- 「誰に話しているか」は `ConversationStandingRules.getInterviewSpeakerPosture()` を正本とし、父/祖父/伯父の `senior_close` / `senior_extended` のみ、当主自身に向けた敬語を言い換える。
+- 「誰について話しているか」は既存の `getPersonalStanding()` と専用所見本文が所有し、軍師/国主/高格式者への呼称・尊敬語を維持する。
+- 同じ共通の常体変換で抜けていた「思えます」を「思える」にする。専用の新しい口調表やルール判定は作らない。
+
+## 修正範囲と見送り
+- 製品コードは `js/interview_system.js` の第三段の当主向け文言整形、`js/conversation_standing_rules.js` の1つの語尾変換のみ。
+- 通常家臣・子から親への敬語・非親族の高格式者口調や、対象人物への敬称は維持する。
+- 忠誠推測の根拠・計算・表面態度・逆接/話題遷移・イベント・セーブ形式・マスターExcel/BINへの変更は不要。
+
+## 検証
+- r722ソースに追加回帰を適用した実行結果: 1,200件成功/1件失敗。父→子に「信長のお考え」と当主への敬語が残ることを確認。
+- r723修正後: 1,201件成功/失敗0。父・祖父・伯父、stable/warning/danger/dissatisfied/serious/critical、家族/高格式者/偽装看破/情報不足の実メソッドの文章生成を検証。
+- 実ブラウザ表示回帰（PC/スマホ/低メモリ）: 成功。
+- tools/verify_release_sources.js と verify_excel_bin_parity.py: 共通/1560/1570すべて一致。
+- simulationの4単体テスト: 成功。
+
+## 検証限界
+- コード上の会話生成経路と正常な人物関係を使ったfixtureを検証した。全シナリオ・全武将の自然プレイと、すべての自由記述イベント台詞を完全に網羅したものではない。
+- 顔表示・画面遷移ではなく文言の修正であり、ちらつき対策には触れていない。

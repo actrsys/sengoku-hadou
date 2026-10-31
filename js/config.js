@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r720'
+        Version: 'r731'
     },
 
     // 拠点の資源・人口の保存上限。モデル、計算、AI、入力画面、歴史イベントで共用する。

@@ -1239,6 +1239,10 @@ class UIManager {
         const dialogGeneration = Number(this._dialogGeneration || 0);
         
         const modal = document.getElementById('dialog-modal');
+        // 次の顔画像のdecode中にも旧終端会話の非同期closeが進み得る。
+        // 新しい会話を処理し始めた時点で旧closeだけを失効させ、
+        // 準備が終わるまで旧画面をcoverとして保持する。
+        if (modal && typeof this.cancelCoveredClose === 'function') this.cancelCoveredClose(modal);
 
         const msgEl = document.getElementById('dialog-message');
         const leftFaceEl = document.getElementById('dialog-left-face');
@@ -3675,9 +3679,10 @@ class UIManager {
             // 固定war DOMを閉じる時点で、旧メッセージのtimer/callbackを次の戦闘から切り離す。
             this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;
 
-            const finishWarCoverClose = () => {
-                // スマホでは戦争モーダルの表示/非表示で地図の可視領域寸法が微妙に変わる場合があります。
-                // coverを外したDOM状態で同じ戦場中心へ即時補正します。
+            // r721: 戦場カメラの補正は、背景地図が復帰してから全画面coverを
+            // 外す前に行う。従来のafterHide内では地図が露出した後でscroll位置が
+            // 変わるため、戦闘終了時に画面が一瞬跳ねることがあった。
+            const focusWarMapUnderCover = () => {
                 const warState = this.game && this.game.warManager ? this.game.warManager.state : null;
                 if (warState && warState.battleCameraLocked && Number(warState.battleFocusCastleId) > 0 && typeof this.focusMapOnCastle === 'function') {
                     this.focusMapOnCastle(Number(warState.battleFocusCastleId), {
@@ -3688,8 +3693,10 @@ class UIManager {
                         lockInteraction: false
                     });
                 }
+            };
 
-                // 戦争が終わって画面を閉じる時に、カードの「部隊がいたよシール」を全部外します。
+            const finishWarCoverClose = () => {
+                // 戦闘画面のカードの「部隊がいたよシール」は表示終了後に解放する。
                 const allCards = document.querySelectorAll('.responsive-army-box, .army-box');
                 allCards.forEach(card => {
                     this._cancelEmptyCardAnimation(card);
@@ -3701,11 +3708,13 @@ class UIManager {
                 this.closeCoveredViewAfterRecovery(this.warModal, {
                     recoverUnderCover: () => {
                         if (typeof this.resumeMainMapAfterBattle === 'function') this.resumeMainMapAfterBattle('siege-war');
+                        focusWarMapUnderCover();
                     },
                     afterHide: finishWarCoverClose
                 });
             } else {
                 if (typeof this.resumeMainMapAfterBattle === 'function') this.resumeMainMapAfterBattle('siege-war');
+                focusWarMapUnderCover();
                 this.warModal.classList.add('hidden');
                 finishWarCoverClose();
             }

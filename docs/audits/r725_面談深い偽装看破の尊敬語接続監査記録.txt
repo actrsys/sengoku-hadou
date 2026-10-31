@@ -1,0 +1,25 @@
+# r725 面談「他者について」深い偽装看破の尊敬語接続監査（A-045）
+
+## 原因と到達経路
+- r724時点の `InterviewSystem._getDetectedConcealmentText()` には、対象の忠誠段階が `dissatisfied` または `critical` で、対象が一門／高格式者の場合「表には出しておられませぬが、……ようです」という所見がある。
+- 実際の `PersonnelRules.calcRelationshipProfile()`、`LoyaltyInsightRules.getConcealmentProfile()`、`InterviewSystem._canDetectConcealment()` と `executeInterviewTopic()` を接続する。父が子の当主へ、智謀90で低忠誠を隠す孫について回答する条件で発生を確認。
+- 通常のプレイヤー面談から到達できる判定分岐であり、対象の状態を破壊する操作は用いていない。一方、長時間の自然プレイで当該条件が成立するまでのE2E検証ではなく、明示した数値による局所結合テストである。
+- 年長親族・高格式者への共通変換 `ConversationStandingRules.applyIndependentDaimyoRegister()` には肯定の「おられます→おられる」はあったが、否定の「おられませぬ」がなかった。聞き手に対する一般家臣の敬体が一文の中に残った。
+
+## 設計思想との照合および改修
+- 正本は既存の共通話者レジスター。変換表に `おられませぬ→おられぬ` を1項目追加する。話題人物に対する「おられ」の敬意は保持し、聞き手に対する語尾だけを常体にする。
+- 親族・官位・忠誠・偽装・情報確度・面談UI・会話生成分岐・外交・軍師判断・セーブ形式・管理Excel/BINは変更しない。
+- 通常家臣は共通変換を通らず、既存の「おられませぬ」を維持する。新たな専用変換や別の正本を作らない。
+
+## 検証
+- r724の製品コードに今回の追加回帰を適用すると、1,202件成功・1件失敗。失敗時の第三段は「表には出しておられませぬが、信長の考えに…ようだ」。
+- 修正後は同じ追加回帰で `dissatisfied` / `critical` の2条件が「表には出しておられぬが」となり、通常家臣は元の敬体のまま。
+- `node tests/run_tests.js`: 1,203件成功・失敗0件。
+- `node tests/run_visual_tests.js`: PC/スマホ/低メモリスマホを含む表示回帰成功。
+- `node tools/verify_release_sources.js`: 共通・1560年・1570年のExcel/BIN/数式検査成功。
+- `python tools/verify_excel_bin_parity.py`: 3組一致。
+- `python tools/simulation/test_player_focus_sim.py`: 4件成功。シミュレーションはJS実行エンジンを再現しない近似モデルであり、実機自然プレイの証拠とはしない。
+- 改修後に最優先改修判断規則と既存の面談・共通レジスター規則を再照合。人物条件や第三者の敬意を変えない、1項目の最小修正に限定した。
+
+## 未検証
+- 全武将・全組合せの長期自然プレイと、歴史イベントを含む全台詞の網羅的な語感確認は未実施。

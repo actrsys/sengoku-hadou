@@ -222,7 +222,12 @@ class InterviewSystem {
     }
 
     _applyDirectAddress(text, busho) {
-        const address = this._getDirectAddressName(busho);
+        // 挨拶では氏名・官位を用いるが、面談の本題で年長親族が
+        // 子・孫・甥の当主に言及する際は、名を繰り返さず二人称で話す。
+        // 話題の第三者の呼称はこの関数の対象にせず、本文の「殿」のみを扱う。
+        const posture = this._getInterviewSpeakerPosture(busho);
+        const address = ['senior_close', 'senior_extended'].includes(posture.key)
+            ? 'おぬし' : this._getDirectAddressName(busho);
         if (address === '殿') return String(text || '');
         return String(text || '').replace(/殿/g, address);
     }
@@ -1476,13 +1481,26 @@ class InterviewSystem {
         // 3段階の会話列全体で逆接を管理する。1段目の本文中ですでに「ただ／もっとも」を
         // 使っている場合も使用済みとし、後続で逆接を重ねない。
         const transitionState = {
-            used: /(?:^|[。！？])(?:ただ|もっとも|正直なところ)、/.test(opinionText),
+            // 人物評の中で「だが、」と既に逆接した場合も使用済みとする。
+            // 後続の接触説明へ「もっとも、」を重ねない。
+            used: /(?:^|[。！？])(?:ただ|だが|もっとも|正直なところ)、/.test(opinionText),
             last: null,
             contactScore: Number(relation && relation.contactScore || 0)
         };
 
+        // 忠誠所見の「殿のお考え」は話題の相手でなく、聞き手の当主を指す。
+        // 父・祖父・伯父等から子・孫へ話す場合だけ、呼びかけと同じ距離感に揃える。
+        // 高格式の話題人物を敬う「お考え」「おられる」等は変更しない。
+        const speakerPosture = this._getInterviewSpeakerPosture(interviewer);
+        const speaksToYoungerFamily = ['senior_close', 'senior_extended'].includes(speakerPosture.key);
+        const listenerLoyaltyText = speaksToYoungerFamily
+            ? loyaltyAssessment.text
+                .replace(/殿のお考え/g, '殿の考え')
+                .replace(/気を配られた方が/g, '気を配った方が')
+                .replace(/ご注意を/g, '注意した方がよい')
+            : loyaltyAssessment.text;
         const loyaltyBase = this._applyFamilyReferenceText(
-            this._applyStandingReferenceText(this._applyDirectAddress(loyaltyAssessment.text, interviewer), standing),
+            this._applyStandingReferenceText(this._applyDirectAddress(listenerLoyaltyText, interviewer), standing),
             isFamilyDialogue
         );
         const normalizedLoyalty = normalizeForListener(loyaltyBase);
@@ -1574,9 +1592,12 @@ class InterviewSystem {
     _bridgeAssessmentText(text, previousDirection, currentDirection, transitionState = null) {
         const body = this._stripAssessmentTransition(text);
         const connector = this._chooseAssessmentTransition(previousDirection, currentDirection, transitionState);
+        // 本文自体に「…だが、…」がある場合、その中の逆接を活かし、段頭の「ただ」を重ねない。
+        const hasInternalContrast = /(?:だが|ですが)、/.test(body);
+        if (hasInternalContrast && transitionState) transitionState.used = true;
         // 3段階の会話列では明示的な接続（ただ／もっとも／正直なところ）は原則1回だけ。各文を個別に補正して
         // 「ただ、…」→「ただ、…」のように重ねるより、後段は独立文で受けた方が自然。
-        if (!connector || (transitionState && transitionState.used)) return body;
+        if (!connector || hasInternalContrast || (transitionState && transitionState.used)) return body;
         if (transitionState) {
             transitionState.used = true;
             transitionState.last = connector;
