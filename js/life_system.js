@@ -1786,7 +1786,8 @@ class LifeSystem {
             // 滅ぼした勢力は、最後の戦争を処理している呼出元が持つ確定値を使う。
             // 過去に奪われた城を配列先頭から探すと、複数勢力に領地を失った家で
             // 「最後の一城を落とした家」と別の勢力を誤認するため、履歴から推測しない。
-            killerClanId = reason === 'no_castle' ? (Number(killerClanId) || 0) : 0;
+            // 総取りも同じ戦争で攻撃側が全拠点を接収するため、勝者を引き継ぐ。
+            killerClanId = (reason === 'no_castle' || reason === 'total_takeover') ? (Number(killerClanId) || 0) : 0;
 
             // ★ここから追加：未婚の姫を、攻め滅ぼした大名家が総取りする魔法
             if (killerClanId > 0 && killerClanId !== clan.id) {

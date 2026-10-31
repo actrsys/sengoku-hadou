@@ -1733,7 +1733,7 @@ Object.assign(WarManager.prototype, {
                         await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
                         if (!isCurrentWar()) return;
                         const extReason1 = s.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
-                        await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason1, extReason1 === 'no_castle' ? winnerClan : 0);
+                        await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason1, winnerClan);
                         if (!isCurrentWar()) return;
                         if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige(); // 威信を更新
                         this.game.finishTurn();
@@ -1745,7 +1745,7 @@ Object.assign(WarManager.prototype, {
                     await this.checkTotalTakeover(s); // ★総取りシステムをチェック！
                     if (!isCurrentWar()) return;
                     const extReason2 = s.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
-                    await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason2, extReason2 === 'no_castle' ? winnerClan : 0);
+                    await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason2, winnerClan);
                     if (!isCurrentWar()) return;
                     if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige(); // 威信を更新
                     this.game.finishTurn();
@@ -2998,7 +2998,7 @@ Object.assign(WarManager.prototype, {
 
         // 全て終わったので滅亡チェックをしてターンを終了します
         const extReason = this.state.isTotalTakeoverExecuted ? 'total_takeover' : 'no_castle';
-        await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, extReason, extReason === 'no_castle' ? Number(this.state.attacker.ownerClan) || 0 : 0);
+        await this.game.lifeSystem.checkClanExtinction(this.state.oldDefClanId, extReason, Number(this.state.attacker.ownerClan) || 0);
         if (!this._isPrisonerPhaseCurrent(session)) {
             if (this._prisonerPhaseFlow === session) this._invalidatePrisonerPhase();
             return;

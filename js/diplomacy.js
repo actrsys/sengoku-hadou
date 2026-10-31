@@ -1316,6 +1316,7 @@ class DiplomacyManager {
     _returnEscapedHostageHome(hostage) {
         if (!hostage) return false;
         const originClanId = Number(hostage.originalClanId) || 0;
+        const captorClanId = Number(hostage.clan) || 0;
         hostage.isHostage = false;
         hostage.originalClanId = undefined;
 
@@ -1324,6 +1325,9 @@ class DiplomacyManager {
             const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
             // joinClan は人質受け渡し時の功績・派閥処理をもう一度発生させるため使わない。
             this.game.affiliationSystem.setClanIdRaw(hostage, originClanId);
+            // 人質受入時に夫へ追従していた妻も、帰還時には旧所属の名簿から戻す。
+            // 人質中に保留した外交婚姻フラグは、この所属復元では変更しない。
+            this.game.affiliationSystem.syncSpousesForClanChange(hostage, captorClanId, originClanId, { refreshDiplomacy: false });
             this.game.affiliationSystem.moveCastle(hostage, escapeCastle.id);
         } else {
             this.game.affiliationSystem.becomeRonin(hostage);
@@ -1344,11 +1348,14 @@ class DiplomacyManager {
         const hostage = record && record.busho;
         if (!hostage) return null;
         const originClanId = Number(record.originClanId) || 0;
+        const captorClanId = Number(record.captorClanId) || 0;
         hostage.isHostage = false;
         hostage.originalClanId = undefined;
         if (originClanId > 0) {
             // 物理的な拘束先（castleId）はそのままに、通常捕虜が期待する元所属だけ復元する。
             this.game.affiliationSystem.setClanIdRaw(hostage, originClanId);
+            // 捕虜処遇で解放・登用される前に、妻の所属・姫名簿も夫の元所属へ戻す。
+            this.game.affiliationSystem.syncSpousesForClanChange(hostage, captorClanId, originClanId, { refreshDiplomacy: false });
         }
         return hostage;
     }
