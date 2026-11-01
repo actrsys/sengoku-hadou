@@ -1858,15 +1858,13 @@ class CommandSystem {
             c.morale = 0;
         }
         
-        bushoIds.forEach(id => {
-            const b = this.game.getBusho(id);
+        // 複数人での輸送は一つの移動命令。全員の移動後に城主を確定し、
+        // 途中で退任する仮城主の任命履歴を残さない。
+        const transportBushos = bushoIds.map(id => this.game.getBusho(id));
+        this.game.affiliationSystem.moveCastleGroup(transportBushos, targetId);
+        transportBushos.forEach(b => { b.isActionDone = true; });
 
-            this.game.affiliationSystem.moveCastle(b, targetId);
-            
-            b.isActionDone = true;
-        });
-        
-        this.finishCommand(`${this.game.getBusho(bushoIds[0]).name}が${t.name}へ物資を輸送しました`);
+        this.finishCommand(`${transportBushos[0].name}が${t.name}へ物資を輸送しました`);
     }
     
     executeAppointGunshi(bushoId) {

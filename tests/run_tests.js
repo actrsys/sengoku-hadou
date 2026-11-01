@@ -18039,7 +18039,7 @@ test('r453 輸送量が不正または保有超過なら元・先拠点の物資
     const target={id:2,ownerClan:1,gold:0,rice:0,soldiers:0,horses:0,guns:0,training:0,morale:0};
     const busho={id:7,name:'仮武将',clan:1,castleId:1,isActionDone:false};
     const game={playerClanId:1,getCurrentTurnCastle:()=>source,getCastle:id=>id===2?target:source,getBusho:()=>busho,ui:{showDialog(){}},
-        factionSystem:{handleMove(){}},affiliationSystem:{moveCastle(){}}};
+        factionSystem:{handleMove(){}},affiliationSystem:{moveCastleGroup(){}}};
     const command=new Command(game);command.finishCommand=()=>{};command.getValidTargets=()=>[2];
     command.executeTransport([7],2,{gold:NaN,rice:0,soldiers:0,horses:0,guns:0});
     command.executeTransport([7],2,{gold:0,rice:0,soldiers:0,horses:11,guns:0});
@@ -25905,7 +25905,7 @@ function createR574TransportCase() {
         getProvince:()=>province,
         mapGraph:{getConnectedOwnIdsForMove:()=>new Set(connectedTargets)},
         getBusho:id=>id===7?officer:null,ui:{showDialog:s=>dialogs.push(s)},
-        factionSystem:{handleMove(){}},affiliationSystem:{moveCastle(){moves++;}}};
+        factionSystem:{handleMove(){}},affiliationSystem:{moveCastleGroup(bushos){moves+=bushos.length;}}};
     const command = new Command(game);
     command.finishCommand = () => {finishes++;};
     const vals = {gold:10,rice:20,soldiers:30,horses:4,guns:2};
@@ -34516,6 +34516,71 @@ test('A-096 拠点割譲時の複数家臣退避では移動途中の城主任�
         '割譲される拠点の移動途中の仮城主は正式任命・履歴化しない');
     assert.strictEqual(destination.castellanId, people[0].id,
         '最終配置から一度だけ城主を確定する');
+});
+
+// A-097: ひとつの輸送命令で複数武将が出発するときも、一括配置換えと同じく
+// 出発・到着の最終状態で城主を一度だけ確定する。歴史を後から消す処理は加えない。
+test('A-097 複数武将の通常輸送で仮城主を任命・記録しない', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const original = scenario.castlesState.find(c => Number(c.id) === 190);
+    const receiving = scenario.castlesState.find(c => Number(c.id) === 188);
+    assert.ok(original && receiving && Number(original.ownerClan) === Number(receiving.ownerClan));
+    const members = scenario.warriorsState.filter(b =>
+        Number(b.castleId) === 190 && Number(b.clan) === Number(original.ownerClan)).slice(0, 5);
+    assert.strictEqual(members.length, 5);
+    const people = members.map((r, i) => ({
+        ...common.warriorsMaster.find(b => Number(b.id) === Number(r.id)), ...r,
+        status: 'active', leadership: 100 - i * 8, strength: 80 - i * 6,
+        intelligence: 70 - i * 6, politics: 70 - i * 6,
+        diplomacy: 70 - i * 6, charm: 70 - i * 6, achievementTotal: 0,
+        isCastellan: i === 0, isCommander: false, isDaimyo: false,
+        isGunshi: false, isFactionLeader: false, isRetired: false,
+        isActionDone: false
+    }));
+    const source = { ...original, samuraiIds: people.map(b => b.id),
+        castellanId: people[0].id, legionId: 0,
+        gold: 1000, rice: 1000, soldiers: 1000, horses: 10, guns: 10,
+        training: 70, morale: 70 };
+    const destination = { ...receiving, samuraiIds: [], castellanId: 0, legionId: 0,
+        gold: 100, rice: 100, soldiers: 1000, horses: 0, guns: 0,
+        training: 70, morale: 70 };
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        LifeStatusRules: { isPresent: b => b?.status === 'active' }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/command_system.js');
+    const castles = [source, destination], history = [];
+    const clanId = Number(source.ownerClan);
+    const game = { phase: 'game', year: 1560, month: 5, playerClanId: clanId,
+        castles, bushos: people, legions: [],
+        getCurrentTurnCastle: () => source,
+        getCastle: id => castles.find(c => Number(c.id) === Number(id)) || null,
+        getBusho: id => people.find(b => Number(b.id) === Number(id)) || null,
+        getCastleBushos: id => (castles.find(c => Number(c.id) === Number(id))?.samuraiIds || [])
+            .map(id => people.find(b => Number(b.id) === Number(id))).filter(Boolean),
+        getClan: () => ({name:'旧城主家'}),
+        getClanDaimyo: () => ({innovation:100}),
+        historySystem: {record: text => history.push(text)},
+        factionSystem: {handleMove(){}},
+        ui: {showDialog() {}}
+    };
+    game.affiliationSystem = new (vm.runInContext('AffiliationSystem', ctx))(game);
+    game.affiliationSystem.updateUI = () => {};
+    const command = new (vm.runInContext('CommandSystem', ctx))(game);
+    command._validateTravelOrder = () => true; // 正規の候補選択済みで同一所有家の輸送を成立させる
+    let completed = 0;
+    command.finishCommand = () => completed++;
+    command.executeTransport(people.map(b => b.id), destination.id,
+        {gold: 10, rice: 20, soldiers: 30, horses: 1, guns: 1});
+    assert.strictEqual(completed, 1);
+    assert.strictEqual(history.filter(t => t.includes('【城主任命】') && t.includes(source.name)).length, 0,
+        '一つの輸送命令の途中で仮城主を任命しない');
+    assert.strictEqual(destination.samuraiIds.length, people.length);
+    assert.strictEqual(destination.castellanId, people[0].id);
+    assert.ok(people.every(b => b.isActionDone && Number(b.castleId) === Number(destination.id)));
+    assert.deepStrictEqual([source.gold, source.rice, source.soldiers], [990, 980, 970]);
+    assert.deepStrictEqual([destination.gold, destination.rice, destination.soldiers], [110, 120, 1030]);
 });
 
 Promise.all(pendingTests).then(() => {
