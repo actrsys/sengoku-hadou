@@ -26,17 +26,25 @@ class EndingSystem {
 
     // ★ゲームオーバー（自勢力滅亡）の処理です
     async processGameOver(reasonMsg = "人間五十年――") {
-        if (this.game.ui) {
-            // これまでのBGMを止めます
-            if (window.AudioManager && typeof window.AudioManager.stopBGM === 'function') {
-                window.AudioManager.stopBGM();
-            }
-            
-            const overMessage = reasonMsg + "\n\n野望は潰え、歴史の波に飲まれた。\n\nここに、ひとつの物語が幕を閉じた……";
-            
-            // 3つ目の「false」が、スタッフロールを流さない（滅亡）という合図です
-            await this.playEndingSequence("終焉", overMessage, false);
+        // 最後の武将の死と同時に自大名家が滅亡した場合も、時代終了を優先します。
+        if (this.hasEraEnded()) {
+            await this.processEraEnd();
+            return;
         }
+        await this._showGameOver(reasonMsg + "\n\n野望は潰え、歴史の波に飲まれた。\n\nここに、ひとつの物語が幕を閉じた……");
+    }
+
+    // 天下統一に至らぬまま時代が終わった場合。通常の滅亡とは結末を分け、演出は共有します。
+    async processEraEnd() {
+        await this._showGameOver("天下を統べる者が現れぬまま、\n長い年月が過ぎ去った。\n\n戦国武将たちの時代は終わりを告げ、\n彼らの名は歴史の波に埋もれていった……\n\nここに、ひとつの物語が幕を閉じた――");
+    }
+
+    async _showGameOver(message) {
+        if (!this.game.ui) return;
+        if (window.AudioManager && typeof window.AudioManager.stopBGM === 'function') {
+            window.AudioManager.stopBGM();
+        }
+        await this.playEndingSequence("終焉", message, false);
     }
 
     // ★エンディングやゲームオーバーの演出（アニメーションの順番）を管理する魔法です
@@ -163,8 +171,26 @@ class EndingSystem {
         }
     }
 
+    // 月末チェックと滅亡時の即時終了から共通参照する、戦国の時代の終了条件。
+    hasEraEnded() {
+        if (this.game.year >= GameConfig.Ending.EndYear) return true;
+        // 未登場でも今後登場する武将がいる間は終わらせません（9999年は登場しないダミー）。
+        return !this.game.bushos.some(b =>
+            !b.isAutoLeader && (
+                window.LifeStatusRules.isPresent(b) ||
+                (window.LifeStatusRules.isUnborn(b) && b.startYear > this.game.year && b.startYear < 9999)
+            )
+        );
+    }
+
     // ★毎月の終わりなどに呼ばれる、クリア・ゲームオーバーの総合チェックです
     async checkEnding() {
+        // 観戦中も同じ条件を使い、時代終了は通常の天下統一より先に判定します。
+        if (this.hasEraEnded()) {
+            await this.processEraEnd();
+            return true;
+        }
+
         // 生き残っている大名家を集めます
         const aliveClans = this.game.clans.filter(c => c.id !== 0 && !c.isDestroyed);
         // プレイヤーがその中にいるか確認します

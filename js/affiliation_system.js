@@ -85,6 +85,19 @@ class AffiliationSystem {
     }
 
     /**
+     * 正規の所属変更で人質が預かり家を離れる場合、担保関係の終了だけ外交担当へ委譲。
+     * 人質を最初に送る時は元家から預かり家への移籍なので対象外とする。
+     * 所属更新・妻の追従は引き続きこの部署で一度だけ行う。
+     */
+    _settleDepartingHostage(busho, nextClanId) {
+        if (!busho || busho.isHostage !== true) return;
+        const currentClanId = Number(busho.clan) || 0;
+        if (currentClanId <= 0 || currentClanId === Number(nextClanId)
+            || currentClanId === Number(busho.originalClanId)) return;
+        this.game.diplomacyManager?.settleHostageOnAffiliationDeparture(busho);
+    }
+
+    /**
      * 低レベル配置書換API。城内名簿の同期まで必要な通常移動では moveCastle を使用してください。
      * busho.castleId の直接代入はこのクラス以外では行いません。
      */
@@ -137,6 +150,7 @@ class AffiliationSystem {
      */
     joinClan(busho, newClanId, newCastleId, forceLoyalty = null, keepAchievement = false) {
         const oldClanId = busho.clan;
+        this._settleDepartingHostage(busho, newClanId);
 
         // 1. 今いるお城から出ます
         this.leaveCastle(busho);
@@ -214,6 +228,7 @@ class AffiliationSystem {
         }
 
         const oldClanId = busho.clan;
+        this._settleDepartingHostage(busho, 0);
 
         // ★後で「元々の家臣」と判定できるように、所属をメモしておきます
         busho._lastClanId = oldClanId;
@@ -648,6 +663,9 @@ class AffiliationSystem {
         const oldClanId = Number(busho.clan) || 0;
         const nextClanId = Number(newClanId) || 0;
         if (oldClanId === nextClanId) return oldClanId;
+        // 城主の引抜・臣従・史実イベントなども通る正規の一括移籍入口。
+        // 預かり家から離れた人質の担保だけ、通常移籍と同じ外交窓口で終了する。
+        this._settleDepartingHostage(busho, nextClanId);
         this.resetFactionData(busho);
         this.setClanIdRaw(busho, nextClanId);
         if (syncSpouses) this.syncSpousesForClanChange(busho, oldClanId, nextClanId, { refreshDiplomacy: true });

@@ -1315,7 +1315,7 @@ class DiplomacyManager {
     
     /**
      * 外交人質が終了したときの共通窓口。
-     * 「脱走」「通常捕虜化」「実家滅亡」の違いは引渡し先だけで、
+     * 「脱走」「通常捕虜化」「滅亡」「死亡」「預かり家離脱」の結果を同一窓口で扱い、
      * 人質印の解除と、所属変更に伴う妻・姫名簿の同期はここで一度だけ行う。
      * 通常捕虜化は後続の捕虜処遇が参照する拘束先の拠点を維持する。
      */
@@ -1326,8 +1326,8 @@ class DiplomacyManager {
         hostage.isHostage = false;
         hostage.originalClanId = undefined;
 
-        if (outcome === 'origin_extinct' || outcome === 'holder_extinct' || outcome === 'died') {
-            // 実家・預かり家の滅亡や本人死亡では担保だけ解除する。
+        if (outcome === 'origin_extinct' || outcome === 'holder_extinct' || outcome === 'died' || outcome === 'left_holder') {
+            // 滅亡・死亡・預かり家からの通常離脱では担保だけ解除する。
             // 武将・妻の所属と未亡人処理は各結果の専門システムへ委譲する。
             const originClan = this.game.getClan(originClanId);
             const holderClan = this.game.getClan(holderClanId);
@@ -1358,6 +1358,12 @@ class DiplomacyManager {
             this.game.affiliationSystem.moveCastle(hostage, escapeCastle.id);
         }
         return hostage;
+    }
+
+    /** 預かり家から通常の所属離脱が生じたときは担保だけ終了する。所属・妻は人事担当へ委譲。 */
+    settleHostageOnAffiliationDeparture(hostage) {
+        if (!hostage || hostage.isHostage !== true) return;
+        this._finishHostage(hostage, 'left_holder');
     }
 
     /** 人質本人の死亡では担保関係だけを終え、死去・未亡人処理はLifeSystemに任せる。 */

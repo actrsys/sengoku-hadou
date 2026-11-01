@@ -1,0 +1,31 @@
+戦国覇道 r742 継続監査 A-068
+基準：r741 完全版ZIP（601ファイル）
+対象：城主の引抜・臣従・史実イベント等の一括移籍時、外交人質の担保終了
+
+【通常進行における再現】
+- 1560年「桶狭間」実行用BINの武田義信（ID1002003）・妻の嶺（姫ID10）を利用。
+- 正規 DiplomacyManager.applyHostageData() で武田家（ID3）から北条家（ID4）へ人質を預け、妻も北条家へ移動する。
+- 預かり家で城主に任命された人質は、StrategySystem.isRegularClanStrategyTarget() において通常引抜候補となる（本人は大名ではなく諸勢力所属でもない）。
+- 城主の引抜が成功すると StrategySystem.applyHeadhuntEffect() が拠点所有者を変更し、AffiliationSystem.transferClanRaw() で第三家へ移籍させる。
+- r741では旧預かり家の外へ移っても isHostage=true、originalClanId=3、武田家・北条家双方のhostageIdsに本人IDが残留した。
+- 同一入口は外交の臣従、月初の臣従申し出、歴史イベント吸収、反乱等でも使用される。
+- r741を無改修のまま実データ＋正規外交受入＋城主引抜の結合テストを追加して、既存1,218件成功・追加1件失敗を確認。
+
+【最小改修】
+- 所属変更責務の正本 AffiliationSystem.transferClanRaw() で実際に別家へ移籍する直前に、既存 _settleDepartingHostage() を呼ぶ。
+- 外交の担保解除は既存 DiplomacyManager.settleHostageOnAffiliationDeparture() → _finishHostage() を再利用する。
+- 人質の最初の受入（元家→預かり家）、同家IDへの転属要求、非人質の転属では解除されない。
+- 本人の異動・派閥リセット・妻の所属と名簿・外交婚姻再評価は transferClanRaw() の従来処理へ委譲し、重複処理を追加しない。
+- 戦闘・引抜確率・外交状態・セーブ・管理Excel/BIN・画像・既存ゲームオーバー仕様は変更しない。
+
+【検証】
+- 正規人質受入→預かり家での城主役職→城主引抜の実計略実装→第三家移籍の結合回帰で、人質印・元家記録・双方担保名簿解除、妻の所属と拠点所有者移転を確認。
+- 預かり家IDが変わらない transferClanRaw() は担保を維持する。
+- Node回帰 1,219件成功、0件失敗。
+- 実ブラウザのPC/スマホ表示回帰成功。管理用Excel・BIN配布検査、全出力フィールド照合、シミュレーション4件すべて成功。
+- 長期自然プレイ全分岐の再現、実画面の全イベント遷移は未実施。
+
+【変更ファイル】
+追加：docs/audits/r742_城主引抜等の一括移籍時の人質担保解除監査記録.txt
+更新：ARCHITECTURE.md / docs/audits/README.md / js/affiliation_system.js / tests/run_tests.js
+削除：なし

@@ -1,0 +1,24 @@
+戦国覇道 r740 継続監査 A-067
+基準：r739 完全版ZIP（599ファイル）
+対象：人質成立後、預かり家からの通常所属離脱時の外交担保・姫名簿整合性
+
+【再現と通常進行への到達性】
+- 1560年「桶狭間」の武田義信（ID1002003）と妻・嶺（姫ID10）を実行用マスター・シナリオから採用。
+- DiplomacyManager.applyHostageData() で武田家（ID3）から北条家（ID4）へ人質を送る。妻も北条家へ追従する。
+- 北条家をプレイヤーにすると、通常人事の追放候補資格 PersonnelRules.canBanish() が義信で成立する。
+- 正規 AffiliationSystem.becomeRonin(…, 'banish') を実行すると、r739では義信と妻が無所属になる一方、isHostage・originalClanIdと双方のhostageIdsが残留する。
+- 月初の下野も同じbecomeRoninを利用する。正規のjoinClanによる第三家移籍も同種の状態不整合となる。
+- 追加結合回帰はr739で既存1214件成功・追加1件失敗を再現。
+
+【設計と改修】
+- AffiliationSystem の正規所属変更入口 joinClan / becomeRonin が共通の _settleDepartingHostage() を使用。
+- 人質成立時は元家から預かり家へ移動するため、人質印・元所属情報を保持し終了処理は行わない。
+- 預かり家から別所属へ実際に移る時に限り、外交担当 DiplomacyManager.settleHostageOnAffiliationDeparture() に委譲。
+- 既存の _finishHostage() の担保のみ解除する分岐で isHostage・originalClanId・双方向hostageIdsを解除。
+- 本人の所属・活動状態・妻の所属・姫名簿・必要時の婚姻外交の更新は従来のAffiliationSystemに任せる。
+- 死亡・滅亡・断交の既存の人質終了、候補資格、セーブ形式、管理Excel/BIN、画像は不変。
+- 人質以外の通常所属変更ではこの処理は実行されない。低レベル所属Setterの責務も変更しない。
+
+【検証と限界】
+- r740の追加回帰：追放・月初下野相当・第三家へのjoinClanで人質印・元家ID・双方名簿の解消を確認。受入時には人質状態維持を確認。
+- 追加回帰は実データと製品の正規所属変更の結合試験であり、全画面操作の自然プレイや全イベント分岐の網羅試験ではない。
