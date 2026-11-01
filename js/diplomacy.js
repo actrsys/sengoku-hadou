@@ -3134,8 +3134,9 @@ class DiplomacyManager {
         const myDaimyo = this.game.getClanDaimyo(targetClanId);
         const enemyDaimyo = this.game.getClanDaimyo(doer.clan);
         
-        let myCastle = null;
-        if (myDaimyo) myCastle = this.game.getCastle(myDaimyo.castleId);
+        // プレイヤー本拠の正本を利用する。拠点一覧の先頭とは限らない。
+        let myCastle = this.game.getDaimyoHomeCastle?.(targetClanId) || null;
+        if (!myCastle && myDaimyo) myCastle = this.game.getCastle(myDaimyo.castleId);
         if (!myCastle) myCastle = this.game.getClanCastles(targetClanId)[0];
         const proposalOrder = myCastle ? this._captureDiplomacyOrder(doer, myCastle, type) : null;
         const isProposalCurrent = () => this._isDiplomacyOrderCurrent(proposalOrder);
@@ -3243,10 +3244,12 @@ class DiplomacyManager {
                 // AI外交計画で金額を決めた後も、会話中に保有金や所属拠点が変わり得る。
                 // 贈答金は了承時に一度だけ確定し、不足時に受取側へ金を生成しない。
                 const doerCastle = this.game.getCastle(doer.castleId);
-                const myCastleObj = this.game.getClanCastles(targetClanId)[0];
+                // 使者との面会先に選んだプレイヤー大名の居城をそのまま受領先とする。
+                // 拠点一覧の先頭を再検索すると、複数拠点を持つ家で別拠点へ入金される。
                 const giftGold = Number(gold);
                 if (!doerCastle || Number(doerCastle.ownerClan) !== Number(doer.clan)
-                    || !myCastleObj || !Number.isFinite(giftGold) || giftGold < 0
+                    || !myCastle || Number(myCastle.ownerClan) !== Number(targetClanId)
+                    || !Number.isFinite(giftGold) || giftGold < 0
                     || Number(doerCastle.gold) < giftGold) {
                     this.game.ui.showResultModal('親善の金を用意できなくなったため、贈答は成立しませんでした。', () => {
                         this._scheduleProposalCompletion(onComplete, 100);
@@ -3254,7 +3257,7 @@ class DiplomacyManager {
                     return;
                 }
                 doerCastle.gold -= giftGold;
-                myCastleObj.gold = Math.min(GameConfig.Limits.CastleStock, myCastleObj.gold + giftGold);
+                myCastle.gold = Math.min(GameConfig.Limits.CastleStock, myCastle.gold + giftGold);
             }
             this.calcDiplomacyExp(doer, type, true, true);
 

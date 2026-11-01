@@ -34294,6 +34294,38 @@ test('A-091 AIからプレイヤーへの和睦圧力は月初計画から使者
     assert.strictEqual(receivedScore, plan.score, '月初計画で計算した圧力を同じ値で受け渡す');
 });
 
+
+// A-092: AIからプレイヤーへ親善を申し込む場合、プレイヤー大名がいる拠点を
+// 会話の受け手・受領先の双方で同一に扱う。複数拠点の配列先頭は本拠とは限らない。
+test('A-092 AI親善の贈答金は先頭拠点でなくプレイヤー大名の居城へ届く', () => {
+    const daimyoCastle = { id: 21, ownerClan: 2, gold: 400 };
+    // 正規の会話開始から受諾までを、複数拠点を保有するプレイヤーで確認する。
+    const accepted = createR764AIGoodwillProposalCase();
+    accepted.husband.castleId = daimyoCastle.id;
+    const acceptedGetCastle = accepted.game.getCastle.bind(accepted.game);
+    accepted.game.getCastle = id => Number(id) === daimyoCastle.id ? daimyoCastle : acceptedGetCastle(id);
+    accepted.game.getClanCastles = id => Number(id) === 2 ? [accepted.target, daimyoCastle] : [accepted.home];
+    let homeLookups = 0;
+    accepted.game.getDaimyoHomeCastle = id => {
+        assert.strictEqual(Number(id), 2);
+        homeLookups++;
+        return daimyoCastle;
+    };
+    // 別のテスト用の会話ハンドラを用い、通常会話開始と同じ流れで受け取る。
+    let accept;
+    accepted.game.ui.showDialog = (_text, _a, onAccept, _onReject, opts) => {
+        if (opts?.okText === '受け取る') accept = onAccept;
+        else if (typeof onAccept === 'function') onAccept();
+    };
+    accepted.diplomacy.proposeDiplomacyToPlayer(accepted.doer, 2, 'goodwill', 100, () => {});
+    assert.strictEqual(typeof accept, 'function');
+    accept();
+    assert.strictEqual(homeLookups, 1, 'プレイヤー本拠の正規問い合わせを一度だけ使用する');
+    assert.strictEqual(accepted.home.gold, 700, '使者の拠点での支払は100金');
+    assert.strictEqual(daimyoCastle.gold, 500, 'プレイヤー大名の居城に100金が届く');
+    assert.strictEqual(accepted.target.gold, 50, '別拠点には誤入金しない');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
