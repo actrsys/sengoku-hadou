@@ -18757,7 +18757,14 @@ test('r470 非城主の派閥主を擁立した独立でも遠方派閥武将が
         updateCastleLord() {},
         affiliationSystem: {
             transferClanRaw(b, clanId) { b.clan = clanId; },
-            setCastleIdRaw(b, castleId) { b.castleId = castleId; }
+            moveCastleGroup(movers, castleId) {
+                movers.forEach(b => {
+                    const previous = game.getCastle(b.castleId);
+                    if (previous) previous.samuraiIds = previous.samuraiIds.filter(id => id !== b.id);
+                    b.castleId = castleId;
+                    game.getCastle(castleId).samuraiIds.push(b.id);
+                });
+            }
         }
     };
     const sys = new Independence(game);
@@ -28423,6 +28430,7 @@ test('r629 独立時に遠方派閥武将が別城から合流すると滞在履
     const fixedMath = Object.create(Math); fixedMath.random = () => 0;
     const ctx = createContext({ Math: fixedMath,
         BushoStatusRules: { isActive: b => b.status === 'active' },
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
         PersonnelRules: { calcAffinityDiff: () => 0 } });
     for (const file of ['js/affiliation_system.js', 'js/faction_system.js', 'js/independence_system.js']) loadScript(ctx, file);
     const Aff = vm.runInContext('AffiliationSystem', ctx);
@@ -28442,6 +28450,8 @@ test('r629 独立時に遠方派閥武将が別城から合流すると滞在履
         getCastle: id => [home, origin].find(c => c.id === Number(id)) || null,
         getClanBushos: clanId => people.filter(b => b.clan === Number(clanId)),
         getBusho: id => people.find(b => b.id === Number(id)),
+        getClanDaimyo: () => null,
+        getCastleBushos: id => (game.getCastle(id)?.samuraiIds || []).map(bid => game.getBusho(bid)).filter(Boolean),
         updateCastleLord() {}, ui: { log() {} } };
     game.factionSystem = new Fac(game);
     game.affiliationSystem = new Aff(game);
@@ -34702,6 +34712,72 @@ test('A-099 諸勢力蜂起で同じ拠点から退避する家臣を途中で�
     assert.strictEqual(destination.castellanId, clanRow.leaderId, '到着した大名が正式城主');
     assert.strictEqual(events.filter(message => message.includes('【城主任命】')).length, 0,
         '退避途中だけ存在した仮城主の任命を歴史に記録しない');
+});
+
+
+// r774: 独立時の遠方同派閥家臣は、城主不在の旧城から連続合流しても
+// 一括移動完了後に城主を確定し、旧城に移動済みの仮城主を残さない。
+test('r774 独立時の同派閥複数合流で途中の城主任命を記録せず旧城の城主IDを整合させる', () => {
+    const random = Object.create(Math); random.random = () => 0;
+    const ctx = createContext({ Math: random,
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
+        PersonnelRules: { calcAffinityDiff: (a, b) => Math.min(Math.abs(a - b), 100 - Math.abs(a - b)) }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/independence_system.js');
+    const Aff = vm.runInContext('AffiliationSystem', ctx);
+    const Independence = vm.runInContext('IndependenceSystem', ctx);
+    const home = { id: 10, name: '新大名居城', ownerClan: 3, legionId: 0,
+        castellanId: 19, samuraiIds: [19] };
+    const origin = { id: 11, name: '旧勢力の城主不在拠点', ownerClan: 2, legionId: 0,
+        castellanId: 0, samuraiIds: [22, 23] };
+    const oldHome = { id: 12, name: '旧大名居城', ownerClan: 2, legionId: 0,
+        castellanId: 21, samuraiIds: [21] };
+    const character = (id, name, clan, castleId, extra = {}) => ({
+        id, name, fullName: name, clan, castleId, status: 'active',
+        isDaimyo: false, isCastellan: false, isCommander: false, isGunshi: false,
+        isFactionLeader: false, factionId: 5, ambition: 90, duty: 30,
+        loyalty: 20, affinity: 30, achievementTotal: 100,
+        leadership: 60, strength: 60, intelligence: 60, politics: 60, diplomacy: 60,
+        charm: 60, ...extra
+    });
+    const newDaimyo = character(19, '新大名', 3, 10, { isDaimyo: true, isCastellan: true, loyalty: 100 });
+    const oldDaimyo = character(21, '旧大名', 2, 12, { isDaimyo: true, isCastellan: true, factionId: 1, affinity: 80 });
+    const first = character(22, '遠方家臣甲', 2, 11);
+    const second = character(23, '遠方家臣乙', 2, 11);
+    const castles = [home, origin, oldHome], bushos = [newDaimyo, oldDaimyo, first, second];
+    const events = [];
+    const game = {
+        castles, bushos, legions: [], phase: 'game', playerClanId: 99, year: 1570, month: 6,
+        getBusho: id => bushos.find(b => b.id === Number(id)),
+        getCastle: id => castles.find(c => c.id === Number(id)),
+        getClan: id => ({ id, name: id === 3 ? '新家' : '旧家' }),
+        getClanDaimyo: id => bushos.find(b => b.clan === id && b.isDaimyo),
+        getClanBushos: id => bushos.filter(b => b.clan === Number(id)),
+        getCastleBushos: id => {
+            const castle = castles.find(c => c.id === Number(id));
+            return castle ? castle.samuraiIds.map(id => bushos.find(b => b.id === Number(id))).filter(Boolean) : [];
+        },
+        historySystem: { record: message => events.push(message) },
+        ui: { log() {} },
+        factionSystem: { handleMove() {} }
+    };
+    game.affiliationSystem = new Aff(game);
+    game.affiliationSystem.updateUI = () => {};
+    game.updateCastleLord = c => game.affiliationSystem.updateCastleLord(c);
+    const sys = new Independence(game);
+    sys.calcDaimyoPowerBonus = () => 0;
+    sys._logIndependence = () => {};
+    // 同一派閥の家臣が、城主不在を許容する自領拠点から新大名へ呼応する。
+    assert.strictEqual(origin.castellanId, 0);
+    sys.resolveDistantFactionMembers(newDaimyo, 2, 3, oldDaimyo, 5);
+    assert.ok([first, second].every(b => b.castleId === 10 && b.clan === 3), '両家臣が新大名へ合流する');
+    assert.strictEqual(origin.castellanId, 0, '旧拠点に移動済みの城主IDを残さない');
+    assert.deepStrictEqual(origin.samuraiIds, [], '旧拠点名簿は空になる');
+    assert.deepStrictEqual(home.samuraiIds, [19, 22, 23], '合流先名簿に全員を一度ずつ載せる');
+    assert.strictEqual(events.filter(msg => msg.includes('【城主任命】')).length, 0,
+        '移動途中だけ成立した仮城主任命を履歴に記録しない');
 });
 
 Promise.all(pendingTests).then(() => {

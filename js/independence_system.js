@@ -837,25 +837,27 @@ class IndependenceSystem {
         const mainCastle = this.game.getCastle(newDaimyo.castleId);
         if (!mainCastle || Number(mainCastle.ownerClan) !== Number(newClanId)) return;
 
+        // 同一の独立に呼応した遠方家臣は、移動途中に城主を選び直さない。
+        // 資格判定と追随確率は従来の各人ごとの計算を維持する。
+        const joiners = [];
         potential.forEach(busho => {
-            // ★修正：記憶しておいた元の派閥IDを渡します
             const { joinScore, stayScore } = this.calculateLoyaltyScores(busho, newDaimyo, oldDaimyo, leaderOriginalFactionId);
-            if (joinScore > stayScore && Math.random() * 300 < joinScore) {
-                const oldCastle = this.game.getCastle(busho.castleId);
-                if (oldCastle) {
-                    oldCastle.samuraiIds = oldCastle.samuraiIds.filter(id => id !== busho.id);
-                    this.game.updateCastleLord(oldCastle);
-                }
-                // ★大名家が変わるので功績半分！
-                if (busho.clan !== 0 && busho.clan !== newClanId) {
-                    busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
-                }
-                this.game.affiliationSystem.transferClanRaw(busho, newClanId, { syncSpouses: true });
-                this.game.affiliationSystem.setCastleIdRaw(busho, mainCastle.id, { recordStayHistory: true });
-                busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
-                mainCastle.samuraiIds.push(busho.id);
-                this._logIndependence(`  -> ${busho.name}が拠点を脱出し、${newDaimyo.name}の元へ駆けつけました！`, [oldClanId, newClanId]);
+            if (joinScore > stayScore && Math.random() * 300 < joinScore) joiners.push(busho);
+        });
+        if (joiners.length === 0) return;
+
+        // 所属と妻の同期は従来の共通窓口に任せる。移動の前に全員の所属を確定し、
+        // 所在・在城履歴・城主更新は AffiliationSystem の一括移動に任せる。
+        joiners.forEach(busho => {
+            if (busho.clan !== 0 && busho.clan !== newClanId) {
+                busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
             }
+            this.game.affiliationSystem.transferClanRaw(busho, newClanId, { syncSpouses: true });
+            busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
+        });
+        this.game.affiliationSystem.moveCastleGroup(joiners, mainCastle.id);
+        joiners.forEach(busho => {
+            this._logIndependence(`  -> ${busho.name}が拠点を脱出し、${newDaimyo.name}の元へ駆けつけました！`, [oldClanId, newClanId]);
         });
     }
 
