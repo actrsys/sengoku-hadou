@@ -2170,14 +2170,22 @@ class DiplomacyManager {
         }
     }
     
-    /**
-     * ★新設：外交の結果表示と、それに伴う画面の更新をひとまとめに行う魔法です！
-     */
+    // 外交条件の成立文を、一度だけ履歴・結果へ合成する。
+    // 履行済み条件の文面は各条件の正本（_applyNegotiatedConditionData）から受け取る。
+    _formatAgreementHistory(baseText, fulfilledConditionText = '') {
+        const detail = String(fulfilledConditionText || '').trim();
+        if (!detail) return baseText;
+        // 無条件成立時の既存文面は変えず、条件が付くときだけ文末を整える。
+        const separator = /[。.!?！？]$/.test(baseText) ? ' ' : '。 ';
+        return `${baseText}${separator}${detail}`;
+    }
+
     _recordDiplomacyHistory(text, clanIds = []) {
         if (!text || !this.game.historySystem) return;
         this.game.historySystem.record(text, { clanIds, category: 'diplomacy', inferCurrentTurn: false });
     }
 
+    /** 外交の結果記録と、必要な結果モーダルへの引き渡しを担当する。 */
     showDiplomacyResult(doerClanId, isPlayerInvolved, msg, logMsg = "", aiMsg = "", onClose = null, relatedClanIds = null, options = {}) {
         const historyClanIds = Array.isArray(relatedClanIds) && relatedClanIds.length > 0 ? relatedClanIds : [doerClanId];
         const historyText = logMsg || aiMsg;
@@ -2436,26 +2444,19 @@ class DiplomacyManager {
                     || !this._isNegotiatedConditionCurrent(conditionType, conditionData, doer.clan, targetClanId)) return;
                 this.applyDominationData(targetClanId, doer.clan);
 
-                let conditionMsg = "";
-                if (conditionType === 'marriage') {
-                    const princess = conditionData.princess;
-                    const busho = conditionData.busho;
-                    this._applyMarriageLinkData(
-                        princess.id, busho.id, doer.clan, targetClanId,
-                        { isMainWife: false, boostSentiment: true }
-                    );
-                    conditionMsg = `\n${princess.name}が${busho.name}の側室として迎えられました。`;
-                } else if (conditionType === 'hostage') {
-                    this.applyHostageData(conditionData.busho.id, doer.clan, targetClanId);
-                    conditionMsg = `\n${conditionData.busho.name}を人質として差し出しました。`;
-                } else if (conditionType === 'castle') {
-                    this.applyCastleCessionData(conditionData.castle.id, doer.clan, targetClanId);
-                    conditionMsg = `\n${conditionData.castle.name}を割譲しました。`;
-                }
+                const conditionMsg = this._applyNegotiatedConditionData(
+                    conditionType, conditionData, doer.clan, targetClanId, { agreementType: 'subordinate' }
+                );
 
                 msg = `${this.game.getClan(targetClanId).name}に従属しました！${conditionMsg}`;
-                if (!isPlayerInvolved) aiMsg = `${targetClanName}が${doerClanName}を支配下に置きました！`;
-                else logMsg = `${doerClanName}が${targetClanName}に従属しました`;
+                const agreementHistory = this._formatAgreementHistory(
+                    isPlayerInvolved
+                        ? `${doerClanName}が${targetClanName}に従属しました`
+                        : `${targetClanName}が${doerClanName}を支配下に置きました！`,
+                    conditionMsg
+                );
+                if (!isPlayerInvolved) aiMsg = agreementHistory;
+                else logMsg = agreementHistory;
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 30);
 
@@ -2520,16 +2521,19 @@ class DiplomacyManager {
                 if (relationA) relationA.sentiment = 50;
                 if (relationB) relationB.sentiment = 50;
 
-                const conditionMsg = this._applyTruceConditionData(
+                const conditionMsg = this._applyNegotiatedConditionData(
                     conditionType, conditionData, doer.clan, targetClanId, { receiverPerspective: false }
                 );
                 
                 msg = `${this.game.getClan(targetClanId).name}との和睦が成立しました！${conditionMsg}`;
-                // 和睦成立時の履行内容は、結果本文だけでなく全国・自国履歴にも残す。
-                // 縁組・人質・拠点割譲の文面は実行結果の共通窓口を正本とし、重複生成しない。
-                const conditionHistory = conditionMsg ? ` ${conditionMsg.trim()}` : '';
-                if (!isPlayerInvolved) aiMsg = `${doerClanName}と${targetClanName}が和睦しました。${conditionHistory}`;
-                else logMsg = `${doerClanName}が${targetClanName}と和睦しました${conditionHistory}`;
+                const agreementHistory = this._formatAgreementHistory(
+                    isPlayerInvolved
+                        ? `${doerClanName}が${targetClanName}と和睦しました`
+                        : `${doerClanName}と${targetClanName}が和睦しました。`,
+                    conditionMsg
+                );
+                if (!isPlayerInvolved) aiMsg = agreementHistory;
+                else logMsg = agreementHistory;
                 
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 30);
@@ -3379,14 +3383,15 @@ class DiplomacyManager {
                 if (relationA) relationA.sentiment = 50;
                 if (relationB) relationB.sentiment = 50;
 
-                const conditionMsg = this._applyTruceConditionData(
+                const conditionMsg = this._applyNegotiatedConditionData(
                     selectedOption.type, selectedOption, doer.clan, targetClanId, { receiverPerspective: true }
                 );
                 this.calcDiplomacyExp(doer, type, true, true);
-                // 履行条件の正本は結果画面と同じ _applyTruceConditionData() の返却文。
-                // AI→プレイヤーの外交履歴でも縁組・人質・拠点割譲の内容を欠落させない。
-                const conditionHistory = conditionMsg ? ` ${conditionMsg.trim()}` : '';
-                this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}と条件付きで和睦しました。${conditionHistory}`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
+                const historyText = this._formatAgreementHistory(
+                    `【外交】${targetClan.name}は${doerClan.name}と条件付きで和睦しました。`,
+                    conditionMsg
+                );
+                this.game.ui.log(historyText, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name}と和睦しました。${conditionMsg}`, () => {
                     this._scheduleProposalCompletion(onComplete, 100);
                 });
@@ -4427,43 +4432,42 @@ class DiplomacyManager {
     }
 
     /**
-     * 和睦条件の実データ反映を一元化する。
-     * requestClanId が条件を差し出す側、targetClanId が受け取る側。
+     * 従属・和睦の婚姻／人質／拠点割譲を共通の履行窓口で反映する。
+     * requestClanId が差し出す側、targetClanId が受け取る側。
+     * 婚姻の友好度補正と条件文だけは外交契約により異なるため明示指定する。
+     * 候補資格は _isNegotiatedConditionCurrent()、外交関係そのものは各交渉の担当が確定する。
      */
-    _applyTruceConditionData(conditionType, conditionData, requestClanId, targetClanId, { receiverPerspective = false } = {}) {
+    _applyNegotiatedConditionData(conditionType, conditionData, requestClanId, targetClanId,
+        { agreementType = 'truce', receiverPerspective = false } = {}) {
         if (!conditionType || conditionType === 'none' || !conditionData) return '';
-        const requestClan = this.game.getClan(requestClanId);
-        const relationA = this.getDiplomacyData(requestClanId, targetClanId);
-        const relationB = this.getDiplomacyData(targetClanId, requestClanId);
+        const isTruce = agreementType === 'truce';
 
         if (conditionType === 'marriage') {
             const princess = conditionData.princess;
             const busho = conditionData.busho;
             if (!princess || !busho) return '';
-            // 和睦条件としての縁組は通常の婚姻外交とは性格が異なり、
-            // 人質・城割譲と同じく「和睦の担保」として扱う。
-            // 婚姻関係そのものは成立させるが、通常婚姻の大幅な友好度上昇は適用しない。
             this._applyMarriageLinkData(
                 princess.id, busho.id, requestClanId, targetClanId,
-                { isMainWife: false, boostSentiment: false }
+                { isMainWife: false, boostSentiment: !isTruce }
             );
-            return `\n${princess.name}と${busho.name}の縁組が結ばれました。`;
+            return isTruce
+                ? `\n${princess.name}と${busho.name}の縁組が結ばれました。`
+                : `\n${princess.name}が${busho.name}の側室として迎えられました。`;
         }
-
         if (conditionType === 'hostage' && conditionData.busho) {
             this.applyHostageData(conditionData.busho.id, requestClanId, targetClanId);
-            return receiverPerspective
-                ? `\n${conditionData.busho.name}を和睦の証として預かりました。`
-                : `\n${conditionData.busho.name}を和睦の証として差し出しました。`;
+            return isTruce
+                ? (receiverPerspective
+                    ? `\n${conditionData.busho.name}を和睦の証として預かりました。`
+                    : `\n${conditionData.busho.name}を和睦の証として差し出しました。`)
+                : `\n${conditionData.busho.name}を人質として差し出しました。`;
         }
-
         if (conditionType === 'castle' && conditionData.castle) {
             this.applyCastleCessionData(conditionData.castle.id, requestClanId, targetClanId);
-            return receiverPerspective
+            return isTruce && receiverPerspective
                 ? `\n${conditionData.castle.name}を受け取りました。`
                 : `\n${conditionData.castle.name}を割譲しました。`;
         }
-
         return '';
     }
 
