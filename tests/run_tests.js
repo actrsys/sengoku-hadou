@@ -26779,9 +26779,9 @@ test('A-080 プレイヤーがAI和睦の人質条件を受けた履歴に人質
     accept.onClick();
     assert.strictEqual(s.statusChanges, 1, '成立した条件付き和睦を確定する');
     assert.strictEqual(s.conditionChanges, 1, '条件の履行は既存共通入口を一度だけ通る');
-    assert.ok(results.some(m => m.includes('一門を和睦の証として預かりました')), '結果画面に履行条件が表示される');
+    assert.ok(results.some(m => m.includes('甲家の一門が和睦の証として乙家へ人質に送られました')), '結果画面に履行条件が表示される');
     assert.strictEqual(logs.length, 1, '従来の履歴窓口から一件だけ記録される');
-    assert.ok(logs[0].includes('一門を和睦の証として預かりました'), '履歴にも成立条件を記録');
+    assert.ok(logs[0].includes('甲家の一門が和睦の証として乙家へ人質に送られました'), '履歴にも成立条件を記録');
 });
 
 // A-081: プレイヤーの従属願で相手が示した条件を受け入れた時、
@@ -26814,10 +26814,10 @@ test('A-081 従属願の人質条件は成立後の履歴にも人質名が残�
     assert.strictEqual(s.dominationChanges, 1, '従属の成立は一度');
     assert.strictEqual(s.conditionChanges, 1, '人質処理は一度');
     assert.strictEqual(s.doer.isActionDone, true);
-    assert(result.length === 1 && result[0].includes('一門を人質として差し出しました'), '結果画面に人質の履行が表示される');
+    assert(result.length === 1 && result[0].includes('甲家の一門が乙家へ人質として送られました'), '結果画面に人質の履行が表示される');
     assert.strictEqual(history.length, 1, '履歴は一件');
     assert.deepStrictEqual(Array.from(history[0].clanIds), [1, 2], '履歴の両当事者を維持');
-    assert(history[0].message.includes('一門を人質として差し出しました'), '履歴に成立条件を記録する');
+    assert(history[0].message.includes('甲家の一門が乙家へ人質として送られました'), '履歴に成立条件を記録する');
 });
 
 // r583: プレイヤーが選択した全武将は、内政上限に途中で到達しても
@@ -33724,8 +33724,9 @@ test('A-079 AI条件付き和睦の婚姻成立は当事者と姫・婿の内容
     assert.strictEqual(dm.getRelation(1, 2).status, '和睦');
     assert.strictEqual(entries.length, 1, '外交履歴は一件に集約');
     assert.deepStrictEqual(Array.from(entries[0].meta.clanIds), [1, 2]);
-    assert.ok(entries[0].text.includes('架空姫') && entries[0].text.includes('相手一門'), '全国履歴で婚姻当事者を確認できる');
-    assert.ok(dialogs[0]?.includes('架空姫'), 'AI外交の結果画面にも成立条件が表示される');
+    const marriageDetail = '申込家の架空姫が相手家の相手一門へ嫁ぎ、縁組が成立しました。';
+    assert.ok(entries[0].text.includes(marriageDetail), '全国履歴は姫の出身家と嫁ぎ先を明示する');
+    assert.ok(dialogs[0]?.includes(marriageDetail), 'AI外交の結果画面も同一の婚姻成立文を表示する');
 });
 
 
@@ -33737,7 +33738,7 @@ test('A-082 従属と和睦の三条件は外交の同一履行窓口を通り�
     loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/diplomacy.js');
     const Manager = vm.runInContext('DiplomacyManager', ctx);
-    const game = {};
+    const game = { getClan: id => ({ name: Number(id) === 1 ? '甲家' : '乙家' }) };
     const dm = new Manager(game);
     assert.strictEqual(typeof dm._applyNegotiatedConditionData, 'function', '履行の共通窓口が存在する');
     const princess = { id: 8, name: '姫' };
@@ -33763,14 +33764,14 @@ test('A-082 従属と和睦の三条件は外交の同一履行窓口を通り�
         }
     }
     assert.deepStrictEqual(actual.subordinate, [
-        '\n姫が婿の側室として迎えられました。',
-        '\n一門を人質として差し出しました。',
-        '\n境城を割譲しました。'
+        '\n甲家の姫が乙家の婿の側室として迎えられました。',
+        '\n甲家の一門が乙家へ人質として送られました。',
+        '\n甲家領の境城が割譲され、乙家領となりました。'
     ]);
     assert.deepStrictEqual(actual.truce, [
-        '\n姫と婿の縁組が結ばれました。',
-        '\n一門を和睦の証として差し出しました。',
-        '\n境城を割譲しました。'
+        '\n甲家の姫が乙家の婿へ嫁ぎ、縁組が成立しました。',
+        '\n甲家の一門が和睦の証として乙家へ人質に送られました。',
+        '\n甲家領の境城が割譲され、乙家領となりました。'
     ]);
     const marriages = calls.filter(call => call[0] === 'marriage');
     assert.strictEqual(marriages[0][5].boostSentiment, true, '従属婚姻の友好度補正');
@@ -33780,12 +33781,43 @@ test('A-082 従属と和睦の三条件は外交の同一履行窓口を通り�
     assert.strictEqual(dm._applyNegotiatedConditionData('none', null, 1, 2, { agreementType: 'truce' }), '');
     assert.strictEqual(calls.length, prior, '条件なしは履行処理を行わない');
     assert.strictEqual(dm._applyNegotiatedConditionData('hostage', conditions[1][1], 1, 2,
-        { agreementType: 'truce', receiverPerspective: true }), '\n一門を和睦の証として預かりました。');
+        { agreementType: 'truce' }), '\n甲家の一門が和睦の証として乙家へ人質に送られました。');
     assert.strictEqual(dm._applyNegotiatedConditionData('castle', conditions[2][1], 1, 2,
-        { agreementType: 'truce', receiverPerspective: true }), '\n境城を受け取りました。');
+        { agreementType: 'truce' }), '\n甲家領の境城が割譲され、乙家領となりました。');
 });
 
 
+
+// A-095: 実際の条件交渉では外交結果・履歴の両方から、人物や拠点の所属移動を読み取れる。
+test('A-095 和睦・従属の三条件は当事者両家と移転先を共通文面で明示する', () => {
+    const s = createR580DiplomacyConditionCase();
+    const dm = s.diplomacy;
+    const cases = [
+        ['marriage', { type: 'marriage', princess: s.princess, busho: s.husband },
+            '甲家の姫が乙家の当主へ嫁ぎ、縁組が成立しました。',
+            '甲家の姫が乙家の当主の側室として迎えられました。'],
+        ['hostage', { type: 'hostage', busho: s.kinsman },
+            '甲家の一門が和睦の証として乙家へ人質に送られました。',
+            '甲家の一門が乙家へ人質として送られました。'],
+        ['castle', { type: 'castle', castle: s.secondHome },
+            '甲家領の境城が割譲され、乙家領となりました。',
+            '甲家領の境城が割譲され、乙家領となりました。']
+    ];
+    for (const [type, option, truce, subordinate] of cases) {
+        for (const agreementType of ['truce', 'subordinate']) {
+            const detail = dm._applyNegotiatedConditionData(type, option, 1, 2, { agreementType });
+            const expected = agreementType === 'truce' ? truce : subordinate;
+            assert.strictEqual(detail, `\n${expected}`, `成立した${type}の移転前後を明記する`);
+            assert.strictEqual(
+                dm._formatAgreementHistory('甲家と乙家が和睦しました。', detail),
+                `甲家と乙家が和睦しました。 ${expected}`, '同じ結果を履歴に転記する'
+            );
+        }
+    }
+    assert.strictEqual(dm._applyNegotiatedConditionData('hostage', cases[1][1], 1, 2,
+        { agreementType: 'truce' }),
+        '\n甲家の一門が和睦の証として乙家へ人質に送られました。', '同じ和睦条件をどのUIでも一意に読める');
+});
 
 // A-083: 和睦成立後の外交status・双方友好度は、AI同士/プレイヤー発/AIからの提案で同じ窓口へ集約する。
 test('A-083 和睦成立の状態変更は外交Systemの共通窓口で双方一括適用する', () => {

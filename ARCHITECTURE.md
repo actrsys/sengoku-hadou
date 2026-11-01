@@ -36,7 +36,7 @@
 | 拠点所有・城主・国主軍団 | `CastleManager`。軍団の正本は `Legion.commanderId`、`Castle.legionId` は勢力内番号 |
 | 拠点の隣接・通行・積雪経路 | `MapGraphService` / 既存の到達性Rules |
 | 外交状態と友好度 | `DiplomacyManager.changeStatus()` / `setSentimentAbsolute()`。双方の状態を個別代入しない | <!-- RULE:STATE-DIPLOMACY -->
-| 和睦確定・交渉条件 | `DiplomacyManager.applyTruceData()` / `_applyNegotiatedConditionData()`。履行結果から結果文を再利用 | <!-- RULE:STATE-TRUCE -->
+| 和睦確定・交渉条件 | `DiplomacyManager.applyTruceData()` / `_applyNegotiatedConditionData()`。履行結果から結果文を再利用し、婚姻・人質・拠点割譲の移転元と移転先を結果表示と履歴の双方で明示する | <!-- RULE:STATE-TRUCE -->
 | 外交履歴の保存・分類 | `HistorySystem`。発生事象の内容は当該Systemが確定し、当事者の `clanIds` を明示する | <!-- RULE:STATE-HISTORY -->
 | 大名の本拠 | `GameManager.getDaimyoHomeCastle()` 等の現在当主所在の正規問い合わせ（プレイヤー）。拠点一覧先頭や古い固定居城を代用しない | <!-- RULE:STATE-HOME -->
 | 月次・ターンの進行 | `TurnManager`。個別の具体的ルールは専門System / Rulesへ委譲 |

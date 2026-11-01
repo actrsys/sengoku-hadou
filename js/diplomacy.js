@@ -2504,7 +2504,7 @@ class DiplomacyManager {
                 this.applyTruceData(doer.clan, targetClanId);
 
                 const conditionMsg = this._applyNegotiatedConditionData(
-                    conditionType, conditionData, doer.clan, targetClanId, { receiverPerspective: false }
+                    conditionType, conditionData, doer.clan, targetClanId
                 );
                 
                 msg = `${this.game.getClan(targetClanId).name}との和睦が成立しました！${conditionMsg}`;
@@ -3380,7 +3380,7 @@ class DiplomacyManager {
                 this.applyTruceData(doer.clan, targetClanId);
 
                 const conditionMsg = this._applyNegotiatedConditionData(
-                    selectedOption.type, selectedOption, doer.clan, targetClanId, { receiverPerspective: true }
+                    selectedOption.type, selectedOption, doer.clan, targetClanId
                 );
                 this.calcDiplomacyExp(doer, type, true, true);
                 const historyText = this._formatAgreementHistory(
@@ -4440,9 +4440,13 @@ class DiplomacyManager {
      * 候補資格は _isNegotiatedConditionCurrent()、外交関係そのものは各交渉の担当が確定する。
      */
     _applyNegotiatedConditionData(conditionType, conditionData, requestClanId, targetClanId,
-        { agreementType = 'truce', receiverPerspective = false } = {}) {
+        { agreementType = 'truce' } = {}) {
         if (!conditionType || conditionType === 'none' || !conditionData) return '';
         const isTruce = agreementType === 'truce';
+        // 成立結果と永久履歴はどの家からどの家へ移ったかを示す一つの事実文とする。
+        // 会話の発言者（差し出す／預かる）によって同じ履行結果の意味を変えない。
+        const sourceClanName = this.game.getClan(requestClanId).name;
+        const targetClanName = this.game.getClan(targetClanId).name;
 
         if (conditionType === 'marriage') {
             const princess = conditionData.princess;
@@ -4453,22 +4457,18 @@ class DiplomacyManager {
                 { isMainWife: false, boostSentiment: !isTruce }
             );
             return isTruce
-                ? `\n${princess.name}と${busho.name}の縁組が結ばれました。`
-                : `\n${princess.name}が${busho.name}の側室として迎えられました。`;
+                ? `\n${sourceClanName}の${princess.name}が${targetClanName}の${busho.name}へ嫁ぎ、縁組が成立しました。`
+                : `\n${sourceClanName}の${princess.name}が${targetClanName}の${busho.name}の側室として迎えられました。`;
         }
         if (conditionType === 'hostage' && conditionData.busho) {
             this.applyHostageData(conditionData.busho.id, requestClanId, targetClanId);
             return isTruce
-                ? (receiverPerspective
-                    ? `\n${conditionData.busho.name}を和睦の証として預かりました。`
-                    : `\n${conditionData.busho.name}を和睦の証として差し出しました。`)
-                : `\n${conditionData.busho.name}を人質として差し出しました。`;
+                ? `\n${sourceClanName}の${conditionData.busho.name}が和睦の証として${targetClanName}へ人質に送られました。`
+                : `\n${sourceClanName}の${conditionData.busho.name}が${targetClanName}へ人質として送られました。`;
         }
         if (conditionType === 'castle' && conditionData.castle) {
             this.applyCastleCessionData(conditionData.castle.id, requestClanId, targetClanId);
-            return isTruce && receiverPerspective
-                ? `\n${conditionData.castle.name}を受け取りました。`
-                : `\n${conditionData.castle.name}を割譲しました。`;
+            return `\n${sourceClanName}領の${conditionData.castle.name}が割譲され、${targetClanName}領となりました。`;
         }
         return '';
     }
