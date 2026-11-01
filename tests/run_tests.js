@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r756');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r757');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -33780,6 +33780,88 @@ test('A-082 従属と和睦の三条件は外交の同一履行窓口を通り�
         { agreementType: 'truce', receiverPerspective: true }), '\n一門を和睦の証として預かりました。');
     assert.strictEqual(dm._applyNegotiatedConditionData('castle', conditions[2][1], 1, 2,
         { agreementType: 'truce', receiverPerspective: true }), '\n境城を受け取りました。');
+});
+
+
+
+// A-083: 和睦成立後の外交status・双方友好度は、AI同士/プレイヤー発/AIからの提案で同じ窓口へ集約する。
+test('A-083 和睦成立の状態変更は外交Systemの共通窓口で双方一括適用する', () => {
+    const source = read('js/diplomacy.js');
+    assert.strictEqual(typeof createR580DiplomacyConditionCase().diplomacy.applyTruceData, 'function', '共通窓口を備える');
+    assert(source.includes('applyTruceData(clanA, clanB)'), '共通状態確定メソッド');
+    assert.strictEqual((source.match(/this\.changeStatus\(clanA, clanB, window\.GameConstants\.DiplomacyStatus\.TRUCE, 6\)/g) || []).length, 1, '和睦の状態更新は共通窓口だけ');
+    assert.strictEqual((source.match(/this\.applyTruceData\(doer\.clan, targetClanId\)/g) || []).length, 3, '3つの通常和睦成立経路で共通窓口を使用する');
+    const s = createR580DiplomacyConditionCase();
+    const prior = [s.relations[0].sentiment, s.relations[1].sentiment];
+    assert.deepStrictEqual(prior, [20, 20]);
+    s.diplomacy.applyTruceData(1, 2);
+    assert.strictEqual(s.statusChanges, 1, '関係状態の更新は一度だけ');
+    assert.strictEqual(s.relations[0].sentiment, 50);
+    assert.strictEqual(s.relations[1].sentiment, 50);
+});
+
+test('A-083 有効なAI和睦提案は従来どおり承諾できる', () => {
+    const s = createR580DiplomacyConditionCase();
+    s.game.playerClanId = 2;
+    s.game.getRelation = () => ({ status: '敵対' });
+    s.game.getNavigatorInfo = () => ({ name: '小姓', faceIcon: 'face.webp' });
+    s.diplomacy._getThirdPartyDaimyoReference = () => '甲当主';
+    s.diplomacy.getCallName = b => b?.name || '使者';
+    s.diplomacy.buildDiplomacyGreeting = () => ({ greetMsg1: '挨拶', greetMsg2: '返答', context: {} });
+    s.diplomacy.getDiplomacyMessages = () => ({ demandMsg: '和睦', acceptMsg: '', replyAcceptMsg: '' });
+    s.diplomacy._styleDiplomacyTextForSpeaker = text => text;
+    let choices = [], results = 0, histories = 0;
+    s.game.ui = {
+        showDialog(_text, _a, onClose, _b, options) {
+            if (options?.choices) choices = options.choices;
+            else if (typeof onClose === 'function') onClose();
+        },
+        showResultModal() { results++; },
+        log() { histories++; }
+    };
+    s.diplomacy.proposeDiplomacyToPlayer(s.doer, 2, 'truce', 0, () => {}, 60);
+    const accept = choices.find(c => c.label === '和睦する');
+    assert(accept, '通常の受諾操作が現れる');
+    accept.onClick();
+    assert.strictEqual(s.statusChanges, 1, '通常和睦が一度だけ成立する');
+    assert.deepStrictEqual([s.relations[0].sentiment, s.relations[1].sentiment], [50, 50]);
+    assert.strictEqual(histories, 1);
+    assert.strictEqual(results, 1);
+});
+
+// A-083: AI使者の会話中に月が進んだ場合、閉じた旧会話の結果を今月へ持ち込まない。
+test('A-083 AIからの和睦提案が失効したら承諾・拒否を後から実行しない', () => {
+    for (const chosen of ['和睦する', '断る']) {
+        const s = createR580DiplomacyConditionCase();
+        s.game.playerClanId = 2;
+        s.game.getRelation = () => ({ status: '敵対' });
+        s.game.getNavigatorInfo = () => ({ name: '小姓', faceIcon: 'face.webp' });
+        s.diplomacy._getThirdPartyDaimyoReference = () => '甲当主';
+        s.diplomacy.getCallName = b => b?.name || '使者';
+        s.diplomacy.buildDiplomacyGreeting = () => ({ greetMsg1: '挨拶', greetMsg2: '返答', context: {} });
+        s.diplomacy.getDiplomacyMessages = () => ({ demandMsg: '和睦', acceptMsg: '', replyAcceptMsg: '' });
+        s.diplomacy._styleDiplomacyTextForSpeaker = text => text;
+        const history = [], results = [];
+        let choices = [];
+        s.game.ui = {
+            showDialog(_text, _a, onClose, _b, options) {
+                if (options?.choices) choices = options.choices;
+                else if (typeof onClose === 'function') onClose();
+            },
+            showResultModal(text) { results.push(text); },
+            log(text) { history.push(text); }
+        };
+        s.diplomacy._recordDiplomacyHistory = text => history.push(text);
+        s.diplomacy.proposeDiplomacyToPlayer(s.doer, 2, 'truce', 0, () => {}, 60);
+        const action = choices.find(c => c.label === chosen);
+        assert(action, `会話に${chosen}を表示`);
+        s.game.month++; // 会話提示後に自動進行・ロードで旧月が失効
+        action.onClick();
+        assert.strictEqual(s.statusChanges, 0, `${chosen}: 旧月の和睦を成立させない`);
+        assert.deepStrictEqual([s.relations[0].sentiment, s.relations[1].sentiment], [20, 20], '旧月から感情値を変更しない');
+        assert.strictEqual(history.length, 0, '旧月の結果を履歴登録しない');
+        assert.strictEqual(results.length, 0, '旧月の結果モーダルを開かない');
+    }
 });
 
 

@@ -2170,6 +2170,12 @@ class DiplomacyManager {
         }
     }
     
+    /** 和睦成立の状態・6か月の停戦・双方友好度を同じ窓口で確定する。 */
+    applyTruceData(clanA, clanB) {
+        this.changeStatus(clanA, clanB, window.GameConstants.DiplomacyStatus.TRUCE, 6);
+        this.setSentimentAbsolute(clanA, clanB, 50);
+    }
+
     // 外交条件の成立文を、一度だけ履歴・結果へ合成する。
     // 履行済み条件の文面は各条件の正本（_applyNegotiatedConditionData）から受け取る。
     _formatAgreementHistory(baseText, fulfilledConditionText = '') {
@@ -2514,12 +2520,7 @@ class DiplomacyManager {
             const handleSuccess = (conditionType, conditionData) => {
                 if (!this._isDiplomacyOrderCurrent(order)
                     || !this._isNegotiatedConditionCurrent(conditionType, conditionData, doer.clan, targetClanId)) return;
-                this.changeStatus(doer.clan, targetClanId, '和睦', 6);
-                
-                const relationA = this.getDiplomacyData(doer.clan, targetClanId);
-                const relationB = this.getDiplomacyData(targetClanId, doer.clan);
-                if (relationA) relationA.sentiment = 50;
-                if (relationB) relationB.sentiment = 50;
+                this.applyTruceData(doer.clan, targetClanId);
 
                 const conditionMsg = this._applyNegotiatedConditionData(
                     conditionType, conditionData, doer.clan, targetClanId, { receiverPerspective: false }
@@ -3159,6 +3160,7 @@ class DiplomacyManager {
         if (myDaimyo) myCastle = this.game.getCastle(myDaimyo.castleId);
         if (!myCastle) myCastle = this.game.getClanCastles(targetClanId)[0];
         const proposalOrder = myCastle ? this._captureDiplomacyOrder(doer, myCastle, type) : null;
+        const isProposalCurrent = () => this._isDiplomacyOrderCurrent(proposalOrder);
         const nav = myCastle ? this.game.getNavigatorInfo(myCastle) : { faceIcon: 'unknown_face.webp', name: '小姓' };
 
         const isEnemy = this.game.getRelation(targetClanId, doer.clan)?.status === '敵対';
@@ -3212,6 +3214,7 @@ class DiplomacyManager {
         if (window.playEventSoundAndBlock) window.playEventSoundAndBlock();
 
         const doReject = () => {
+            if (!isProposalCurrent()) return;
             this.calcDiplomacyExp(doer, type, false, true);
             const rejectNames = { goodwill: '親善', alliance: '同盟', dominate: '従属要求', truce: '和睦' };
             const rejectHistory = isVassalAllianceUpgrade
@@ -3244,6 +3247,7 @@ class DiplomacyManager {
         };
 
         const rejectAction = () => {
+            if (!isProposalCurrent()) return;
             let msg1 = msgs.rejectMsg;
             let msg2 = msgs.replyRejectMsg;
 
@@ -3257,6 +3261,7 @@ class DiplomacyManager {
         };
 
         const doAccept = () => {
+            if (!isProposalCurrent()) return;
             this.calcDiplomacyExp(doer, type, true, true);
 
             if (type === 'goodwill') {
@@ -3286,11 +3291,7 @@ class DiplomacyManager {
                     this._scheduleProposalCompletion(onComplete, 100);
                 });
             } else if (type === 'truce') {
-                this.changeStatus(doer.clan, targetClanId, '和睦', 6);
-                const relationA = this.getDiplomacyData(doer.clan, targetClanId);
-                const relationB = this.getDiplomacyData(targetClanId, doer.clan);
-                if (relationA) relationA.sentiment = 50;
-                if (relationB) relationB.sentiment = 50;
+                this.applyTruceData(doer.clan, targetClanId);
 
                 this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}と和睦しました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name}と和睦しました。`, () => {
@@ -3300,6 +3301,7 @@ class DiplomacyManager {
         };
 
         const acceptAction = () => {
+            if (!isProposalCurrent()) return;
             let msg1 = msgs.acceptMsg;
             let msg2 = msgs.replyAcceptMsg;
 
@@ -3318,10 +3320,12 @@ class DiplomacyManager {
 
         // 和睦条件を詰める時も、別の事務的な確認画面へ飛ばさず使者との会話を続ける。
         const negotiateAction = () => {
+            if (!isProposalCurrent()) return;
             const requiredScore = 60;
             const penalty = 30;
 
             const finishBreakdown = () => {
+                if (!isProposalCurrent()) return;
                 const reply = this._styleDiplomacyTextForSpeaker(
                     `「左様にござるか。ならば此度の話はここまでにいたしましょう」`,
                     conversationContext && conversationContext.senderSpeakerPosture ? conversationContext.senderSpeakerPosture.key : 'normal'
@@ -3333,6 +3337,7 @@ class DiplomacyManager {
             };
 
             const offerUnconditionalFallback = (message) => {
+                if (!isProposalCurrent()) return;
                 this.game.ui.showDialog(message, false, null, null, {
                     leftFace: doer.faceIcon,
                     leftName: doerNameStr,
@@ -3370,18 +3375,14 @@ class DiplomacyManager {
             }
 
             const onConditionAccept = () => {
-                if (!this._isDiplomacyOrderCurrent(proposalOrder)) return;
+                if (!isProposalCurrent()) return;
                 if (!this._isNegotiatedConditionCurrent(selectedOption.type, selectedOption, doer.clan, targetClanId)) {
                     this.game.ui.showResultModal('交渉中に提示条件を履行できなくなったため、和睦は成立しませんでした。', () => {
                         this._scheduleProposalCompletion(onComplete, 100);
                     });
                     return;
                 }
-                this.changeStatus(doer.clan, targetClanId, '和睦', 6);
-                const relationA = this.getDiplomacyData(doer.clan, targetClanId);
-                const relationB = this.getDiplomacyData(targetClanId, doer.clan);
-                if (relationA) relationA.sentiment = 50;
-                if (relationB) relationB.sentiment = 50;
+                this.applyTruceData(doer.clan, targetClanId);
 
                 const conditionMsg = this._applyNegotiatedConditionData(
                     selectedOption.type, selectedOption, doer.clan, targetClanId, { receiverPerspective: true }
@@ -3398,6 +3399,7 @@ class DiplomacyManager {
             };
 
             const onConditionReject = () => {
+                if (!isProposalCurrent()) return;
                 const conditionRejectRaw = isDaimyoSelf
                     ? `「その条件でも叶わぬか……。残念だが、此度は兵を収めるには至らぬようだ」`
                     : `「その条件でも叶いませぬか……。残念ながら、此度は兵を収めるには至らぬようにござる」`;
@@ -3424,6 +3426,7 @@ class DiplomacyManager {
 
         this.game.ui.showDialog(introMsg, true,
             () => {
+                if (!isProposalCurrent()) return;
                 // ★「面会する」を選んで本格的に会話劇が始まる瞬間に、外交用のBGMに変更します！
                 if (window.AudioManager) {
                     window.AudioManager.memorizeCurrentBgm();
@@ -3434,7 +3437,9 @@ class DiplomacyManager {
                 const greetMsg2 = greeting.greetMsg2;
 
                 this.game.ui.showDialog(greetMsg1, false, () => {
+                    if (!isProposalCurrent()) return;
                     this.game.ui.showDialog(greetMsg2, false, () => {
+                        if (!isProposalCurrent()) return;
                         let demandMsg = msgs.demandMsg;
                         let confirmMsg = "";
                         let okText = "";
@@ -3463,6 +3468,7 @@ class DiplomacyManager {
                         }
 
                         const showDecision = () => {
+                            if (!isProposalCurrent()) return;
                             if (type === 'truce') {
                                 this.game.ui.showDialog(confirmMsg, false, null, null, {
                                     leftFace: nav.faceIcon, leftName: nav.name,
@@ -3485,6 +3491,7 @@ class DiplomacyManager {
                             }
                         };
                         const showRemainingDemand = () => {
+                            if (!isProposalCurrent()) return;
                             if (msgs.demandMsg2) {
                                 this.game.ui.showDialog(msgs.demandMsg2, false, showDecision, null, {
                                     leftFace: doer.faceIcon, leftName: doerNameStr
