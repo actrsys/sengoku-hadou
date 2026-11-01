@@ -32,6 +32,17 @@ class LifeSystem {
             : Array.isArray(this.game.princesses) && this.game.princesses.includes(person);
         if (!isPrincess) return;
 
+        // 婚姻解消の人物参照は死亡理由によらずここで同期する。
+        // 外交婚姻フラグ・処遇通知・一門再構築は各専門処理に残す。
+        const husbandId = Number(person.husbandId) || 0;
+        if (husbandId > 0) {
+            const husband = this.game.getBusho?.(husbandId);
+            if (husband && Array.isArray(husband.wifeIds)) {
+                husband.wifeIds = husband.wifeIds.filter(id => Number(id) !== Number(person.id));
+            }
+            person.husbandId = 0;
+        }
+
         // 過去の移籍・離縁で別家にも残った姫名簿があれば同じ死亡確定時に除籍する。
         // 所属の履歴値(currentClanId)は動かさない。
         const clans = Array.isArray(this.game.clans)
@@ -917,17 +928,15 @@ class LifeSystem {
             const deathProb = 0.02 + (yearsPassed * 0.02);
 
             if (Math.random() < deathProb) {
-                const wasUnborn = (window.LifeStatusRules.isUnborn(p)); // ★追加：死ぬ前に未登場だったかメモしておく
-                this.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); // 「死亡」の印をつけます
-                // 姫の所属名簿からの除籍は上の setLifeStatusRaw() に一元化した。
-                
-                // もし結婚していたら、旦那さんの奥さんリストから外します
-                if (p.husbandId > 0) {
+                const wasUnborn = window.LifeStatusRules.isUnborn(p);
+                // 共通死亡窓口が夫婦双方の参照を解除するため、外交再評価に必要な夫を先に保持する。
+                const husband = Number(p.husbandId) > 0 ? this.game.getBusho(p.husbandId) : null;
+                const hadHusbandId = Number(p.husbandId) > 0;
+                this.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD);
+
+                if (hadHusbandId) {
                     marriageFamilyRebuildNeeded = true;
-                    const husband = this.game.getBusho(p.husbandId);
                     if (husband) {
-                        husband.wifeIds = husband.wifeIds.filter(id => id !== p.id);
-                        
                         // 婚姻フラグの正本は DiplomacyManager。死亡した姫を除外して再評価する。
                         const clanA = p.originalClanId;
                         const clanB = husband.clan;

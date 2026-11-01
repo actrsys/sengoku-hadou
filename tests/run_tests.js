@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r749');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r750');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -33405,6 +33405,67 @@ test('r749 生死状態の共通窓口は死亡→未登場の逆行を許さな
     assert.strictEqual(livePerson.isNotBorn, true, '生存中の未登場者の出生前判定は維持');
     life._syncPreBirthStatus(livePerson, 1575);
     assert.strictEqual(livePerson.isNotBorn, false, '出生年到達後のフラグ解除も維持');
+});
+
+// A-076: 月末の姫寿命死も婚姻を解消し、夫側と姫本人の関係正本を一致させる。
+test('r750 1560実データの既婚姫が寿命で死亡した際に夫婦の両側を解除する', async () => {
+    const data = getRuntimeData('1560_okehazama');
+    const princessMaster = data.common.princessMaster.find(p => Number(p.id) === 5); // 梅
+    const princessState = data.scenario.princessState.find(p => Number(p.id) === 5);
+    const husbandMaster = data.common.warriorsMaster.find(b => Number(b.id) === Number(princessState.husbandId));
+    const husbandState = data.scenario.warriorsState.find(b => Number(b.id) === Number(princessState.husbandId));
+    assert.ok(princessMaster && princessState && husbandMaster && husbandState, '1560年の実婚姻関係を使用する');
+    assert.ok(Number(princessMaster.endYear) < Number(husbandMaster.endYear), '姫の寿命死で夫が生存する組合せ');
+    const context = createContext({
+        Math: Object.assign(Object.create(Math), { random: () => 0 }),
+        MainParams: { StartYear: 1560, StartMonth: 5 },
+        FamilyLinker: { rebuildAllFamilyIds() {} }
+    });
+    loadScript(context, 'js/constants.js');
+    loadScript(context, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', context);
+    const princess = { ...princessMaster, ...princessState, status: 'married' };
+    const husband = { ...husbandMaster, ...husbandState, status: 'active', wifeIds: [princess.id] };
+    const clan = { id: Number(princess.currentClanId), princessIds: [princess.id] };
+    let marriageRefresh = 0;
+    const game = {
+        year: Number(princess.endYear), month: 1, gameStartYear: 1560, gameStartMonth: 5,
+        princesses: [princess], bushos: [], clans: [clan], playerClanId: -1,
+        getPrincess(id) { return Number(id) === Number(princess.id) ? princess : null; },
+        getBusho(id) { return Number(id) === Number(husband.id) ? husband : null; },
+        getClan(id) { return Number(id) === Number(clan.id) ? clan : null; },
+        diplomacyManager: { refreshMarriageRelation() { marriageRefresh++; return false; } }
+    };
+    await new Life(game).checkDeath();
+    assert.strictEqual(princess.status, 'dead', '実シナリオの姫の寿命死が成立');
+    assert.deepStrictEqual(husband.wifeIds, [], '夫の妻名簿から削除');
+    assert.strictEqual(princess.husbandId, 0, '死亡者にも古い夫への参照を残さない');
+    assert.deepStrictEqual(Array.from(clan.princessIds), [], '姫の所属名簿から除籍');
+    assert.strictEqual(marriageRefresh, 1, '外交婚姻関係は既存の専門処理で再評価');
+});
+
+test('r750 姫死亡共通窓口は夫・所属名簿の双方を一度で整合させる', () => {
+    const context = createContext();
+    loadScript(context, 'js/constants.js');
+    loadScript(context, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', context);
+    const p = { id: 5, status: 'married', husbandId: 1003004, currentClanId: 4 };
+    const husband = { id: 1003004, wifeIds: [5, 7] };
+    const clans = [{ id: 3, princessIds: [5, 9] }, { id: 4, princessIds: [5, 8] }];
+    const game = {
+        princesses: [p], clans,
+        getPrincess(id) { return Number(id) === 5 ? p : null; },
+        getBusho(id) { return Number(id) === 1003004 ? husband : null; }
+    };
+    const life = new Life(game);
+    life.setLifeStatusRaw(p, 'dead');
+    assert.strictEqual(p.status, 'dead');
+    assert.strictEqual(p.husbandId, 0, '死亡後の姫本人に夫参照が残らない');
+    assert.deepStrictEqual(husband.wifeIds, [7], '夫の名簿は当該姫だけ削除');
+    assert.deepStrictEqual(clans[0].princessIds, [9], '旧所属にも残っていたIDを除籍');
+    assert.deepStrictEqual(clans[1].princessIds, [8], '現所属から除籍');
+    life.setLifeStatusRaw(p, 'dead');
+    assert.deepStrictEqual(husband.wifeIds, [7], '重複した死亡通知でも他の妻は変わらない');
 });
 
 Promise.all(pendingTests).then(() => {
