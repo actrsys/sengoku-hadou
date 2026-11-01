@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r752');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r754');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -26740,6 +26740,48 @@ test('r580 AIから提示された和睦条件も確定前に人質資格を確�
 });
 
 
+// A-080: AIからプレイヤーへの条件付き和睦も、履行済み条件が履歴に残る。
+// 会話で条件提示を要求→提示された人質を承諾する、正規のユーザー選択経路。
+test('A-080 プレイヤーがAI和睦の人質条件を受けた履歴に人質名が残る', () => {
+    const s = createR580DiplomacyConditionCase();
+    s.game.playerClanId = 2;
+    s.game.getRelation = () => ({ status: '敵対' });
+    s.game.getNavigatorInfo = () => ({ name: '小姓', faceIcon: 'face.webp' });
+    s.diplomacy._getThirdPartyDaimyoReference = () => '甲当主';
+    s.diplomacy.getCallName = b => b?.name || '使者';
+    s.diplomacy.buildDiplomacyGreeting = () => ({ greetMsg1: '挨拶', greetMsg2: '返答', context: {} });
+    s.diplomacy.getDiplomacyMessages = () => ({ demandMsg: '和睦', acceptMsg: '', replyAcceptMsg: '' });
+    s.diplomacy._styleDiplomacyTextForSpeaker = text => text;
+    s.diplomacy._getTruceConditionOfferText = () => '一門を人質として出す';
+    // 兵力・姫・城の候補計算そのものではなく、成立時の履行結果を履歴へ渡す契約を検査する。
+    s.diplomacy._buildTruceConditionOptions = () => [{ type: 'hostage', busho: s.kinsman }];
+    s.diplomacy._selectTruceConditionOption = options => options[0];
+    // r580の検査用上書きを外し、実際の条件履行文面生成を使用する。
+    delete s.diplomacy._applyTruceConditionData;
+    const logs = [], results = [];
+    let choices = [];
+    s.game.ui = {
+        showDialog(_text, _a, onClose, _b, options) {
+            if (options?.choices) choices = options.choices;
+            else if (typeof onClose === 'function') onClose();
+        },
+        showResultModal(text) { results.push(text); },
+        log(text) { logs.push(text); }
+    };
+    s.diplomacy.proposeDiplomacyToPlayer(s.doer, 2, 'truce', 0, () => {}, 100);
+    const negotiate = choices.find(c => c.label === '条件を示させる');
+    assert(negotiate, 'プレイヤーは条件の提示を求められる');
+    negotiate.onClick();
+    const accept = choices.find(c => c.label === 'その条件で和睦');
+    assert(accept, 'AIが提示した条件を選択できる');
+    accept.onClick();
+    assert.strictEqual(s.statusChanges, 1, '成立した条件付き和睦を確定する');
+    assert.strictEqual(s.conditionChanges, 1, '条件の履行は既存共通入口を一度だけ通る');
+    assert.ok(results.some(m => m.includes('一門を和睦の証として預かりました')), '結果画面に履行条件が表示される');
+    assert.strictEqual(logs.length, 1, '従来の履歴窓口から一件だけ記録される');
+    assert.ok(logs[0].includes('一門を和睦の証として預かりました'), '履歴にも成立条件を記録');
+});
+
 // r583: プレイヤーが選択した全武将は、内政上限に途中で到達しても
 // 費用・行動・経験値相当の実行を維持し、功績も得る。AIの候補選別は別経路。
 // r584: 開始時点で上限ならメニュー/確定とも不可。ただし開始時に未達なら
@@ -33585,6 +33627,67 @@ test('A-078 AI二正面の拮抗和睦が婚姻条件まで実際に到達し成
     assert.strictEqual(dm.getRelation(1, 2).isMarriage, true, '婚姻フラグも成立する');
     assert.strictEqual(dm.getRelation(1, 2).status, '和睦', '外交状態は和睦で維持される');
     assert.strictEqual(dm.getRelation(1, 2).sentiment, 50, '通常婚姻の大幅友好度上昇は適用しない');
+});
+
+// A-079: AI同士の条件付き和睦を実コマンドから成立させ、全国履歴へ条件も残す。
+test('A-079 AI条件付き和睦の婚姻成立は当事者と姫・婿の内容を履歴に残す', async () => {
+    const fixedMath = Object.create(Math);
+    fixedMath.random = () => 0;
+    const ctx = createContext({
+        Math: fixedMath,
+        MapGraphService: { isAdjacent: () => false },
+        FamilyLinker: { rebuildAllFamilyIds() {} }
+    });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+    const princess = { id: 90000, name: '架空姫', birthYear: 1547, status: 'unmarried', currentClanId: 1, originalClanId: 1, husbandId: 0 };
+    const sender = { id: 101, name: '申込当主', clan: 1, status: 'active', castleId: 10, birthYear: 1520, isDaimyo: true, diplomacy: 80, achievementTotal: 0, familyIds: [], wifeIds: [] };
+    const groom = { id: 201, name: '相手一門', clan: 2, status: 'active', birthYear: 1538, female: false, wifeIds: [], familyIds: [202] };
+    const targetDaimyo = { id: 202, name: '相手当主', clan: 2, status: 'active', castleId: 20, familyIds: [201], wifeIds: [] };
+    const clans = [
+        { id: 1, name: '申込家', leaderId: 101, princessIds: [90000], diplomacyValue: {} },
+        { id: 2, name: '相手家', leaderId: 202, princessIds: [], diplomacyValue: {} },
+        { id: 3, name: '別敵家', leaderId: 301, princessIds: [], diplomacyValue: {} }
+    ];
+    const castles = [
+        { id: 10, ownerClan: 1, adjacentCastleIds: [20, 30], castellanId: 101 },
+        { id: 11, ownerClan: 1, adjacentCastleIds: [] },
+        { id: 12, ownerClan: 1, adjacentCastleIds: [] },
+        { id: 20, ownerClan: 2, adjacentCastleIds: [10], castellanId: 202 },
+        { id: 30, ownerClan: 3, adjacentCastleIds: [10] }
+    ];
+    const bushos = [sender, groom, targetDaimyo];
+    const entries = [], dialogs = [];
+    const game = {
+        clans, castles, bushos, princesses: [princess], playerClanId: 99,
+        year: 1560, month: 7, isProcessingAI: true,
+        ui: { showDialog: text => dialogs.push(text) },
+        historySystem: { record: (text, meta) => entries.push({ text, meta }) },
+        factionSystem: { updateRecognition() {} },
+        getClan(id) { return clans.find(c => Number(c.id) === Number(id)) || null; },
+        getCastle(id) { return castles.find(c => Number(c.id) === Number(id)) || null; },
+        getClanCastles(id) { return castles.filter(c => Number(c.ownerClan) === Number(id)); },
+        getBusho(id) { return bushos.find(b => Number(b.id) === Number(id)) || null; },
+        getPrincess(id) { return Number(id) === princess.id ? princess : null; },
+        getClanDaimyo(id) { return this.getBusho(this.getClan(id)?.leaderId); },
+        getClanBushos(id) { return bushos.filter(b => Number(b.clan) === Number(id)); },
+        getClanTotalSoldiers(id) { return ({1:10000, 2:11000, 3:8000})[id] || 1; }
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    game.diplomacyManager = dm;
+    dm.changeStatus(1, 2, '敵対');
+    dm.changeStatus(1, 3, '敵対');
+    // 乱数0・通常外交確率0で無条件成立を避け、条件交渉に必ず進める。
+    dm.getDiplomacyProb = () => 0;
+    await dm.executeDiplomacy(sender.id, 20, 'truce');
+    assert.strictEqual(princess.status, 'married', '実際のAI外交命令で縁組が成立');
+    assert.strictEqual(dm.getRelation(1, 2).status, '和睦');
+    assert.strictEqual(entries.length, 1, '外交履歴は一件に集約');
+    assert.deepStrictEqual(Array.from(entries[0].meta.clanIds), [1, 2]);
+    assert.ok(entries[0].text.includes('架空姫') && entries[0].text.includes('相手一門'), '全国履歴で婚姻当事者を確認できる');
+    assert.ok(dialogs[0]?.includes('架空姫'), 'AI外交の結果画面にも成立条件が表示される');
 });
 
 Promise.all(pendingTests).then(() => {

@@ -2525,8 +2525,11 @@ class DiplomacyManager {
                 );
                 
                 msg = `${this.game.getClan(targetClanId).name}との和睦が成立しました！${conditionMsg}`;
-                if (!isPlayerInvolved) aiMsg = `${doerClanName}と${targetClanName}が和睦しました。`;
-                else logMsg = `${doerClanName}が${targetClanName}と和睦しました`;
+                // 和睦成立時の履行内容は、結果本文だけでなく全国・自国履歴にも残す。
+                // 縁組・人質・拠点割譲の文面は実行結果の共通窓口を正本とし、重複生成しない。
+                const conditionHistory = conditionMsg ? ` ${conditionMsg.trim()}` : '';
+                if (!isPlayerInvolved) aiMsg = `${doerClanName}と${targetClanName}が和睦しました。${conditionHistory}`;
+                else logMsg = `${doerClanName}が${targetClanName}と和睦しました${conditionHistory}`;
                 
                 doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;
                 this.game.factionSystem.updateRecognition(doer, 30);
@@ -3380,7 +3383,10 @@ class DiplomacyManager {
                     selectedOption.type, selectedOption, doer.clan, targetClanId, { receiverPerspective: true }
                 );
                 this.calcDiplomacyExp(doer, type, true, true);
-                this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}と条件付きで和睦しました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
+                // 履行条件の正本は結果画面と同じ _applyTruceConditionData() の返却文。
+                // AI→プレイヤーの外交履歴でも縁組・人質・拠点割譲の内容を欠落させない。
+                const conditionHistory = conditionMsg ? ` ${conditionMsg.trim()}` : '';
+                this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}と条件付きで和睦しました。${conditionHistory}`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
                 this.game.ui.showResultModal(`${doerClan.name}と和睦しました。${conditionMsg}`, () => {
                     this._scheduleProposalCompletion(onComplete, 100);
                 });
