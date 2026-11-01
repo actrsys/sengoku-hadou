@@ -429,8 +429,8 @@ class CourtRankSystem {
         
         this.addTrust(doer.clan, -500);
         this.calcCourtTruceExp(doer, true);
-        this.game.diplomacyManager.changeStatus(doer.clan, targetClanId, '和睦', 6);
-        this.game.diplomacyManager.updateSentiment(doer.clan, targetClanId, 30);
+        // 和睦の外交状態は外交Systemへ委譲し、朝廷固有の友好度+30だけを指定する。
+        this.game.diplomacyManager.applyTruceData(doer.clan, targetClanId, { sentimentDelta: 30 });
 
         doer.isActionDone = true;
         doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 10;

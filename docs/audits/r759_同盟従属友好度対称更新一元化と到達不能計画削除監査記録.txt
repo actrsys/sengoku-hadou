@@ -1,0 +1,23 @@
+戦国覇道 継続監査 A-085 / r759
+基準：r758 完全版
+
+【設計・責務の監査】
+外交状態の正本は DiplomacyManager.changeStatus()、双方向の友好度更新は setSentimentAbsolute() である。しかし、同盟成立 applyAllianceData() と支配・従属成立 applyDominationData() は、個別に正方向を直接変更し、逆方向へ値を再代入していた。同じ友好度の双方向同期を複数の実装で行うことは、将来の変更漏れを招く。
+
+また、双方の外交状態が成立した後に、同じ相手への currentDiplomacyTarget を goodwill へ変更するコードが存在した。しかし changeStatus() が双方の同じ相手への外交計画を既に null にしており、成立後の書換え部分は正常な数値IDを使うゲーム経路で到達しない。そのため、古い計画を復元する特例は作らず到達不能な枝を削除した。
+
+【監査で改修を見送った事項】
+AI同士の通常の executeDiplomacy() は async 関数だが、プレイヤーが関わらない通常和睦・同盟・親善では会話 await を通らず、条件付き和睦もAI側は同期的に成立/不成立を判定する。AI呼出し側が Promise を await していないことのみを根拠に非同期仕様へ変更するのは不適切なため、今回は変更していない。
+
+【改修】
+- applyAllianceData / applyDominationData は従来の閾値・増加量を保ち、確定値を既存 setSentimentAbsolute() に一度渡す。
+- changeStatus() の外交予定破棄と矛盾して到達不能だった「成立後に親善へ書き換える」処理を同盟・支配の両経路から削除。新たなプラン状態や互換APIは作らない。
+- 計画生成、外交確率、同盟の閾値（31未満50・それ以外+20）、支配の閾値（40以下50・それ以外+10）、基本状態、セーブ形式は変更しない。
+
+【回帰】
+正規DiplomacyManagerの同盟成立・支配成立を通し、双方向の友好度50と85、同盟と支配/従属の方向、両家の旧外交計画の破棄、共通友好度窓口への委譲2回を追加回帰で確認した。その他の既存テストも実行する。
+
+【変更ファイル】
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/diplomacy.js、tests/run_tests.js
+追加：docs/audits/r759_同盟従属友好度対称更新一元化と到達不能計画削除監査記録.txt
+削除：なし

@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r757');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r759');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -33788,7 +33788,7 @@ test('A-082 従属と和睦の三条件は外交の同一履行窓口を通り�
 test('A-083 和睦成立の状態変更は外交Systemの共通窓口で双方一括適用する', () => {
     const source = read('js/diplomacy.js');
     assert.strictEqual(typeof createR580DiplomacyConditionCase().diplomacy.applyTruceData, 'function', '共通窓口を備える');
-    assert(source.includes('applyTruceData(clanA, clanB)'), '共通状態確定メソッド');
+    assert(source.includes('applyTruceData(clanA, clanB, { sentimentDelta = null } = {})'), '通常・朝廷共用の和睦状態確定メソッド');
     assert.strictEqual((source.match(/this\.changeStatus\(clanA, clanB, window\.GameConstants\.DiplomacyStatus\.TRUCE, 6\)/g) || []).length, 1, '和睦の状態更新は共通窓口だけ');
     assert.strictEqual((source.match(/this\.applyTruceData\(doer\.clan, targetClanId\)/g) || []).length, 3, '3つの通常和睦成立経路で共通窓口を使用する');
     const s = createR580DiplomacyConditionCase();
@@ -33864,6 +33864,93 @@ test('A-083 AIからの和睦提案が失効したら承諾・拒否を後から
     }
 });
 
+
+
+// A-084: 朝廷を介した和睦も通常和睦と同じ外交状態確定窓口を通す。
+// 朝廷固有の友好度「+30」・費用・朝廷信用は維持する。
+test('A-084 朝廷和睦も外交Systemの共通窓口で確定し友好度増分を維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    loadScript(ctx, 'js/courtRank_system.js');
+    const clans = [
+        { id: 1, name: '申込家', diplomacyValue: {} },
+        { id: 2, name: '相手家', diplomacyValue: {} }
+    ];
+    const castle = { id: 10, ownerClan: 1, gold: 4000 };
+    const envoy = { id: 100, name: '使者', clan: 1, castleId: 10, diplomacy: 80, achievementTotal: 0, isActionDone: false };
+    const game = {
+        clans, getClan(id) { return clans.find(c => c.id === Number(id)) || null; },
+        getCastle(id) { return Number(id) === 10 ? castle : null; },
+        factionSystem: { updateRecognition() {} }
+    };
+    ctx.game = game;
+    const dm = vm.runInContext('new DiplomacyManager(game)', ctx);
+    const court = vm.runInContext('new CourtRankSystem(game)', ctx);
+    game.diplomacyManager = dm;
+    game.courtRankSystem = court;
+    dm.setSentimentAbsolute(1, 2, 55);
+    dm.changeStatus(1, 2, '敵対');
+    let commonCalls = 0;
+    const original = dm.applyTruceData.bind(dm);
+    dm.applyTruceData = (...args) => { commonCalls++; return original(...args); };
+    const trustCosts = [], expCalls = [];
+    court.addTrust = (id, amount) => trustCosts.push([id, amount]);
+    court.calcCourtTruceExp = (...args) => expCalls.push(args);
+    court.applyCourtTruce(envoy, 2, 2000);
+    assert.strictEqual(commonCalls, 1, '朝廷の和睦確定も共通窓口を一度呼ぶ');
+    for (const [a,b] of [[1,2],[2,1]]) {
+        const relation = dm.getRelation(a, b);
+        assert.strictEqual(relation.status, '和睦');
+        assert.strictEqual(relation.trucePeriod, 6);
+        assert.strictEqual(relation.sentiment, 85, '朝廷和睦は従来の30加算であり50固定ではない');
+    }
+    assert.strictEqual(castle.gold, 2000);
+    assert.deepStrictEqual(trustCosts, [[1,-500]]);
+    assert.strictEqual(expCalls.length, 1);
+    assert.strictEqual(envoy.isActionDone, true);
+
+    dm.changeStatus(1, 2, '敵対');
+    dm.applyTruceData(1, 2);
+    assert.strictEqual(commonCalls, 2);
+    assert.strictEqual(dm.getRelation(1, 2).sentiment, 50, '通常和睦の固定50を維持');
+    assert.strictEqual(dm.getRelation(2, 1).sentiment, 50);
+});
+
+// r759: 外交成立の関係値確定を既存の対称更新窓口へ集約し、
+// 予定外交目標の破棄をchangeStatusの正本に任せる。
+test('r759 同盟・支配成立は対称友好度の共通窓口を通り、外交予定を両家で破棄する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    const clans = [
+        { id: 1, diplomacyValue: {}, currentDiplomacyTarget: { targetId: 2, action: 'alliance', gold: 0 } },
+        { id: 2, diplomacyValue: {}, currentDiplomacyTarget: { targetId: 1, action: 'goodwill', gold: 300 } }
+    ];
+    ctx.game = { clans, getClan(id) { return clans.find(clan => clan.id === Number(id)); } };
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = vm.runInContext('new DiplomacyManager(game)', ctx);
+    const originalSet = manager.setSentimentAbsolute.bind(manager);
+    const calls = [];
+    manager.setSentimentAbsolute = (a, b, value) => { calls.push([a, b, value]); return originalSet(a, b, value); };
+
+    originalSet(1, 2, 25);
+    manager.applyAllianceData(1, 2);
+    assert.strictEqual(manager.getRelation(1, 2).status, '同盟');
+    assert.strictEqual(manager.getRelation(2, 1).status, '同盟');
+    assert.strictEqual(manager.getRelation(1, 2).sentiment, 50, '低友好度の同盟時は50');
+    assert.strictEqual(manager.getRelation(2, 1).sentiment, 50);
+    assert.strictEqual(clans[0].currentDiplomacyTarget, null);
+    assert.strictEqual(clans[1].currentDiplomacyTarget, null);
+
+    originalSet(1, 2, 75);
+    manager.applyDominationData(1, 2);
+    assert.strictEqual(manager.getRelation(1, 2).status, '支配');
+    assert.strictEqual(manager.getRelation(2, 1).status, '従属');
+    assert.strictEqual(manager.getRelation(1, 2).sentiment, 85, '高友好度の従属時は10加算');
+    assert.strictEqual(manager.getRelation(2, 1).sentiment, 85);
+    assert.deepStrictEqual(calls, [[1, 2, 50], [1, 2, 85]], '両方の成立経路が対称更新窓口へ委譲する');
+});
 
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);

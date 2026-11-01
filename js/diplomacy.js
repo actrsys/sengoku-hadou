@@ -2129,16 +2129,13 @@ class DiplomacyManager {
     applyAllianceData(clanA, clanB) {
         const relation = this.getRelation(clanA, clanB);
         if (relation) {
-            if (relation.sentiment < 31) {
-                relation.sentiment = 50;
-            } else {
-                relation.sentiment = Math.min(100, relation.sentiment + 20);
-            }
-            const oppRelation = this.getRelation(clanB, clanA);
-            if (oppRelation) oppRelation.sentiment = relation.sentiment;
+            const nextSentiment = relation.sentiment < 31
+                ? 50
+                : Math.min(100, relation.sentiment + 20);
+            this.setSentimentAbsolute(clanA, clanB, nextSentiment);
         }
-        
-        // 状態を同盟に変更する処理もここにまとめます
+
+        // 同盟成立の状態変更は既存の正規窓口を利用する。
         this.changeStatus(clanA, clanB, '同盟');
     }
 
@@ -2146,34 +2143,29 @@ class DiplomacyManager {
      * ★新設：支配・従属が成立した時のデータ書き換えを一手に引き受ける専門の魔法です
      */
     applyDominationData(dominantClanId, subordinateClanId) {
-        // 関係値の調整
         const relation = this.getRelation(dominantClanId, subordinateClanId);
         if (relation) {
-            if (relation.sentiment <= 40) {
-                relation.sentiment = 50;
-            } else {
-                relation.sentiment = Math.min(100, relation.sentiment + 10);
-            }
-            const oppRelation = this.getRelation(subordinateClanId, dominantClanId);
-            if (oppRelation) oppRelation.sentiment = relation.sentiment;
+            const nextSentiment = relation.sentiment <= 40
+                ? 50
+                : Math.min(100, relation.sentiment + 10);
+            this.setSentimentAbsolute(dominantClanId, subordinateClanId, nextSentiment);
         }
 
         // 状態を支配・従属に変更します
         // （changeStatusの仕様で、片方を「支配」にすると相手側は自動で「従属」になります）
         this.changeStatus(dominantClanId, subordinateClanId, '支配');
 
-        // ★支配した側の大名家の「今月の外交目標」を親善に書き換えます
-        const dominantClan = this.game.getClan(dominantClanId);
-        if (dominantClan && dominantClan.currentDiplomacyTarget && dominantClan.currentDiplomacyTarget.targetId === subordinateClanId) {
-            dominantClan.currentDiplomacyTarget.action = 'goodwill';
-            dominantClan.currentDiplomacyTarget.gold = 300;
-        }
     }
     
-    /** 和睦成立の状態・6か月の停戦・双方友好度を同じ窓口で確定する。 */
-    applyTruceData(clanA, clanB) {
+    /**
+     * 和睦の基本外交状態・停戦期間を唯一の窓口で確定する。
+     * 通常和睦は双方の友好度50固定、朝廷和睦のみ旧仕様の+30を指定する。
+     * 貢金や朝廷信用など契約固有の費用は、各専門Systemが引き続き担当する。
+     */
+    applyTruceData(clanA, clanB, { sentimentDelta = null } = {}) {
         this.changeStatus(clanA, clanB, window.GameConstants.DiplomacyStatus.TRUCE, 6);
-        this.setSentimentAbsolute(clanA, clanB, 50);
+        if (sentimentDelta === null) this.setSentimentAbsolute(clanA, clanB, 50);
+        else this.updateSentiment(clanA, clanB, sentimentDelta);
     }
 
     // 外交条件の成立文を、一度だけ履歴・結果へ合成する。
@@ -2353,24 +2345,6 @@ class DiplomacyManager {
             if (isSuccess) {
                 this.applyAllianceData(doer.clan, targetClanId);
                 
-                const doerClan = this.game.getClan(doer.clan);
-                if (doerClan && doerClan.currentDiplomacyTarget && doerClan.currentDiplomacyTarget.targetId === targetClanId) {
-                    doerClan.currentDiplomacyTarget.action = 'goodwill';
-                    
-                    const myPower = this.game.getClanTotalSoldiers(doer.clan) || 1;
-                    const targetPower = this.game.getClanTotalSoldiers(targetClanId) || 1;
-                    const ratio = targetPower / Math.max(1, myPower);
-                    let goodwillGold = 300; 
-                    
-                    if (ratio >= 3.0) {
-                        goodwillGold = 1000; 
-                    } else if (ratio > 1.5) {
-                        goodwillGold = 300 + ((ratio - 1.5) / 1.5) * 700; 
-                    }
-                    
-                    doerClan.currentDiplomacyTarget.gold = Math.floor(goodwillGold / 100) * 100;
-                }
-
                 msg = isVassalAllianceUpgrade
                     ? `${targetClanName}との主従関係を解き、同盟を結びました！`
                     : `同盟の締結に成功しました！`;

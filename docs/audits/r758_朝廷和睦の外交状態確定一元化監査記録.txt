@@ -1,0 +1,23 @@
+戦国覇道 継続監査 A-084 / r758
+基準：r757 完全版
+
+【対象と設計監査】
+通常和睦（プレイヤー・AI）およびAI→プレイヤーの和睦受諾はr757にて DiplomacyManager.applyTruceData() に集約済み。一方、通常ゲームの朝廷コマンド「朝廷和睦」は、CourtRankSystem.applyCourtTruce() が直接 DiplomacyManager.changeStatus(..., '和睦', 6) を呼び、状態確定の共通窓口を迂回していた。
+朝廷和睦固有の仕様は通常和睦と異なり、双方友好度を50に固定せず現在値から30加算する。外交状態の正本と朝廷の費用・信用・功績を別責務として保ちつつ、状態更新を一本化すべき構造を確認した。
+
+【修正前の到達検査】
+実行可能な朝廷和睦の通常経路（CourtRankSystem.applyCourtTruce）を使用した回帰を追加。r757の既存1,242件は成功し、新規テストのみ「外交共通窓口を一度も呼ばない」で失敗した。
+
+【改修】
+- DiplomacyManager.applyTruceData() にオプション sentimentDelta を追加。省略時は従来の双方友好度50固定、指定時は既存 updateSentiment() に委譲して双方へ加算。外交状態と停戦6か月の設定は両方とも従来の changeStatus() を一度だけ使用する。
+- CourtRankSystem.applyCourtTruce() はこの単一の外交窓口を呼ぶ。朝廷固有の金2000・信用500、経験値・功績・行動済み・勢力承認更新は同System内にそのまま残す。
+- 旧朝廷側の直接状態変更および感情更新の重複呼び出しを削除。互換用ラッパーや新しい保存項目は作らない。
+
+【回帰】
+A-084 の回帰で、朝廷和睦による敵対→和睦、停戦6か月、双方友好度55→85、金4000→2000、朝廷信用-500、行動済みを確認。さらに通常和睦を同じ窓口から呼んで双方友好度50固定を確認。
+修正後ロジック回帰1,243件成功。マスターデータ・BIN・セーブ形式・外交確率や特殊な朝廷和睦の費用仕様は変更していない。
+
+【変更ファイル】
+更新：ARCHITECTURE.md、docs/audits/README.md、js/config.js、js/diplomacy.js、js/courtRank_system.js、tests/run_tests.js
+追加：docs/audits/r758_朝廷和睦の外交状態確定一元化監査記録.txt
+削除：なし
