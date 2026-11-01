@@ -34460,6 +34460,64 @@ test('A-094 一括移動の最終城主任命だけを履歴に残し状態も�
     assert.strictEqual(people[4].isCastellan, true, '留守居の城主バッジを維持する');
 });
 
+// A-096: 条件付き和睦・従属の拠点割譲は、同じ拠点から複数の家臣を一括退避させる。
+// 旧城主が最初に退避しても、残る退避予定者を仮城主に任命・履歴化しない。
+test('A-096 拠点割譲時の複数家臣退避では移動途中の城主任命を記録しない', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const sourceData = scenario.castlesState.find(c => Number(c.id) === 190);
+    const destinationData = scenario.castlesState.find(c => Number(c.id) === 188);
+    assert.ok(sourceData && destinationData && Number(sourceData.ownerClan) === Number(destinationData.ownerClan));
+    const sourceStates = scenario.warriorsState.filter(b => Number(b.castleId) === 190 && Number(b.clan) === Number(sourceData.ownerClan));
+    const selected = [sourceStates.find(b => Number(b.id) === Number(sourceData.castellanId)),
+        ...sourceStates.filter(b => Number(b.id) !== Number(sourceData.castellanId)).slice(0, 4)];
+    assert.strictEqual(selected.length, 5);
+    const people = selected.map((row, i) => ({
+        ...common.warriorsMaster.find(b => Number(b.id) === Number(row.id)), ...row,
+        status: 'active', isCastellan: i === 0, isCommander: false, isDaimyo: false,
+        isGunshi: false, isFactionLeader: false, isRetired: false,
+        leadership: 100 - i * 8, strength: 80 - i * 6, politics: 80 - i * 6,
+        intelligence: 80 - i * 6, diplomacy: 80 - i * 6, charm: 80 - i * 6,
+        achievementTotal: 0
+    }));
+    const source = { ...sourceData, samuraiIds: people.map(b => b.id), castellanId: people[0].id,
+        legionId: 0, soldiers: 1200, rice: 3000, gold: 400, horses: 0, guns: 0,
+        training: 70, morale: 70, defense: 250, maxDefense: 500, peoplesLoyalty: 70 };
+    const destination = { ...destinationData, samuraiIds: [], castellanId: 0,
+        legionId: 0, soldiers: 1000, rice: 2000, gold: 300, horses: 0, guns: 0,
+        training: 70, morale: 70, defense: 250, maxDefense: 500, peoplesLoyalty: 70 };
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        LifeStatusRules: { isPresent: b => b?.status === 'active' }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    const castles = [source, destination];
+    const records = [];
+    const oldClan = Number(source.ownerClan);
+    const game = { year: 1560, month: 5, phase: 'game', playerClanId: 999,
+        isRestoringSave: false, bushos: people, castles, legions: [],
+        getCastle: id => castles.find(c => Number(c.id) === Number(id)) || null,
+        getBusho: id => people.find(b => Number(b.id) === Number(id)) || null,
+        getCastleBushos: id => (castles.find(c => Number(c.id) === Number(id))?.samuraiIds || [])
+            .map(id => people.find(b => Number(b.id) === Number(id))).filter(Boolean),
+        getClanCastles: id => castles.filter(c => Number(c.ownerClan) === Number(id)),
+        getClanDaimyo: id => Number(id) === oldClan ? { castleId: destination.id, innovation: 100 } : null,
+        getClan: id => ({ name: id === oldClan ? '旧領主家' : '割譲先家' }),
+        historySystem: { record: text => records.push(text) }, factionSystem: { handleMove() {} },
+        castleManager: { changeOwner(c, id) { c.ownerClan = id; } }
+    };
+    game.affiliationSystem = new (vm.runInContext('AffiliationSystem', ctx))(game);
+    game.affiliationSystem.updateUI = () => {};
+    const diplomacy = new (vm.runInContext('DiplomacyManager', ctx))(game);
+    diplomacy.applyCastleCessionData(source.id, oldClan, 999);
+    assert.strictEqual(source.ownerClan, 999);
+    assert.deepStrictEqual(people.map(b => b.castleId), [destination.id, destination.id, destination.id, destination.id, destination.id]);
+    assert.strictEqual(records.filter(t => t.includes('【城主任命】') && t.includes(source.name)).length, 0,
+        '割譲される拠点の移動途中の仮城主は正式任命・履歴化しない');
+    assert.strictEqual(destination.castellanId, people[0].id,
+        '最終配置から一度だけ城主を確定する');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);

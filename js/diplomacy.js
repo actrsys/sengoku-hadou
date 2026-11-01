@@ -2709,9 +2709,12 @@ class DiplomacyManager {
                 }
             }
 
-            // 城割譲による退避も所属変更窓口が旧城の在城期間を確定する。
-            this.game.affiliationSystem.moveCastle(b, castleB.id);
         });
+
+        // 割譲に伴う退避は一つの命令であり、移動途中の仮城主を任命・履歴化しない。
+        // 城主・国主の既存の処遇を確定した後、全員の配置を共通の一括移動窓口で反映する。
+        // 旧城・移動先の最終城主と在城履歴は AffiliationSystem が一度だけ整合させる。
+        this.game.affiliationSystem.moveCastleGroup(bushosInA, castleB.id);
 
         // ★追加：合流先の訓練と士気を割合に応じて再計算します！
         const totalSoldiers = castleB.soldiers + castleA.soldiers;
