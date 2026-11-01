@@ -697,6 +697,9 @@ class DiplomacyManager {
      * ★新しく追加！：毎月末に呼ばれて、和睦の期間を減らす魔法です
      */
     processEndMonth() {
+        // 月末の期限満了を一旦収集する。全勢力の時計を先に進めた後、
+        // 外交状態変更の正本 changeStatus() を勢力の組ごとに一度だけ通す。
+        const expiredTrucePairs = new Map();
         const hostilityPairsNeedingResolution = new Map();
         const recordHostilePair = (clanId, targetId) => {
             const a = Number(clanId);
@@ -723,14 +726,12 @@ class DiplomacyManager {
                     
                     // 減らした結果、期間が0になったら…
                     if (data.trucePeriod <= 0) {
-                        // 感情値（仲の良さ）に合わせて、元の状態に戻します！
-                        if (data.sentiment >= 70) {
-                            data.status = window.GameConstants.DiplomacyStatus.FRIENDLY;
-                        } else if (data.sentiment <= 30) {
-                            data.status = window.GameConstants.DiplomacyStatus.HOSTILE;
-                            recordHostilePair(clan.id, targetId);
-                        } else {
-                            data.status = window.GameConstants.DiplomacyStatus.NORMAL;
+                        const a = Number(clan.id);
+                        const b = Number(targetId);
+                        if (a > 0 && b > 0 && a !== b) {
+                            const low = Math.min(a, b);
+                            const high = Math.max(a, b);
+                            expiredTrucePairs.set(`${low}:${high}`, [low, high]);
                         }
                     }
                 }
@@ -743,6 +744,22 @@ class DiplomacyManager {
                 }
             }
         });
+        // 期限満了時の基本外交status変更とイベント保護・AI外交予定の破棄は
+        // 他の外交成立／断交と同じ changeStatus() に委譲する。
+        // 婚姻・人質は独立した付加関係なので、従来どおりここでは解除しない。
+        for (const [clanAId, clanBId] of expiredTrucePairs.values()) {
+            const relation = this.getRelation(clanAId, clanBId);
+            if (!relation || relation.status !== window.GameConstants.DiplomacyStatus.TRUCE) continue;
+            const nextStatus = relation.sentiment >= 70
+                ? window.GameConstants.DiplomacyStatus.FRIENDLY
+                : relation.sentiment <= 30
+                    ? window.GameConstants.DiplomacyStatus.HOSTILE
+                    : window.GameConstants.DiplomacyStatus.NORMAL;
+            this.changeStatus(clanAId, clanBId, nextStatus);
+            if (nextStatus === window.GameConstants.DiplomacyStatus.HOSTILE) {
+                recordHostilePair(clanAId, clanBId);
+            }
+        }
         if (hostilityPairsNeedingResolution.size === 0) return;
         const consequences = [];
         for (const [clanAId, clanBId] of hostilityPairsNeedingResolution.values()) {

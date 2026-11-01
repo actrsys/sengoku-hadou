@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r759');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r760');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -33951,6 +33951,53 @@ test('r759 同盟・支配成立は対称友好度の共通窓口を通り、外
     assert.strictEqual(manager.getRelation(2, 1).sentiment, 85);
     assert.deepStrictEqual(calls, [[1, 2, 50], [1, 2, 85]], '両方の成立経路が対称更新窓口へ委譲する');
 });
+
+
+// A-086: 通常の外交・朝廷による和睦は、月末の期限満了でも
+// 外交状態変更の正本を通り、イベント保護と古いAI外交計画を残さない。
+test('A-086 和睦満了は外交状態変更の共通窓口を一度だけ通す', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    const clans = [
+        { id: 1, diplomacyValue: {}, currentDiplomacyTarget: null },
+        { id: 2, diplomacyValue: {}, currentDiplomacyTarget: null }
+    ];
+    ctx.game = {
+        clans, princesses: [], bushos: [],
+        getClan(id) { return clans.find(c => c.id === Number(id)) || null; }
+    };
+    loadScript(ctx, 'js/diplomacy.js');
+    const dm = vm.runInContext('new DiplomacyManager(game)', ctx);
+    dm.applyTruceData(1, 2);
+    dm.setEventRelationFlag(1, 2, true);
+    dm.setMarriageRelation(1, 2, true);
+    // 和睦中もAIの外交方針は月中に設定できる。月末の関係変化で旧計画は無効になる。
+    clans[0].currentDiplomacyTarget = { targetId: 2, action: 'goodwill', gold: 100 };
+    clans[1].currentDiplomacyTarget = { targetId: 1, action: 'goodwill', gold: 100 };
+    let statusChanges = 0;
+    const originalChange = dm.changeStatus.bind(dm);
+    dm.changeStatus = (...args) => { statusChanges++; return originalChange(...args); };
+    for (let i = 0; i < 5; i++) await dm.processEndMonth();
+    assert.strictEqual(statusChanges, 0, '停戦期間中に状態を変更しない');
+    assert.strictEqual(dm.getRelation(1, 2).trucePeriod, 1);
+    assert.strictEqual(dm.getRelation(1, 2).isEvent, true);
+    assert.notStrictEqual(clans[0].currentDiplomacyTarget, null);
+    await dm.processEndMonth();
+    assert.strictEqual(statusChanges, 1, '期限満了時は双方まとめて正規窓口を一回だけ通る');
+    for (const [a, b] of [[1, 2], [2, 1]]) {
+        const relation = dm.getRelation(a, b);
+        assert.strictEqual(relation.status, '普通');
+        assert.strictEqual(relation.trucePeriod, 0);
+        assert.strictEqual(relation.isEvent, false, '終了した和睦のイベント保護を残さない');
+        assert.strictEqual(relation.isMarriage, true, '外交婚姻は和睦終了だけでは解除しない');
+    }
+    assert.strictEqual(clans[0].currentDiplomacyTarget, null);
+    assert.strictEqual(clans[1].currentDiplomacyTarget, null);
+    await dm.processEndMonth();
+    assert.strictEqual(statusChanges, 1, '月末再処理で関係を再変更しない');
+});
+
 
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
