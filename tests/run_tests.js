@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r741');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r749');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -11393,12 +11393,12 @@ test('臣従・吸収は武将の派閥婚姻同期と未婚姫移籍を共通�
     assert.ok(absorb.includes('game.affiliationSystem.transferUnmarriedPrincesses(subordinateClanId, dominantClanId);'));
 });
 
-test('独立・寝返りは旧派閥を破棄するが婚姻は専用外交再編へ残す', () => {
+test('独立・寝返りは妻の実所属を同期し、特殊な外交再編は専用担当に残す', () => {
     const src = read('js/independence_system.js');
-    assert.ok(src.includes('this.game.affiliationSystem.transferClanRaw(castellan, newClanId);'));
-    assert.ok(src.includes('this.game.affiliationSystem.transferClanRaw(rebellionLeader, newClanId);'));
-    assert.ok(src.includes('this.game.affiliationSystem.transferClanRaw(busho, newClanId);'));
-    assert.ok(!src.includes('transferClanRaw(castellan, newClanId, { syncSpouses: true })'));
+    for (const name of ['castellan', 'rebellionLeader', 'busho']) {
+        assert.ok(src.includes(`this.game.affiliationSystem.transferClanRaw(${name}, newClanId, { syncSpouses: true });`));
+        assert.ok(!src.includes(`this.game.affiliationSystem.transferClanRaw(${name}, newClanId);`));
+    }
     assert.ok(src.includes('reorganizeRelationsAfterRebellion(oldClanId, newClanId)'));
 });
 
@@ -17688,6 +17688,8 @@ test('r450 独立会話の待機中にタイトルへ戻ると旧勢力の地図
     system.resolveDistantFactionMembers=()=>{};
     const pending=system.executeRebellion(castle,rebel,oldDaimyo,'defect',2);
     assert.strictEqual(game.isSuspendingColorUpdate,true,'独立開始時は旧勢力色更新を停止する');
+    // 部下の処遇と派閥処理のasync完了後に、独立本文の表示が始まる。
+    for (let i = 0; i < 5 && typeof finishDialog !== 'function'; i++) await Promise.resolve();
     assert.strictEqual(typeof finishDialog,'function');
     generation=2;
     finishDialog();
@@ -18566,7 +18568,7 @@ test('r466 引抜実行直前に対象が大名なら資金も勢力も変更し
 
 // r467: 引抜で通常家臣が移籍する場合、功績半減は joinClan の責務。
 // StrategySystem で先に半減すると、城主と異なり通常家臣だけ 1/4 になる。
-test('r467 引抜後の功績は通常家臣・城主とも別家移籍につき一度だけ半減する', () => {
+test('r467 引抜後の功績は通常家臣・城主とも別家移籍につき一度だけ半減する', async () => {
     const ctx = createContext({
         GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin' } },
         LifeStatusRules: { isPresent: b => b.status !== 'dead' && b.status !== 'unborn' },
@@ -18604,11 +18606,11 @@ test('r467 引抜後の功績は通常家臣・城主とも別家移籍につき
     affiliation.updateUI = () => {};
     const strategy = new Strategy(game);
     const ordinary = makeTarget(false);
-    strategy.applyHeadhuntEffect(doer, ordinary, destination, true);
+    await strategy.applyHeadhuntEffect(doer, ordinary, destination, true);
     assert.strictEqual(ordinary.clan, 1);
     assert.strictEqual(ordinary.achievementTotal, 50, '通常家臣の功績は101→50で止める');
     const castellan = makeTarget(true);
-    strategy.applyHeadhuntEffect(doer, castellan, destination, true);
+    await strategy.applyHeadhuntEffect(doer, castellan, destination, true);
     assert.strictEqual(castellan.clan, 1);
     assert.strictEqual(castellan.achievementTotal, 50, '城主の功績も101→50とする');
 });
@@ -28437,7 +28439,7 @@ test('r629 非城主派閥主を擁立した寝返りは神輿本人の別城移
 });
 
 // r630: 独立で捕らわれた家臣を旧家の別城へ解放した際の着任月。
-test('r630 独立時の捕縛から旧家の別城へ解放された武将は帰還月を着任月にする', () => {
+test('r630 独立時の捕縛から旧家の別城へ解放された武将は帰還月を着任月にする', async () => {
     const fixedMath = Object.create(Math); fixedMath.random = () => 0;
     const ctx = createContext({ Math: fixedMath,
         BushoStatusRules: { isActive: b => b.status === 'active' },
@@ -28463,7 +28465,7 @@ test('r630 独立時の捕縛から旧家の別城へ解放された武将は帰
     const sys = new Indep(game);
     sys.calculateLoyaltyScores = () => ({ joinScore: 0, stayScore: 100 });
     const oldLeader = { id: 203, name: '旧大名' };
-    sys.resolveSubordinates(lost, newLeader, oldLeader, 3, 2);
+    await sys.resolveSubordinates(lost, newLeader, oldLeader, 3, 2);
     assert.strictEqual(captive.castleId, 22, '捕虜となった家臣は旧家の別城へ解放される');
     assert.strictEqual(captive.clan, 2, '旧家への所属は維持される');
     assert.ok(refuge.samuraiIds.includes(captive.id), '帰還先の武将名簿に載る');
@@ -32897,7 +32899,7 @@ test('A-067 預かり家からの通常所属離脱では人質担保と双方�
 
 // A-068: 人質を預かる家の城主が引抜により拠点ごと寝返る正規の計略経路。
 // 引抜成功側は joinClan ではなく transferClanRaw を呼ぶため、外交上の担保も終了する。
-test('A-068 城主となった人質の引抜では元家・預かり家の担保を終了する', () => {
+test('A-068 城主となった人質の引抜では元家・預かり家の担保を終了する', async () => {
     const { common, scenario } = getRuntimeData('1560_okehazama');
     const master = common.warriorsMaster.find(b => Number(b.id) === 1002003);
     const state = scenario.warriorsState.find(b => Number(b.id) === 1002003);
@@ -32959,7 +32961,7 @@ test('A-068 城主となった人質の引抜では元家・預かり家の担�
     castles[1].samuraiIds.push(hostage.id);
     const strategy = vm.runInContext('new StrategySystem(game)', ctx);
     assert.strictEqual(strategy.isRegularClanStrategyTarget(hostage, 4), true);
-    strategy.applyHeadhuntEffect(doer, hostage, castles[2], true);
+    await strategy.applyHeadhuntEffect(doer, hostage, castles[2], true);
     assert.strictEqual(hostage.clan, 1, '引抜成功で第三家へ移籍');
     assert.strictEqual(wife.currentClanId, 1, '夫に従って妻も移籍');
     assert.strictEqual(castles[1].ownerClan, 1, '城主の引抜で拠点も移籍');
@@ -32967,6 +32969,442 @@ test('A-068 城主となった人質の引抜では元家・預かり家の担�
     assert.strictEqual(hostage.originalClanId, undefined);
     assert.deepStrictEqual(Array.from(diplomacy.getRelation(3, 4).hostageIds), [], '元家の担保名簿');
     assert.deepStrictEqual(Array.from(diplomacy.getRelation(4, 3).hostageIds), [], '預かり家の担保名簿');
+});
+
+// r743: 実データの既婚城主が寝返るとき、妻の帰属と姫名簿は本人に追従する。
+test('r743 1560年松平元信の城主寝返りで妻の帰属と両家の姫名簿が一致する', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const bushoId = 1301006; // 松平元信、岡崎城主
+    const oldClanId = 5; // 今川
+    const newClanId = 1; // 織田
+    const master = common.warriorsMaster.find(b => Number(b.id) === bushoId);
+    const state = scenario.warriorsState.find(b => Number(b.id) === bushoId);
+    const wifeId = Number(String(state.wife).split('|')[0]);
+    const wifeMaster = common.princessMaster.find(p => Number(p.id) === wifeId);
+    const wifeState = scenario.princessState.find(p => Number(p.id) === wifeId);
+    const castleState = scenario.castlesState.find(c => Number(c.castellanId) === bushoId);
+    assert.ok(master && state && wifeMaster && wifeState && castleState);
+    assert.strictEqual(Number(castleState.ownerClan), oldClanId);
+    assert.strictEqual(Number(wifeState.currentClanId), oldClanId);
+    const ctx = createContext({ setTimeout });
+    for (const f of ['js/config.js', 'js/constants.js', 'js/personnel_rules.js',
+        'js/affiliation_system.js', 'js/independence_system.js']) loadScript(ctx, f);
+    const rebel = { ...master, ...state, id: bushoId, name: '松平元信', fullName: '松平元信',
+        clan: oldClanId, castleId: Number(castleState.id), status: 'active',
+        wifeIds: [wifeId], isCastellan: true, factionId: 0, isFactionLeader: false,
+        achievementTotal: 100, nemesisIds: [], nemesisList: [],
+        affinity: 50, duty: 30, ambition: 70 };
+    const lord = { id: 1004009, name: '今川義元', fullName: '今川義元',
+        clan: oldClanId, castleId: 13, affinity: 50, nemesisIds: [], nemesisList: [] };
+    const newLord = { id: 1006006, name: '織田信長', fullName: '織田信長',
+        clan: newClanId, castleId: 7, affinity: 50 };
+    const wife = { ...wifeMaster, ...wifeState, id: wifeId, currentClanId: oldClanId,
+        husbandId: bushoId, status: 'married' };
+    const castle = { id: Number(castleState.id), name: castleState.name, ownerClan: oldClanId,
+        castellanId: bushoId, samuraiIds: [bushoId] };
+    const oldHome = { id: 13, name: '駿府城', ownerClan: oldClanId,
+        castellanId: lord.id, samuraiIds: [lord.id] };
+    const newHome = { id: 7, name: '清洲城', ownerClan: newClanId,
+        castellanId: newLord.id, samuraiIds: [newLord.id] };
+    const clans = [
+        { id: oldClanId, name: '今川家', princessIds: [wifeId], color: '#112233' },
+        { id: newClanId, name: '織田家', princessIds: [], color: '#334455' }
+    ];
+    const people = [rebel, lord, newLord];
+    const game = { year: 1560, month: 6, phase: 'game', isProcessingAI: true, isWatchMode: true,
+        playerClanId: 99, bushos: people, princesses: [wife], clans,
+        castles: [castle, oldHome, newHome], legions: [],
+        getBusho(id) { return people.find(b => Number(b.id) === Number(id)) || null; },
+        getPrincess(id) { return Number(id) === wifeId ? wife : null; },
+        getClan(id) { return clans.find(c => Number(c.id) === Number(id)) || null; },
+        getClanDaimyo(id) { return Number(id) === oldClanId ? lord : Number(id) === newClanId ? newLord : null; },
+        getClanBushos(id) { return people.filter(b => Number(b.clan) === Number(id)); },
+        getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)) || null; },
+        getCastleBushos(id) { const c = this.getCastle(id); return c ? people.filter(b => c.samuraiIds.includes(b.id)) : []; },
+        castleManager: { changeOwner(c, id) { c.ownerClan = id; } },
+        factionSystem: { updateFactions() {} },
+        updateCastleLord() {}, updateClanPrestige() {},
+        ui: { log() {}, async showDialogAsync() {}, showMapGuard() {}, hideMapGuard() {},
+            async playBattleBlink() { return true; },
+            async playCaptureEffect(ids, callback) { callback(); return true; },
+            updateClanColors() {}, renderMap() {} },
+        diplomacyManager: { refreshMarriageRelation() {}, reorganizeRelationsAfterRebellion() {} }
+    };
+    ctx.game = game;
+    game.affiliationSystem = vm.runInContext('new AffiliationSystem(game)', ctx);
+    const independence = vm.runInContext('new IndependenceSystem(game)', ctx);
+    independence.resolveSubordinates = () => [];
+    independence.resolveFactionWideRebellion = () => {};
+    independence.resolveDistantFactionMembers = () => {};
+    await independence.executeRebellion(castle, rebel, lord, 'defect', newClanId);
+    assert.strictEqual(rebel.clan, newClanId, '寝返りの本人は新勢力へ');
+    assert.strictEqual(castle.ownerClan, newClanId, '拠点も新勢力へ');
+    assert.strictEqual(wife.currentClanId, newClanId, '妻の現所属も夫へ追従');
+    assert.deepStrictEqual(Array.from(clans[0].princessIds), [], '旧家の妻名簿から除く');
+    assert.deepStrictEqual(Array.from(clans[1].princessIds), [wifeId], '新家の妻名簿へ登録');
+});
+
+// A-070: 独立・寝返りで旧家臣が捕らえられて処断される場合も、
+// 1560年の武田義信と妻・嶺を通して正規の死亡処理が行われること。
+test('r744 1560年の既婚旧家臣の捕縛処断で未亡人・姫名簿・死亡後の所在を同期する', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const id = 1002003, wifeId = 10;
+    const m = common.warriorsMaster.find(b => Number(b.id) === id);
+    const s = scenario.warriorsState.find(b => Number(b.id) === id);
+    const pm = common.princessMaster.find(p => Number(p.id) === wifeId);
+    const ps = scenario.princessState.find(p => Number(p.id) === wifeId);
+    assert.ok(m && s && pm && ps && Number(s.clan) === 3 && Number(pm.originalClanId) === 5);
+    const fixedMath = Object.create(Math); fixedMath.random = () => 0;
+    const ctx = createContext({ Math: fixedMath,
+        FamilyLinker: { rebuildAllFamilyIds() {} },
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        LifeStatusRules: { isDead: b => b?.status === 'dead', isUnborn: b => b?.status === 'unborn',
+            isPresent: b => b?.status !== 'dead' && b?.status !== 'unborn' }
+    });
+    for (const file of ['js/config.js', 'js/constants.js', 'js/personnel_rules.js',
+        'js/affiliation_system.js', 'js/life_system.js', 'js/independence_system.js']) loadScript(ctx, file);
+    const captive = { ...m, ...s, id, name: '武田義信', fullName: '武田義信',
+        clan: 3, castleId: Number(s.castleId), status: 'active', wifeIds: [wifeId],
+        isCastellan: false, isCommander: false, isDaimyo: false, isGunshi: false,
+        duty: 90, courtRankIds: [], belongKunishuId: 0, nemesisIds: [], nemesisList: [] };
+    const wife = { ...pm, ...ps, status: 'married', husbandId: id };
+    const lost = { id: captive.castleId, ownerClan: 4, samuraiIds: [id], name: '陥落拠点' };
+    const refuge = { id: 90001, ownerClan: 3, samuraiIds: [], name: '武田家残存拠点' };
+    const home = { id: 90002, ownerClan: 5, samuraiIds: [], name: '今川家拠点' };
+    const clans = [{ id: 3, name: '武田家', princessIds: [wifeId] },
+        { id: 4, name: '北条家', princessIds: [] },
+        { id: 5, name: '今川家', princessIds: [] }];
+    const game = { year: 1560, month: 6, playerClanId: 99,
+        bushos: [captive], princesses: [wife], castles: [lost, refuge, home], clans, legions: [],
+        getBusho(bid) { return Number(bid) === id ? captive : null; },
+        getPrincess(pid) { return Number(pid) === wifeId ? wife : null; },
+        getClan(cid) { return clans.find(c => Number(c.id) === Number(cid)) || null; },
+        getCastle(cid) { return this.castles.find(c => Number(c.id) === Number(cid)) || null; },
+        getClanCastles(cid) { return this.castles.filter(c => Number(c.ownerClan) === Number(cid)); },
+        getCastleBushos(cid) { return cid === lost.id ? [captive] : []; },
+        ui: { log() {}, async showDialogAsync() {} },
+        updateCastleLord() {}, factionSystem: { updateFactions() {}, handleMove() {} },
+        diplomacyManager: { refreshMarriageRelation() { return false; } },
+        historySystem: { record() {} }
+    };
+    ctx.game = game;
+    game.affiliationSystem = vm.runInContext('new AffiliationSystem(game)', ctx);
+    game.lifeSystem = vm.runInContext('new LifeSystem(game)', ctx);
+    const independence = vm.runInContext('new IndependenceSystem(game)', ctx);
+    independence.calculateLoyaltyScores = () => ({ joinScore: 0, stayScore: 100 });
+    await independence.resolveSubordinates(lost, { id: 999, leadership: 150, intelligence: 150,
+        affinity: 50 }, { id: 111, name: '武田旧主' }, 4, 3);
+    assert.strictEqual(captive.status, 'dead', 'AIの捕縛処断が実際に成立');
+    assert.strictEqual(captive.clan, 0, '死亡後に旧家所属を解除');
+    assert.strictEqual(captive.castleId, 0, '通常の死亡処理で在城を解除');
+    assert.strictEqual(captive.wifeIds.length, 0, '亡夫の妻名簿を解消');
+    assert.strictEqual(wife.husbandId, 0, '妻を未亡人にする');
+    assert.strictEqual(wife.status, 'unmarried', '妻を未婚状態に戻す');
+    assert.strictEqual(wife.currentClanId, 5, '妻は実家へ帰る');
+    assert.deepStrictEqual(Array.from(clans[0].princessIds), [], '旧家の姫名簿を更新');
+    assert.deepStrictEqual(Array.from(clans[2].princessIds), [wifeId], '実家の姫名簿に復帰');
+});
+
+
+// A-071: 城主引抜で独立側の処遇が非同期になっても、結果通知とAI次命令は完了後。
+test('r745 城主引抜の捕虜処遇を待ってから結果と解放情報を表示する', async () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active' } },
+        BushoStatusRules: { isActive: b => b?.status === 'active' }
+    });
+    loadScript(ctx, 'js/strategy_system.js');
+    const Strategy = vm.runInContext('StrategySystem', ctx);
+    const doer = { id: 100, name: '引抜担当', clan: 1, status: 'active', intelligence: 75,
+        achievementTotal: 0 };
+    const castellan = { id: 200, name: '城主', fullName: '城主', clan: 2, castleId: 20,
+        status: 'active', isCastellan: true, strength: 50, intelligence: 60,
+        leadership: 70, charm: 40, diplomacy: 35, factionId: 0, achievementTotal: 200 };
+    const dest = { id: 10, ownerClan: 1, gold: 1000 };
+    const captured = { id: 20, ownerClan: 2, name: '対象拠点', samuraiIds: [castellan.id] };
+    let release;
+    const subordinatesCompleted = new Promise(resolve => { release = resolve; });
+    let resolved = false;
+    let finishMsg = null;
+    const game = {
+        year: 1560, month: 6, playerClanId: 1, legions: [],
+        getBusho(id) { return id === doer.id ? doer : castellan; },
+        getCastle(id) { return id === 20 ? captured : dest; },
+        getCurrentTurnCastle() { return dest; },
+        getClanDaimyo() { return { affinity: 50 }; },
+        getCastleBushos() { return [castellan]; },
+        castleManager: { changeOwner(c, newClanId) { c.ownerClan = newClanId; } },
+        affiliationSystem: {
+            transferClanRaw(b, id) { b.clan = id; },
+            setActivityStatusRaw(b, s) { b.status = s; },
+            updateLoyaltyForNewLord() {}
+        },
+        independenceSystem: {
+            async resolveSubordinates() { const result = await subordinatesCompleted; resolved = true; return result; }
+        },
+        updateCastleLord() {},
+        commandSystem: { finishCommand(message) { finishMsg = message; } }
+    };
+    const sys = new Strategy(game);
+    sys._rejectInvalidRegularStrategyTarget = () => false;
+    sys._validatePlayerStrategyOrder = () => true;
+    sys.calcHeadhunt = () => true;
+    sys.handleCovertAction = () => ({ message: '' });
+    sys.recordStrategyHistory = () => {};
+    const result = sys.executeHeadhunt(doer.id, castellan.id, 100);
+    assert.strictEqual(finishMsg, null, '捕虜処遇中は結果画面を開かない');
+    release(['解放：旧家臣は解放されました。']);
+    await result;
+    assert.strictEqual(resolved, true, '処遇完了を待つ');
+    assert.ok(finishMsg?.includes('旧家臣は解放'), '処遇を反映した結果を表示する');
+    assert.strictEqual(castellan.clan, 1, '城主・拠点の移籍は維持する');
+    assert.strictEqual(captured.ownerClan, 1);
+});
+
+test('r745 AI城主引抜も家臣処遇を待って次命令へ進む', () => {
+    const ai = read('js/ai.js');
+    assert.match(ai, /await this\.game\.strategySystem\.applyHeadhuntEffect\(doer, targetBusho, castle, isSuccess\);\s*if \(!isCurrentTurnFlow\(\)\) return;/,
+        'AIの引抜も家臣処遇の完了待ちと既存の世代検査を行う');
+});
+
+// A-072: 通常調略の暗殺成功は実在する LifeSystem.executeDeath() に委譲し、
+// 未完了の死亡処理を追い越して結果通知・AI次行動を出さない。
+test('r746 1560年の通常暗殺成功は死亡処理の正本を待ってから結果を確定する', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const actorId = 1401002, victimId = 1043055;
+    const actorRow = scenario.warriorsState.find(b => Number(b.id) === actorId);
+    const victimRow = scenario.warriorsState.find(b => Number(b.id) === victimId);
+    const actorMaster = common.warriorsMaster.find(b => Number(b.id) === actorId);
+    const victimMaster = common.warriorsMaster.find(b => Number(b.id) === victimId);
+    const targetCastleRow = scenario.castlesState.find(c => Number(c.id) === Number(victimRow?.castleId));
+    assert.ok(actorRow && victimRow && actorMaster && victimMaster && targetCastleRow);
+    assert.notStrictEqual(actorRow.clan, victimRow.clan);
+    assert.strictEqual(targetCastleRow.castellanId, victimId, '対象は大名ではない現役城主');
+    const fixedMath = Object.create(Math); fixedMath.random = () => 0;
+    const ctx = createContext({ Math: fixedMath,
+        BushoStatusRules: { isActive: b => b?.status === 'active' }
+    });
+    loadScript(ctx, 'js/strategy_system.js');
+    const Strategy = vm.runInContext('StrategySystem', ctx);
+    const actor = { ...actorMaster, ...actorRow, name: '木下秀吉', fullName: '木下秀吉',
+        clan: Number(actorRow.clan), status: 'active', isActionDone: false, achievementTotal: 0 };
+    const victim = { ...victimMaster, ...victimRow, name: '羽倉元蔭', fullName: '羽倉元蔭',
+        clan: Number(victimRow.clan), status: 'active', isDaimyo: false, isCastellan: true };
+    // 合戦によって守備兵が減った実在拠点。拠点配置・家臣人数・家系は1560年のデータを用いる。
+    const targetCastle = { ...targetCastleRow, soldiers: 20 };
+    const actorCastle = { id: Number(actorRow.castleId), ownerClan: actor.clan };
+    let releaseDeath;
+    const deathFinished = new Promise(resolve => { releaseDeath = resolve; });
+    let deathCalled = false, historyCount = 0, message = null;
+    const game = {
+        playerClanId: actor.clan, year: 1560, month: 6,
+        getBusho(id) { return id === actorId ? actor : id === victimId ? victim : null; },
+        getCastle(id) { return id === targetCastle.id ? targetCastle : actorCastle; },
+        getCastleBushos(id) { return id === targetCastle.id ? [victim] : [actor]; },
+        commandSystem: {
+            finishCommand(msg) { message = msg; },
+            _captureCommandTurnContext() { return { year: 1560, month: 6 }; },
+            _isCommandTurnCurrent(c) { return c.year === game.year && c.month === game.month; }
+        },
+        lifeSystem: {
+            async executeDeath(b) { deathCalled = true; assert.strictEqual(b, victim); await deathFinished; b.status = 'dead'; }
+        }
+    };
+    const system = new Strategy(game);
+    system._validatePlayerStrategyOrder = () => true;
+    system.addStrategyExperience = () => {};
+    system.handleCovertAction = () => ({ message: '' });
+    system.recordStrategyHistory = () => { historyCount++; };
+    assert.strictEqual(system.isRegularClanStrategyTarget(victim), true);
+    assert.ok(system.getAssassinateProb(actorId, victimId) > 0, '兵が損耗した拠点への暗殺は成功し得る');
+    const operation = system.executeAssassinate(actorId, victimId);
+    assert.ok(operation && typeof operation.then === 'function', '死亡処理をawaitする計略');
+    assert.strictEqual(deathCalled, true, '死亡処理の正規窓口を呼ぶ');
+    assert.strictEqual(message, null, '死亡処理完了前に結果を開かない');
+    assert.strictEqual(historyCount, 0);
+    releaseDeath();
+    await operation;
+    assert.strictEqual(victim.status, 'dead');
+    assert.strictEqual(actor.isActionDone, true);
+    assert.ok(message && message.includes('暗殺が成功'));
+    assert.strictEqual(historyCount, 1);
+});
+
+test('r746 AI暗殺も死亡処理の正本をawaitし、既存ターン寿命を照合する', () => {
+    const ai = read('js/ai.js');
+    const start = ai.indexOf("if (action.type === 'assassinate')", ai.indexOf("await this.game.strategySystem.applyHeadhuntEffect"));
+    const end = ai.indexOf("if (action.type === 'repair'", start);
+    assert.ok(start >= 0 && end > start);
+    const branch = ai.slice(start, end);
+    assert.match(branch, /await this\.game\.lifeSystem\.executeDeath\(targetBusho\);\s*if \(!isCurrentTurnFlow\(\)\) return;/);
+    assert.doesNotMatch(branch, /processDeath\(/);
+});
+
+// r747: 1560年の武田家の未婚姫・菊が自然寿命で死亡した際、姫名簿に死者を残さない。
+test('r747 未婚姫の自然死亡は所属家の姫名簿からも除外する', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const id = 4; // 菊。実シナリオで武田家の姫名簿に登録されている。
+    const master = common.princessMaster.find(p => Number(p.id) === id);
+    const state = scenario.princessState.find(p => Number(p.id) === id);
+    const clanState = scenario.clansState.find(c => Number(c.id) === 3);
+    assert.ok(master && state && clanState && String(clanState.princess).split('|').map(Number).includes(id));
+    const princess = { ...master, ...state };
+    const clan = { id: 3, name: '武田家', princessIds: String(clanState.princess).split('|').map(Number).filter(Boolean) };
+    const random = Object.create(Math);
+    random.random = () => 0; // 通常の月末死亡抽選（没年1年前から）に当選。
+    const ctx = createContext({ Math: random });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/data_manager.js');
+    loadScript(ctx, 'js/life_system.js');
+    const Data = vm.runInContext('DataManager', ctx);
+    Data.normalizePrincessRosterAffiliations([clan], [princess]); // 本番初期化と同じ名簿優先補正。
+    assert.strictEqual(princess.currentClanId, 3);
+    assert.ok(clan.princessIds.includes(id));
+    const game = {
+        year: Number(princess.endYear) - 1, month: 6, gameStartYear: 1560, gameStartMonth: 5,
+        playerClanId: 3, bushos: [], princesses: [princess],
+        getClan: targetId => Number(targetId) === clan.id ? clan : null,
+        ui: { log() {}, async showDialogAsync() {} }
+    };
+    const Life = vm.runInContext('LifeSystem', ctx);
+    await new Life(game).checkDeath(); // 通常月末の死亡経路そのもの。
+    assert.strictEqual(princess.status, 'dead');
+    assert.ok(!clan.princessIds.includes(id), '死亡後の自家姫一覧と勢力情報に死者を残さない');
+    assert.strictEqual(princess.currentClanId, 3, '死亡者の最終所属は履歴として維持');
+});
+
+// r748: 姫がどの死亡経路を通っても、死亡状態の正本が姫名簿から除去する。
+test('r748 姫の死亡状態の正本は所属名簿を全経路で整理する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const princess = { id: 14, status: 'unmarried', currentClanId: 2, originalClanId: 1, husbandId: 0 };
+    const otherPrincess = { id: 15, status: 'unmarried', currentClanId: 2, originalClanId: 2, husbandId: 0 };
+    const clans = [
+        { id: 1, princessIds: [14] }, // 履歴上の旧家に残っていた重複も除く
+        { id: 2, princessIds: ['14', 15] },
+        { id: 3, princessIds: [99] }
+    ];
+    const game = {
+        princesses: [princess, otherPrincess], clans,
+        getPrincess(id) { return this.princesses.find(p => p.id === Number(id)); }
+    };
+    const life = new Life(game);
+    life.setLifeStatusRaw(princess, 'dead');
+    assert.strictEqual(princess.status, 'dead');
+    assert.deepStrictEqual(clans.map(c => Array.from(c.princessIds)), [[], [15], [99]], '死者IDだけを全家から除く');
+    assert.strictEqual(princess.currentClanId, 2, '最終所属は変更しない');
+    life.setLifeStatusRaw(otherPrincess, 'unborn');
+    assert.deepStrictEqual(Array.from(clans[1].princessIds), [15], '未登場への変更で名簿は書換えない');
+});
+
+test('r748 外交敵対化で姫を処断する実経路も姫名簿を残さない', async () => {
+    const ctx = createContext({ FamilyLinker: { rebuildAllFamilyIds() {} } });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/life_system.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const Diplomacy = vm.runInContext('DiplomacyManager', ctx);
+    const princess = { id: 14, name: '姫', husbandId: 90, originalClanId: 1, currentClanId: 2, status: 'married' };
+    const husband = { id: 90, clan: 2, wifeIds: [14] };
+    const clans = [ { id: 1, princessIds: [] }, { id: 2, name: '敵国', princessIds: [14] } ];
+    const game = {
+        princesses: [princess], clans, bushos: [husband], playerClanId: 1,
+        getPrincess(id) { return Number(id) === 14 ? princess : null; },
+        getBusho(id) { return Number(id) === 90 ? husband : null; },
+        getClan(id) { return clans.find(c => c.id === Number(id)); },
+        ui: { log() {}, async showDialogAsync() {} }
+    };
+    game.lifeSystem = new Life(game);
+    game.diplomacyManager = new Diplomacy(game);
+    game.diplomacyManager._chooseAIPrincessConflictTreatment = () => 'kill';
+    game.diplomacyManager.refreshMarriageRelation = () => false;
+    await game.diplomacyManager._resolveAIPrincessConflict(princess);
+    assert.strictEqual(princess.status, 'dead');
+    assert.ok(!husband.wifeIds.includes(princess.id));
+    assert.deepStrictEqual(Array.from(clans[1].princessIds), [], '外交処断でも姫名簿から除く');
+});
+
+test('r748 生死の正本を迂回する死亡状態直接代入を実行系に増やさない', () => {
+    const paths = [];
+    const walk = dir => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (entry.name.endsWith('.js') && !entry.name.startsWith('howler')) paths.push(full);
+        }
+    };
+    walk(path.join(ROOT, 'js'));
+    for (const file of paths) {
+        if (path.basename(file) === 'data_manager.js') continue; // 初期ロードの正規状態組立ては例外
+        const source = fs.readFileSync(file, 'utf8')
+            .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+        assert.doesNotMatch(source, /\.status\s*=\s*['\"]dead['\"]/,
+            `${path.relative(ROOT, file)} で死亡状態を直接代入しない`);
+        assert.doesNotMatch(source, /\.lifeSystem\.processDeath\s*\(/,
+            `${path.relative(ROOT, file)} で廃止済み死亡APIを呼ばない`);
+    }
+});
+
+
+test('r749 1560実データの父死亡後・出生前に死亡した子を翌年1月に復活させない', async () => {
+    const data = getRuntimeData('1560_okehazama');
+    const fatherMaster = data.common.warriorsMaster.find(x => Number(x.id) === 1015005);
+    const sonMaster = data.common.warriorsMaster.find(x => Number(x.id) === 1015006);
+    const daughterMaster = data.common.princessMaster.find(x => Number(x.id) === 26);
+    assert.ok(fatherMaster && sonMaster && daughterMaster, '1560年浅井家の実親子を使う');
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const father = { ...fatherMaster, status: 'active' };
+    const son = { ...sonMaster, status: 'unborn', isNotBorn: true, clan: 0, castleId: 0, belongKunishuId: 0 };
+    const daughter = { ...daughterMaster, status: 'unborn', isNotBorn: true, currentClanId: 15 };
+    const clan = { id: 15, princessIds: [] };
+    const game = {
+        year: 1561, month: 12, bushos: [father, son], princesses: [daughter], clans: [clan],
+        getBusho(id) { return this.bushos.find(x => Number(x.id) === Number(id)); },
+        getPrincess(id) { return this.princesses.find(x => Number(x.id) === Number(id)); },
+        getClan(id) { return Number(id) === 15 ? clan : null; },
+        affiliationSystem: { setClanIdRaw(b, id) { b.clan = id; }, setCastleIdRaw(b, id) { b.castleId = id; } }
+    };
+    const life = new Life(game);
+    life.setLifeStatusRaw(father, 'dead');
+    life.cascadeDeathToUnbornChildren(father.id, game.year);
+    assert.strictEqual(son.status, 'dead', '父死亡で息子が出生前に死亡');
+    assert.strictEqual(daughter.status, 'dead', '父死亡で娘も出生前に死亡');
+
+    game.year = 1562; game.month = 1;
+    life.updateAllBushosAge();
+    assert.strictEqual(son.status, 'dead', '同期版年齢更新で死亡武将を未登場に戻さない');
+    await life.updateAllBushosAgeCooperatively();
+    assert.strictEqual(son.status, 'dead', '協調版年齢更新でも死亡武将を未登場に戻さない');
+    life.checkBirth = async () => {};
+    life.checkNameChange = async () => {};
+    life.checkFaceChange = () => {};
+    life.checkRandomPrincessAppearance = async () => {};
+    life._yieldToBrowserForLife = async () => {};
+    await life.processStartMonth();
+    assert.strictEqual(son.status, 'dead', '正規1月月初でも武将の死亡を維持');
+    assert.strictEqual(daughter.status, 'dead', '正規1月月初でも姫の死亡を維持');
+    assert.deepStrictEqual(Array.from(clan.princessIds), [], '死亡姫の所属名簿を増やさない');
+});
+
+test('r749 生死状態の共通窓口は死亡→未登場の逆行を許さない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const person = { id: 10, status: 'dead', birthYear: 1575, isNotBorn: true };
+    const life = new Life({ bushos: [person], princesses: [], clans: [], year: 1560 });
+    life.setLifeStatusRaw(person, 'unborn');
+    assert.strictEqual(person.status, 'dead', '外部経路からも死亡を取り消さない');
+    const livePerson = { id: 11, status: 'unborn', birthYear: 1575, isNotBorn: false };
+    life._syncPreBirthStatus(livePerson, 1560);
+    assert.strictEqual(livePerson.status, 'unborn');
+    assert.strictEqual(livePerson.isNotBorn, true, '生存中の未登場者の出生前判定は維持');
+    life._syncPreBirthStatus(livePerson, 1575);
+    assert.strictEqual(livePerson.isNotBorn, false, '出生年到達後のフラグ解除も維持');
 });
 
 Promise.all(pendingTests).then(() => {

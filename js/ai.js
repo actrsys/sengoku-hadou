@@ -2820,7 +2820,8 @@ class AIEngine {
                     let isSuccess = this.game.strategySystem.calcHeadhunt(doer.id, action.targetBushoId, action.gold, true);
                     const covertOutcome = this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'headhunt', targetBusho.isCastellan && isSuccess, targetBusho.id);
                     
-                    this.game.strategySystem.applyHeadhuntEffect(doer, targetBusho, castle, isSuccess);
+                    await this.game.strategySystem.applyHeadhuntEffect(doer, targetBusho, castle, isSuccess);
+                    if (!isCurrentTurnFlow()) return;
                     this.game.strategySystem.recordStrategyHistory('引抜', doer, targetBusho.fullName || targetBusho.name, isSuccess, [targetClanIdForHistory], covertOutcome);
                     
                     let keepAction = false;
@@ -2845,7 +2846,9 @@ class AIEngine {
                     const covertOutcome = this.game.strategySystem.handleCovertAction(doer.id, targetBusho.castleId, isSuccess, 'assassinate', false, targetBusho.id);
                     
                     if (isSuccess) {
-                        this.game.lifeSystem.processDeath(targetBusho, 'assassination');
+                        // 暗殺成功時も死亡処理の正本を待ち、旧ターンの計略結果を継続しない。
+                        await this.game.lifeSystem.executeDeath(targetBusho);
+                        if (!isCurrentTurnFlow()) return;
                     }
                     this.game.strategySystem.recordStrategyHistory('暗殺', doer, targetBusho.fullName || targetBusho.name, isSuccess, [targetClanIdForHistory], covertOutcome);
                     

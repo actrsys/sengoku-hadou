@@ -587,8 +587,8 @@ class AffiliationSystem {
 
     /**
      * 通常の別家移籍に伴う妻（姫）の所属と外交婚姻を同期する。
-     * 独立・謀反は DiplomacyManager.reorganizeRelationsAfterRebellion() が正本なので、
-     * その経路からはこの処理を呼ばない。
+     * 独立・寝返りも妻の現所属・姫名簿はここで同期する。ただし独立時の
+     * 外交関係の継承・破棄は後続の DiplomacyManager.reorganizeRelationsAfterRebellion() が正本。
      */
     syncSpousesForClanChange(busho, oldClanId, newClanId, { refreshDiplomacy = true } = {}) {
         if (!busho || !this.game || !Array.isArray(busho.wifeIds) || busho.wifeIds.length === 0) return;

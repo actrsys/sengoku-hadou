@@ -734,7 +734,7 @@ class StrategySystem {
         this.applyCommonSuccessEffect(doer, result.success);
     }
 
-    applyHeadhuntEffect(doer, target, destCastle, isSuccess) {
+    async applyHeadhuntEffect(doer, target, destCastle, isSuccess) {
         let captiveMsgs = [];
         if (isSuccess) {
             const oldCastle = this.game.getCastle(target.castleId);
@@ -755,10 +755,14 @@ class StrategySystem {
                 this.game.affiliationSystem.setActivityStatusRaw(target, window.GameConstants.BushoStatus.ACTIVE);
                 
                 const targetLord = this.game.getClanDaimyo(oldClanId) || { affinity: 50 };
-                captiveMsgs = this.game.independenceSystem.resolveSubordinates(
+                // 家臣の捕縛・処断には通常死亡処理のawaitが含まれる。
+                // 独立Systemの既存世代検査を共用し、旧ターンの後処理を進めない。
+                const isCurrentFlow = this.game.independenceSystem._captureIndependenceFlow?.();
+                captiveMsgs = await this.game.independenceSystem.resolveSubordinates(
                     oldCastle, target, targetLord, newClanId, oldClanId, targetOriginalFactionId
                 );
-                
+                if (isCurrentFlow && !isCurrentFlow()) return [];
+
                 this.game.getCastleBushos(oldCastle.id).forEach(b => {
                     if (b.clan === newClanId && window.BushoStatusRules.isActive(b)) {
                         this.game.affiliationSystem.updateLoyaltyForNewLord(b, newClanId);
@@ -783,7 +787,7 @@ class StrategySystem {
     }
     
     // 引抜を実行する魔法
-    executeHeadhunt(doerId, targetBushoId, gold) {
+    async executeHeadhunt(doerId, targetBushoId, gold) {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getBusho(targetBushoId);
         if (this._rejectInvalidRegularStrategyTarget(target)) return;
@@ -803,8 +807,10 @@ class StrategySystem {
         
         const oldCastleName = target.isCastellan ? this.game.getCastle(target.castleId)?.name : "";
         
-        // ★ 一元化した処理を呼び出します
-        const captiveMsgs = this.applyHeadhuntEffect(doer, target, castle, isSuccess);
+        // ★ 一元化した処理を呼び出します。城主引抜時の家臣処遇が終わるまで結果を開かない。
+        const commandContext = this.game.commandSystem?._captureCommandTurnContext?.();
+        const captiveMsgs = await this.applyHeadhuntEffect(doer, target, castle, isSuccess);
+        if (commandContext && !this.game.commandSystem._isCommandTurnCurrent(commandContext)) return;
         
         let msg = "";
         if (isSuccess) {
@@ -827,7 +833,7 @@ class StrategySystem {
     }
 
     // 暗殺を実行する魔法
-    executeAssassinate(doerId, targetBushoId) {
+    async executeAssassinate(doerId, targetBushoId) {
         const doer = this.game.getBusho(doerId);
         const target = this.game.getBusho(targetBushoId);
         if (this._rejectInvalidRegularStrategyTarget(target)) return;
@@ -840,11 +846,13 @@ class StrategySystem {
         let isSuccess = this.calcAssassinate(doerId, targetBushoId, true);
         const covertOutcome = this.handleCovertAction(doerId, target.castleId, isSuccess, 'assassinate', false, target.id);
         const covertMsg = covertOutcome.message;
+        const commandContext = this.game.commandSystem?._captureCommandTurnContext?.();
         
         let msg = "";
         if (isSuccess) {
-            // 暗殺成功時の処理
-            this.game.lifeSystem.processDeath(target, 'assassination');
+            // 暗殺の死亡処理はLifeSystemの共通窓口が正本。後継・妻・官位等の終了を待つ。
+            await this.game.lifeSystem.executeDeath(target);
+            if (commandContext && !this.game.commandSystem._isCommandTurnCurrent(commandContext)) return;
             
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
             doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(maxStat * 0.5);

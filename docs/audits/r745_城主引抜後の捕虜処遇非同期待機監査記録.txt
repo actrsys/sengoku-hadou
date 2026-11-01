@@ -1,0 +1,28 @@
+戦国覇道 r745 継続監査 A-071
+基準：r744 完全版ZIP（604ファイル）
+対象：城主引抜成功時の追随家臣・捕虜処遇の非同期完了契約
+
+【到達可能な不整合】
+- 通常の計略による城主引抜：CommandSystem.showAdviceAndExecute() → executeWithEvent() → StrategySystem.executeHeadhunt() → applyHeadhuntEffect() → IndependenceSystem.resolveSubordinates() → handleCaptives()。
+- AIの計略による城主引抜：AIManager.execAI() → StrategySystem.applyHeadhuntEffect() → IndependenceSystem.resolveSubordinates()。
+- r744で旧家臣の捕縛処断をLifeSystem.executeDeath()へ委譲し、resolveSubordinates()が非同期処理になった。一方、両呼出し元は従来どおり同期結果を前提としていた。
+- プレイヤー側はPromiseを捕虜の文言配列として受け取るため、捕虜の解放情報が結果メッセージに載らず、処断・未亡人処理等が完了する前に結果画面が開き得る。AI側は未完了のまま行動済処理・履歴登録・次の行動へ進み得る。
+- 引抜成功時の城主・拠点・家臣の所属変更経路そのものは正常なので、そこでの算式や役職を変更しない。
+
+【最小改修】
+- StrategySystem.applyHeadhuntEffect()をasyncとし、既存のresolveSubordinates()をawaitする。待機前に既存IndependenceSystemのフロー確認を取得し、失効後は追撃更新をしない。
+- StrategySystem.executeHeadhunt()もasyncとし、結果の捕虜文言を受け取るまで待機する。既存CommandSystemの実行コンテキストで旧ターンなら結果表示・履歴を行わない。CommandSystem.executeWithEvent()はもとからexecuteFunc()をawaitするため変更不要。
+- AIManager.execAI()は同じ適用関数をawaitし、既存ターン世代の再確認後に履歴・行動済処理へ進む。新たなタイマー・寿命カウンタや、捕虜状態の別正本は設けない。
+- 旧来の同期呼出しを前提としたr467/A-068のテストを非同期完了待ちへ変更。実行前から対象外の引抜は同期して拒否されることを維持。
+
+【回帰と境界】
+- 新設テスト：プレイヤー城主引抜の家臣処遇Promiseを保留し、処遇前に結果を出さないこと、解放文言を最後に組み込むことを正規executeHeadhunt()で確認。AI呼出しではawaitおよび既存世代ガードを検査する。
+- 修正前：1,221件成功、追加2件失敗。
+- 修正後：1,223件成功、失敗0。
+- セーブ形式、命中確率、功績、家臣捕縛・処断の抽選、管理Excel/BIN、画像は変更しない。
+- 実ブラウザでの全年月の自然観戦・引抜全件の網羅検証は未実施。
+
+【変更ファイル】
+追加：docs/audits/r745_城主引抜後の捕虜処遇非同期待機監査記録.txt
+更新：ARCHITECTURE.md / docs/audits/README.md / js/strategy_system.js / js/ai.js / js/config.js / tests/run_tests.js
+削除：なし

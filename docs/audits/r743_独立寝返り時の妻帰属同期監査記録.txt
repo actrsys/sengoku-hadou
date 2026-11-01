@@ -1,0 +1,30 @@
+戦国覇道 r743 継続監査 A-069
+基準：r742 完全版ZIP（602ファイル）
+対象：独立・寝返りで移籍した既婚武将の妻の現所属・姫名簿
+
+【到達する処理】
+- 月末の IndependenceSystem.checkIndependence() → calculateAndExecute() → executeRebellion() で、城主の独立・寝返りが生じる。
+- 同じ executeRebellion() は総取り・強制臣従から forceTargetClanId 付きで使用される。
+- 1560年桶狭間の実行データで、今川所属・岡崎城主の松平元信（ID1301006）には妻（姫ID11）がいる。
+- r742で実コード executeRebellion(岡崎城, 元信, 今川義元, 'defect', 織田家ID) を動かすと、夫のclanと拠点ownerClanが織田に変わる一方、妻のcurrentClanIdと旧/新のprincessIdsは今川のまま残る。
+- 実データ由来の既婚城主・製品の独立実行本体による再現テストはr742では既存1219件成功、追加1件失敗。
+
+【最小改修】
+- 独立・寝返りの城主、神輿、追随家臣、別拠点での呼応者、遠隔派閥員が行うtransferClanRaw()で、既存のsyncSpousesオプションをtrueにする。既存のAffiliationSystemが妻のcurrentClanIdと旧/新姫名簿をまとめて管理する。
+- 先に婚姻が更新される場合も、独立新勢力の外交特殊関係の最終決定は既存reorganizeRelationsAfterRebellionが実行する。新ID独立は旧家との婚姻を継承しない従来規則、同ID政権交代は血縁に応じた継承を維持する。
+- 新しい妻更新ロジックや別の所属正本は作らず、他の通常移籍や人質担保解除も変更しない。
+
+【検証】
+- 修正前：Node回帰の既存1219件成功、追加の実データ城主寝返り回帰1件失敗。妻の所属5が移籍先1にならない。
+- 修正後：実データ回帰を含むNode回帰1220件成功、失敗0。
+- ChromiumのPC/スマホ/低メモリスマホ表示回帰成功。
+- 管理用Excelと実行用BINの共通/1560/1570出力フィールドが全件一致。
+- 管理Excel主要シートの数式（共通12126、1560・1570各26259）と配布正本を検証。
+- プレイヤー重点シミュレーション4件成功。
+- r742では実装メタ版番号がr741のままであったため、r743に更新した。
+- 長期観戦中のすべての独立・寝返り組合せ、実ブラウザでの各外交会話分岐の網羅は未実施。
+
+【変更ファイル】
+追加：docs/audits/r743_独立寝返り時の妻帰属同期監査記録.txt
+更新：ARCHITECTURE.md / docs/audits/README.md / js/affiliation_system.js / js/config.js / js/independence_system.js / tests/run_tests.js
+削除：なし

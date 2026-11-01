@@ -19,7 +19,44 @@ class LifeSystem {
             console.warn('LifeSystem: life status 以外の書換要求を拒否しました', newStatus, person.id);
             return;
         }
+        // 死亡は終端状態。出生前に死亡した人物を、翌年の出生時期同期で未登場へ戻さない。
+        if (person.status === S.DEAD && newStatus === S.UNBORN) return;
         person.status = newStatus;
+
+        // 姫名簿は生存者の所属名簿。自然寿命死・外交処断・夫の死亡時の退場など、
+        // 死亡理由にかかわらず、この生死状態の唯一の書換窓口で除籍を保証する。
+        // 退場時の婚姻解除・通知・姻戚再構築は各専門処理が従来どおり担当する。
+        if (newStatus !== S.DEAD || !this.game) return;
+        const isPrincess = typeof this.game.getPrincess === 'function'
+            ? this.game.getPrincess(person.id) === person
+            : Array.isArray(this.game.princesses) && this.game.princesses.includes(person);
+        if (!isPrincess) return;
+
+        // 過去の移籍・離縁で別家にも残った姫名簿があれば同じ死亡確定時に除籍する。
+        // 所属の履歴値(currentClanId)は動かさない。
+        const clans = Array.isArray(this.game.clans)
+            ? this.game.clans
+            : [this.game.getClan?.(person.currentClanId)];
+        for (const clan of clans) {
+            if (!clan || !Array.isArray(clan.princessIds)) continue;
+            if (clan.princessIds.some(id => Number(id) === Number(person.id))) {
+                clan.princessIds = clan.princessIds.filter(id => Number(id) !== Number(person.id));
+            }
+        }
+    }
+
+    /**
+     * 1月の出生時期同期。武将の同期/協調更新と姫の月初処理は同じ規則を使う。
+     * 死亡済みの人物は変更せず、未登場への逆行と復活を起こさない。
+     */
+    _syncPreBirthStatus(person, currentYear) {
+        if (!person || person.status === window.GameConstants.BushoStatus.DEAD) return;
+        if (person.birthYear > currentYear) {
+            this.setLifeStatusRaw(person, window.GameConstants.BushoStatus.UNBORN);
+            person.isNotBorn = true;
+        } else if (person.isNotBorn && person.birthYear <= currentYear) {
+            person.isNotBorn = false;
+        }
     }
 
     /**
@@ -194,12 +231,7 @@ class LifeSystem {
             // ★ここから追加：姫の年齢（出生前かどうか）も毎年1月にチェックします！
             const currentYear = this.game.year;
             for (const p of this.game.princesses) {
-                if (p.birthYear > currentYear) {
-                    this.setLifeStatusRaw(p, window.GameConstants.BushoStatus.UNBORN);
-                    p.isNotBorn = true;
-                } else if (p.isNotBorn && p.birthYear <= currentYear) {
-                    p.isNotBorn = false; // 生まれたのでフラグを下ろします
-                }
+                this._syncPreBirthStatus(p, currentYear);
             }
 
             await this.checkBirth();
@@ -275,12 +307,7 @@ class LifeSystem {
             const end = Math.min(bushos.length, start + chunkSize);
             for (let i = start; i < end; i++) {
                 const b = bushos[i];
-                if (b.birthYear > currentYear) {
-                    this.setLifeStatusRaw(b, window.GameConstants.BushoStatus.UNBORN);
-                    b.isNotBorn = true;
-                } else if (b.isNotBorn && b.birthYear <= currentYear) {
-                    b.isNotBorn = false;
-                }
+                this._syncPreBirthStatus(b, currentYear);
                 this.recalculateBushoAgeStats(b, currentYear);
             }
             if (end < bushos.length) {
@@ -297,12 +324,7 @@ class LifeSystem {
 
         for (const b of this.game.bushos) {
             // 出生状態の同期は年次処理だけで行い、寿命補正の付け外しからは触りません。
-            if (b.birthYear > currentYear) {
-                this.setLifeStatusRaw(b, window.GameConstants.BushoStatus.UNBORN);
-                b.isNotBorn = true;
-            } else if (b.isNotBorn && b.birthYear <= currentYear) {
-                b.isNotBorn = false;
-            }
+            this._syncPreBirthStatus(b, currentYear);
 
             this.recalculateBushoAgeStats(b, currentYear);
         }
@@ -897,6 +919,7 @@ class LifeSystem {
             if (Math.random() < deathProb) {
                 const wasUnborn = (window.LifeStatusRules.isUnborn(p)); // ★追加：死ぬ前に未登場だったかメモしておく
                 this.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); // 「死亡」の印をつけます
+                // 姫の所属名簿からの除籍は上の setLifeStatusRaw() に一元化した。
                 
                 // もし結婚していたら、旦那さんの奥さんリストから外します
                 if (p.husbandId > 0) {

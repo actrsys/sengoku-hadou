@@ -299,7 +299,7 @@ class IndependenceSystem {
             if (castellan.clan !== 0 && castellan.clan !== newClanId) {
                 castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
             }
-            this.game.affiliationSystem.transferClanRaw(castellan, newClanId);
+            this.game.affiliationSystem.transferClanRaw(castellan, newClanId, { syncSpouses: true });
             castellan.loyalty = this.calcNewLoyalty(castellan, targetDaimyo);
             this.game.castleManager.changeOwner(castle, newClanId);
             
@@ -338,7 +338,7 @@ class IndependenceSystem {
             if (castellan.clan !== 0 && castellan.clan !== newClanId) {
                 castellan.achievementTotal = Math.floor((castellan.achievementTotal || 0) / 2);
             }
-            this.game.affiliationSystem.transferClanRaw(castellan, newClanId);
+            this.game.affiliationSystem.transferClanRaw(castellan, newClanId, { syncSpouses: true });
             if (castellan.id === rebellionLeader.id) {
                 castellan.loyalty = 100;
             } else {
@@ -358,7 +358,7 @@ class IndependenceSystem {
             if (rebellionLeader.isCastellan && leaderCastle) {
                 // 派閥主がどこかの城主なら、その城も新勢力になる
                 this.game.castleManager.changeOwner(leaderCastle, newClanId);
-                this.game.affiliationSystem.transferClanRaw(rebellionLeader, newClanId);
+                this.game.affiliationSystem.transferClanRaw(rebellionLeader, newClanId, { syncSpouses: true });
                 if (rebellionLeader.isDaimyo) {
                     rebellionLeader.loyalty = 100;
                 } else {
@@ -370,7 +370,7 @@ class IndependenceSystem {
                     leaderCastle.samuraiIds = leaderCastle.samuraiIds.filter(id => id !== rebellionLeader.id);
                     this.game.updateCastleLord(leaderCastle);
                 }
-                this.game.affiliationSystem.transferClanRaw(rebellionLeader, newClanId);
+                this.game.affiliationSystem.transferClanRaw(rebellionLeader, newClanId, { syncSpouses: true });
                 this.game.affiliationSystem.setCastleIdRaw(rebellionLeader, castle.id, { recordStayHistory: true });
                 castle.samuraiIds.push(rebellionLeader.id);
                 if (rebellionLeader.isDaimyo) {
@@ -432,13 +432,16 @@ class IndependenceSystem {
         // 部下たちの去就
         // ★主君の基準を rebellionLeader にする
         // ★修正：記憶しておいた元の派閥ID(leaderOriginalFactionId)を渡して判定させます
-        let captiveMsgs = this.resolveSubordinates(castle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
+        let captiveMsgs = await this.resolveSubordinates(castle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
+
+        if (!isCurrentFlow()) return;
 
         // ★派閥主が別の城の城主だった場合、その城の部下たちも処遇を決定する
         if (isProxyRebellion && rebellionLeader.isCastellan) {
             const leaderCastle = this.game.getCastle(rebellionLeader.castleId);
             if (leaderCastle && leaderCastle.id !== castle.id) {
-                const extraMsgs = this.resolveSubordinates(leaderCastle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
+                const extraMsgs = await this.resolveSubordinates(leaderCastle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
+                if (!isCurrentFlow()) return;
                 if (extraMsgs.length > 0) captiveMsgs = captiveMsgs.concat(extraMsgs);
                 this.game.updateCastleLord(leaderCastle);
             }
@@ -446,7 +449,8 @@ class IndependenceSystem {
 
         // ★基準を rebellionLeader にして派閥全体の呼応を処理
         // ★修正：記憶しておいた元の派閥ID(leaderOriginalFactionId)を渡して判定させます
-        this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
+        await this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
+        if (!isCurrentFlow()) return;
         this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
 
         // 独立勢力の外交は、最終的に誰が新勢力へ残ったか確定してから再編する。
@@ -741,7 +745,7 @@ class IndependenceSystem {
         return { joinScore, stayScore };
     }
 
-    resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId = null) {
+    async resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId = null) {
         const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.clan === oldClanId && window.BushoStatusRules.isActive(b) && b.id !== newDaimyo.id);
         const captives = [], joiners = [];
         const escapeCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.id !== castle.id);
@@ -754,7 +758,7 @@ class IndependenceSystem {
                 if (busho.clan !== 0 && busho.clan !== newClanId) {
                     busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
                 }
-                this.game.affiliationSystem.transferClanRaw(busho, newClanId);
+                this.game.affiliationSystem.transferClanRaw(busho, newClanId, { syncSpouses: true });
                 busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
                 joiners.push(busho);
             } else {
@@ -783,22 +787,24 @@ class IndependenceSystem {
                     if (busho.clan !== 0 && busho.clan !== newClanId) {
                         busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
                     }
-                    this.game.affiliationSystem.transferClanRaw(busho, newClanId);
+                    this.game.affiliationSystem.transferClanRaw(busho, newClanId, { syncSpouses: true });
                     busho.loyalty = Math.max(0, Math.min(40, this.calcNewLoyalty(busho, newDaimyo) - 50)); // 消極的合流は低めに設定
                     joiners.push(busho);
                 }
             }
         });
         if (joiners.length > 0) this._logIndependence(`  -> ${castle.name}にて${joiners.length}名が追随しました。`, [oldClanId, newClanId]);
-        return captives.length > 0 ? this.handleCaptives(captives, oldClanId, newClanId, newDaimyo) : [];
+        return captives.length > 0 ? await this.handleCaptives(captives, oldClanId, newClanId, newDaimyo) : [];
     }
 
-    resolveFactionWideRebellion(leader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId = null) {
+    async resolveFactionWideRebellion(leader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId = null) {
+        const isCurrentFlow = this._captureIndependenceFlow();
         // ★修正：記憶しておいた元の派閥IDを基準として使います
         const targetFactionId = (leaderOriginalFactionId !== null && leaderOriginalFactionId !== 0) ? leaderOriginalFactionId : leader.factionId;
         
         const otherCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.castellanId !== 0 && c.castellanId !== leader.id);
-        otherCastles.forEach(castle => {
+        for (const castle of otherCastles) {
+            if (!isCurrentFlow()) return;
             const busho = this.game.getBusho(castle.castellanId);
             if (busho && busho.clan === oldClanId && window.BushoStatusRules.isActive(busho) && busho.factionId !== 0 && busho.factionId === targetFactionId && !busho.isDaimyo && !busho.isCommander && !busho.isFactionLeader) {
                 // ★修正：記憶しておいた元の派閥IDを渡します
@@ -810,13 +816,14 @@ class IndependenceSystem {
                     if (busho.clan !== 0 && busho.clan !== newClanId) {
                         busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
                     }
-                    this.game.affiliationSystem.transferClanRaw(busho, newClanId);
+                    this.game.affiliationSystem.transferClanRaw(busho, newClanId, { syncSpouses: true });
                     busho.loyalty = this.calcNewLoyalty(busho, leader);
-                    this.resolveSubordinates(castle, leader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
+                    await this.resolveSubordinates(castle, leader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
+                    if (!isCurrentFlow()) return;
                     this.game.updateCastleLord(castle);
                 }
             }
-        });
+        }
     }
 
     resolveDistantFactionMembers(newDaimyo, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId = null) {
@@ -843,7 +850,7 @@ class IndependenceSystem {
                 if (busho.clan !== 0 && busho.clan !== newClanId) {
                     busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
                 }
-                this.game.affiliationSystem.transferClanRaw(busho, newClanId);
+                this.game.affiliationSystem.transferClanRaw(busho, newClanId, { syncSpouses: true });
                 this.game.affiliationSystem.setCastleIdRaw(busho, mainCastle.id, { recordStayHistory: true });
                 busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
                 mainCastle.samuraiIds.push(busho.id);
@@ -852,13 +859,17 @@ class IndependenceSystem {
         });
     }
 
-    handleCaptives(captives, oldClanId, newClanId, newDaimyo) {
+    async handleCaptives(captives, oldClanId, newClanId, newDaimyo) {
+        const isCurrentFlow = this._captureIndependenceFlow();
         const returnCastles = this.game.castles.filter(c => c.ownerClan === oldClanId);
         let alertMsgs = [];
-        captives.forEach(p => {
+        for (const p of captives) {
+            if (!isCurrentFlow()) return alertMsgs;
             if (oldClanId === this.game.playerClanId) {
                 if (PersonnelRules.calcAffinityDiff(p.affinity, newDaimyo.affinity) > 60) {
-                    this.game.lifeSystem.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); this.game.affiliationSystem.setClanIdRaw(p, 0);
+                    // 処断の生死判定は従来どおり。死亡確定後の妻・婚姻・官位・在城・人質解除はLifeSystemが正本。
+                    await this.game.lifeSystem.executeDeath(p);
+                    if (!isCurrentFlow()) return alertMsgs;
                     alertMsgs.push(`処断：${p.name}は処断されました。`);
                 } else {
                     if (returnCastles.length > 0) {
@@ -883,7 +894,10 @@ class IndependenceSystem {
                 }
                 alertMsgs.push(`${p.name}は元の主君のもとへ逃げ去りました。`);
             } else {
-                if (Math.random() < 0.3) { this.game.lifeSystem.setLifeStatusRaw(p, window.GameConstants.BushoStatus.DEAD); this.game.affiliationSystem.setClanIdRaw(p, 0); }
+                if (Math.random() < 0.3) {
+                    await this.game.lifeSystem.executeDeath(p);
+                    if (!isCurrentFlow()) return alertMsgs;
+                }
                 else if (returnCastles.length > 0) {
                     const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
                     this.game.affiliationSystem.setClanIdRaw(p, oldClanId); this.game.affiliationSystem.setCastleIdRaw(p, target.id, { recordStayHistory: true }); target.samuraiIds.push(p.id);
@@ -893,7 +907,7 @@ class IndependenceSystem {
                     this.game.affiliationSystem.becomeRonin(p);
                 }
             }
-        });
+        }
         return alertMsgs;
     }
     

@@ -1,0 +1,30 @@
+戦国覇道 r746 継続監査 A-072
+基準：r745 完全版ZIP（605ファイル）
+対象：プレイヤー・AIの暗殺成功時の死亡処理入口／設計思想・マニュアル準拠
+
+【実ゲーム経路と原因】
+- プレイヤー：敵家臣選択→暗殺担当選択→軍師助言→CommandSystem.executeWithEvent('assassinate')→StrategySystem.executeAssassinate()。
+- AI：AIManager.execAI() で暗殺対象・担当を選定し calcAssassinate() を実行する。
+- 両経路とも成功時に this.game.lifeSystem.processDeath() を呼ぶが、現行 LifeSystem にそのメソッドはなく、成功時にTypeErrorで停止する。
+- 暗殺成功率は智謀・敵兵数・同城敵家臣数で算出。1560年実データの木下秀吉（智謀96）と羽倉元蔭（亀尾山城の唯一の家臣）で、守備兵が戦闘により20まで減った場合に成功率は正となる。武将ID・初期所属・在城・人数はBINに基づく。
+- 正規の調略結果（プレイヤー側）を使う再現回帰はr745で「processDeath is not a function」と失敗。ゲーム全期間の自然観戦で実際に暗殺が成功する瞬間までの連続再現は未実施であり、兵数減少は到達可能な戦後状態を模した条件である。
+
+【最小改修と設計監査】
+- 寿命・暗殺・捕縛処断の武将死亡は既存LifeSystem.executeDeath()を正本とする。別名の互換ラッパーや固有の死亡整理を作らない。
+- StrategySystem.executeAssassinate()をasyncとし、死亡完了後に功績・履歴・結果を更新する。既存CommandSystemのターン寿命確認をawait後に再利用する。上位CommandSystem.executeWithEvent()は元からexecuteFunc()をawaitするため変更しない。
+- AIManager.execAI()も共通死亡をawaitし、既存のisCurrentTurnFlow()を待機復帰時に確認。計略優先順位・担当選定・確率・行動済判定は変更しない。
+- 新たな状態正本・死亡処理分岐・待機時間・ライフサイクルカウンタは追加しない。r744/r745で採用した非同期処理の契約と統一する。
+
+【確認】
+- 修正前：既存1,223件成功・追加2件失敗（成功時のTypeError／AI側の未移行契約）。
+- 修正後：ロジックテスト1,225件成功、失敗0。
+- 実ブラウザ表示回帰：PC／スマホ／低メモリスマホを含む既存レイアウト検査成功。
+- 管理用Excel→BINは共通・1560・1570の出力フィールド全件一致。別途、Excelの主要シート数式数を確認。
+- 近似型バランスシミュレーターの単体テスト4件成功、1560年織田家standardの4試行成功。これは本編の自然進行を検証するものではない。
+- セーブ構造、BIN、ゲーム素材、外交・暗殺抽選、経験値算式は不変。
+- 未検証：ブラウザ実操作での暗殺成功直後の演出全ケース、自然進行の長期観戦による網羅。
+
+【変更ファイル】
+追加：docs/audits/r746_通常暗殺成功時の死亡共通処理監査記録.txt
+更新：ARCHITECTURE.md / docs/audits/README.md / js/strategy_system.js / js/ai.js / js/config.js / tests/run_tests.js
+削除：なし
