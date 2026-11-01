@@ -3709,8 +3709,10 @@ class DiplomacyManager {
                     if (courtTrust >= 500) {
                         return { action: 'court_truce', gold: 2000 };
                     } else {
-                        // ★変更：朝廷和睦ができない時、和睦したい度合い（スコア）を計算して判定
-                        let truceScore = (enemyCount * 15) + ((targetClanTotal / Math.max(1, myPower)) * 10);
+                        // 申し込む動機・条件の重さ・条件受諾を同じ前線圧力で評価する。
+                        // 別々の式では、二正面で拮抗する相手との和睦が候補に上がらず、
+                        // 本来選ばれるはずの縁組条件へ到達できなくなる。
+                        const truceScore = this._getAITrucePressureScore(myClanId, targetClanId);
                         if (truceScore >= 60) {
                             return { action: 'truce', gold: 0, score: truceScore };
                         }

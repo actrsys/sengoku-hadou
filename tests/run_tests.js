@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r750');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r752');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -33466,6 +33466,125 @@ test('r750 姫死亡共通窓口は夫・所属名簿の双方を一度で整合
     assert.deepStrictEqual(clans[1].princessIds, [8], '現所属から除籍');
     life.setLifeStatusRaw(p, 'dead');
     assert.deepStrictEqual(husband.wifeIds, [7], '重複した死亡通知でも他の妻は変わらない');
+});
+
+// A-077: 夫の死亡後、実家と生存親族が残らない寡婦が夫家に留まった場合、
+// 妻名簿から外れた後は未婚の所属姫として家中名簿へ登録される。
+test('A-077 1560実婚姻の未亡人は実家・頼れる親族がなければ夫の家の未婚姫名簿に残る', async () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const pMaster = common.princessMaster.find(p => Number(p.id) === 5); // 梅
+    const pState = scenario.princessState.find(p => Number(p.id) === 5);
+    const hMaster = common.warriorsMaster.find(b => Number(b.id) === 1003004); // 北条氏政
+    const hState = scenario.warriorsState.find(b => Number(b.id) === 1003004);
+    const fMaster = common.warriorsMaster.find(b => Number(b.id) === 1002002); // 武田晴信
+    const fState = scenario.warriorsState.find(b => Number(b.id) === 1002002);
+    assert.ok(pMaster && pState && hMaster && hState && fMaster && fState);
+    assert.strictEqual(Number(pState.husbandId), Number(hMaster.id), '実シナリオの夫婦関係');
+    const wife = { ...pMaster, ...pState, status: 'married', originalClanId: 3, currentClanId: 4,
+        husbandId: Number(hMaster.id) };
+    const husband = { ...hMaster, ...hState, status: 'active', clan: 4,
+        fullName: String(hMaster.name).replace('|', ''), courtRankIds: [], wifeIds: [Number(wife.id)], isDaimyo: false, isCastellan: false, isCommander: false };
+    const father = { ...fMaster, ...fState, status: 'dead', clan: 0,
+        wifeIds: [], isDaimyo: false };
+    const source = { id: 3, name: '武田家', princessIds: [] };
+    const holder = { id: 4, name: '北条家', princessIds: [] };
+    // 出生家の拠点がすべて落ち、頼れる父系一門もいない戦後の通常到達状態。
+    const castle = { id: Number(hState.castleId), ownerClan: 4, samuraiIds: [husband.id] };
+    const ctx = createContext();
+    ['js/constants.js', 'js/family_system.js', 'js/life_system.js'].forEach(f => loadScript(ctx, f));
+    const Family = vm.runInContext('FamilyLinker', ctx);
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const bushos = [husband, father], princesses = [wife], clans = [source, holder];
+    const game = {
+        year: 1575, month: 9, playerClanId: 999, bushos, princesses, clans, legions: [],
+        getBusho(id) { return bushos.find(b => Number(b.id) === Number(id)); },
+        getPrincess(id) { return princesses.find(p => Number(p.id) === Number(id)); },
+        getClan(id) { return clans.find(c => Number(c.id) === Number(id)); },
+        getClanCastles(id) { return Number(id) === 4 ? [castle] : []; },
+        getCastle(id) { return Number(id) === Number(castle.id) ? castle : null; },
+        ui: { log() {}, async showDialogAsync() {} }, historySystem: { record() {} },
+        affiliationSystem: { setClanIdRaw(b, id) { b.clan = id; }, setCastleIdRaw(b, id) { b.castleId = id; } },
+        factionSystem: { updateFactions() {} }, courtRankSystem: { RANK_ID_SHOGUN: 1, returnRank() {} },
+        diplomacyManager: { refreshMarriageRelation() { return false; } }
+    };
+    Family.rebuildAllFamilyIds(bushos, princesses);
+    assert.deepStrictEqual(holder.princessIds, [], '嫁ぎ先は婚姻中の妻を姫名簿には載せない');
+    await new Life(game).executeDeath(husband, { deferFactionUpdate: true });
+    assert.strictEqual(wife.status, 'unmarried', '夫死亡後、帰還先がなければ夫家に留まる');
+    assert.strictEqual(wife.husbandId, 0, '婚姻参照は解除される');
+    assert.strictEqual(Number(wife.currentClanId), 4, '所属は夫家のまま');
+    assert.deepStrictEqual(holder.princessIds, [wife.id], '未婚に戻った姫は現所属家の姫名簿に登録');
+    assert.deepStrictEqual(source.princessIds, [], '滅亡した実家の名簿には戻さない');
+});
+
+
+// A-078: 通常のAI和睦を決める「動機」と条件の「重さ」を同じ前線圧力で評価する。
+// 二正面で相手と拮抗していると、r751以前は和睦行動の閾値に達せず婚姻候補まで進めなかった。
+test('A-078 AI二正面の拮抗和睦が婚姻条件まで実際に到達し成立する', () => {
+    const fixedMath = Object.create(Math);
+    fixedMath.random = () => 0;
+    const ctx = createContext({
+        Math: fixedMath,
+        MapGraphService: { isAdjacent: () => false },
+        FamilyLinker: { rebuildAllFamilyIds() {} }
+    });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    vm.runInContext('this.DiplomacyManager = DiplomacyManager;', ctx);
+    const princess = { id: 90000, name: '架空姫', birthYear: 1547, status: 'unmarried', currentClanId: 1, originalClanId: 1, husbandId: 0 };
+    const groom = { id: 201, name: '相手一門', clan: 2, status: 'active', birthYear: 1538, female: false, wifeIds: [], familyIds: [202] };
+    const reqDaimyo = { id: 101, clan: 1, status: 'active', familyIds: [], wifeIds: [] };
+    const tgtDaimyo = { id: 202, clan: 2, status: 'active', familyIds: [201], wifeIds: [] };
+    const clans = [
+        { id: 1, name: '申込家', leaderId: 101, courtTrust: 0, princessIds: [90000], diplomacyValue: {} },
+        { id: 2, name: '相手家', leaderId: 202, courtTrust: 0, princessIds: [], diplomacyValue: {} },
+        { id: 3, name: '別の敵家', leaderId: 301, courtTrust: 0, princessIds: [], diplomacyValue: {} }
+    ];
+    // 申込側は三拠点を持ち、二つの敵対勢力と直接隣接する通常の戦線状態。
+    const castles = [
+        { id: 10, ownerClan: 1, adjacentCastleIds: [20, 30], legionId: 0, castellanId: 101 },
+        { id: 11, ownerClan: 1, adjacentCastleIds: [], legionId: 0 },
+        { id: 12, ownerClan: 1, adjacentCastleIds: [], legionId: 0 },
+        { id: 20, ownerClan: 2, adjacentCastleIds: [10], legionId: 0, castellanId: 202 },
+        { id: 30, ownerClan: 3, adjacentCastleIds: [10], legionId: 0 }
+    ];
+    const bushos = [reqDaimyo, groom, tgtDaimyo];
+    const powers = { 1: 10000, 2: 11000, 3: 8000 };
+    const game = {
+        clans, castles, bushos, princesses: [princess], playerClanId: 99,
+        getClan(id) { return clans.find(c => Number(c.id) === Number(id)) || null; },
+        getCastle(id) { return castles.find(c => Number(c.id) === Number(id)) || null; },
+        getClanCastles(id) { return castles.filter(c => Number(c.ownerClan) === Number(id)); },
+        getClanDaimyo(id) { return this.getBusho(this.getClan(id)?.leaderId); },
+        getBusho(id) { return bushos.find(b => Number(b.id) === Number(id)) || null; },
+        getPrincess(id) { return Number(id) === princess.id ? princess : null; },
+        getClanBushos(id) { return bushos.filter(b => Number(b.clan) === Number(id)); },
+        getClanTotalSoldiers(id) { return powers[id] || 1; }
+    };
+    const dm = new ctx.DiplomacyManager(game);
+    dm.changeStatus(1, 2, '敵対');
+    dm.changeStatus(1, 3, '敵対');
+    const plan = dm.determineAIDiplomacyAction(1, 2, 10000, 11000, 11000, 50, 0, false, 0);
+    assert.strictEqual(plan.action, 'truce', '二正面で拮抗した相手への通常和睦が計画対象になる');
+    const options = dm._buildTruceConditionOptions(1, 2, { aiVsAi: true });
+    assert.ok(options.some(o => o.type === 'marriage'), '架空姫と未婚相手武将から婚姻条件を提示できる');
+    const selected = dm._selectTruceConditionOption(options, 1, 2, dm._getAITrucePressureScore(1, 2));
+    assert.strictEqual(selected.type, 'marriage', '無理な城割譲より軽い縁組を選ぶ');
+    let marriageCondition = null;
+    dm.negotiateTruceConditions(1, 2, (type, option) => { marriageCondition = { type, option }; }, () => { throw new Error('和睦交渉が失敗'); });
+    assert.strictEqual(marriageCondition?.type, 'marriage', 'AI同士が実際の交渉窓口で婚姻条件を受諾する');
+    assert.ok(dm._isNegotiatedConditionCurrent(marriageCondition.type, marriageCondition.option, 1, 2, { aiVsAi: true }));
+    dm.changeStatus(1, 2, '和睦', 6);
+    dm._applyTruceConditionData(marriageCondition.type, marriageCondition.option, 1, 2);
+    assert.strictEqual(princess.status, 'married', '姫の婚姻が成立する');
+    assert.strictEqual(princess.husbandId, groom.id, '夫の参照が保存される');
+    assert.strictEqual(princess.currentClanId, 2, '姫の所属が嫁ぎ先へ移る');
+    assert.ok(groom.wifeIds.includes(princess.id), '夫の妻名簿へ登録される');
+    assert.deepStrictEqual(clans[0].princessIds, [], '嫁いだ姫は実家名簿から削除される');
+    assert.strictEqual(dm.getRelation(1, 2).isMarriage, true, '婚姻フラグも成立する');
+    assert.strictEqual(dm.getRelation(1, 2).status, '和睦', '外交状態は和睦で維持される');
+    assert.strictEqual(dm.getRelation(1, 2).sentiment, 50, '通常婚姻の大幅友好度上昇は適用しない');
 });
 
 Promise.all(pendingTests).then(() => {

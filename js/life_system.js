@@ -1068,7 +1068,13 @@ class LifeSystem {
                         }
                     }
                     
-                    // 行き先の決定
+                    // 実家・父系の帰還先がなくても、夫の家が存続していればそこに留まる。
+                    // 婚姻中は夫のwifeIdsだけに載っていたため、未婚化に際して姫名簿へ再登録する。
+                    if (nextClanId === 0 && busho.clan > 0 && this.game.getClanCastles(busho.clan).length > 0) {
+                        nextClanId = busho.clan;
+                    }
+
+                    // 帰還・夫家への残留を問わず、未婚姫の所属名簿は同じ経路で更新する。
                     if (nextClanId > 0) {
                         // ★ここから書き足し：大名家の「姫の名簿」も書き換えます！
                         // 1. 今までいた大名家（亡くなった夫の家）の名簿から名前を消します
@@ -1091,23 +1097,9 @@ class LifeSystem {
                         princess.currentClanId = nextClanId;
                         princess.status = 'unmarried'; // 再び未婚に戻ります
                     } else {
-                        // ★ここから修正：実家も親戚もない場合、夫の家が残っているかチェックします
-                        const husbandClanCastles = busho.clan > 0 ? this.game.getClanCastles(busho.clan) : [];
-                        
-                        if (husbandClanCastles.length > 0) {
-                            // 夫の家がまだお城を持っていれば、所属も名簿も変えず、「未婚」に戻って居座ります
-                            princess.status = 'unmarried';
-                        } else {
-                            // 夫の家も滅びていて完全に身寄りがないなら、ゲームから退場（死亡）させます
-                            this.setLifeStatusRaw(princess, window.GameConstants.BushoStatus.DEAD);
-                            
-                            if (busho.clan !== 0) {
-                                const oldClan = this.game.getClan(busho.clan);
-                                if (oldClan && oldClan.princessIds) {
-                                    oldClan.princessIds = oldClan.princessIds.filter(id => id !== princess.id);
-                                }
-                            }
-                        }
+                        // 帰還先も夫家も残っていない場合だけ退場する。
+                        // 除籍は setLifeStatusRaw() が一元処理するのでここで重複更新しない。
+                        this.setLifeStatusRaw(princess, window.GameConstants.BushoStatus.DEAD);
                     }
                     
                 }
