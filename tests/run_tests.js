@@ -28476,7 +28476,8 @@ test('r629 非城主派閥主を擁立した寝返りは神輿本人の別城移
     const ctx = createContext({ Math: fixedMath, setTimeout,
         WarParams: { Independence: { ThresholdBase: 70, ThresholdDutyDiv: 10, ThresholdAmbitionDiv: 10, ProbLoyaltyFactor: 5, ProbAffinityFactor: 1 } },
         PersonnelRules: { calcAffinityDiff: () => 0 },
-        BushoStatusRules: { isActive: b => b.status === 'active' } });
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        LifeStatusRules: { isPresent: b => b.status === 'active' } });
     for (const file of ['js/affiliation_system.js', 'js/faction_system.js', 'js/independence_system.js']) loadScript(ctx, file);
     const Aff = vm.runInContext('AffiliationSystem', ctx);
     const Fac = vm.runInContext('FactionSystem', ctx);
@@ -28533,6 +28534,7 @@ test('r630 独立時の捕縛から旧家の別城へ解放された武将は帰
     const fixedMath = Object.create(Math); fixedMath.random = () => 0;
     const ctx = createContext({ Math: fixedMath,
         BushoStatusRules: { isActive: b => b.status === 'active' },
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
         PersonnelRules: { calcAffinityDiff: () => 0 } });
     for (const file of ['js/affiliation_system.js', 'js/faction_system.js', 'js/independence_system.js']) loadScript(ctx, file);
     const Aff = vm.runInContext('AffiliationSystem', ctx);
@@ -28549,6 +28551,7 @@ test('r630 独立時の捕縛から旧家の別城へ解放された武将は帰
         getCastle: id => [lost, refuge].find(c => c.id === Number(id)) || null,
         getCastleBushos: id => [captive].filter(b => b.castleId === id),
         getBusho: id => id === 101 ? captive : null,
+        getClanDaimyo() { return null; },
         updateCastleLord() {}, ui: { log() {} } };
     game.factionSystem = new Fac(game);
     game.affiliationSystem = new Aff(game);
@@ -34778,6 +34781,216 @@ test('r774 独立時の同派閥複数合流で途中の城主任命を記録せ
     assert.deepStrictEqual(home.samuraiIds, [19, 22, 23], '合流先名簿に全員を一度ずつ載せる');
     assert.strictEqual(events.filter(msg => msg.includes('【城主任命】')).length, 0,
         '移動途中だけ成立した仮城主任命を履歴に記録しない');
+});
+
+// r775: 独立・寝返りで捕縛後に旧主家へ解放された旧城主は、
+// かつての城主の役職を別拠点へ持ち込んで現任城主を追い出してはならない。
+test('r775 捕縛された旧城主の解放は正規転任となり帰還先の現任城主を維持する', async () => {
+    const fixedMath = Object.create(Math); fixedMath.random = () => 0;
+    const ctx = createContext({ Math: fixedMath,
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
+        PersonnelRules: { calcAffinityDiff: () => 0 }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/faction_system.js');
+    loadScript(ctx, 'js/independence_system.js');
+    const Aff = vm.runInContext('AffiliationSystem', ctx);
+    const Indep = vm.runInContext('IndependenceSystem', ctx);
+    const Fac = vm.runInContext('FactionSystem', ctx);
+    const fallen = { id: 11, name: '寝返り拠点', ownerClan: 3, legionId: 0,
+        castellanId: 201, samuraiIds: [201] };
+    const refuge = { id: 12, name: '旧主家の別拠点', ownerClan: 2, legionId: 0,
+        castellanId: 202, samuraiIds: [202] };
+    const make = (id, name, castleId, castellan, skill) => ({
+        id, name, fullName: name, clan: 2, castleId, status: 'active',
+        isCastellan: castellan, isCommander: false, isDaimyo: false, isGunshi: false,
+        factionId: 0, duty: 90, strength: 0, intelligence: skill, leadership: skill,
+        politics: skill, diplomacy: skill, charm: skill, loyalty: 95,
+        achievementTotal: skill * 10, isFactionLeader: false,
+        arrivalTurn: 1569 * 12 + 1, stayHistory: []
+    });
+    const captive = make(201, '旧拠点の城主', 11, true, 95);
+    const incumbent = make(202, '帰還先の現任城主', 12, true, 10);
+    const people = [captive, incumbent], castles = [fallen, refuge], history = [];
+    const oldDaimyo = { id: 299, name: '旧当主', affinity: 50, innovation: 50 };
+    const game = { year: 1570, month: 6, playerClanId: 3, phase: 'game',
+        castles, bushos: people, legions: [],
+        getBusho: id => people.find(b => b.id === Number(id)) || null,
+        getCastle: id => castles.find(c => c.id === Number(id)) || null,
+        getCastleBushos: id => {
+            const castle = castles.find(c => c.id === Number(id));
+            return castle ? castle.samuraiIds.map(id => people.find(b => b.id === id)).filter(Boolean) : [];
+        },
+        getClanCastles: id => castles.filter(c => c.ownerClan === id),
+        getClanDaimyo: id => id === 2 ? oldDaimyo : null,
+        getClan: id => ({ id, name: id === 2 ? '旧主家' : '新主家' }),
+        historySystem: { record: msg => history.push(msg) },
+        ui: { log() {} }
+    };
+    game.affiliationSystem = new Aff(game);
+    game.factionSystem = new Fac(game);
+    game.affiliationSystem.updateUI = () => {};
+    game.updateCastleLord = castle => game.affiliationSystem.updateCastleLord(castle);
+    const independence = new Indep(game);
+    independence.calculateLoyaltyScores = () => ({ joinScore: 0, stayScore: 100 });
+    independence._logIndependence = () => {};
+    const rebel = { id: 301, leadership: 90, intelligence: 90, affinity: 50 };
+    await independence.resolveSubordinates(fallen, rebel, oldDaimyo, 3, 2);
+    assert.strictEqual(captive.castleId, 12, '捕縛後に残存する旧主家の拠点へ帰還');
+    assert.ok(refuge.samuraiIds.includes(captive.id), '帰還先の在城名簿に登録');
+    assert.strictEqual(captive.isCastellan, false, '喪失した旧拠点の城主資格を持ち込まない');
+    assert.strictEqual(refuge.castellanId, incumbent.id, '帰還先に既存の城主がいる場合は保持');
+    assert.strictEqual(incumbent.isCastellan, true, '現任城主の派生フラグも維持');
+    assert.strictEqual(history.filter(msg => msg.includes('【城主任命】')).length, 0,
+        '捕虜帰還だけで新たな城主任命履歴を増やさない');
+    assert.strictEqual(captive.arrivalTurn, 1570 * 12 + 6, '着任月は正規移動で同期');
+});
+
+// r776: 城主不在の旧拠点から非城主派閥主を神輿として迎える場合、
+// 中間の仮任命によって派閥呼応拠点を増やしてはならない。
+test('r776 非城主派閥主の脱出で仮城主を選ばず旧拠点の所有と呼応者を維持する', async () => {
+    const random = Object.create(Math); random.random = () => 0;
+    const ctx = createContext({ Math: random, setTimeout: fn => fn(),
+        WarParams: { Independence: { ThresholdBase: 70, ThresholdDutyDiv: 10, ThresholdAmbitionDiv: 10, ProbLoyaltyFactor: 5, ProbAffinityFactor: 1 } },
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
+        PersonnelRules: { calcAffinityDiff: () => 0 }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/faction_system.js');
+    loadScript(ctx, 'js/independence_system.js');
+    const Aff = vm.runInContext('AffiliationSystem', ctx);
+    const Fac = vm.runInContext('FactionSystem', ctx);
+    const Indep = vm.runInContext('IndependenceSystem', ctx);
+    const rebelCastle = { id: 10, name: '起点城', ownerClan: 2, castellanId: 20, legionId: 0, samuraiIds: [20] };
+    const leaderCastle = { id: 11, name: '城主不在の旧拠点', ownerClan: 2, castellanId: 0, legionId: 0, samuraiIds: [21, 22, 23] };
+    const oldCastle = { id: 12, name: '旧当主本拠', ownerClan: 2, castellanId: 24, legionId: 0, samuraiIds: [24] };
+    const make = (id, name, castleId, extra = {}) => ({
+        id, name, fullName: name, castleId, clan: 2, status: 'active', factionId: 5,
+        isCastellan: false, isCommander: false, isDaimyo: false, isGunshi: false, isFactionLeader: false,
+        duty: 10, ambition: 100, loyalty: 10, affinity: 50, familyIds: [],
+        leadership: 70, strength: 70, intelligence: 70, politics: 70, diplomacy: 70, charm: 70,
+        achievementTotal: 100, arrivalTurn: 1569 * 12 + 6, stayHistory: [], ...extra
+    });
+    const rebel = make(20, '決起城主', 10, { isCastellan: true });
+    const leader = make(21, '非城主派閥主', 11, { isFactionLeader: true, loyalty: 0 });
+    const one = make(22, '同派閥家臣甲', 11);
+    const two = make(23, '同派閥家臣乙', 11);
+    const oldDaimyo = make(24, '旧大名', 12, { isCastellan: true, isDaimyo: true, factionId: 0, nemesisIds: [], nemesisList: [] });
+    const targetDaimyo = make(30, '移籍先大名', 0, { clan: 3, isDaimyo: true, factionId: 0 });
+    const bushos = [rebel, leader, one, two, oldDaimyo, targetDaimyo];
+    const castles = [rebelCastle, leaderCastle, oldCastle];
+    const clans = [{ id: 2, name: '旧家', color: '#111111' }, { id: 3, name: '新家', color: '#888888' }];
+    const history = [];
+    const game = { year: 1570, month: 6, phase: 'game', playerClanId: 99,
+        castles, bushos, clans, legions: [],
+        getBusho: id => bushos.find(b => b.id === Number(id)) || null,
+        getCastle: id => castles.find(c => c.id === Number(id)) || null,
+        getClan: id => clans.find(c => c.id === Number(id)) || null,
+        getClanDaimyo: id => id === 2 ? oldDaimyo : id === 3 ? targetDaimyo : null,
+        getClanBushos: id => bushos.filter(b => b.clan === Number(id)),
+        getCastleBushos: id => (game.getCastle(id)?.samuraiIds || []).map(id => game.getBusho(id)).filter(Boolean),
+        getClanCastles: id => castles.filter(c => c.ownerClan === Number(id)),
+        updateClanPrestige() {},
+        historySystem: { record: msg => history.push(msg) },
+        ui: { log() {}, async showDialogAsync() {}, showMapGuard() {}, hideMapGuard() {},
+            async playBattleBlink() { return true; },
+            async playCaptureEffect(ids, onHalfway) { onHalfway(); return true; },
+            updateClanColors() {}, renderMap() {} },
+        castleManager: { changeOwner(c, ownerId) { c.ownerClan = ownerId; } }
+    };
+    game.affiliationSystem = new Aff(game);
+    game.factionSystem = new Fac(game);
+    game.affiliationSystem.updateUI = () => {};
+    game.updateCastleLord = c => game.affiliationSystem.updateCastleLord(c);
+    const sys = new Indep(game);
+    sys.calculateLoyaltyScores = () => ({ joinScore: 500, stayScore: 0 });
+    sys.calcNewLoyalty = () => 95;
+    // 領内の直接処遇はこの事例に関係ないので、派閥拠点への呼応は本体の実処理で確認する。
+    sys.resolveSubordinates = async () => [];
+    assert.strictEqual(leaderCastle.castellanId, 0, '城主不在は許容された初期状態');
+    await sys.executeRebellion(rebelCastle, rebel, oldDaimyo, 'defect', 3);
+    assert.strictEqual(leaderCastle.ownerClan, 2, '実在しない中間城主の呼応で旧拠点の所有権を奪わない');
+    assert.ok([one, two].every(b => b.clan === 3 && b.castleId === 10), '同派閥の非城主家臣は通常の遠方合流へ進む');
+    assert.deepStrictEqual(leaderCastle.samuraiIds, [], '全員脱出後の在城名簿');
+    assert.strictEqual(leaderCastle.castellanId, 0, '城主不在の最終状態');
+    assert.strictEqual(history.filter(m => m.includes('【城主任命】')).length, 0, '途中だけの城主任命履歴なし');
+});
+
+// r777: 決起側から旧主家へ脱出した武将が城主不在拠点へ入っても、
+// その拠点の同派閥家臣を「途中だけの城主」として呼応させてはならない。
+test('r777 離反時の逃亡・捕縛解放による退避先の仮城主が呼応城主になるのを防ぐ', async () => {
+    for (const isCaptive of [false, true]) {
+    const random = Object.create(Math); random.random = () => 0.2;
+    const ctx = createContext({ Math: random, setTimeout: fn => fn(),
+        WarParams: { Independence: { ThresholdBase: 70, ThresholdDutyDiv: 10, ThresholdAmbitionDiv: 10, ProbLoyaltyFactor: 5, ProbAffinityFactor: 1 } },
+        BushoStatusRules: { isActive: b => b.status === 'active' },
+        LifeStatusRules: { isPresent: b => b.status === 'active' },
+        PersonnelRules: { calcAffinityDiff: () => 0 }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/faction_system.js');
+    loadScript(ctx, 'js/independence_system.js');
+    const Aff = vm.runInContext('AffiliationSystem', ctx);
+    const Fac = vm.runInContext('FactionSystem', ctx);
+    const Indep = vm.runInContext('IndependenceSystem', ctx);
+    const rebelCastle = { id: 10, name: '決起拠点', ownerClan: 2, castellanId: 20, legionId: 0, samuraiIds: [20, 21] };
+    const refuge = { id: 11, name: '城主不在の退避先', ownerClan: 2, castellanId: 0, legionId: 0, samuraiIds: [22] };
+    const oldHome = { id: 12, name: '旧当主本拠', ownerClan: 2, castellanId: 24, legionId: 0, samuraiIds: [24] };
+    const make = (id, name, castleId, extra = {}) => ({
+        id, name, fullName: name, castleId, clan: 2, status: 'active', factionId: 5,
+        isCastellan: false, isCommander: false, isDaimyo: false, isGunshi: false, isFactionLeader: false,
+        duty: 10, ambition: 100, loyalty: 95, affinity: 50, familyIds: [],
+        leadership: 70, strength: 70, intelligence: 70, politics: 70, diplomacy: 70, charm: 70,
+        achievementTotal: 100, arrivalTurn: 1569 * 12 + 6, stayHistory: [], ...extra
+    });
+    const rebel = make(20, '決起城主', 10, { isCastellan: true, isFactionLeader: true, loyalty: 50 });
+    const holdout = make(21, '脱出する忠臣', 10, { factionId: 0, duty: 90, strength: isCaptive ? 0 : 100, intelligence: isCaptive ? 0 : 100, loyalty: 95 });
+    const follower = make(22, '遠方の同派閥家臣', 11);
+    const oldDaimyo = make(24, '旧大名', 12, { isCastellan: true, isDaimyo: true, factionId: 0, nemesisIds: [], nemesisList: [] });
+    const targetDaimyo = make(30, '移籍先大名', 0, { clan: 3, isDaimyo: true, factionId: 0 });
+    const bushos = [rebel, holdout, follower, oldDaimyo, targetDaimyo];
+    const castles = [rebelCastle, refuge, oldHome];
+    const clans = [{ id: 2, name: '旧家', color: '#111111' }, { id: 3, name: '新家', color: '#888888' }];
+    const history = [];
+    const game = { year: 1570, month: 6, phase: 'game', playerClanId: isCaptive ? 3 : 99,
+        castles, bushos, clans, legions: [],
+        getBusho: id => bushos.find(b => b.id === Number(id)) || null,
+        getCastle: id => castles.find(c => c.id === Number(id)) || null,
+        getClan: id => clans.find(c => c.id === Number(id)) || null,
+        getClanDaimyo: id => id === 2 ? oldDaimyo : id === 3 ? targetDaimyo : null,
+        getClanBushos: id => bushos.filter(b => b.clan === Number(id)),
+        getCastleBushos: id => (game.getCastle(id)?.samuraiIds || []).map(id => game.getBusho(id)).filter(Boolean),
+        getClanCastles: id => castles.filter(c => c.ownerClan === Number(id)),
+        updateClanPrestige() {},
+        historySystem: { record: msg => history.push(msg) },
+        ui: { log() {}, async showDialogAsync() {}, showMapGuard() {}, hideMapGuard() {},
+            async playBattleBlink() { return true; },
+            async playCaptureEffect(ids, onHalfway) { onHalfway(); return true; },
+            updateClanColors() {}, renderMap() {} },
+        castleManager: { changeOwner(c, ownerId) { c.ownerClan = ownerId; } }
+    };
+    game.affiliationSystem = new Aff(game);
+    game.factionSystem = new Fac(game);
+    game.affiliationSystem.updateUI = () => {};
+    game.updateCastleLord = c => game.affiliationSystem.updateCastleLord(c);
+    const sys = new Indep(game);
+    sys.calculateLoyaltyScores = b => b.id === holdout.id
+        ? ({ joinScore: 0, stayScore: 500 }) : ({ joinScore: 500, stayScore: 0 });
+    sys.calcNewLoyalty = () => 95;
+    assert.strictEqual(refuge.castellanId, 0, '退避先は当初から城主不在');
+    await sys.executeRebellion(rebelCastle, rebel, oldDaimyo, 'defect', 3);
+    assert.strictEqual(refuge.ownerClan, 2, '途中で選出された城主を理由に退避先の領地を奪わない');
+    assert.strictEqual(follower.clan, 3, '遠方の非城主派閥家臣は本来の合流判定を受ける');
+    assert.strictEqual(follower.castleId, 10, '合流した派閥家臣は決起拠点に移動');
+    assert.strictEqual(holdout.clan, 2, '反対した忠臣は旧家所属を維持');
+    assert.strictEqual(holdout.castleId, 11, '反対者は逃亡または解放によって旧主家拠点に戻る');
+    assert.strictEqual(refuge.castellanId, 21, '最終状態の旧家残留者からのみ城主を任命');
+    assert.deepStrictEqual(refuge.samuraiIds, [21], '退避先に残る実際の在城者だけを登録');
+    assert.strictEqual(history.filter(m => m.includes('【城主任命】') && m.includes('遠方の同派閥家臣')).length, 0,
+        '移動途中だけの家臣を城主に任命した永久履歴を残さない');
+    }
 });
 
 Promise.all(pendingTests).then(() => {

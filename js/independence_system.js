@@ -349,6 +349,8 @@ class IndependenceSystem {
         }
 
         // ★神輿（派閥主）本人の処遇
+        // 派閥の呼応と遠方家臣の合流が終わるまで、脱出元の城主を選び直さない。
+        let proxyLeaderSourceCastle = null;
         if (isProxyRebellion) {
             const leaderCastle = this.game.getCastle(rebellionLeader.castleId);
             // ★神輿（派閥主）も大名家が変わるので功績半分！
@@ -366,13 +368,13 @@ class IndependenceSystem {
                 }
             } else {
                 // 城主でない（どこかの城の部下）なら、脱出して起点の城に合流する
-                if (leaderCastle) {
-                    leaderCastle.samuraiIds = leaderCastle.samuraiIds.filter(id => id !== rebellionLeader.id);
-                    this.game.updateCastleLord(leaderCastle);
+                if (leaderCastle && leaderCastle.id !== castle.id) {
+                    proxyLeaderSourceCastle = leaderCastle;
                 }
                 this.game.affiliationSystem.transferClanRaw(rebellionLeader, newClanId, { syncSpouses: true });
-                this.game.affiliationSystem.setCastleIdRaw(rebellionLeader, castle.id, { recordStayHistory: true });
-                castle.samuraiIds.push(rebellionLeader.id);
+                this.game.affiliationSystem.moveCastle(rebellionLeader, castle.id, {
+                    deferCastleLordUpdate: true, deferUI: true
+                });
                 if (rebellionLeader.isDaimyo) {
                     rebellionLeader.loyalty = 100;
                 } else {
@@ -429,10 +431,14 @@ class IndependenceSystem {
             this._logIndependence(nameChangeMsg, [oldClanId, newClanId]);
         }
 
+        // 独立・寝返りの同一処理中に旧主家への退避・捕虜解放が重なっても、
+        // 退避先の仮城主を次の派閥呼応判定へ混入させない。最終配置後に一度だけ確定する。
+        const deferredRebellionCastleLords = new Set();
+
         // 部下たちの去就
         // ★主君の基準を rebellionLeader にする
         // ★修正：記憶しておいた元の派閥ID(leaderOriginalFactionId)を渡して判定させます
-        let captiveMsgs = await this.resolveSubordinates(castle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
+        let captiveMsgs = await this.resolveSubordinates(castle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId, deferredRebellionCastleLords);
 
         if (!isCurrentFlow()) return;
 
@@ -440,7 +446,7 @@ class IndependenceSystem {
         if (isProxyRebellion && rebellionLeader.isCastellan) {
             const leaderCastle = this.game.getCastle(rebellionLeader.castleId);
             if (leaderCastle && leaderCastle.id !== castle.id) {
-                const extraMsgs = await this.resolveSubordinates(leaderCastle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
+                const extraMsgs = await this.resolveSubordinates(leaderCastle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId, deferredRebellionCastleLords);
                 if (!isCurrentFlow()) return;
                 if (extraMsgs.length > 0) captiveMsgs = captiveMsgs.concat(extraMsgs);
                 this.game.updateCastleLord(leaderCastle);
@@ -449,9 +455,15 @@ class IndependenceSystem {
 
         // ★基準を rebellionLeader にして派閥全体の呼応を処理
         // ★修正：記憶しておいた元の派閥ID(leaderOriginalFactionId)を渡して判定させます
-        await this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
+        await this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId, deferredRebellionCastleLords);
         if (!isCurrentFlow()) return;
         this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
+        // 呼応の対象と残留者が確定した最終名簿からだけ、脱出元の城主を再選出する。
+        if (proxyLeaderSourceCastle) deferredRebellionCastleLords.add(Number(proxyLeaderSourceCastle.id));
+        deferredRebellionCastleLords.forEach(id => {
+            const affectedCastle = this.game.getCastle(id);
+            if (affectedCastle) this.game.updateCastleLord(affectedCastle);
+        });
 
         // 独立勢力の外交は、最終的に誰が新勢力へ残ったか確定してから再編する。
         // 寝返りは既存勢力へ合流するため対象外。
@@ -745,7 +757,7 @@ class IndependenceSystem {
         return { joinScore, stayScore };
     }
 
-    async resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId = null) {
+    async resolveSubordinates(castle, newDaimyo, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId = null, deferredCastleLordIds = null) {
         const subordinates = this.game.getCastleBushos(castle.id).filter(b => b.clan === oldClanId && window.BushoStatusRules.isActive(b) && b.id !== newDaimyo.id);
         const captives = [], joiners = [];
         const escapeCastles = this.game.castles.filter(c => c.ownerClan === oldClanId && c.id !== castle.id);
@@ -770,8 +782,13 @@ class IndependenceSystem {
                         if ((busho.strength + busho.intelligence) * (Math.random() + 0.5) > (newDaimyo.leadership + newDaimyo.intelligence) * 0.8) {
                             const target = escapeCastles[Math.floor(Math.random() * escapeCastles.length)];
                             // ★新しいお引越しセンターの魔法を使います！
-                            this.game.affiliationSystem.moveCastle(busho, target.id);
-                            this.game.updateCastleLord(target);
+                            if (deferredCastleLordIds) {
+                                deferredCastleLordIds.add(Number(castle.id));
+                                deferredCastleLordIds.add(Number(target.id));
+                            }
+                            this.game.affiliationSystem.moveCastle(busho, target.id,
+                                deferredCastleLordIds ? { deferCastleLordUpdate: true, deferUI: true } : {});
+                            if (!deferredCastleLordIds) this.game.updateCastleLord(target);
                         } else {
                             castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
                             this.game.affiliationSystem.setCastleIdRaw(busho, 0); captives.push(busho);
@@ -794,10 +811,10 @@ class IndependenceSystem {
             }
         });
         if (joiners.length > 0) this._logIndependence(`  -> ${castle.name}にて${joiners.length}名が追随しました。`, [oldClanId, newClanId]);
-        return captives.length > 0 ? await this.handleCaptives(captives, oldClanId, newClanId, newDaimyo) : [];
+        return captives.length > 0 ? await this.handleCaptives(captives, oldClanId, newClanId, newDaimyo, deferredCastleLordIds) : [];
     }
 
-    async resolveFactionWideRebellion(leader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId = null) {
+    async resolveFactionWideRebellion(leader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId = null, deferredCastleLordIds = null) {
         const isCurrentFlow = this._captureIndependenceFlow();
         // ★修正：記憶しておいた元の派閥IDを基準として使います
         const targetFactionId = (leaderOriginalFactionId !== null && leaderOriginalFactionId !== 0) ? leaderOriginalFactionId : leader.factionId;
@@ -818,7 +835,7 @@ class IndependenceSystem {
                     }
                     this.game.affiliationSystem.transferClanRaw(busho, newClanId, { syncSpouses: true });
                     busho.loyalty = this.calcNewLoyalty(busho, leader);
-                    await this.resolveSubordinates(castle, leader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId);
+                    await this.resolveSubordinates(castle, leader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId, deferredCastleLordIds);
                     if (!isCurrentFlow()) return;
                     this.game.updateCastleLord(castle);
                 }
@@ -861,9 +878,24 @@ class IndependenceSystem {
         });
     }
 
-    async handleCaptives(captives, oldClanId, newClanId, newDaimyo) {
+    async handleCaptives(captives, oldClanId, newClanId, newDaimyo, deferredCastleLordIds = null) {
         const isCurrentFlow = this._captureIndependenceFlow();
         const returnCastles = this.game.castles.filter(c => c.ownerClan === oldClanId);
+        // 捕縛時に所在を0へ外された武将は、解放時には通常の転任窓口から再配置する。
+        // 旧拠点の城主フラグを他拠点へ持ち越さず、在城名簿・着任月・新城主を同じ正本で同期する。
+        const releaseCaptive = p => {
+            if (returnCastles.length > 0) {
+                const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
+                this.game.affiliationSystem.setClanIdRaw(p, oldClanId);
+                if (deferredCastleLordIds) deferredCastleLordIds.add(Number(target.id));
+                this.game.affiliationSystem.moveCastle(p, target.id, {
+                    stayHistoryFromCastleId: 0,
+                    ...(deferredCastleLordIds ? { deferCastleLordUpdate: true, deferUI: true } : {})
+                });
+            } else {
+                this.game.affiliationSystem.becomeRonin(p);
+            }
+        };
         let alertMsgs = [];
         for (const p of captives) {
             if (!isCurrentFlow()) return alertMsgs;
@@ -874,40 +906,19 @@ class IndependenceSystem {
                     if (!isCurrentFlow()) return alertMsgs;
                     alertMsgs.push(`処断：${p.name}は処断されました。`);
                 } else {
-                    if (returnCastles.length > 0) {
-                        const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
-                        this.game.affiliationSystem.setClanIdRaw(p, oldClanId); this.game.affiliationSystem.setCastleIdRaw(p, target.id, { recordStayHistory: true }); target.samuraiIds.push(p.id);
-                        this.game.updateCastleLord(target);
-                    } else { 
-                        // ★新しいお引越しセンターの魔法を使います！
-                        this.game.affiliationSystem.becomeRonin(p);
-                    }
+                    releaseCaptive(p);
                     alertMsgs.push(`解放：${p.name}は解放されました。`);
                 }
             } else if (newClanId === this.game.playerClanId) {
                 // ★プレイヤーの城に寝返った場合、戦争画面ではないので捕虜画面を出さず、逃がしてあげる魔法にします！
-                if (returnCastles.length > 0) {
-                    const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
-                    this.game.affiliationSystem.setClanIdRaw(p, oldClanId); this.game.affiliationSystem.setCastleIdRaw(p, target.id, { recordStayHistory: true }); target.samuraiIds.push(p.id);
-                    this.game.updateCastleLord(target);
-                } else {
-                    // ★逃げる城がなければ浪にします
-                    this.game.affiliationSystem.becomeRonin(p);
-                }
+                releaseCaptive(p);
                 alertMsgs.push(`${p.name}は元の主君のもとへ逃げ去りました。`);
             } else {
                 if (Math.random() < 0.3) {
                     await this.game.lifeSystem.executeDeath(p);
                     if (!isCurrentFlow()) return alertMsgs;
                 }
-                else if (returnCastles.length > 0) {
-                    const target = returnCastles[Math.floor(Math.random() * returnCastles.length)];
-                    this.game.affiliationSystem.setClanIdRaw(p, oldClanId); this.game.affiliationSystem.setCastleIdRaw(p, target.id, { recordStayHistory: true }); target.samuraiIds.push(p.id);
-                    this.game.updateCastleLord(target);
-                } else {
-                    // ★AIの場合も、逃げる城がなければ浪人になるように安全対策を入れます！
-                    this.game.affiliationSystem.becomeRonin(p);
-                }
+                else releaseCaptive(p);
             }
         }
         return alertMsgs;
