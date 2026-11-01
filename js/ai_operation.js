@@ -862,6 +862,9 @@ class AIOperationManager {
                     gold: decision.gold,
                     reason: decision.reason || ''
                 };
+                // 和睦圧力は外交専門処理が計算した値をそのまま引き継ぐ。
+                // 別のスコア計算を作らず、AI使者の条件交渉へ渡す。
+                if (decision.action === 'truce') clan.currentDiplomacyTarget.score = decision.score;
                 break; // 1つ決めたら探すのをおしまいにします
             }
         }

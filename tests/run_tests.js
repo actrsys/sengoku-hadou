@@ -541,7 +541,7 @@ test('GameConfig / GameConstants が中央定義として読み込める', () =>
     loadScript(ctx, 'js/constants.js');
     assert.strictEqual(ctx.WarParams, ctx.GameConfig.War);
     assert.strictEqual(ctx.MainParams, ctx.GameConfig.Main);
-    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r760');
+    assert.strictEqual(ctx.GameConfig.Meta.Version, 'r765');
     assert.strictEqual(ctx.GameConstants.BushoStatus.ACTIVE, 'active');
     assert.strictEqual(ctx.GameConstants.DiplomacyStatus.ALLIANCE, '同盟');
     assert.strictEqual(ctx.DiplomacyRules.canPassTerritory('同盟'), true);
@@ -33999,6 +33999,301 @@ test('A-086 和睦満了は外交状態変更の共通窓口を一度だけ通�
 });
 
 
+// A-087: 友好度の増減に伴う基本外交statusの切替も、状態変更の正本を必ず通す。
+test('A-087 友好度の閾値変化は外交共通窓口を通りイベント保護と旧AI計画を解除する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    const clans = [
+        { id: 1, diplomacyValue: {}, currentDiplomacyTarget: null },
+        { id: 2, diplomacyValue: {}, currentDiplomacyTarget: null }
+    ];
+    ctx.game = { clans, getClan(id) { return clans.find(c => c.id === Number(id)); } };
+    loadScript(ctx, 'js/diplomacy.js');
+    const dm = vm.runInContext('new DiplomacyManager(game)', ctx);
+    dm.changeStatus(1, 2, '普通');
+    dm.setSentimentAbsolute(1, 2, 65);
+    dm.setEventRelationFlag(1, 2, true);
+    clans[0].currentDiplomacyTarget = { targetId: 2, type: 'goodwill' };
+    clans[1].currentDiplomacyTarget = { targetId: 1, type: 'goodwill' };
+    let changes = 0;
+    const originalChange = dm.changeStatus.bind(dm);
+    dm.changeStatus = (...args) => { changes++; return originalChange(...args); };
+
+    // 実際の親善などで使う友好度更新API。同一status内は付随状態を維持する。
+    dm.updateSentiment(1, 2, 3);
+    assert.strictEqual(dm.getRelation(1, 2).status, '普通');
+    assert.strictEqual(changes, 0);
+    assert.strictEqual(dm.getRelation(1, 2).isEvent, true);
+    assert.notStrictEqual(clans[0].currentDiplomacyTarget, null);
+
+    // 70到達でstatusが普通→友好に変化。古い計画やイベント保護を持ち越さない。
+    dm.updateSentiment(1, 2, 2);
+    assert.strictEqual(changes, 1, '状態の確定はDiplomacyManager.changeStatus()へ委譲する');
+    for (const [a, b] of [[1, 2], [2, 1]]) {
+        assert.strictEqual(dm.getRelation(a, b).status, '友好');
+        assert.strictEqual(dm.getRelation(a, b).sentiment, 70);
+        assert.strictEqual(dm.getRelation(a, b).isEvent, false);
+    }
+    assert.strictEqual(clans[0].currentDiplomacyTarget, null);
+    assert.strictEqual(clans[1].currentDiplomacyTarget, null);
+
+    // 戦闘や調略による友好度低下でも同じ入口を通す。
+    dm.setEventRelationFlag(1, 2, true);
+    clans[0].currentDiplomacyTarget = { targetId: 2, type: 'goodwill' };
+    dm.updateSentiment(1, 2, -45);
+    assert.strictEqual(changes, 2);
+    assert.strictEqual(dm.getRelation(1, 2).status, '敵対');
+    assert.strictEqual(dm.getRelation(2, 1).status, '敵対');
+    assert.strictEqual(dm.getRelation(1, 2).isEvent, false);
+    assert.strictEqual(clans[0].currentDiplomacyTarget, null);
+    dm.changeStatus(1, 2, '和睦', 6);
+    changes = 0;
+    dm.updateSentiment(1, 2, 50);
+    assert.strictEqual(changes, 0, '和睦等の特殊statusは友好度更新だけでは上書きしない');
+    assert.strictEqual(dm.getRelation(1, 2).status, '和睦');
+    assert.strictEqual(dm.getRelation(1, 2).trucePeriod, 6);
+});
+
+// A-088: 謀反・独立の外交反転でも友好度更新は正規の対称書込窓口を使う。
+test('A-088 政権交代の外交反転は友好度の正本を通り婚姻以外の状態を保つ', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    const clans = [
+        { id: 1, diplomacyValue: {}, currentDiplomacyTarget: { targetId: 2, type: 'goodwill' } },
+        { id: 2, diplomacyValue: {}, currentDiplomacyTarget: { targetId: 1, type: 'goodwill' } }
+    ];
+    ctx.game = { clans, princesses: [], getClan(id) { return clans.find(c => c.id === Number(id)); } };
+    loadScript(ctx, 'js/diplomacy.js');
+    const dm = vm.runInContext('new DiplomacyManager(game)', ctx);
+    dm.changeStatus(1, 2, '同盟');
+    dm.setSentimentAbsolute(1, 2, 80);
+    dm.setEventRelationFlag(1, 2, true);
+    const writes = [];
+    const originalSet = dm.setSentimentAbsolute.bind(dm);
+    dm.setSentimentAbsolute = (a, b, sentiment) => {
+        writes.push([a, b, sentiment]);
+        return originalSet(a, b, sentiment);
+    };
+    assert.strictEqual(dm.reorganizeRelationsAfterRebellion(1, 1), true);
+    assert.deepStrictEqual(writes, [[1, 2, 30]], '反転値も友好度正本から対称更新する');
+    assert.strictEqual(dm.getRelation(1, 2).status, '敵対');
+    assert.strictEqual(dm.getRelation(2, 1).status, '敵対');
+    assert.strictEqual(dm.getRelation(2, 1).sentiment, 30);
+    assert.strictEqual(dm.getRelation(1, 2).isEvent, false);
+    assert.strictEqual(clans[0].currentDiplomacyTarget, null);
+    assert.strictEqual(clans[1].currentDiplomacyTarget, null);
+});
+
+test('A-088 独立新家と旧家の敵対友好度も外交正本を通る', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    const clans = [
+        { id: 1, diplomacyValue: {}, currentDiplomacyTarget: null },
+        { id: 2, diplomacyValue: {}, currentDiplomacyTarget: null },
+        { id: 3, diplomacyValue: {}, currentDiplomacyTarget: null }
+    ];
+    ctx.game = { clans, princesses: [], getClan(id) { return clans.find(c => c.id === Number(id)); } };
+    loadScript(ctx, 'js/diplomacy.js');
+    const dm = vm.runInContext('new DiplomacyManager(game)', ctx);
+    dm.changeStatus(1, 2, '同盟');
+    dm.setSentimentAbsolute(1, 2, 75);
+    const writes = [];
+    const originalSet = dm.setSentimentAbsolute.bind(dm);
+    dm.setSentimentAbsolute = (a, b, sentiment) => {
+        writes.push([a, b, sentiment]);
+        return originalSet(a, b, sentiment);
+    };
+    assert.strictEqual(dm.reorganizeRelationsAfterRebellion(1, 3), true);
+    assert.deepStrictEqual(writes, [[3, 2, 30], [1, 3, 0]], '継承関係と旧家への敵対を共通書込する');
+    assert.strictEqual(dm.getRelation(3, 2).sentiment, 30);
+    assert.strictEqual(dm.getRelation(2, 3).sentiment, 30);
+    assert.strictEqual(dm.getRelation(1, 3).status, '敵対');
+    assert.strictEqual(dm.getRelation(3, 1).status, '敵対');
+    assert.strictEqual(dm.getRelation(3, 1).sentiment, 0);
+});
+
+// A-089: 通常対外婚姻の友好度補正は双方直接書込をせず、既存の外交正本へ委譲する。
+test('A-089 通常婚姻の補正前同期と友好度増加は共通窓口を通る', () => {
+    const ctx = createContext({
+        FamilyLinker: { rebuildAllFamilyIds() {} },
+        LifeStatusRules: { isUnavailable: () => false }
+    });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    const clans = [
+        { id: 1, princessIds: [1], diplomacyValue: { 2: { status: '普通', sentiment: 40, isMarriage: false, hostageIds: [], subordinateMonths: 0 } } },
+        { id: 2, princessIds: [], diplomacyValue: { 1: { status: '普通', sentiment: 60, isMarriage: false, hostageIds: [], subordinateMonths: 0 } } }
+    ];
+    const princess = { id: 1, status: 'unmarried', originalClanId: 1, currentClanId: 1, husbandId: 0 };
+    const husband = { id: 20, clan: 2, wifeIds: [] };
+    const game = {
+        clans, playerClanId: 1, princesses: [princess], bushos: [husband],
+        getClan(id) { return clans.find(c => c.id === Number(id)); },
+        getBusho(id) { return Number(id) === 20 ? husband : null; },
+        getPrincess(id) { return Number(id) === 1 ? princess : null; }
+    };
+    const dm = vm.runInContext('new DiplomacyManager(game)', Object.assign(ctx, { game }));
+    const writes = [];
+    const set = dm.setSentimentAbsolute.bind(dm);
+    dm.setSentimentAbsolute = (a, b, value) => {
+        writes.push([a, b, value]);
+        return set(a, b, value);
+    };
+    const originalUpdate = dm.updateSentiment.bind(dm);
+    let observedAtUpdate = null;
+    dm.updateSentiment = (a, b, delta) => {
+        observedAtUpdate = [clans[0].diplomacyValue[2].sentiment, clans[1].diplomacyValue[1].sentiment];
+        return originalUpdate(a, b, delta);
+    };
+    assert.strictEqual(dm.applyMarriageData(1, 20, 2, true), true);
+    const marriageCfg = ctx.MainParams.Diplomacy.Marriage;
+    const expected = Math.min(100, Math.max(marriageCfg.SentimentFloor, 60 + marriageCfg.SentimentIncrease));
+    assert.deepStrictEqual(observedAtUpdate, [40, 60], '婚姻補正前に両国の友好度を直接書き換えない');
+    assert.strictEqual(writes.length, 1, '婚姻成立の友好度確定は共通窓口を一度だけ通る');
+    assert.deepStrictEqual(writes[0], [1, 2, expected]);
+    assert.strictEqual(clans[0].diplomacyValue[2].sentiment, expected);
+    assert.strictEqual(clans[1].diplomacyValue[1].sentiment, expected);
+    assert.strictEqual(clans[0].diplomacyValue[2].status, '友好');
+    assert.strictEqual(clans[1].diplomacyValue[1].status, '友好');
+    assert.strictEqual(clans[0].diplomacyValue[2].isMarriage, true);
+    assert.strictEqual(clans[1].diplomacyValue[1].isMarriage, true);
+});
+
+// A-090: AIからプレイヤーへの親善の品は会話を開いた時点では移動させない。
+// 月/ターンが変われば既存の外交寿命判定で失効し、双方の金が動かないことを保証する。
+function createR764AIGoodwillProposalCase() {
+    const s = createR580DiplomacyConditionCase();
+    s.game.playerClanId = 2;
+    s.game.getClanDaimyo = id => Number(id) === 2 ? s.husband : s.doer;
+    s.game.getClanCastles = id => Number(id) === 2 ? [s.target] : [s.home];
+    s.game.getRelation = () => ({ status: '普通', sentiment: 50 });
+    s.game.getNavigatorInfo = () => ({ name: '小姓', faceIcon: 'face.webp' });
+    s.target.gold = 50;
+    s.diplomacy._getThirdPartyDaimyoReference = () => '甲家の当主';
+    s.diplomacy.getCallName = b => b?.name || '使者';
+    s.diplomacy.buildDiplomacyGreeting = () => ({ greetMsg1: '挨拶', greetMsg2: '返答', context: {} });
+    s.diplomacy.getDiplomacyMessages = () => ({ demandMsg: '親善', acceptMsg: '', replyAcceptMsg: '', rejectMsg: '拒否', replyRejectMsg: '了承' });
+    s.diplomacy.calcGoodwillIncrease = () => 12;
+    const history = [], results = [];
+    let accept, reject;
+    s.game.ui = {
+        showDialog(_text, _a, onAccept, onReject, opts) {
+            if (opts?.okText === '受け取る') { accept = onAccept; reject = onReject; }
+            else if (typeof onAccept === 'function') onAccept();
+        },
+        showResultModal(message) { results.push(message); },
+        log(message) { history.push(message); }
+    };
+    s.diplomacy._recordDiplomacyHistory = text => history.push(text);
+    s.diplomacy.proposeDiplomacyToPlayer(s.doer, 2, 'goodwill', 100, () => {});
+    assert.strictEqual(typeof accept, 'function', '通常の親善会話から承諾を選べる');
+    assert.strictEqual(typeof reject, 'function', '通常の親善会話から拒否を選べる');
+    return { ...s, accept, reject, history, results };
+}
+
+test('A-090 AI親善の使者の会話失効時は贈答金が失われず履歴も残らない', () => {
+    const s = createR764AIGoodwillProposalCase();
+    assert.strictEqual(s.home.gold, 800, '会話提示だけでは出資元から差し引かない');
+    assert.strictEqual(s.target.gold, 50, '受領側もまだ増額しない');
+    s.game.month++;
+    s.accept();
+    assert.strictEqual(s.home.gold, 800);
+    assert.strictEqual(s.target.gold, 50);
+    assert.strictEqual(s.history.length, 0);
+    assert.strictEqual(s.results.length, 0);
+});
+
+test('A-090 AI親善は承諾確定時だけ支払い、拒否では支払いを発生させない', () => {
+    const accepted = createR764AIGoodwillProposalCase();
+    assert.strictEqual(accepted.home.gold, 800, '承諾前は金を保持する');
+    accepted.accept();
+    assert.strictEqual(accepted.home.gold, 700, '承諾で出資元の金を一度だけ引く');
+    assert.strictEqual(accepted.target.gold, 150, '承諾で相手の金を増やす');
+    assert.strictEqual(accepted.history.length, 1);
+    const rejected = createR764AIGoodwillProposalCase();
+    assert.strictEqual(rejected.home.gold, 800, '拒否前は金を保持する');
+    rejected.reject();
+    assert.strictEqual(rejected.home.gold, 800, '拒否で未支出の金を操作しない');
+    assert.strictEqual(rejected.target.gold, 50);
+    assert.strictEqual(rejected.history.length, 1);
+});
+
+test('A-090 使者の贈答金が了承直前に不足しても受領側へ金を発生させない', () => {
+    const s = createR764AIGoodwillProposalCase();
+    s.home.gold = 40; // 会話を開いた後、出資元の保有金が変わった。
+    s.accept();
+    assert.strictEqual(s.home.gold, 40);
+    assert.strictEqual(s.target.gold, 50);
+    assert.strictEqual(s.history.length, 0, '未成立の親善を履歴に残さない');
+    assert(s.results.some(text => text.includes('贈答は成立しませんでした')));
+});
+
+// A-091: AI月初外交計画は和睦圧力を保持し、実際の使者派遣まで受け渡す。
+// 会話中の月替わりではなく、月初計画→AI拠点ターンという通常の順序を検査する。
+test('A-091 AIからプレイヤーへの和睦圧力は月初計画から使者派遣へ渡る', () => {
+    const fixedMath = Object.create(Math);
+    fixedMath.random = () => 0;
+    const ctx = createContext({ Math: fixedMath });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    loadScript(ctx, 'js/ai_operation.js');
+    loadScript(ctx, 'js/ai.js');
+    const daimyo = { id: 101, name: 'AI当主', clan: 1, castleId: 10, intelligence: 80, duty: 50, diplomacy: 70 };
+    const other = { id: 202, name: '相手当主', clan: 2, castleId: 20 };
+    const clans = [
+        { id: 1, name: 'AI家', leaderId: 101, courtTrust: 0, diplomacyValue: {} },
+        { id: 2, name: 'プレイヤー家', leaderId: 202, diplomacyValue: {} },
+        { id: 3, name: '敵家A', diplomacyValue: {} },
+        { id: 4, name: '敵家B', diplomacyValue: {} }
+    ];
+    const castles = [
+        { id: 10, ownerClan: 1, adjacentCastleIds: [20, 30, 40], soldiers: 5000, gold: 5000, legionId: 0 },
+        { id: 11, ownerClan: 1, adjacentCastleIds: [], legionId: 0 },
+        { id: 20, ownerClan: 2, adjacentCastleIds: [10] },
+        { id: 30, ownerClan: 3, adjacentCastleIds: [10] },
+        { id: 40, ownerClan: 4, adjacentCastleIds: [10] }
+    ];
+    const powers = { 1: 10000, 2: 11000, 3: 8000, 4: 8000 };
+    const game = {
+        clans, castles, playerClanId: 2,
+        getClan(id) { return clans.find(c => c.id === Number(id)) || null; },
+        getCastle(id) { return castles.find(c => c.id === Number(id)) || null; },
+        getClanCastles(id) { return castles.filter(c => c.ownerClan === Number(id)); },
+        getClanDaimyo(id) { return Number(id) === 1 ? daimyo : (Number(id) === 2 ? other : null); },
+        getClanTotalSoldiers(id) { return powers[id] || 1; },
+        getRelation(a, b) { return this.diplomacyManager.getRelation(a, b); },
+        aiEngine: { getClanPrestige(id) { return powers[id] || 1; }, getAISmartness() { return 0; } }
+    };
+    const dm = vm.runInContext('new DiplomacyManager(game)', Object.assign(ctx, { game }));
+    game.diplomacyManager = dm;
+    dm.changeStatus(1, 2, '敵対');
+    dm.changeStatus(1, 3, '敵対');
+    dm.changeStatus(1, 4, '敵対');
+    dm.getAllyCount = () => 0;
+    dm.getDiplomacyPriorityList = () => [{ clanId: 2, isStrategicPartner: false }];
+    const planner = vm.runInContext('new AIOperationManager(game)', ctx);
+    planner._getAdjacentIds = c => c.adjacentCastleIds || [];
+    planner.thinkMonthlyDiplomacy(clans[0]);
+    const plan = clans[0].currentDiplomacyTarget;
+    assert.strictEqual(plan?.action, 'truce', '通常の三正面の外交計画で和睦を選ぶ');
+    assert.ok(plan.score >= 90, '交渉条件を検討できる前線圧力が計画に残る');
+    let receivedScore = null;
+    dm.proposeDiplomacyToPlayer = (_doer, targetId, type, _gold, _complete, score) => {
+        assert.strictEqual(targetId, 2);
+        assert.strictEqual(type, 'truce');
+        receivedScore = score;
+    };
+    const ai = vm.runInContext('new AIEngine(game)', ctx);
+    const result = ai.execAIDiplomacy(castles[0], daimyo, 0, plan);
+    assert.strictEqual(result, 'waiting', 'プレイヤー使者会話の選択待ちに入る');
+    assert.strictEqual(receivedScore, plan.score, '月初計画で計算した圧力を同じ値で受け渡す');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
@@ -34007,5 +34302,6 @@ Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(1);
 });
+
 
 

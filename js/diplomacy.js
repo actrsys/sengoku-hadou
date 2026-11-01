@@ -170,10 +170,9 @@ class DiplomacyManager {
             if (inverted <= 30) status = window.GameConstants.DiplomacyStatus.HOSTILE;
 
             this.changeStatus(successorClanId, snapshot.otherId, status);
-            const relationA = this.getDiplomacyData(successorClanId, snapshot.otherId);
-            const relationB = this.getDiplomacyData(snapshot.otherId, successorClanId);
-            if (relationA) relationA.sentiment = inverted;
-            if (relationB) relationB.sentiment = inverted;
+            // 再編の友好度も通常外交と同じ双方向更新窓口を正本にする。
+            // 既に確定した外交statusを閾値判定で再変更しないため、updateSentiment() は使わない。
+            this.setSentimentAbsolute(successorClanId, snapshot.otherId, inverted);
             this.setMarriageRelation(
                 successorClanId,
                 snapshot.otherId,
@@ -184,10 +183,7 @@ class DiplomacyManager {
         // 旧家から分離して新勢力を立てた場合だけ、旧家との関係は従来どおり即時敵対にする。
         if (sourceClanId !== successorClanId) {
             this.changeStatus(sourceClanId, successorClanId, window.GameConstants.DiplomacyStatus.HOSTILE);
-            const relationA = this.getDiplomacyData(sourceClanId, successorClanId);
-            const relationB = this.getDiplomacyData(successorClanId, sourceClanId);
-            if (relationA) relationA.sentiment = 0;
-            if (relationB) relationB.sentiment = 0;
+            this.setSentimentAbsolute(sourceClanId, successorClanId, 0);
             this.setMarriageRelation(sourceClanId, successorClanId, false);
         }
 
@@ -323,11 +319,10 @@ class DiplomacyManager {
         if (!dataA || !dataB) return;
         const current = Math.max(Number(dataA.sentiment || 0), Number(dataB.sentiment || 0));
         const next = Math.min(100, Math.max(cfg.SentimentFloor, current + cfg.SentimentIncrease));
-        // 友好度の増減と「普通/友好/敵対」の閾値処理は既存の updateSentiment() を正本にする。
-        // 同盟・支配・従属・和睦などの特殊statusは updateSentiment 側で保護されるため、婚姻だけで上書きされない。
-        dataA.sentiment = current;
-        dataB.sentiment = current;
-        this.updateSentiment(clanId, targetId, next - current);
+        // 補正の起点は従来どおり双方向の高い友好度を使うが、
+        // 中間値を両家へ直接書かず、最終値だけを既存の友好度・基本status正本から確定する。
+        // 同盟・支配・従属・和睦などの特殊statusは updateSentiment 側で保護する。
+        this.updateSentiment(clanId, targetId, next - Number(dataA.sentiment || 0));
     }
 
     getMarriageDiplomacyBonus(type, relation) {
@@ -611,31 +606,26 @@ class DiplomacyManager {
     }
 
     /**
-     * 感情値を加減し、閾値に応じて自動でステータスを変動させる
+     * 友好度を増減する。基本statusが閾値をまたいだ場合の状態変更は
+     * changeStatus() を正本とし、イベント保護・旧AI外交計画も同時に整理する。
+     * 同盟・主従・和睦などの特殊statusは友好度だけでは変えない。
      */
     updateSentiment(clanId, targetId, delta) {
-        const dataA = this.getDiplomacyData(clanId, targetId);
-        const dataB = this.getDiplomacyData(targetId, clanId);
+        const relation = this.getDiplomacyData(clanId, targetId);
+        if (!relation || !this.getDiplomacyData(targetId, clanId)) return;
 
-        if (!dataA || !dataB) return;
+        const nextSentiment = Math.max(0, Math.min(100, relation.sentiment + delta));
+        this.setSentimentAbsolute(clanId, targetId, nextSentiment);
+        if (!window.DiplomacyRules.isBasicSentimentStatus(relation.status)) return;
 
-        const update = (data) => {
-            data.sentiment = Math.max(0, Math.min(100, data.sentiment + delta));
-            
-            // ★変更：和睦中も、勝手に状態が戻らないように保護します！
-            if (window.DiplomacyRules.isBasicSentimentStatus(data.status)) {
-                if (data.sentiment >= 70) {
-                    data.status = window.GameConstants.DiplomacyStatus.FRIENDLY;
-                } else if (data.sentiment <= 30) {
-                    data.status = window.GameConstants.DiplomacyStatus.HOSTILE;
-                } else {
-                    data.status = window.GameConstants.DiplomacyStatus.NORMAL;
-                }
-            }
-        };
-
-        update(dataA);
-        update(dataB);
+        const nextStatus = nextSentiment >= 70
+            ? window.GameConstants.DiplomacyStatus.FRIENDLY
+            : nextSentiment <= 30
+                ? window.GameConstants.DiplomacyStatus.HOSTILE
+                : window.GameConstants.DiplomacyStatus.NORMAL;
+        if (nextStatus !== relation.status) {
+            this.changeStatus(clanId, targetId, nextStatus);
+        }
     }
     
     /**
@@ -3138,11 +3128,8 @@ class DiplomacyManager {
     proposeDiplomacyToPlayer(doer, targetClanId, type, gold, onComplete, score = 0) {
         const doerClan = this.game.getClan(doer.clan);
 
-        if (type === 'goodwill') {
-            const doerCastle = this.game.getCastle(doer.castleId);
-            if (doerCastle) doerCastle.gold = Math.max(0, doerCastle.gold - gold);
-        }
-
+        // AI親善の金は会話表示時に先払いしない。失効・拒否時には未成立の取引を残さず、
+        // 承諾確定の共通寿命判定を通過した時だけ双方の金を更新する。
         const targetClan = this.game.getClan(targetClanId);
         const myDaimyo = this.game.getClanDaimyo(targetClanId);
         const enemyDaimyo = this.game.getClanDaimyo(doer.clan);
@@ -3214,8 +3201,7 @@ class DiplomacyManager {
             this._recordDiplomacyHistory(rejectHistory, [doer.clan, targetClanId]);
 
             if (type === 'goodwill') {
-                const doerCastle = this.game.getCastle(doer.castleId);
-                if (doerCastle) doerCastle.gold = Math.min(GameConfig.Limits.CastleStock, doerCastle.gold + gold);
+                // 未成立の会話では引落しを行わないため、拒否側の返金も不要。
                 this.game.ui.showResultModal(`親善の品を突き返しました。`, () => {
                     this._scheduleProposalCompletion(onComplete, 100);
                 });
@@ -3253,11 +3239,26 @@ class DiplomacyManager {
 
         const doAccept = () => {
             if (!isProposalCurrent()) return;
+            if (type === 'goodwill') {
+                // AI外交計画で金額を決めた後も、会話中に保有金や所属拠点が変わり得る。
+                // 贈答金は了承時に一度だけ確定し、不足時に受取側へ金を生成しない。
+                const doerCastle = this.game.getCastle(doer.castleId);
+                const myCastleObj = this.game.getClanCastles(targetClanId)[0];
+                const giftGold = Number(gold);
+                if (!doerCastle || Number(doerCastle.ownerClan) !== Number(doer.clan)
+                    || !myCastleObj || !Number.isFinite(giftGold) || giftGold < 0
+                    || Number(doerCastle.gold) < giftGold) {
+                    this.game.ui.showResultModal('親善の金を用意できなくなったため、贈答は成立しませんでした。', () => {
+                        this._scheduleProposalCompletion(onComplete, 100);
+                    });
+                    return;
+                }
+                doerCastle.gold -= giftGold;
+                myCastleObj.gold = Math.min(GameConfig.Limits.CastleStock, myCastleObj.gold + giftGold);
+            }
             this.calcDiplomacyExp(doer, type, true, true);
 
             if (type === 'goodwill') {
-                const myCastleObj = this.game.getClanCastles(targetClanId)[0];
-                if (myCastleObj) myCastleObj.gold = Math.min(GameConfig.Limits.CastleStock, myCastleObj.gold + gold);
                 const increase = this.calcGoodwillIncrease(gold, doer);
                 this.updateSentiment(doer.clan, targetClanId, increase);
                 this.game.ui.log(`【外交】${targetClan.name}は${doerClan.name}からの親善を受け入れました。`, { clanIds: [doer.clan, targetClanId], category: 'diplomacy', inferCurrentTurn: false });
