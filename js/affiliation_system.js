@@ -548,6 +548,29 @@ class AffiliationSystem {
     // 城の所有者変更は CastleManager.changeOwner() に一元化しました。
 
     /**
+     * 同じ命令で複数人が移動するときは、各人の所属・在城更新だけ先に行い、
+     * 出発元と到着先の城主を最終状態から一度だけ決める。
+     * 一人ずつ自動選出すると移動途中の仮城主が任命履歴に残るため。
+     */
+    moveCastleGroup(bushos, newCastleId) {
+        if (!Array.isArray(bushos) || bushos.length === 0) return;
+        const sourceIds = new Set();
+        bushos.forEach(busho => {
+            if (!busho) return;
+            const previousId = Number(busho.castleId);
+            if (previousId > 0 && previousId !== Number(newCastleId)) sourceIds.add(previousId);
+            this.moveCastle(busho, newCastleId, { deferCastleLordUpdate: true, deferUI: true });
+        });
+        sourceIds.forEach(id => {
+            const source = this.game.getCastle(id);
+            if (source) this.updateCastleLord(source);
+        });
+        const destination = this.game.getCastle(newCastleId);
+        if (destination) this.updateCastleLord(destination);
+        this.updateUI();
+    }
+
+    /**
      * （共通の道具）お城から出る時の処理
      */
     leaveCastle(busho, options = {}) {

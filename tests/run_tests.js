@@ -5103,10 +5103,13 @@ test('捕虜・結果画面の固定ボタンは inline onclick を生成しな�
     assert.ok(!ui.includes('onclick="window.GameApp.ui.closeResultModal()"'));
 });
 
-test('コード構成ガイドが存在し、主要な専門部署を索引化している', () => {
-    const doc = read('ARCHITECTURE.md');
+test('現行設計マニュアルから専門部署の技術索引を参照できる', () => {
+    const manual = read('ARCHITECTURE.md');
+    const referencePath = 'docs/manual/TECHNICAL_REFERENCE.md';
+    assert.ok(manual.includes(referencePath), '現行マニュアルから技術索引へ誘導する');
+    const doc = read(referencePath);
     for (const name of ['app_bootstrap.js', 'skill_manager.js', 'turn_manager.js', 'selector_modal_view.js', 'troop_allocation.js']) {
-        assert.ok(doc.includes(name), `${name} がARCHITECTURE.mdにありません`);
+        assert.ok(doc.includes(name), `${name} が技術索引にありません`);
     }
 });
 
@@ -17049,7 +17052,7 @@ test('r445 AIの正式な居城移転は本拠地記録も移し、戦時の単�
         // 移転元には当主以外の留守居家臣がいる正常な配置を使用する。
         getCastleBushos: id => Number(id) === 1 ? [{ id: 124, clan: 2, isDaimyo: false,
             isCommander: false, status: 'active', factionId: 0, leadership: 50, strength: 50 }] : [],
-        affiliationSystem: { moveCastle(b, id) { b.castleId = id; } }
+        affiliationSystem: { moveCastleGroup(bushos, id) { bushos.forEach(b => { b.castleId = id; }); } }
     };
     useRealMoveGraphWithFixtureAdjacency(ctx, game);
     const staffing = new Staffing(game);
@@ -25499,7 +25502,7 @@ test('r566 国主居城移転でも委任城の武将移動不可を守り、他
             mapGraph:{getAdjacentCastles:c=>c.id===1?[to]:[from]},aiOperationManager:{operations:{}},
             getCastleBushos:id=>Number(id)===1?[{id:100,clan:2,isDaimyo:false,
                 isCommander:false,factionId:0,leadership:50,strength:50}]:[],
-            affiliationSystem:{moveCastle(b,id){moves++;b.castleId=id;}}};
+            affiliationSystem:{moveCastleGroup(bushos,id){bushos.forEach(b=>{moves++;b.castleId=id;});}}};
         useRealMoveGraphWithFixtureAdjacency(ctx, game);
         return {from,to,leader,clan,staffing:new Staffing(game),getMoves:()=>moves};
     }
@@ -25990,7 +25993,7 @@ function createR575MoveCase() {
         mapGraph:{getConnectedOwnIdsForMove:()=>new Set(connected)},
         getBusho:id=>bushoMap.get(id),ui:{showDialog:s=>dialogs.push(s)},
         factionSystem:{handleMove(){}},
-        affiliationSystem:{moveCastle:(officer,id)=>{moved.push(officer.id);officer.castleId=id;}}
+        affiliationSystem:{moveCastleGroup:(officers,id)=>{officers.forEach(officer=>{moved.push(officer.id);officer.castleId=id;});}}
     };
     const command=new Command(game);
     command.finishCommand=()=>{finished++;};
@@ -29820,7 +29823,7 @@ test('r654 AIの居城移転と通常配置換えは地図の共通通行探索�
             getRelation: (_, other) => Number(other) === 2 ? { status: diplomacyStatus } : null,
             getCastleBushos: id => Number(id) === 1 ? [leader, attendant] : [],
             aiOperationManager: { operations: {} },
-            affiliationSystem: { moveCastle(b, id) { b.castleId = id; } }
+            affiliationSystem: { moveCastleGroup(bushos, id) { bushos.forEach(b => { b.castleId = id; }); } }
         };
         game.mapGraph = new Graph(game);
         let calls = 0;
@@ -34324,6 +34327,105 @@ test('A-092 AI親善の贈答金は先頭拠点でなくプレイヤー大名の
     assert.strictEqual(accepted.home.gold, 700, '使者の拠点での支払は100金');
     assert.strictEqual(daimyoCastle.gold, 500, 'プレイヤー大名の居城に100金が届く');
     assert.strictEqual(accepted.target.gold, 50, '別拠点には誤入金しない');
+});
+
+// A-094: 実際の敗戦退避では複数武将を一度に処遇する。旧城主が先に退避しても、
+// 退避の途中で残存武将を仮城主に任命して履歴を連発してはならない。
+test('A-094 敗戦時の複数武将退避で旧拠点の仮城主任命履歴を連続記録しない', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const sourceData = scenario.castlesState.find(c => Number(c.id) === 190);
+    const targetData = scenario.castlesState.find(c => Number(c.id) === 188);
+    assert.ok(sourceData && targetData && Number(sourceData.ownerClan) === Number(targetData.ownerClan));
+    const sourceStates = scenario.warriorsState.filter(b => Number(b.castleId) === 190 && Number(b.clan) === Number(sourceData.ownerClan));
+    const selectedStates = [sourceStates.find(b => Number(b.id) === Number(sourceData.castellanId)), ...sourceStates.filter(b => Number(b.id) !== Number(sourceData.castellanId)).slice(0, 4)];
+    assert.strictEqual(selectedStates.length, 5);
+    const people = selectedStates.map((row, i) => {
+        const master = common.warriorsMaster.find(b => Number(b.id) === Number(row.id));
+        return { ...master, ...row, leadership: 100 - i * 9, strength: 80 - i * 5, politics: 70 - i * 5, intelligence: 70 - i * 5,
+            diplomacy: 70 - i * 5, charm: 70 - i * 5, achievementTotal: 0, isFactionLeader: false, isRetired: false,
+            status: 'active', isCastellan: i === 0,
+            isDaimyo: false, isCommander: false, isGunshi: false, wifeIds: [] };
+    });
+    const source = { ...sourceData, samuraiIds: people.map(b => b.id), castellanId: people[0].id };
+    const target = { ...targetData, samuraiIds: [], castellanId: 0 };
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active', isRonin: b => b?.status === 'ronin' },
+        LifeStatusRules: { isPresent: b => b?.status === 'active', isUnavailable: b => b?.status !== 'active' },
+        WarParams: { War: { CaptureChanceBase: 0, CaptureStrFactor: 0, DaimyoCaptureReduction: 0 } }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/war.js');
+    loadScript(ctx, 'js/war_effort.js');
+    const records = [];
+    const castles = [source, target];
+    const game = { phase: 'game', year: 1560, month: 5, playerClanId: 999, isRestoringSave: false,
+        castles, bushos: people, legions: [],
+        getCastle: id => castles.find(c => Number(c.id) === Number(id)) || null,
+        getBusho: id => people.find(b => Number(b.id) === Number(id)) || null,
+        getCastleBushos: id => {
+            const castle = castles.find(c => Number(c.id) === Number(id));
+            return (castle?.samuraiIds || []).map(id => people.find(b => Number(b.id) === Number(id))).filter(Boolean);
+        },
+        getClan: () => ({ name: '南部家' }), getClanDaimyo: () => ({ innovation: 50 }),
+        historySystem: { record: text => records.push(text) },
+        factionSystem: { handleMove() {} }, ui: { log() {} }
+    };
+    game.affiliationSystem = new (vm.runInContext('AffiliationSystem', ctx))(game);
+    game.affiliationSystem.updateUI = () => {};
+    const war = new (vm.runInContext('WarManager', ctx))(game);
+    war.getEscapeCandidates = () => [target];
+    war.processCaptures(source, 999);
+    assert.strictEqual(source.samuraiIds.length, 0, '同じ拠点からの通常退避を全員に実施');
+    assert.strictEqual(target.samuraiIds.length, people.length, '生存者は退避先へ移動する');
+    assert.strictEqual(records.filter(text => text.includes('【城主任命】') && text.includes(source.name)).length, 0,
+        '退避中にだけ存在した仮城主を正式任命として記録しない');
+});
+
+// A-094: プレイヤー・AIの一括配置換えは所属Systemを一度だけ通して城主を確定する。
+// 途中で交代した人物を正規の任命履歴として記録しない。一方、次の独立した
+// 人事変更までHistorySystem側で一律に重複削除しない。
+test('A-094 一括移動の最終城主任命だけを履歴に残し状態も一致させる', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const sourceData = scenario.castlesState.find(c => Number(c.id) === 190);
+    const targetData = scenario.castlesState.find(c => Number(c.id) === 188);
+    const roster = scenario.warriorsState.filter(b => Number(b.castleId) === 190 && Number(b.clan) === Number(sourceData.ownerClan)).slice(0, 5);
+    assert.strictEqual(roster.length, 5);
+    const people = roster.map((r, i) => ({
+        ...common.warriorsMaster.find(b => Number(b.id) === Number(r.id)), ...r,
+        status: 'active', leadership: 100-i*10, strength: 80-i*6, intelligence: 70-i*6,
+        politics: 70-i*6, diplomacy: 70-i*6, charm: 70-i*6,
+        achievementTotal: 0, isCastellan: i === 0,
+        isCommander: false, isDaimyo: false, isGunshi: false, isFactionLeader: false, isRetired: false
+    }));
+    const source = { ...sourceData, castellanId: people[0].id, samuraiIds: people.map(b => b.id) };
+    const target = { ...targetData, castellanId: 0, samuraiIds: [] };
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        LifeStatusRules: { isPresent: b => b?.status === 'active' }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const records = [], castles = [source, target];
+    const game = { phase: 'game', playerClanId: 999, year: 1560, month: 5,
+        castles, bushos: people, legions: [],
+        getCastle: id => castles.find(c => c.id === Number(id)) || null,
+        getBusho: id => people.find(b => b.id === Number(id)) || null,
+        getCastleBushos: id => {
+            const c = castles.find(c => c.id === Number(id));
+            return (c?.samuraiIds || []).map(id => people.find(b => b.id === Number(id))).filter(Boolean);
+        },
+        getClan: () => ({ name: '南部家' }), getClanDaimyo: () => ({ innovation: 100 }),
+        historySystem: { record: text => records.push(text) }, factionSystem: { handleMove() {} }
+    };
+    const affiliation = new (vm.runInContext('AffiliationSystem',ctx))(game);
+    affiliation.updateUI = () => {};
+    affiliation.moveCastleGroup(people.slice(0, 4), target.id);
+    assert.strictEqual(source.castellanId, people[4].id, '途中で抜ける武将でなく最終留守居を城主に');
+    assert.strictEqual(people[4].isCastellan, true);
+    assert.strictEqual(records.filter(t => t.includes('【城主任命】') && t.includes(source.name)).length, 1,
+        '同一命令から旧拠点の城主任命は一件のみ');
+    assert.strictEqual(target.samuraiIds.length, 4);
+    assert.strictEqual(target.castellanId, people[0].id, '到着者全員から選定する');
+    assert.strictEqual(people[4].isCastellan, true, '留守居の城主バッジを維持する');
 });
 
 Promise.all(pendingTests).then(() => {

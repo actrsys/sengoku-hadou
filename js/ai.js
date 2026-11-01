@@ -3228,12 +3228,8 @@ class AIEngine {
 
                     if (movers.length > 0) {
                         // リストに入っている全員を一斉に移動させます
-                        movers.forEach(mover => {
-                            // お引越しセンターの機能を使って所属を書き換えます
-                            this.game.affiliationSystem.moveCastle(mover, action.targetId);
-                            
-                            mover.isActionDone = true;
-                        });
+                        this.game.affiliationSystem.moveCastleGroup(movers, action.targetId);
+                        movers.forEach(mover => { mover.isActionDone = true; });
                         
                         actionDoneInThisStep = true; 
                         break;

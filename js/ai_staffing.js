@@ -147,13 +147,10 @@ class AIStaffing {
             });
 
             const movers = castleBushos.slice(keepCount);
-            movers.forEach(mover => {
-                this.game.affiliationSystem.moveCastle(mover, bestCastle.id);
-                mover.isActionDone = true; 
-            });
-
-            // 大名自身も移動します
-            this.game.affiliationSystem.moveCastle(castellan, bestCastle.id);
+            // 随伴家臣と当主・国主は一度の居城移転として扱う。
+            // 各人の移動途中で仮城主を任命しない。
+            this.game.affiliationSystem.moveCastleGroup([...movers, castellan], bestCastle.id);
+            movers.forEach(mover => { mover.isActionDone = true; });
             // AIによる正式な居城移転だけ本拠地を更新する。出陣・占領の移動では変更しない。
             if (castellan.isDaimyo) {
                 const clan = this.game.getClan(clanId);

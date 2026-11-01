@@ -1538,10 +1538,10 @@ Object.assign(WarManager.prototype, {
                     if (chance > 0.5) { 
                         capturedBushos.push(b); 
                         // ★城から出て捕虜になります
-                        this.game.affiliationSystem.leaveCastle(b);
-                    } else { 
-                        // ★新しいお引越しセンターの魔法を使います！
-                        this.game.affiliationSystem.moveCastle(b, target.id); 
+                        this.game.affiliationSystem.leaveCastle(b, { deferCastleLordUpdate: true });
+                    } else {
+                        // 一括撤退が完了するまで仮城主任命を保留する。
+                        this.game.affiliationSystem.moveCastle(b, target.id, { deferCastleLordUpdate: true, deferUI: true }); 
                         
                         // ★修正：共通化された大名逃亡処理を呼び出します
                         this.handleDaimyoEscape(b, target);
@@ -2457,6 +2457,7 @@ Object.assign(WarManager.prototype, {
         // ★修正：新しい逃げ先を探す魔法を使います！
         const friendlyCastles = this.getEscapeCandidates(defeatedCastle);
         const isLastStand = friendlyCastles.length === 0;
+        const retreatDestinationIds = new Set();
 
         losers.forEach(b => { 
             // ★ 修正: 未登場の武将を巻き込んで捕虜や浪人にしないように守ります！
@@ -2470,13 +2471,14 @@ Object.assign(WarManager.prototype, {
             
             if (chance > 0.5) { 
                 captives.push(b); 
-                // ★城から出て捕虜になります
-                this.game.affiliationSystem.leaveCastle(b);
-            } else { 
+                // 捕縛の途中で旧拠点に仮城主を任命しない。
+                this.game.affiliationSystem.leaveCastle(b, { deferCastleLordUpdate: true });
+            } else {
                 if (friendlyCastles.length > 0) {
                     const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
-                    // ★新しいお引越しセンターの魔法を使います！
-                    this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
+                    // 全捕縛・退避の完了後に行先の城主を一度だけ確定する。
+                    this.game.affiliationSystem.moveCastle(b, escapeCastle.id, { deferCastleLordUpdate: true, deferUI: true });
+                    retreatDestinationIds.add(escapeCastle.id);
                     escapees.push(b);
                     
                     // ★修正：共通化された大名逃亡処理を呼び出します
@@ -2486,7 +2488,13 @@ Object.assign(WarManager.prototype, {
                     this.game.affiliationSystem.becomeRonin(b);
                 }
             }
-        }); 
+        });
+        retreatDestinationIds.forEach(id => {
+            const castle = this.game.getCastle(id);
+            if (castle) this.game.affiliationSystem.updateCastleLord(castle);
+        });
+        if (retreatDestinationIds.size > 0) this.game.affiliationSystem.updateUI();
+        // 陥落元は直後に所有家が変わるので、勝者の正式な占領処理で確定する。
         if (escapees.length > 0 && (defeatedCastle.ownerClan === this.game.playerClanId || winnerClanId === this.game.playerClanId)) this.game.ui.log(`${escapees.length}名の武将が自領へ逃げ帰りました。`, { history: false });
         if (captives.length > 0) { 
             this.pendingPrisoners = captives; 

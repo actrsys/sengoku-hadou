@@ -1559,7 +1559,13 @@ class CommandSystem {
             return;
         }
 
-        bushoIds.forEach(bid => {
+        if (type === 'move_deploy') {
+            // 同一命令の配置換えで途中の仮城主を記録せず、移動完了後に一度だけ再選出する。
+            this.game.affiliationSystem.moveCastleGroup(execBushos, targetId);
+            execBushos.forEach(busho => { busho.isActionDone = true; });
+            count = execBushos.length;
+            actionName = '移動';
+        } else bushoIds.forEach(bid => {
             const busho = this.game.getBusho(bid); if (!busho) return;
             const previousCount = count;
             
@@ -1627,11 +1633,6 @@ class CommandSystem {
                     busho.achievementTotal += this._calcPlayerDomesticMerit(actualVal, val);
                     this.game.factionSystem.updateRecognition(busho, 10);
                 }
-            }
-            else if (type === 'move_deploy') { 
-                this.game.affiliationSystem.moveCastle(busho, targetId);
-
-                count++; actionName = "移動"; 
             }
             // 資源不足でどの分岐も成立しなかった武将の行動は消費しない。
             if (count > previousCount) busho.isActionDone = true;

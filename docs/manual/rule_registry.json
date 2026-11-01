@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "canonical_manual": "ARCHITECTURE.md",
+  "description": "現行マニュアルの主要規則を識別する索引。規則本文は複製せず、本文中の RULE タグを参照する。",
+  "rules": [
+    {
+      "id": "AUDIT-REAL",
+      "area": "監査・到達性",
+      "owner": "監査担当",
+      "anchor": "実ゲームでの到達性を最初に調べる。",
+      "status": "current"
+    },
+    {
+      "id": "AUDIT-TEST",
+      "area": "監査・到達性",
+      "owner": "監査担当",
+      "anchor": "人工テストと実害を混同しない。",
+      "status": "current"
+    },
+    {
+      "id": "AUDIT-SCOPE",
+      "area": "監査・改修方針",
+      "owner": "監査担当",
+      "anchor": "成果はゲームの改善であり、修正件数や版数ではない。",
+      "status": "current"
+    },
+    {
+      "id": "STATE-LIFE",
+      "area": "状態・正本",
+      "owner": "LifeSystem",
+      "anchor": "武将・姫の生死・登場",
+      "status": "current"
+    },
+    {
+      "id": "STATE-AFFILIATION",
+      "area": "状態・正本",
+      "owner": "AffiliationSystem",
+      "anchor": "武将の所属・所在・活動・軍師役職",
+      "status": "current"
+    },
+    {
+      "id": "STATE-DIPLOMACY",
+      "area": "状態・正本",
+      "owner": "DiplomacyManager",
+      "anchor": "外交状態と友好度",
+      "status": "current"
+    },
+    {
+      "id": "STATE-TRUCE",
+      "area": "状態・正本",
+      "owner": "DiplomacyManager",
+      "anchor": "和睦確定・交渉条件",
+      "status": "current"
+    },
+    {
+      "id": "STATE-HISTORY",
+      "area": "状態・正本",
+      "owner": "HistorySystem",
+      "anchor": "外交履歴の保存・分類",
+      "status": "current"
+    },
+    {
+      "id": "STATE-HOME",
+      "area": "状態・正本",
+      "owner": "GameManager",
+      "anchor": "| 大名の本拠 |",
+      "status": "current"
+    },
+    {
+      "id": "RULE-START",
+      "area": "ゲーム固有仕様",
+      "owner": "DataManager/管理Excel",
+      "anchor": "開始データ：",
+      "status": "current"
+    },
+    {
+      "id": "RULE-CASTLE",
+      "area": "ゲーム固有仕様",
+      "owner": "CastleManager/UI",
+      "anchor": "一般名称として場所を指す時は「拠点」を使う。",
+      "status": "current"
+    },
+    {
+      "id": "RULE-HOME",
+      "area": "ゲーム固有仕様",
+      "owner": "GameManager",
+      "anchor": "- **本拠：",
+      "status": "current"
+    },
+    {
+      "id": "RULE-DIPLOMACY",
+      "area": "ゲーム固有仕様",
+      "owner": "DiplomacyManager",
+      "anchor": "外交：",
+      "status": "current"
+    },
+    {
+      "id": "RULE-END",
+      "area": "ゲーム固有仕様",
+      "owner": "TurnManager",
+      "anchor": "ゲーム終了：",
+      "status": "current"
+    },
+    {
+      "id": "RULE-DOMESTIC",
+      "area": "ゲーム固有仕様",
+      "owner": "DomesticRules",
+      "anchor": "一括内政の重要な例外：",
+      "status": "current"
+    },
+    {
+      "id": "RULE-RECRUIT",
+      "area": "撤回済み規則",
+      "owner": "DomesticRules",
+      "anchor": "徴兵の過剰制限撤回：",
+      "status": "current"
+    },
+    {
+      "id": "RULE-EMPTY-CASTLE",
+      "area": "撤回済み規則",
+      "owner": "CastleManager",
+      "anchor": "国主・居城の旧対処撤回：",
+      "status": "current"
+    },
+    {
+      "id": "RULE-SAVE",
+      "area": "データ・保存",
+      "owner": "SaveManager",
+      "anchor": "現行セーブのみ",
+      "status": "current"
+    },
+    {
+      "id": "UI-VIEWPORT",
+      "area": "画面・読み込み",
+      "owner": "UIManager",
+      "anchor": "PCは16:9、スマホは9:16の固定論理画面",
+      "status": "current"
+    },
+    {
+      "id": "UI-LOADING",
+      "area": "画面・読み込み",
+      "owner": "UIManager",
+      "anchor": "ロード幕の具体的な待機契約",
+      "status": "current"
+    },
+    {
+      "id": "UI-RETURN",
+      "area": "画面・読み込み",
+      "owner": "UIManager",
+      "anchor": "非同期画面遷移の完了契約",
+      "status": "current"
+    },
+    {
+      "id": "POLICY-MAINTENANCE",
+      "area": "マニュアル保守",
+      "owner": "マニュアル管理",
+      "anchor": "マニュアルの保守",
+      "status": "current"
+    }
+  ]
+}
