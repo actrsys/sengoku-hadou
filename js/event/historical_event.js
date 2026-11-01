@@ -3003,10 +3003,11 @@ window.GameEvents.push({
         // 二条城(26)と槇島城(90)にいる「擁立勢力の武将（将軍候補以外）」を全員、大名の元へ送ります
         [26, 90].forEach(castleId => {
             const residents = game.bushos.filter(b => b.castleId === castleId && b.clan === sponsorClanId && b.id !== candidate.id);
-            residents.forEach(b => {
-                b.isCastellan = false; // 城主バッジを剥がします
-                game.affiliationSystem.moveCastle(b, destinationCastleId);
-            });
+            if (residents.length === 0) return;
+            // 一回の将軍就任で退く武将は、仮城主を途中で選ばず最終配置から確定する。
+            // 個々の在城履歴・所属移動は AffiliationSystem の共通窓口に任せる。
+            residents.forEach(b => { b.isCastellan = false; });
+            game.affiliationSystem.moveCastleGroup(residents, destinationCastleId);
         });
 
         // お城の持ち主を新しい将軍家に変えます

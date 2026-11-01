@@ -2061,19 +2061,30 @@ Object.assign(WarManager.prototype, {
                     
                     const kunishuMembers = this.game.kunishuSystem.getKunishuMembers(s.attacker.kunishuId).map(b => b.id);
                     
+                    // 蜂起による同一処理内の退避は、逃亡先が分かれても途中では
+                    // 城主を選出しない。すべての移動を終えてから最終状態で確定する。
+                    const retreatDestinationIds = new Set();
                     this.game.getCastleBushos(targetC.id).forEach(b => {
                         // 蜂起で退避・浪人化するのは、陥落前の城主家に所属する通常武将だけ。
                         // 同居する別の諸勢力・浪人・他家武将は、その勢力とは無関係なので巻き込まない。
                         if (Number(b.clan) !== Number(oldOwner) || Number(b.belongKunishuId || 0) > 0) return;
                         if (friendlyCastles.length > 0) {
                             const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];
-                            this.game.affiliationSystem.moveCastle(b, escapeCastle.id);
+                            this.game.affiliationSystem.moveCastle(b, escapeCastle.id,
+                                { deferCastleLordUpdate: true, deferUI: true });
+                            retreatDestinationIds.add(escapeCastle.id);
                             this.handleDaimyoEscape(b, escapeCastle);
                         } else {
                             this.game.affiliationSystem.becomeRonin(b);
                         }
                     });
                     
+                    retreatDestinationIds.forEach(id => {
+                        const destination = this.game.getCastle(id);
+                        if (destination) this.game.affiliationSystem.updateCastleLord(destination);
+                    });
+                    if (retreatDestinationIds.size > 0) this.game.affiliationSystem.updateUI();
+
                     // 所属変更APIが旧城主家の武将を名簿から外すので、同居する無関係な人物はそのまま残す。
                     targetC.samuraiIds = targetC.samuraiIds.filter(id => {
                         const busho = this.game.getBusho(id);
