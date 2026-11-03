@@ -1886,12 +1886,20 @@ class LifeSystem {
             // WarManager が引き続き管理する。通常の浪人移動を先取りしない。
             const pendingCaptives = reason === 'no_heir' && Array.isArray(pendingCaptiveIds)
                 ? new Set(pendingCaptiveIds.map(Number)) : null;
+            // 滅亡は複数の家臣が一度に所属を離れる処理。
+            // 個々の浪人化は所属担当へ委譲し、派閥と画面だけ最後に確定する。
+            const bulkRoninOptions = { deferFactionUpdate: true, deferCastleLordUpdate: true, deferUI: true };
+            const affectedCastleIds = new Set();
+            let hadExtinctionDepartures = false;
+            const departExtinctClan = busho => {
+                const castleId = Number(busho.castleId) || 0;
+                if (castleId > 0) affectedCastleIds.add(castleId);
+                hadExtinctionDepartures = true;
+                // 功績の半減・残党諸勢力化は通常の浪人化窓口に任せる。
+                this.game.affiliationSystem.becomeRonin(busho, 'desertion', bulkRoninOptions);
+            };
             this.game.getClanBushos(clanId).filter(b => window.BushoStatusRules.isActive(b)
-                && !(pendingCaptives && pendingCaptives.has(Number(b.id)))).forEach(b => {
-                // 功績半減は AffiliationSystem.becomeRonin() が一度だけ担当する。
-                // ここで先に半減すると、通常浪人化と残党合流のどちらも二重減少する。
-                this.game.affiliationSystem.becomeRonin(b);
-            });
+                && !(pendingCaptives && pendingCaptives.has(Number(b.id)))).forEach(departExtinctClan);
 
             // 城主や大名がまだ城に残っている判定になっていれば、お城を空っぽにします
             clanCastles.forEach(c => {
@@ -1902,11 +1910,19 @@ class LifeSystem {
                     // 後継者不在で処分するのは滅亡した大名家の通常武将だけ。
                     // 同居する浪人・諸勢力・他家武将は巻き込まない。
                     if (Number(l.clan) !== Number(clanId) || Number(l.belongKunishuId || 0) > 0) return;
-                    this.game.affiliationSystem.becomeRonin(l);
+                    departExtinctClan(l);
                 });
-                this.game.updateCastleLord(c); 
+                affectedCastleIds.add(Number(c.id));
+            });
+            // 全員の退去と、後継者不在なら拠点の中立化を終えてから正式城主を確定。
+            affectedCastleIds.forEach(id => {
+                const affectedCastle = this.game.getCastle(id);
+                if (affectedCastle) this.game.updateCastleLord(affectedCastle);
             });
 
+            if (hadExtinctionDepartures && this.game.factionSystem) {
+                this.game.factionSystem.updateFactions(clanId);
+            }
             clan.isDestroyed = true; 
 
             if (this.game.ui && typeof this.game.ui.renderMap === 'function') {

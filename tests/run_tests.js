@@ -1240,7 +1240,8 @@ test('r736 実家滅亡で既婚人質の担保印と双方の人質名簿を解
         getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)); },
         getClanDaimyo(id) { return Number(id) === 4 ? captorDaimyo : null; },
         ui: { log() {}, renderMap() {}, async showDialogAsync() {} },
-        factionSystem: { updateFactions() {}, handleMove() {} }
+        factionSystem: { updateFactions() {}, handleMove() {} },
+        updateCastleLord() {}
     };
     ctx.game = game;
     const affiliation = vm.runInContext('new AffiliationSystem(game)', ctx);
@@ -5306,7 +5307,7 @@ test('残党諸勢力化も妻婚姻同期の共通窓口を通す', () => {
     assert.ok(create.includes('this.syncSpousesForClanChange(busho, oldClanId, 0'));
     assert.ok(create.includes('refreshDiplomacy: busho.isHostage !== true'));
 
-    const joinAt = src.indexOf('_joinSurvivalKunishu(busho, kunishu)');
+    const joinAt = src.indexOf('_joinSurvivalKunishu(busho, kunishu, options = {})');
     const join = src.slice(joinAt, src.indexOf('\n    /**\n     * ③ 同じ大名家', joinAt));
     assert.ok(join.includes('const oldClanId = Number(busho.clan) || 0;'));
     assert.ok(join.includes('this.syncSpousesForClanChange(busho, oldClanId, 0'));
@@ -9816,12 +9817,14 @@ test('r734 総取りで滅亡した武田家の未婚姫を攻略側の家中名
         castles, bushos: warriors, princesses: [princess], clans: [victor, victim], legions: [],
         getClan: id => game.clans.find(c => Number(c.id) === Number(id)),
         getBusho: id => byBushoId.get(Number(id)) || null,
+        getCastle: id => castles.find(c => Number(c.id) === Number(id)),
         getClanCastles: id => castles.filter(c => Number(c.ownerClan) === Number(id)),
         getClanBushos: id => warriors.filter(b => Number(b.clan) === Number(id) && b.status === 'active'),
         getCastleBushos: id => warriors.filter(b => Number(b.castleId) === Number(id) && b.status === 'active'),
         ui: { log() {}, updateClanColors() {}, renderMap() {}, async showDialogAsync() {} },
         castleManager: { changeOwner(c, ownerClan) { c.ownerClan = ownerClan; } },
         affiliationSystem: { becomeRonin(b) { b.clan = 0; b.status = 'ronin'; }, updateCastleLord() {} },
+        updateCastleLord() {},
         independenceSystem: { calcDaimyoPowerBonus: () => 100,
             async executeRebellion(c) { game.castleManager.changeOwner(c, 1); },
             async planCoupDetatOrRebellion(c) { game.castleManager.changeOwner(c, 1); } }
@@ -11065,7 +11068,8 @@ test('後継者不在滅亡は滅亡家所属者だけを浪人化し同居人�
     const block = life.slice(at, at + 550);
     assert.ok(block.includes('Number(l.clan) !== Number(clanId)'));
     assert.ok(block.includes('Number(l.belongKunishuId || 0) > 0'));
-    assert.ok(block.includes('this.game.affiliationSystem.becomeRonin(l);'));
+    assert.ok(block.includes('departExtinctClan(l);'));
+    assert.ok(life.includes("this.game.affiliationSystem.becomeRonin(busho, 'desertion', bulkRoninOptions)"));
 });
 
 test('落城捕虜と守備撤退は敗戦大名家の通常武将だけを処理する', () => {
@@ -32859,7 +32863,8 @@ test('r738 預かり家の滅亡で人質印・双方名簿を解消し、所属
         getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)); },
         getClanDaimyo(id) { return Number(id) === 4 ? holderDaimyo : sourceDaimyo; },
         ui: { log() {}, renderMap() {}, async showDialogAsync() {} },
-        factionSystem: { updateFactions() {}, handleMove() {} }
+        factionSystem: { updateFactions() {}, handleMove() {} },
+        updateCastleLord() {}
     };
     ctx.game = game;
     const affiliation = vm.runInContext('new AffiliationSystem(game)', ctx);
@@ -35910,6 +35915,163 @@ test('A-114 臣従で引き取った未婚姫の外交婚姻は新主家との�
     assert.strictEqual(game.diplomacyManager.refreshMarriageRelation(1,3),true,
         '実際の婚姻照合後も、新家と他家の姻戚関係が成立している');
     assert.strictEqual(game.diplomacyManager.getRelation(1,3).isMarriage,true);
+});
+
+// A-115: 実戦で最終拠点を失った家は、残る家臣をまとめて浪人化する。
+// 個々の浪人化の共通処理を通しても、旧主家の派閥と全国地図は一括処理後に確定する。
+test('A-115 最終拠点陥落後の複数家臣の浪人化は派閥・UIを一度だけ更新する', async () => {
+    let factionUpdates = 0;
+    let uiUpdates = 0;
+    const ctx = createContext({
+        SkillManager: { getExtinctionSurvivalInfo: () => null },
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
+        LifeStatusRules: { isActive: b => b.status === 'active', isDead: b => b.status === 'dead',
+            isUnavailable: b => b.status === 'dead' || b.status === 'unborn',
+            isPresent: b => b.status !== 'dead' && b.status !== 'unborn' }
+    });
+    for (const f of ['js/config.js','js/constants.js','js/affiliation_system.js','js/life_system.js']) loadScript(ctx,f);
+    const victim = { id: 2, name: '旧家', leaderId: 201, princessIds: [], extinctionNotified: false };
+    const victor = { id: 1, name: '新家', leaderId: 101, princessIds: [] };
+    const members = [201,202,203].map(id => ({ id, clan:2, castleId:10,
+        name:`家臣${id}`, status:'active', isDaimyo:id===201,
+        isCastellan:false, isCommander:false, isGunshi:false, isAutoLeader:false,
+        isHostage:false, belongKunishuId:0, nemesisIds:[],nemesisList:[],
+        achievementTotal:100, wifeIds:[], factionId:1 }));
+    const conquered = { id:10, ownerClan:1, samuraiIds:members.map(b=>b.id), castellanId:0 };
+    const game = { playerClanId:1, year:1582,month:6, phase:'game',
+        clans:[victor,victim],bushos:members,castles:[conquered],princesses:[],legions:[],
+        getClan:id=>game.clans.find(c=>c.id===Number(id)),
+        getBusho:id=>game.bushos.find(b=>b.id===Number(id)),
+        getCastle:id=>game.castles.find(c=>c.id===Number(id)),
+        getClanCastles:id=>game.castles.filter(c=>c.ownerClan===Number(id)),
+        getClanBushos:id=>game.bushos.filter(b=>b.clan===Number(id) && b.status==='active'),
+        getCastleBushos:id=>game.bushos.filter(b=>b.castleId===Number(id) && b.status==='active'),
+        getClanDaimyo:id=>game.bushos.find(b=>b.clan===Number(id) && b.isDaimyo),
+        factionSystem:{ updateFactions(){factionUpdates++;}, handleMove(){} },
+        ui:{ log(){},renderMap(){uiUpdates++;},async showDialogAsync(){} },
+        castleManager:{ changeOwner(c,id){c.ownerClan=id;} },
+        updateCastleLord(){} };
+    game.affiliationSystem = vm.runInContext('new AffiliationSystem(game)',Object.assign(ctx,{game}));
+    game.lifeSystem = vm.runInContext('new LifeSystem(game)',ctx);
+    game.affiliationSystem.updateCastleLord=()=>{};
+    game.lifeSystem._captureLifeFlowContext=()=>({});
+    game.lifeSystem._isLifeFlowCurrent=()=>true;
+    await game.lifeSystem.checkClanExtinction(2,'no_castle',1);
+    assert.deepStrictEqual(members.map(b=>b.clan),[0,0,0]);
+    assert.deepStrictEqual(members.map(b=>b.status),['ronin','ronin','ronin']);
+    assert.strictEqual(factionUpdates,1,'家臣全員の所属が確定した後だけ派閥を更新する');
+    assert.strictEqual(uiUpdates,1,'画面は個別浪人化ではなく、滅亡処理完了時に一度だけ更新する');
+});
+
+// A-116: 後継者不在で拠点を中立化する場合も、退去途中の家臣を仮城主に任命しない。
+test('A-116 後継者不在滅亡は一括退去後に城主を確定し仮任命履歴を作らない', async () => {
+    const ctx = createContext({
+        SkillManager: { getExtinctionSurvivalInfo: () => null },
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
+        LifeStatusRules: { isDead: b => b.status === 'dead',
+            isUnavailable: b => b.status === 'dead' || b.status === 'unborn',
+            isPresent: b => b.status !== 'dead' && b.status !== 'unborn' }
+    });
+    for (const f of ['js/config.js','js/constants.js','js/affiliation_system.js','js/life_system.js']) loadScript(ctx,f);
+    const victim = { id:2, name:'旧家', leaderId:201, princessIds:[], extinctionNotified:false };
+    const victor = { id:1, name:'他家', leaderId:101, princessIds:[] };
+    const members = [201,202,203].map(id => ({id,clan:2,castleId:10,name:`家臣${id}`,
+        status:'active', isDaimyo:id===201, isCastellan:id===201,
+        isCommander:false,isGunshi:false,isAutoLeader:false,isHostage:false,
+        belongKunishuId:0,nemesisIds:[],nemesisList:[],achievementTotal:100,wifeIds:[]}));
+    const castle = {id:10,ownerClan:2,samuraiIds:members.map(b=>b.id),castellanId:201};
+    const interimAppointments=[];
+    let factionUpdates=0, renders=0;
+    const game = {clans:[victor,victim],bushos:members,castles:[castle],princesses:[],legions:[],
+        playerClanId:1,year:1582,month:6,phase:'game',
+        getClan:id=>game.clans.find(c=>c.id===Number(id)),
+        getBusho:id=>game.bushos.find(b=>b.id===Number(id)),
+        getCastle:id=>game.castles.find(c=>c.id===Number(id)),
+        getClanCastles:id=>game.castles.filter(c=>c.ownerClan===Number(id)),
+        getClanBushos:id=>game.bushos.filter(b=>b.clan===Number(id) && b.status==='active'),
+        getCastleBushos:id=>game.bushos.filter(b=>b.castleId===Number(id) && b.status==='active'),
+        getClanDaimyo:id=>game.bushos.find(b=>b.clan===Number(id) && b.isDaimyo),
+        factionSystem:{ updateFactions(){factionUpdates++;},handleMove(){} },
+        ui:{ log(){},renderMap(){renders++;},async showDialogAsync(){} },
+        castleManager:{ changeOwner(c,id){c.ownerClan=id;} } };
+    ctx.game=game;
+    game.affiliationSystem=vm.runInContext('new AffiliationSystem(game)',ctx);
+    game.lifeSystem=vm.runInContext('new LifeSystem(game)',ctx);
+    game.lifeSystem._captureLifeFlowContext=()=>({});
+    game.lifeSystem._isLifeFlowCurrent=()=>true;
+    const pickLord = c => {
+        const eligible=game.getCastleBushos(c.id).filter(b=>b.clan===c.ownerClan);
+        c.castellanId=eligible.length?eligible[0].id:0;
+        if(c.ownerClan===2 && c.castellanId>0) interimAppointments.push(c.castellanId);
+    };
+    game.affiliationSystem.updateCastleLord=pickLord;
+    game.updateCastleLord=pickLord;
+    await game.lifeSystem.checkClanExtinction(2,'no_heir');
+    assert.deepStrictEqual(members.map(b=>b.clan),[0,0,0]);
+    assert.strictEqual(castle.ownerClan,0,'後継者不在では旧拠点が中立化する');
+    assert.deepStrictEqual(interimAppointments,[],'退去予定の家臣を仮城主として記録しない');
+    assert.strictEqual(factionUpdates,1);
+    assert.strictEqual(renders,1);
+});
+
+
+// A-117: 最終拠点を失った家臣が生存スキルで残党化し、残る家臣も
+// その残党に合流した時、滅亡一括処理の城主更新保留を内部の所属移動まで伝える。
+test('A-117 滅亡後の残党結成・合流も仮城主更新を保留し最終状態で確定する', async () => {
+    // 先頭武将が生存する場合と、先行浪人を後から回収する場合を両方通す。
+    for (const survivorId of [201, 202]) {
+        const ctx = createContext({
+            SkillManager: { getExtinctionSurvivalInfo: b => Number(b.id) === survivorId
+                ? { isSurvive:true, skillName:'抗戦', maxSoldiers:1000, soldiers:400,
+                    training:50, morale:50, defaultTraining:50, defaultMorale:50,
+                    horses:0, maxHorses:0, guns:0, maxGuns:0,
+                    defense:10, maxDefense:10, ideology:50 } : null },
+            Kunishu: class { constructor(attrs) { Object.assign(this, attrs); } },
+            BushoStatusRules: { isActive:b=>b.status==='active', isRonin:b=>b.status==='ronin' },
+            LifeStatusRules: { isActive:b=>b.status==='active', isDead:b=>b.status==='dead',
+                isUnavailable:b=>b.status==='dead'||b.status==='unborn',
+                isPresent:b=>b.status!=='dead'&&b.status!=='unborn' }
+        });
+        for (const f of ['js/config.js','js/constants.js','js/affiliation_system.js','js/life_system.js']) loadScript(ctx,f);
+        const victim={id:2,name:'旧家',leaderId:201,princessIds:[],extinctionNotified:false};
+        const victor={id:1,name:'攻略家',leaderId:101,princessIds:[]};
+        const group=[201,202,203].map(id=>({id,clan:2,castleId:10,status:'active',
+            name:`家臣${id}`,fullName:`家臣${id}`,familyName:'家',familyYomi:'け',yomi:'か',
+            isDaimyo:id===201,isCastellan:false,isCommander:false,isGunshi:false,
+            isAutoLeader:false,isHostage:false,belongKunishuId:0,
+            nemesisIds:[],nemesisList:[],achievementTotal:100,wifeIds:[],factionId:2}));
+        // 合戦で最後の拠点を既に奪われ、旧家の家臣が残っている状態。
+        const castle={id:10,name:'陥落拠点',ownerClan:1,samuraiIds:group.map(b=>b.id),castellanId:0};
+        let castleUpdates=0, factionUpdates=0, renders=0;
+        const game={playerClanId:1,year:1582,month:6,phase:'game',
+            clans:[victor,victim],bushos:group,castles:[castle],princesses:[],legions:[],
+            getClan:id=>game.clans.find(c=>c.id===Number(id)),
+            getBusho:id=>game.bushos.find(b=>b.id===Number(id)),
+            getCastle:id=>game.castles.find(c=>c.id===Number(id)),
+            getClanCastles:id=>game.castles.filter(c=>c.ownerClan===Number(id)),
+            getClanBushos:id=>game.bushos.filter(b=>b.clan===Number(id)&&b.status==='active'),
+            getCastleBushos:id=>game.bushos.filter(b=>b.castleId===Number(id)&&b.status==='active'),
+            getClanDaimyo:id=>game.bushos.find(b=>b.clan===Number(id)&&b.isDaimyo),
+            kunishuSystem:{kunishus:[],allocateRegularDynamicKunishuId:()=>501,setRelation(){}},
+            factionSystem:{updateFactions(){factionUpdates++;},handleMove(){}},
+            ui:{log(){},renderMap(){renders++;},async showDialogAsync(){}},
+            updateClanDisplayNames(){},
+            castleManager:{changeOwner(c,id){c.ownerClan=id;}}
+        };
+        ctx.game=game;
+        game.affiliationSystem=vm.runInContext('new AffiliationSystem(game)',ctx);
+        game.lifeSystem=vm.runInContext('new LifeSystem(game)',ctx);
+        game.lifeSystem._captureLifeFlowContext=()=>({});
+        game.lifeSystem._isLifeFlowCurrent=()=>true;
+        game.affiliationSystem.updateCastleLord=()=>{castleUpdates++;};
+        game.updateCastleLord=()=>{castleUpdates++;};
+        await game.lifeSystem.checkClanExtinction(2,'no_castle',1);
+        assert.strictEqual(game.kunishuSystem.kunishus.length,1,'生存スキルによる残党結成');
+        assert.ok(group.every(b=>b.clan===0 && b.belongKunishuId===501),'他の家臣も残党へ合流する');
+        assert.strictEqual(castleUpdates,1,'複数人の残党化でも城主確定は最終状態の一度のみ');
+        assert.strictEqual(factionUpdates,1,'旧家の派閥は最終状態で一度だけ再編');
+        assert.strictEqual(renders,1,'滅亡中の途中地図描画を行わない');
+    }
 });
 
 Promise.all(pendingTests).then(() => {

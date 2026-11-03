@@ -253,7 +253,7 @@ class AffiliationSystem {
             if (this.game && this.game.kunishuSystem) {
                 const survivalKunishu = this.game.kunishuSystem.kunishus.find(k => k._survivalClanId === oldClanId && !k.isDestroyed);
                 if (survivalKunishu) {
-                    this._joinSurvivalKunishu(busho, survivalKunishu);
+                    this._joinSurvivalKunishu(busho, survivalKunishu, options);
                     // 新規結成・通常の浪人化と同じく、旧家側の派閥と表示も更新する。
                     if (options.deferFactionUpdate !== true && this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
                     if (options.deferUI !== true) this.updateUI();
@@ -441,16 +441,16 @@ class AffiliationSystem {
             refreshDiplomacy: busho.isHostage !== true
         });
         
-        // 最後にいた拠点に入る
-        this.leaveCastle(busho);
-        this.enterCastle(busho, newKunishu.castleId);
+        // 残党結成も滅亡時の一括処遇の一部。途中では城主を確定しない。
+        this.leaveCastle(busho, options);
+        this.enterCastle(busho, newKunishu.castleId, options);
         
         this.game.ui.log(`【${survivalInfo.skillName}】${busho.name}は滅亡を逃れ、${this.game.getCastle(newKunishu.castleId).name}周辺に潜伏し抗戦を続けるようです。`);
 
         // すでに浪人化された旧家臣を回収する
         this.game.bushos.forEach(b => {
             if (window.BushoStatusRules.isRonin(b) && b._lastClanId === oldClanId && b.id !== busho.id) {
-                this._joinSurvivalKunishu(b, newKunishu);
+                this._joinSurvivalKunishu(b, newKunishu, options);
             }
         });
 
@@ -466,7 +466,7 @@ class AffiliationSystem {
     }
 
     // ★追加：旧家臣が生存スキルの諸勢力に合流する処理
-    _joinSurvivalKunishu(busho, kunishu) {
+    _joinSurvivalKunishu(busho, kunishu, options = {}) {
         const oldClanId = Number(busho.clan) || 0;
         // 旧家から直接合流した場合のみ一度だけ半減。すでに浪人化済みの家臣は
         // becomeRonin() で半減済みなので、ここで二重に減らさない。
@@ -493,7 +493,8 @@ class AffiliationSystem {
 
         // 滅亡後の別城からの残党合流も、実際の着任月を所属移動の正本で記録する。
         // 旧家での滞在期間は所属変更で不定のため推定せず、合流先への着任だけ確定する。
-        this.moveCastle(busho, kunishu.castleId, { stayHistoryFromCastleId: 0, deferUI: true });
+        // 単独合流は従来どおり即時更新、一括滅亡中は城主確定を最後まで保留。
+        this.moveCastle(busho, kunishu.castleId, { ...options, stayHistoryFromCastleId: 0, deferUI: true });
     }
 
     /**
