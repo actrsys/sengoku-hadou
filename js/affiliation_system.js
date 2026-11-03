@@ -148,12 +148,12 @@ class AffiliationSystem {
      * @param {number|null} forceLoyalty - イベント専用の固定忠誠度（指定がなければ相性計算）
      * @param {boolean} keepAchievement - ★追加：イベント等で功績を半分にしたくない場合に true を指定します
      */
-    joinClan(busho, newClanId, newCastleId, forceLoyalty = null, keepAchievement = false) {
+    joinClan(busho, newClanId, newCastleId, forceLoyalty = null, keepAchievement = false, options = {}) {
         const oldClanId = busho.clan;
         this._settleDepartingHostage(busho, newClanId);
 
         // 1. 今いるお城から出ます
-        this.leaveCastle(busho);
+        this.leaveCastle(busho, options);
 
         // 2. もし元々どこかの大名家にいて、別の大名家に移るなら、功績を半分にします！
         // ★修正：keepAchievement が true の場合は功績をそのまま維持します！
@@ -190,7 +190,7 @@ class AffiliationSystem {
         if (Number(busho.castleId) !== Number(newCastleId)) {
             this._recordCastleArrival(busho, 0, newCastleId);
         }
-        this.enterCastle(busho, newCastleId);
+        this.enterCastle(busho, newCastleId, options);
 
         // 7. 既婚武将の妻は夫の所属へ追従させる。
         // 人質は現行仕様が別途未確定なので、外交婚姻フラグの張替えだけは行わない。
@@ -198,15 +198,15 @@ class AffiliationSystem {
             refreshDiplomacy: busho.isHostage !== true
         });
 
-        // ★軽量化：所属が変化した大名家だけ派閥を再編します。
-        // 派閥は大名家ごとに独立しているため、全国全勢力を作り直す必要はありません。
-        if (this.game && this.game.factionSystem) {
+        // 通常の単独仕官では即時再編する。諸勢力の一括取込・旗揚げ等は
+        // 全員の仕官と新大名の就任が確定してから、呼出元が一度だけ再編する。
+        if (options.deferFactionUpdate !== true && this.game && this.game.factionSystem) {
             if (oldClanId !== 0 && oldClanId !== newClanId) this.game.factionSystem.updateFactions(oldClanId);
             if (newClanId !== 0) this.game.factionSystem.updateFactions(newClanId);
         }
 
         // 画面の絵をすぐに描き直す魔法！
-        this.updateUI();
+        if (options.deferUI !== true) this.updateUI();
     }
 
     /**
@@ -680,6 +680,64 @@ class AffiliationSystem {
                 newClan.princessIds.push(Number(princess.id));
             }
         });
+    }
+
+    /**
+     * 大名家を丸ごと吸収する一括移管の正本。
+     * 外交・史実イベントの成立判定や会話は呼び出し側が担当し、軍団・領地・所属・姫の
+     * 移管と派閥の確定だけをここで共通化する。通常の一人ずつの移籍は既存APIに任せる。
+     * `includeDead` は既存イベントごとの対象範囲を維持するための指定。
+     */
+    absorbClan(subordinateClanId, dominantClanId, {
+        excludeBushoId = 0, fixedLoyalty = null, includeDead = true,
+        markExtinctionNotified = false
+    } = {}) {
+        const oldId = Number(subordinateClanId) || 0;
+        const newId = Number(dominantClanId) || 0;
+        if (oldId <= 0 || newId <= 0 || oldId === newId) return false;
+
+        // 所属は移管を開始する前に確定する。進行途中の索引再構築に左右されない。
+        const members = (typeof this.game.getClanBushos === 'function'
+            ? this.game.getClanBushos(oldId) : this.game.bushos.filter(b => Number(b.clan) === oldId))
+            .filter(b => Number(b.id) !== Number(excludeBushoId)
+                && (includeDead || !window.LifeStatusRules.isDead(b))).slice();
+        const castles = this.game.getClanCastles(oldId).slice();
+        const legions = (this.game.legions || []).filter(l => Number(l.clanId) === oldId).slice();
+        legions.forEach(l => this.game.castleManager.disbandLegion(l.id));
+        castles.forEach(c => this.game.castleManager.changeOwner(c, newId, true, 0));
+
+        members.forEach(b => {
+            if (fixedLoyalty !== null) {
+                // 固定忠誠の史実イベントは従来どおり正規joinClanを使用する。
+                // ただし一括移籍途中の仮城主・派閥・UI確定だけを保留する。
+                this.joinClan(b, newId, b.castleId, fixedLoyalty, false, {
+                    deferFactionUpdate: true, deferCastleLordUpdate: true, deferUI: true
+                });
+            } else {
+                b.isDaimyo = false;
+                this.transferClanRaw(b, newId, { syncSpouses: true });
+                this.updateLoyaltyForNewLord(b, newId);
+            }
+        });
+        this.transferUnmarriedPrincesses(oldId, newId);
+        // 平和的な吸収でも旧主家は消滅する。外家へ預けた人質は移籍対象に
+        // 含まれないため、滅亡時と同じ外交の共通窓口で担保だけ解除する。
+        this.game.diplomacyManager?.settleHostagesFromExtinctClan?.(oldId);
+        if (markExtinctionNotified) {
+            const absorbed = this.game.getClan(oldId);
+            if (absorbed) absorbed.extinctionNotified = true;
+        }
+
+        // 旧家の家臣が全員移動し終わった後だけ役職・派閥を確定する。
+        // 固定忠誠イベントの通常joinClanでも、移動の途中に仮城主を選ばない。
+        if (fixedLoyalty !== null && typeof this.game.updateCastleLord === 'function') {
+            castles.forEach(c => this.game.updateCastleLord(c));
+        }
+        if (this.game.factionSystem) {
+            this.game.factionSystem.updateFactions(oldId);
+            this.game.factionSystem.updateFactions(newId);
+        }
+        return true;
     }
 
     /**

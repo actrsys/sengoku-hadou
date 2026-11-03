@@ -1978,41 +1978,7 @@ window.GameEvents.push({
 
         // ★ 相手の勢力を自分の勢力に吸収する共通の魔法（臣従の処理）
         const processSubordination = (subordinateClanId, dominantClanId) => {
-            // 1. 吸収される側の軍団をすべて解散させます（お片付け）
-            if (game.legions) {
-                const myLegions = game.legions.filter(l => Number(l.clanId) === Number(subordinateClanId));
-                myLegions.forEach(l => {
-                    if (game.castleManager && game.castleManager.disbandLegion) {
-                        game.castleManager.disbandLegion(l.id);
-                    }
-                });
-            }
-
-            // 2. 吸収される側のお城をすべて吸収する大名家にプレゼントして、直轄（0）にします
-            const myCastles = game.getClanCastles(subordinateClanId);
-            myCastles.forEach(c => {
-                if (game.castleManager && game.castleManager.changeOwner) {
-                    game.castleManager.changeOwner(c, dominantClanId, true, 0);
-                }
-            });
-
-            // 3. 吸収される側の武将のバッジ（身分）を外し、吸収する大名家に入れます
-            const myBushos = game.getClanBushos(subordinateClanId).slice();
-            myBushos.forEach(b => {
-                b.isDaimyo = false;
-                
-                game.affiliationSystem.transferClanRaw(b, dominantClanId, { syncSpouses: true });
-                
-                // 人事部（お引越しセンター）にお願いして、新しい殿様との相性で忠誠度を再計算します！
-                if (game.affiliationSystem && game.affiliationSystem.updateLoyaltyForNewLord) {
-                    game.affiliationSystem.updateLoyaltyForNewLord(b, dominantClanId);
-                }
-            });
-
-            // 武将に付随しない未婚姫も、滅亡済み旧家へ取り残さない。
-            game.affiliationSystem.transferUnmarriedPrincesses(subordinateClanId, dominantClanId);
-
-            // 吸収済みリストに追加して、マップ更新の印をつけます
+            game.affiliationSystem.absorbClan(subordinateClanId, dominantClanId);
             absorbedClans.add(subordinateClanId);
             needMapUpdate = true;
         };

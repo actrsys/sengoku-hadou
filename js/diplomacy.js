@@ -3050,33 +3050,9 @@ class DiplomacyManager {
         
         if (!this._isDiplomacyOrderCurrent(order)) return;
 
-        // 1. プレイヤー側の軍団をすべて解散させます（お片付け）
-        if (this.game.legions) {
-            const myLegions = this.game.getClanLegions(myClanId);
-            myLegions.forEach(l => {
-                this.game.castleManager.disbandLegion(l.id);
-            });
-        }
-        
-        // 2. プレイヤー側のお城をすべて対象の大名家にプレゼントして、直轄（0）にします
-        const myCastles = this.game.getClanCastles(myClanId);
-        myCastles.forEach(c => {
-            this.game.castleManager.changeOwner(c, targetClanId, true, 0);
-        });
-        
-        // 3. プレイヤー側の武将のバッジ（身分）を外し、新しい大名家に入れます
-        const myBushos = this.game.getClanBushos(myClanId).slice();
-        myBushos.forEach(b => {
-            b.isDaimyo = false;
-            
-            this.game.affiliationSystem.transferClanRaw(b, targetClanId, { syncSpouses: true });
-            
-            // 人事部（お引越しセンター）にお願いして、新しい殿様との相性で忠誠度を再計算します！
-            this.game.affiliationSystem.updateLoyaltyForNewLord(b, targetClanId);
-        });
-
-        // 武将に付随しない未婚姫も、臣従で消えた旧家へ残さない。
-        this.game.affiliationSystem.transferUnmarriedPrincesses(myClanId, targetClanId);
+        // 城・軍団・武将・姫の一括移管を所属Systemへ委譲。
+        // 一人ずつ派閥や仮城主を確定せず、旧家と新家の最終名簿で再編する。
+        this.game.affiliationSystem.absorbClan(myClanId, targetClanId);
 
         // 外交担当者に行動完了のシールを貼ります
         if (doer) doer.isActionDone = true;

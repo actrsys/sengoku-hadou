@@ -931,14 +931,20 @@ class KunishuSystem {
         const members = this.getKunishuMembers(kunishu.id);
         members.forEach(b => {
             b.belongKunishuId = 0;
-            // joinClanを使うと仕官時の忠誠度再計算が行われる
-            this.game.affiliationSystem.joinClan(b, newClanId, castle.id);
+            // 忠誠・所属変更は共通窓口。全員が加入するまで派閥の途中再編は保留する。
+            this.game.affiliationSystem.joinClan(b, newClanId, castle.id, null, false, {
+                deferFactionUpdate: true, deferCastleLordUpdate: true, deferUI: true
+            });
         });
 
         leader.isDaimyo = true;
         leader.isCastellan = false;
         leader.loyalty = 100;
         this.game.updateCastleLord(castle);
+        // 大名の就任後に確定した最終名簿を唯一の正本として派閥を選び直す。
+        if (members.length > 0 && this.game.factionSystem) this.game.factionSystem.updateFactions(newClanId);
+        // 一括仕官中は仮城主任命と画面の途中更新も行わず、最終状態だけ表示する。
+        if (typeof this.game.affiliationSystem?.updateUI === 'function') this.game.affiliationSystem.updateUI();
 
         kunishu.isDestroyed = true;
         kunishu.soldiers = 0;
@@ -1057,11 +1063,13 @@ class KunishuSystem {
             const members = this.getKunishuMembers(kunishuId);
             members.forEach(b => {
                 b.belongKunishuId = 0;
-                this.game.affiliationSystem.joinClan(b, this.game.playerClanId, castle.id);
+                this.game.affiliationSystem.joinClan(b, this.game.playerClanId, castle.id, null, false, { deferFactionUpdate: true });
             });
-            
+
             kunishu.isDestroyed = true;
             kunishu.soldiers = 0;
+            // 途中の仕官人数で何度も派閥を選ばず、最終所属から一度だけ再編する。
+            if (members.length > 0 && this.game.factionSystem) this.game.factionSystem.updateFactions(this.game.playerClanId);
 
             const kunishuName = kunishu.getName(this.game);
             const playerClan = this.game.getClan ? this.game.getClan(this.game.playerClanId) : null;

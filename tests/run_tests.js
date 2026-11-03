@@ -11398,22 +11398,22 @@ test('通常の別家移籍は旧派閥を破棄し妻所属と外交婚姻を�
     assert.ok(join.includes('refreshDiplomacy: busho.isHostage !== true'));
 });
 
-test('臣従・吸収は武将の派閥婚姻同期と未婚姫移籍を共通窓口へ委譲する', () => {
+test('臣従・吸収は婚姻と派閥を所属Systemの一括移管窓口で確定する', () => {
+    const aff = read('js/affiliation_system.js');
     const common = read('js/event/common_events.js');
-    assert.ok(common.includes('game.affiliationSystem.transferClanRaw(b, dominantClanId, { syncSpouses: true });'));
-    assert.ok(common.includes('game.affiliationSystem.transferUnmarriedPrincesses(subordinateClanId, dominantClanId);'));
-
     const diplomacy = read('js/diplomacy.js');
-    const vassalAt = diplomacy.indexOf('async executeVassalage');
-    const vassal = diplomacy.slice(vassalAt, vassalAt + 3000);
-    assert.ok(vassal.includes('this.game.affiliationSystem.transferClanRaw(b, targetClanId, { syncSpouses: true });'));
-    assert.ok(vassal.includes('this.game.affiliationSystem.transferUnmarriedPrincesses(myClanId, targetClanId);'));
-
     const historical = read('js/event/historical_event.js');
-    const absorbAt = historical.indexOf('absorbClan: function');
-    const absorb = historical.slice(absorbAt, absorbAt + 2600);
-    assert.ok(absorb.includes('game.affiliationSystem.transferClanRaw(b, dominantClanId, { syncSpouses: true });'));
-    assert.ok(absorb.includes('game.affiliationSystem.transferUnmarriedPrincesses(subordinateClanId, dominantClanId);'));
+    assert.ok(common.includes('game.affiliationSystem.absorbClan(subordinateClanId, dominantClanId);'));
+    assert.ok(diplomacy.includes('this.game.affiliationSystem.absorbClan(myClanId, targetClanId);'));
+    assert.ok(historical.includes('game.affiliationSystem.absorbClan(subordinateClanId, dominantClanId, {'));
+    const start = aff.indexOf('    absorbClan(subordinateClanId, dominantClanId, {');
+    const end = aff.indexOf('    transferClanRaw(', start);
+    const block = aff.slice(start, end);
+    for (const expected of ['this.transferClanRaw(b, newId, { syncSpouses: true })',
+        'this.transferUnmarriedPrincesses(oldId, newId)', 'this.game.factionSystem.updateFactions(newId)',
+        'this.game.castleManager.disbandLegion(l.id)', 'this.game.castleManager.changeOwner(c, newId, true, 0)']) {
+        assert.ok(block.includes(expected), `吸収共通窓口に必要: ${expected}`);
+    }
 });
 
 test('独立・寝返りは妻の実所属を同期し、特殊な外交再編は専用担当に残す', () => {
@@ -11960,32 +11960,19 @@ test('AI軍団解散ログは disbandLegion が commanderId を消す前の国�
     assert.ok(!logs.some(line => line.includes('不明な国主軍団')), logs.join('\n'));
 });
 
-test('吸収・臣従は軍団解散後に isCommander を手動で二重解除しない', () => {
-    const historical = read('js/event/historical_event.js');
-    const common = read('js/event/common_events.js');
-    const diplomacy = read('js/diplomacy.js');
-
-    const absorbStart = historical.indexOf('absorbClan: function');
-    const absorbEnd = historical.indexOf('// ==========================================', absorbStart);
-    const absorb = historical.slice(absorbStart, absorbEnd);
-    assert.ok(absorb.includes('disbandLegion(l.id)'));
+test('一括吸収は軍団を一度だけ正規解散し、国主を二重解除しない', () => {
+    const aff = read('js/affiliation_system.js');
+    const start = aff.indexOf('    absorbClan(subordinateClanId, dominantClanId, {');
+    const end = aff.indexOf('    transferClanRaw(', start);
+    const absorb = aff.slice(start, end);
+    assert.ok(absorb.includes('this.game.castleManager.disbandLegion(l.id)'));
     assert.ok(!/b\.isCommander\s*=\s*false/.test(absorb));
-
+    const historical = read('js/event/historical_event.js');
     const arakiStart = historical.indexOf('id: "historical_murashige_submission"');
     const arakiEnd = historical.indexOf('// ==========================================', arakiStart + 10);
     const araki = historical.slice(arakiStart, arakiEnd);
     assert.ok(araki.includes('game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);'));
     assert.ok(!araki.includes('game.castleManager.disbandLegion(legionToDismiss.id);'));
-
-    const commonStart = common.indexOf('const processSubordination =');
-    const commonBlock = common.slice(commonStart, commonStart + 2600);
-    assert.ok(commonBlock.includes('game.castleManager.disbandLegion(l.id)'));
-    assert.ok(!/b\.isCommander\s*=\s*false/.test(commonBlock));
-
-    const dipStart = diplomacy.indexOf('// 1. プレイヤー側の軍団をすべて解散させます');
-    const dipBlock = diplomacy.slice(dipStart, dipStart + 2300);
-    assert.ok(dipBlock.includes('this.game.castleManager.disbandLegion(l.id)'));
-    assert.ok(!/b\.isCommander\s*=\s*false/.test(dipBlock));
 });
 
 test('お市の婚姻イベントは元の実家ではなく現在所属を正本にする', () => {
@@ -12410,7 +12397,7 @@ test('高頻度の人事・コマンド・AI候補抽出は勢力別武将索引
     const staffing = read('js/ai_staffing.js');
     assert.ok(staffing.includes('this.game.getClanBushos(clanId)'));
     const diplomacy = read('js/diplomacy.js');
-    assert.ok(diplomacy.includes('this.game.getClanBushos(myClanId).slice()'));
+    assert.ok(read('js/affiliation_system.js').includes('this.game.getClanBushos(oldId)'));
 });
 
 
@@ -35621,6 +35608,261 @@ test('r785 新規の残党諸勢力結成も一括処理の派閥・画面更新
     assert.ok(logs.length > 0, '通常の生存告知は維持');
     assert.deepStrictEqual(updates, [], '新規結成でも一括処理の派閥更新保留を守る');
     assert.strictEqual(repaint, 0, '一括処理中に画面を再生成しない');
+});
+
+// r786: 諸勢力の旗揚げ・取込では、一括仕官の途中で派閥を再編しない。
+// 正規の所属/派閥クラスを結合し、頭領の大名兼派閥主と再編回数を検証。
+function createR786KunishuFixture(incorporation = false) {
+    const ctx = createContext();
+    for (const file of ['js/config.js', 'js/constants.js', 'js/models.js',
+        'js/personnel_rules.js', 'js/affiliation_system.js', 'js/faction_system.js', 'js/kunishu_system.js']) {
+        loadScript(ctx, file);
+    }
+    ctx.GameConfig = ctx.window.GameConfig;
+    const { Clan, AffiliationSystem, FactionSystem, KunishuSystem } = vm.runInContext(
+        '({Clan,AffiliationSystem,FactionSystem,KunishuSystem})', ctx);
+    const person = (id, affinity, achievement, clan = 0, belonging = 55) => ({
+        id, name: `人${id}`, fullName: `人${id}`, familyName: `家${id}`, familyYomi: 'け', yomi: 'し',
+        givenName: '名', givenYomi: 'な', clan, castleId: 25, status: 'active', belongKunishuId: belonging,
+        isDaimyo: id === 99, isCastellan: id === 99, isCommander: false, isGunshi: false,
+        isFactionLeader: false, factionId: 0, personality: 'balanced', recognitionNeed: 0,
+        affinity, innovation: 30, achievementTotal: achievement, loyalty: 80,
+        leadership: 100, strength: 100, politics: 100, intelligence: 100, diplomacy: 100, charm: 50,
+        familyIds: [id], stayHistory: [], battleHistory: [], isRetired: false, wifeIds: [],
+        nemesisIds: [], nemesisList: [], isActionDone: false
+    });
+    const group = [person(11, 5, 10000), person(12, 55, 10000), person(13, 5, 100), person(14, 55, 100)];
+    const daimyo = person(99, 5, 50, 1, 0);
+    const doer = person(98, 5, 50, 1, 0);
+    const bushos = incorporation ? [daimyo, doer, ...group] : [...group.slice(1), group[0]];
+    const castle = { id: 25, name: '空城', ownerClan: incorporation ? 1 : 0, castellanId: incorporation ? 99 : 0,
+        samuraiIds: bushos.map(b => b.id), soldiers: 1000, horses: 100, guns: 100, morale: 50, training: 50 };
+    const kunishu = { id: 55, leaderId: 11, castleId: 25, isDestroyed: false, ideology: '地縁',
+        soldiers: 200, morale: 30, training: 40, horses: 10, guns: 10,
+        getName: () => '残党', getRelation: () => 100 };
+    const clan = new Clan({ id: 1, name: '甲家', leaderId: 99, yomi: 'こうけ', color: '#334455' });
+    clan.daimyoPrestige = 100000;
+    const appointmentHistory = [];
+    const game = { year: 1571, month: 8, playerClanId: 1, phase: 'game',
+        clans: [clan], castles: [castle], bushos, legions: [],
+        getCastle: id => Number(id) === castle.id ? castle : null,
+        getBusho: id => bushos.find(b => Number(b.id) === Number(id)),
+        getClan: id => game.clans.find(c => Number(c.id) === Number(id)),
+        getClanDaimyo: id => game.getBusho(game.getClan(id)?.leaderId),
+        getClanBushos: id => bushos.filter(b => Number(b.clan) === Number(id)),
+        getCastleBushos: id => bushos.filter(b => Number(b.castleId) === Number(id)
+            && castle.samuraiIds.includes(b.id)),
+        castleManager: { changeOwner(c, id) { c.ownerClan = id; }, disbandLegion() {} },
+        independenceSystem: { generateDistinctColor: () => '#445566' },
+        lifeSystem: { applyDaimyoNameAndFaceChange: () => ({ isNameChanged: false }) },
+        diplomacyManager: { changeStatus() {}, setSentimentAbsolute() {} },
+        updateAllClanPrestige() {},
+        historySystem: { record(message) { appointmentHistory.push(message); } },
+        ui: { log() {}, async showDialogAsync() {}, showDialog() {}, updateClanColors() {},
+            renderMap() {}, showResultModal(_msg, _arg1, _arg2, callback) { callback?.(); },
+            updatePanelHeader() {}, renderCommandMenu() {} }
+    };
+    game.updateCastleLord = c => game.affiliationSystem.updateCastleLord(c);
+    game.affiliationSystem = new AffiliationSystem(game);
+    game.factionSystem = new FactionSystem(game);
+    game.kunishuSystem = new KunishuSystem(game);
+    game.kunishuSystem.setKunishuData([kunishu]);
+    let rebuilds = 0;
+    const original = game.factionSystem.updateFactions.bind(game.factionSystem);
+    game.factionSystem.updateFactions = id => { rebuilds++; original(id); };
+    return { game, group, castle, kunishu, getRebuilds: () => rebuilds, appointmentHistory };
+}
+
+test('r786 諸勢力の旗揚げは大名就任後に一度だけ派閥再編し、大名と派閥主を兼ねない', async () => {
+    const { game, group, castle, kunishu, getRebuilds, appointmentHistory } = createR786KunishuFixture();
+    await game.kunishuSystem.executeIndependentRise(kunishu, group[0], castle, '常陸の不死鳥');
+    assert.strictEqual(kunishu.isDestroyed, true);
+    assert.strictEqual(castle.ownerClan, 2);
+    assert.ok(group.every(b => b.clan === 2 && b.belongKunishuId === 0));
+    assert.ok(group[0].isDaimyo);
+    assert.strictEqual(group[0].isFactionLeader, false, '大名が派閥主を兼任する中間再編の残留を防ぐ');
+    assert.strictEqual(getRebuilds(), 1, '旗揚げ4名の仕官後に一度だけ派閥再編する');
+    assert.strictEqual(appointmentHistory.filter(msg => msg.includes('城主任命')).length, 0,
+        '頭領より先に登録された配下を仮城主として履歴化しない');
+});
+
+test('r786 諸勢力の一括取込も最終名簿から派閥を一度だけ再編する', () => {
+    const { game, group, castle, kunishu, getRebuilds } = createR786KunishuFixture(true);
+    game.kunishuSystem.executeKunishuIncorporate(98, castle.id, kunishu.id);
+    assert.strictEqual(kunishu.isDestroyed, true, '取込に成功');
+    assert.ok(group.every(b => b.clan === 1 && b.belongKunishuId === 0), '全員が正規所属窓口から加入');
+    assert.strictEqual(getRebuilds(), 1, '取込4名の仕官後に一度だけ派閥再編する');
+});
+
+
+// A-112: 史実イベントの勢力吸収も、一括移籍後の派閥再編を専門Systemで確定する。
+test('A-112 史実の勢力吸収は最終所属から派閥を確定し、仮再編を残さない', () => {
+    const ctx = createContext({
+        LifeStatusRules: { isDead: b => b.status === 'dead', isPresent: b => b.status === 'active' },
+        BushoStatusRules: { isActive: b => b.status === 'active' }
+    });
+    for (const f of ['js/config.js','js/constants.js','js/personnel_rules.js','js/affiliation_system.js','js/event/historical_event.js']) loadScript(ctx,f);
+    const oldClan = { id: 2, name: '旧家', leaderId: 21, extinctionNotified: false };
+    const targetClan = { id: 1, name: '新家', leaderId: 11 };
+    const leader = { id: 11, name: '新大名', clan: 1, castleId: 10, status: 'active', isDaimyo: true, affinity: 50, wifeIds: [] };
+    const arrivals = [
+        { id: 21, name: '旧大名', clan: 2, castleId: 20, status: 'active', isDaimyo: true, affinity: 50, wifeIds: [], factionId: 3 },
+        { id: 22, name: '家臣甲', clan: 2, castleId: 20, status: 'active', isDaimyo: false, affinity: 50, wifeIds: [], factionId: 3 },
+        { id: 23, name: '家臣乙', clan: 2, castleId: 20, status: 'active', isDaimyo: false, affinity: 50, wifeIds: [], factionId: 3 }
+    ];
+    const persons = [leader, ...arrivals];
+    const castles = [{ id: 10, ownerClan: 1, samuraiIds: [11], castellanId: 11 },
+        { id: 20, ownerClan: 2, samuraiIds: arrivals.map(p=>p.id), castellanId: 21 }];
+    const rebuilt = [], changes = [];
+    const game = { bushos: persons, castles, clans: [targetClan, oldClan], legions: [], playerClanId: 1,
+        getClan: id => [targetClan,oldClan].find(c=>c.id===id),
+        getClanBushos: id => persons.filter(p=>p.clan===id),
+        getClanCastles: id => castles.filter(c=>c.ownerClan===id),
+        getClanDaimyo: id => persons.find(p=>p.clan===id&&p.isDaimyo),
+        getBusho: id => persons.find(p=>p.id===id),
+        getCastle: id => castles.find(c=>c.id===id),
+        updateCastleLord: c=>changes.push(c.id),
+        castleManager: { changeOwner(c,id){c.ownerClan=id;}, disbandLegion() {} },
+        factionSystem: { updateFactions(id){rebuilt.push(id);} },
+        princesses: [], ui:{ renderMap(){} }
+    };
+    game.affiliationSystem = new (vm.runInContext('AffiliationSystem',ctx))(game);
+    ctx.EventAction.absorbClan(game, 2, 1);
+    assert.deepStrictEqual(arrivals.map(p=>p.clan), [1,1,1]);
+    assert.strictEqual(castles[1].ownerClan,1);
+    assert.strictEqual(oldClan.extinctionNotified,true,'史実イベントの消滅通知を維持');
+    assert.deepStrictEqual(rebuilt,[2,1],'吸収の一括移籍後、旧主家と新主家の派閥を各1回だけ再編');
+});
+
+
+test('A-112 固定忠誠の史実吸収は全員の加入後に派閥と城主を確定し、姫を置き去りにしない', () => {
+    const { game, group, castle, getRebuilds, appointmentHistory } = createR786KunishuFixture(true);
+    const oldClan = { id: 2, name: '旧家', leaderId: 11, princessIds: [900], extinctionNotified: false };
+    game.clans.push(oldClan);
+    const oldCastle = { id: 26, name: '旧居城', ownerClan: 2, castellanId: 11,
+        samuraiIds: group.map(b => b.id), soldiers: 1000, horses: 0, guns: 0 };
+    game.castles.push(oldCastle);
+    castle.samuraiIds = [99, 98];
+    group.forEach((b,i) => { b.clan=2; b.castleId=26; b.belongKunishuId=0;
+        b.isDaimyo=i===0; b.isCastellan=i===0; b.factionId=4; });
+    game.getCastle = id => game.castles.find(c => Number(c.id)===Number(id)) || null;
+    game.getClanCastles = id => game.castles.filter(c => Number(c.ownerClan) === Number(id));
+    game.getCastleBushos = id => (game.getCastle(id)?.samuraiIds||[])
+        .map(id=>game.getBusho(id)).filter(Boolean);
+    game.princesses = [{ id: 900, status: 'unmarried', currentClanId: 2, husbandId: 0 }];
+    game.getClan(1).princessIds = [];
+    const ctx = createContext();
+    loadScript(ctx, 'js/event/historical_event.js');
+    ctx.EventAction.absorbClan(game, 2, 1, 0, 100);
+    assert.ok(group.every(b => b.clan===1 && b.loyalty===100),'固定忠誠と所属を維持');
+    assert.ok(group.every(b => !b.isDaimyo),'旧大名の役職は解除');
+    assert.strictEqual(getRebuilds(),2,'旧家・新家を最終名簿から一度ずつ再編');
+    assert.strictEqual(appointmentHistory.filter(msg=>msg.includes('城主任命')).length,1,
+        '一括加入中の仮城主ではなく旧居城の最終城主を一度だけ確定');
+    assert.strictEqual(game.princesses[0].currentClanId,1,'未婚姫は新家へ移籍');
+    assert.ok(game.getClan(1).princessIds.includes(900));
+    assert.deepStrictEqual(oldClan.princessIds,[]);
+    assert.strictEqual(oldClan.extinctionNotified,true);
+});
+
+
+test('A-112 通常臣従コマンドは軍団や武将を個別移籍せず共通一括吸収を一度だけ呼ぶ', async () => {
+    const ctx = createContext(); loadScript(ctx, 'js/diplomacy.js');
+    const calls = [];
+    const doer = { id: 11, clan: 1, isActionDone: false };
+    const game = { playerClanId: 1, getBusho: id => id===11 ? doer : null,
+        getCastle: id => id===22 ? { id: 22, ownerClan: 2 } : null,
+        getClan: id => ({ id, name: `家${id}` }), getClanDaimyo: id => id===2 ? { id: 21 } : null,
+        affiliationSystem: { absorbClan(oldId, newId) { calls.push([oldId,newId]); } }
+    };
+    const manager = new (vm.runInContext('DiplomacyManager',ctx))(game);
+    manager._captureDiplomacyOrder = () => ({});
+    manager._isDiplomacyOrderCurrent = () => true;
+    manager.playDiplomacyConversation = async () => {};
+    manager._recordDiplomacyHistory = () => {};
+    manager.showDiplomacyResult = () => {};
+    await manager.executeVassalage(11,22);
+    assert.deepStrictEqual(calls, [[1,2]],'通常外交の臣従は共通窓口へ一回だけ委譲');
+    assert.strictEqual(doer.isActionDone,true);
+    assert.strictEqual(game.playerClanId,2,'臣従後の操作勢力変更は従来どおり');
+});
+
+test('A-112 AI同士の月初臣従申し出も共通一括吸収を一度だけ呼ぶ', async () => {
+    const mockMath = Object.create(Math); mockMath.random = () => 0;
+    const ctx = createContext({ Math: mockMath, GameEvents: [],
+        PersonnelRules: { calcAffinityDiff: () => 0 } });
+    loadScript(ctx, 'js/event/common_events.js');
+    const event = ctx.GameEvents.find(e => e.id === 'ai_vassalage_offer_monthly');
+    assert.ok(event);
+    const old = { id: 1, name: '旧家', daimyoPrestige: 1,
+        diplomacyValue: { 2: { status: '従属', sentiment: 100, subordinateMonths: 120 } } };
+    const target = { id: 2, name: '新家', daimyoPrestige: 99999 };
+    const player = { id: 3, name: '第三家', daimyoPrestige: 100 };
+    const daimyo = { 1: { id:11, affinity:50, castleId:10 },
+        2: { id:21, affinity:50, castleId:20 }, 3: { id:31, affinity:50, castleId:30 } };
+    const calls = [];
+    const game = { playerClanId:3, clans:[old,target,player], isProcessingAI:true, isWatchMode:false,
+        getClan: id=>[old,target,player].find(c=>c.id===id),
+        getClanDaimyo: id=>daimyo[id], getCastle: id=>({ id, provinceId:1 }),
+        getClanCastles: () => [],
+        affiliationSystem: { absorbClan(a,b) { calls.push([a,b]); } },
+        ui: { log() {}, async showDialogAsync() {} }
+    };
+    await event.execute(game);
+    assert.deepStrictEqual(calls, [[1,2]],'月初のAI同士の臣従も同一の共通処理へ一回だけ委譲');
+});
+
+// A-113: 勢力吸収は領地消失を伴う滅亡として、預かり人質の担保を専門窓口で終了する。
+test('A-113 臣従で消滅する家の外交人質は第三家預かりも含め共通窓口で解除する', () => {
+    const ctx = createContext();
+    for (const f of ['js/config.js','js/constants.js','js/personnel_rules.js',
+        'js/affiliation_system.js','js/diplomacy.js']) loadScript(ctx, f);
+    const makeClan = id => ({ id, name: `家${id}`, princessIds: [], diplomacyValue: {} });
+    const oldClan = makeClan(2), winnerClan = makeClan(1), thirdClan = makeClan(3);
+    oldClan.diplomacyValue[1] = { hostageIds: [22] };
+    winnerClan.diplomacyValue[2] = { hostageIds: [22] };
+    oldClan.diplomacyValue[3] = { hostageIds: [31] };
+    thirdClan.diplomacyValue[2] = { hostageIds: [31] };
+    const member = (id, clan, castleId) => ({ id, name: `人${id}`, clan, castleId,
+        status:'active', affinity:50, loyalty:80, achievementTotal:0, wifeIds:[],
+        isDaimyo:id===21 || id===11, isCommander:false, isCastellan:false,
+        isHostage:false, isFactionLeader:false, factionId:0, belongKunishuId:0 });
+    const daimyo = member(21,2,20), winner = member(11,1,10);
+    const heldByWinner = member(22,1,10);
+    heldByWinner.isHostage = true;
+    heldByWinner.originalClanId = 2;
+    const heldByOld = member(31,2,20);
+    heldByOld.isHostage = true;
+    heldByOld.originalClanId = 3;
+    const bushos = [daimyo, winner, heldByWinner, heldByOld];
+    const castles = [{ id:20,ownerClan:2,samuraiIds:[21,31],castellanId:21 },
+        { id:10,ownerClan:1,samuraiIds:[11,22],castellanId:11 }];
+    const clans = [oldClan,winnerClan,thirdClan];
+    const game = { bushos, castles, clans, legions:[], princesses:[],
+        getBusho:id=>bushos.find(b=>b.id===id),
+        getClan:id=>clans.find(c=>c.id===id),
+        getClanBushos:id=>bushos.filter(b=>b.clan===id),
+        getClanCastles:id=>castles.filter(c=>c.ownerClan===id),
+        getClanDaimyo:id=>bushos.find(b=>b.clan===id && b.isDaimyo),
+        getCastle:id=>castles.find(c=>c.id===id),
+        castleManager:{ disbandLegion(){}, changeOwner(c,id){ c.ownerClan=id; } },
+        factionSystem:{updateFactions(){}},
+        updateCastleLord(){} };
+    const classes = vm.runInContext('({AffiliationSystem,DiplomacyManager})', ctx);
+    game.affiliationSystem = new classes.AffiliationSystem(game);
+    game.diplomacyManager = new classes.DiplomacyManager(game);
+    assert.strictEqual(game.affiliationSystem.absorbClan(2,1),true);
+    assert.strictEqual(daimyo.clan,1);
+    assert.strictEqual(heldByOld.clan,1,'旧預かり家にいた第三家の人質は所属移管される');
+    for (const hostage of [heldByWinner,heldByOld]) {
+        assert.strictEqual(hostage.isHostage,false,`${hostage.id} の担保が終了`);
+        assert.strictEqual(hostage.originalClanId,undefined,`${hostage.id} の旧担保元を解除`);
+    }
+    for (const relation of [oldClan.diplomacyValue[1],winnerClan.diplomacyValue[2],
+        oldClan.diplomacyValue[3],thirdClan.diplomacyValue[2]]) {
+        assert.deepStrictEqual(Array.from(relation.hostageIds),[],'外交関係双方の人質名簿を整理');
+    }
+    assert.strictEqual(heldByWinner.clan,1,'既存の預かり家での所属は変えない');
 });
 
 Promise.all(pendingTests).then(() => {

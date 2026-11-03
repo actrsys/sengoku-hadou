@@ -336,46 +336,11 @@ window.EventAction = {
 
     // ⑤ ★勢力を丸ごと吸収する（城と武将の引き継ぎ）魔法
     absorbClan: function(game, subordinateClanId, dominantClanId, excludeBushoId = 0, fixedLoyalty = null) {
-        // ① 吸収される側の軍団をすべて解散させます（お片付け）
-        if (game.legions) {
-            const myLegions = game.legions.filter(l => Number(l.clanId) === Number(subordinateClanId));
-            myLegions.forEach(l => {
-                if (game.castleManager && game.castleManager.disbandLegion) {
-                    game.castleManager.disbandLegion(l.id);
-                }
-            });
-        }
-
-        // ② 吸収される側のお城をすべて吸収する大名家にプレゼントして、直轄（0）にします
-        const myCastles = game.getClanCastles(subordinateClanId);
-        myCastles.forEach(c => {
-            game.castleManager.changeOwner(c, dominantClanId, true, 0); // trueで平和的に引き渡し
+        // 史実イベント側は発生条件だけを決め、移管は所属Systemの共通窓口へ委譲する。
+        // 元の対象規則（死亡者を除外／対象人物を除外）と消滅通知は維持する。
+        game.affiliationSystem.absorbClan(subordinateClanId, dominantClanId, {
+            excludeBushoId, fixedLoyalty, includeDead: false, markExtinctionNotified: true
         });
-
-        // ③ 吸収される側の武将（除外ID以外）を吸収する大名家に入れます
-        const myBushos = game.bushos.filter(b => Number(b.clan) === Number(subordinateClanId) && !window.LifeStatusRules.isDead(b) && b.id !== excludeBushoId);
-        myBushos.forEach(b => {
-            if (fixedLoyalty !== null && game.affiliationSystem && game.affiliationSystem.joinClan) {
-                // 忠誠度が指定されている場合（臣従イベントなど）はお引越しセンターの魔法を使います
-                game.affiliationSystem.joinClan(b, dominantClanId, b.castleId, fixedLoyalty);
-            } else {
-                // それ以外（乗っ取りなど）は個別に処理して相性で忠誠を再計算します
-                b.isDaimyo = false;
-                game.affiliationSystem.transferClanRaw(b, dominantClanId, { syncSpouses: true });
-                if (game.affiliationSystem && game.affiliationSystem.updateLoyaltyForNewLord) {
-                    game.affiliationSystem.updateLoyaltyForNewLord(b, dominantClanId);
-                }
-            }
-        });
-
-        // 武将に付随しない未婚姫も、吸収先へ移して旧勢力へ取り残さない。
-        game.affiliationSystem.transferUnmarriedPrincesses(subordinateClanId, dominantClanId);
-
-        // ④ 吸収される側（旧勢力）の滅亡フラグを立てます
-        const subordinateClan = game.getClan(subordinateClanId);
-        if (subordinateClan) {
-            subordinateClan.extinctionNotified = true;
-        }
     }
 };
 
