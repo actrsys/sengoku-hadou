@@ -36381,6 +36381,103 @@ test('r795 共通一括仕官は任命保留時に影響拠点を返し、後続
     assert.strictEqual(old.castellanId,0);
 });
 
+
+// A-124: 松永家臣従の国主昇格で複数家臣が集合するとき、
+// 城主は移動元・移動先の最終配置から決め、イベント中の地図は更新しない。
+test('r796 松永臣従後の配下集合は共通一括転任で城主・画面を最終確定する', async () => {
+    const ctx=createContext({setTimeout});
+    ctx.GameConstants={BushoStatus:{ACTIVE:'active',RONIN:'ronin',DEAD:'dead',UNBORN:'unborn'}};
+    ctx.LifeStatusRules={isPresent:b=>b.status==='active'||b.status==='ronin',isDead:b=>b.status==='dead'};
+    ctx.BushoStatusRules={isActive:b=>b.status==='active'};
+    ctx.MapGraphService={isAdjacent:()=>true};
+    ctx.PersonnelRules={calcAffinityDiff:()=>10};
+    loadScript(ctx,'js/event/historical_event.js');
+    loadScript(ctx,'js/affiliation_system.js');
+    const mkCastle=(id,ownerClan,castellanId=0)=>({id,name:`拠点${id}`,ownerClan,castellanId,samuraiIds:[],legionId:0,isDelegated:false});
+    const castles=[mkCastle(10,1,100),mkCastle(39,2,1202004),mkCastle(41,2,1020014),mkCastle(42,2,1202006),mkCastle(43,3,1020021)];
+    const mkBusho=(id,clan,castleId,extras={})=>({id,clan,castleId,status:'active',name:`武将${id}`,fullName:`武将${id}`,
+        isDaimyo:false,isCastellan:castles.some(c=>c.castellanId===id),isCommander:false,isGunshi:false,
+        isHostage:false,belongKunishuId:0,loyalty:95,achievementTotal:200,wifeIds:[],
+        intelligence:70,leadership:70,strength:70,politics:70,diplomacy:70,charm:70,affinity:50,
+        courtRankIds:[],...extras});
+    const bushos=[mkBusho(100,1,10,{isDaimyo:true}),
+      mkBusho(1017001,1,10,{courtRankIds:[80]}),
+      mkBusho(1202004,2,39,{isDaimyo:true}),
+      mkBusho(1020014,2,41),mkBusho(1202005,2,41),mkBusho(1202006,2,42),
+      mkBusho(1020021,3,43,{isDaimyo:true})];
+    castles.forEach(c=>c.samuraiIds=bushos.filter(b=>b.castleId===c.id).map(b=>b.id));
+    const clans=[{id:1,name:'擁立家',leaderId:100,princessIds:[]},
+        {id:2,name:'松永家',leaderId:1202004,princessIds:[]},
+        {id:3,name:'三好家',leaderId:1020021,princessIds:[]}];
+    let renders=0, updates=[], factionUpdates=0, moved=[];
+    const game={year:1570,month:5,phase:'game',playerClanId:99,isProcessingAI:false,
+      castles,bushos,clans,princesses:[],legions:[],
+      getBusho:id=>bushos.find(b=>b.id===Number(id)),
+      getCastle:id=>castles.find(c=>c.id===Number(id)),
+      getClan:id=>clans.find(c=>c.id===Number(id)),
+      getClanCastles:id=>castles.filter(c=>c.ownerClan===Number(id)),
+      getClanBushos:id=>bushos.filter(b=>b.clan===Number(id)),
+      getCastleBushos:id=>bushos.filter(b=>b.castleId===Number(id)&&b.status==='active'),
+      getClanDaimyo:id=>bushos.find(b=>b.clan===Number(id)&&b.isDaimyo),
+      factionSystem:{handleMove(){},updateFactions(){factionUpdates++}},
+      ui:{log(){},renderMap(){renders++},updatePanelHeader(){},async showDialogAsync(){}},
+      historySystem:{record(){}},
+      castleManager:{disbandLegion(){},changeOwner(c,clanId){c.ownerClan=clanId;c.castellanId=0;}},
+      diplomacyManager:{settleHostagesFromExtinctClan(){}},
+      courtRankSystem:{RANK_IDS_CANDIDATE:[80],RANK_ID_SHOGUN:81},
+      aiStaffing:{assignNewLegion(clanId,commanderId){game.legions.push({id:77,clanId,legionNo:1,commanderId});return 1;}},
+      updateAllClanPrestige(){}
+    };
+    ctx.game=game;
+    game.affiliationSystem=vm.runInContext('new AffiliationSystem(game)',ctx);
+    const rawUpdate=game.affiliationSystem.updateCastleLord.bind(game.affiliationSystem);
+    game.affiliationSystem.updateCastleLord=(c)=>{updates.push(c.id);rawUpdate(c)};
+    game.updateCastleLord=c=>game.affiliationSystem.updateCastleLord(c);
+    const rawMove=game.affiliationSystem.moveCastle.bind(game.affiliationSystem);
+    game.affiliationSystem.moveCastle=(b,id,opts)=>{moved.push({id:b.id,from:b.castleId,to:id,opts:opts||{}});return rawMove(b,id,opts)};
+    const ev=ctx.GameEvents.find(e=>e.id==='historical_hisahide_submission');
+    assert.ok(ev,'松永臣従イベントが登録されている');
+    assert.strictEqual(ev.checkCondition(game),true,'将軍候補・両家当主・義継所属・隣接条件を満たす');
+    const absorb=ctx.EventAction.absorbClan;
+    ctx.EventAction.absorbClan=(...args)=>{const v=absorb(...args);updates=[];renders=0;return v;};
+    await ev.execute(game);
+    assert.deepStrictEqual(bushos.filter(b=>[1020014,1202005,1202006].includes(b.id)).map(b=>b.castleId),[39,39,39]);
+    assert.strictEqual(game.getCastle(39).ownerClan,1);
+    assert.strictEqual(game.getCastle(39).legionId,1);
+    assert.strictEqual(game.getBusho(1202004).isCommander,true);
+    assert.ok(moved.filter(m=>[1020014,1202005,1202006].includes(m.id)).length===3);
+    assert.strictEqual(updates.filter(id=>id===41).length,1,'旧居城は3名の順次退去後に一度だけ更新');
+    assert.strictEqual(updates.filter(id=>id===42).length,1,'第二の移動元も一度だけ更新');
+    assert.strictEqual(updates.filter(id=>id===39).length,2,'国主指定と一括集合の最終確定だけで処理');
+    assert.strictEqual(renders,0,'イベント中の途中地図更新は共通イベント終了処理に委ねる');
+    await ctx.EventAction.refreshScreen(game);
+    assert.strictEqual(renders,1,'イベント終了時だけ一度地図を更新');
+});
+
+// 既存の単独/AI複数移動は、明示保留しなければ従来どおり更新する。
+test('r796 通常の一括転任は従来の即時描画を維持しイベント用保留は任意',()=>{
+    const ctx=createContext();
+    ctx.GameConstants={BushoStatus:{ACTIVE:'active',RONIN:'ronin',DEAD:'dead',UNBORN:'unborn'}};
+    ctx.LifeStatusRules={isPresent:()=>true};
+    ctx.BushoStatusRules={isActive:()=>true};
+    loadScript(ctx,'js/affiliation_system.js');
+    const c1={id:1,ownerClan:1,castellanId:0,samuraiIds:[10,11]},c2={id:2,ownerClan:1,castellanId:0,samuraiIds:[]};
+    const bushos=[10,11].map(id=>({id,clan:1,castleId:1,status:'active',isCastellan:false,isCommander:false,isDaimyo:false}));
+    let renders=0;
+    const game={castles:[c1,c2],bushos,legions:[],phase:'game',playerClanId:8,
+      getCastle:id=>[c1,c2].find(c=>c.id===id),getBusho:id=>bushos.find(b=>b.id===id),
+      getCastleBushos:id=>bushos.filter(b=>b.castleId===id),
+      getClanDaimyo:()=>null,
+      ui:{renderMap(){renders++}}};
+    ctx.game=game;
+    const aff=vm.runInContext('new AffiliationSystem(game)',ctx);
+    aff.updateCastleLord=()=>{};
+    aff.moveCastleGroup(bushos,2);
+    assert.strictEqual(renders,1,'通常グループ移動の即時描画を残す');
+    aff.moveCastleGroup(bushos,1,{deferUI:true});
+    assert.strictEqual(renders,1,'明示的な描画保留を尊重する');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);

@@ -306,6 +306,12 @@ window.EventAction = {
         }
     },
 
+    // 同じ史実イベントで複数武将が同時に転任する時は、途中の地図更新を
+    // EventManagerの終了時処理に委ね、城主は専門Systemで最終確定する。
+    moveBushoGroup: function(game, bushos, targetCastleId) {
+        return game.affiliationSystem.moveCastleGroup(bushos, targetCastleId, { deferUI: true });
+    },
+
     // ② 武将を安全に別のお城へお引越しさせます（新魔法）
     moveBusho: function(game, busho, targetCastleId) {
         if (!busho || busho.castleId === targetCastleId) return;
@@ -3003,7 +3009,7 @@ window.GameEvents.push({
             // 一回の将軍就任で退く武将は、仮城主を途中で選ばず最終配置から確定する。
             // 個々の在城履歴・所属移動は AffiliationSystem の共通窓口に任せる。
             residents.forEach(b => { b.isCastellan = false; });
-            game.affiliationSystem.moveCastleGroup(residents, destinationCastleId);
+            window.EventAction.moveBushoGroup(game, residents, destinationCastleId);
         });
 
         // お城の持ち主を新しい将軍家に変えます
@@ -3464,13 +3470,12 @@ window.GameEvents.push({
                 targetCastle.legionId = newLegionNo;
                 targetCastle.isDelegated = true; // AIに委任する状態にします
                 
-                // ★追加：国主になれた場合、元々の配下たちを久秀の城に集合させます
-                matsunagaBushos.forEach(busho => {
-                    if (busho.id !== hisahide.id && busho.castleId !== targetCastle.id) {
-                        busho.isCastellan = false; // お引越しするので城主のバッジは外します
-                        window.EventAction.moveBusho(game, busho, targetCastle.id);
-                    }
-                });
+                // 元松永家臣の集合はイベント用の一括転任窓口に委譲する。
+                // 途中の仮城主・地図更新を作らず、最後の配置だけで確定する。
+                const followersToGather = matsunagaBushos.filter(busho =>
+                    busho.id !== hisahide.id && busho.castleId !== targetCastle.id
+                );
+                window.EventAction.moveBushoGroup(game, followersToGather, targetCastle.id);
             }
         }
         

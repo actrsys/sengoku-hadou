@@ -598,7 +598,7 @@ class AffiliationSystem {
      * 出発元と到着先の城主を最終状態から一度だけ決める。
      * 一人ずつ自動選出すると移動途中の仮城主が任命履歴に残るため。
      */
-    moveCastleGroup(bushos, newCastleId) {
+    moveCastleGroup(bushos, newCastleId, options = {}) {
         if (!Array.isArray(bushos) || bushos.length === 0) return;
         const sourceIds = new Set();
         bushos.forEach(busho => {
@@ -613,7 +613,9 @@ class AffiliationSystem {
         });
         const destination = this.game.getCastle(newCastleId);
         if (destination) this.updateCastleLord(destination);
-        this.updateUI();
+        // 史実イベント等で既に共通の終了描画がある場合のみ、途中描画を保留する。
+        // 通常の一括転任やAI人事はこれまでどおり一度だけ即時更新する。
+        if (options.deferUI !== true) this.updateUI();
     }
 
     /**
