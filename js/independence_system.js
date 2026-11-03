@@ -116,7 +116,7 @@ class IndependenceSystem {
         }
     }
     
-    async executeRebellion(castle, castellan, oldDaimyo, intention = 'indep', forceTargetClanId = null) {
+    async executeRebellion(castle, castellan, oldDaimyo, intention = 'indep', forceTargetClanId = null, { deferFactionUpdate = false } = {}) {
         const isCurrentFlow = this._captureIndependenceFlow();
         const oldClanId = castle.ownerClan;
         
@@ -491,6 +491,10 @@ class IndependenceSystem {
         });
 
         this.game.updateCastleLord(castle);
+        // 独立後の最終名簿で旧主家の派閥を確定する。途中の離反者移籍では
+        // 旧派閥主が消えても残留家臣の派閥IDが残るため、呼応判定後に一度だけ再編する。
+        // 謀反の勝敗別処理は、戦後の専用補正・一時状態の復旧後に再編する。
+        if (!deferFactionUpdate && this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
         
         // ★Round7：独立・寝返りで実際に値が変わった旧勢力と新勢力だけ威信を更新します。
         // 全勢力の再計算はイベント終了後の共通更新でも行われるため、演出直前の瞬間負荷を抑えます。
@@ -795,7 +799,10 @@ class IndependenceSystem {
                         }
                     } else {
                         // ★変更：逃げる城がない場合は、潔く野に下る（浪人になる）
-                        this.game.affiliationSystem.becomeRonin(busho);
+                        // 独立の呼応判定が終わるまでは途中名簿で派閥を再編しない。
+                        this.game.affiliationSystem.becomeRonin(busho, 'desertion', {
+                            deferFactionUpdate: true
+                        });
                         this._logIndependence(`  -> ${busho.name}は新体制に従わず、野に下りました。`, [oldClanId, newClanId]);
                     }
                 } else {
@@ -893,7 +900,8 @@ class IndependenceSystem {
                     ...(deferredCastleLordIds ? { deferCastleLordUpdate: true, deferUI: true } : {})
                 });
             } else {
-                this.game.affiliationSystem.becomeRonin(p);
+                // 捕虜の帰属が確定するまで派閥を再選出しない。
+                this.game.affiliationSystem.becomeRonin(p, 'desertion', { deferFactionUpdate: true });
             }
         };
         let alertMsgs = [];
@@ -902,7 +910,7 @@ class IndependenceSystem {
             if (oldClanId === this.game.playerClanId) {
                 if (PersonnelRules.calcAffinityDiff(p.affinity, newDaimyo.affinity) > 60) {
                     // 処断の生死判定は従来どおり。死亡確定後の妻・婚姻・官位・在城・人質解除はLifeSystemが正本。
-                    await this.game.lifeSystem.executeDeath(p);
+                    await this.game.lifeSystem.executeDeath(p, { deferFactionUpdate: true });
                     if (!isCurrentFlow()) return alertMsgs;
                     alertMsgs.push(`処断：${p.name}は処断されました。`);
                 } else {
@@ -915,7 +923,7 @@ class IndependenceSystem {
                 alertMsgs.push(`${p.name}は元の主君のもとへ逃げ去りました。`);
             } else {
                 if (Math.random() < 0.3) {
-                    await this.game.lifeSystem.executeDeath(p);
+                    await this.game.lifeSystem.executeDeath(p, { deferFactionUpdate: true });
                     if (!isCurrentFlow()) return alertMsgs;
                 }
                 else releaseCaptive(p);
@@ -1416,7 +1424,7 @@ class IndependenceSystem {
                 // 主家軍の勝利後も、反乱勢力の離脱が確定するまでは元の派閥を維持する。
                 // 一時的に旧大名のisDaimyoを外して選挙すると、大名が派閥主になったまま残る。
                 // 先に敗残側の独立を終え、残留する主家の最終名簿だけで再編する。
-                await this.executeRebellion(castle, castellan, oldDaimyo, 'indep');
+                await this.executeRebellion(castle, castellan, oldDaimyo, 'indep', null, { deferFactionUpdate: true });
                 if (!isCurrentFlow()) return;
 
                 // 勝利した主家側の功績優遇は派閥選出時だけ維持し、実功績には加算しない。
@@ -1457,7 +1465,7 @@ class IndependenceSystem {
                 // 独立参加者の派閥は従来の所属変更窓口で消去される。
                 // 参加しなかった旧家残留者だけを元の状態へ戻す。
                 try {
-                    await this.executeRebellion(castle, castellan, oldDaimyo, 'indep');
+                    await this.executeRebellion(castle, castellan, oldDaimyo, 'indep', null, { deferFactionUpdate: true });
                 } finally {
                     rebelMembers.forEach(b => {
                         const original = originalFactionStates.get(b.id);
@@ -1467,6 +1475,9 @@ class IndependenceSystem {
                         b.isFactionLeader = original.isFactionLeader;
                     });
                 }
+                if (!isCurrentFlow()) return;
+                // 戦闘専用の派閥情報を復旧してから、旧主家の派閥を最終名簿で再編する。
+                if (this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
             }
 
         } else {

@@ -190,8 +190,9 @@ class FactionSystem {
         const clan = this.game.getClan(busho.clan);
         const clanName = clan ? clan.name : "当家";
         
-        // ★新しいお引越しセンターの魔法を使います！
-        this.game.affiliationSystem.becomeRonin(busho);
+        // 月初の下野候補を全員確定してから processStartMonth() が全国派閥を再編する。
+        // 各武将の脱退ごとに個別再編すると途中名簿で同じ選出を繰り返す。
+        this.game.affiliationSystem.becomeRonin(busho, 'desertion', { deferFactionUpdate: true });
 
         if (clan && clan.id === this.game.playerClanId) {
             const message = `${busho.name}は${clanName}に愛想を尽かし、下野しました。`;

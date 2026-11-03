@@ -5301,7 +5301,7 @@ test('残党諸勢力化も妻婚姻同期の共通窓口を通す', () => {
     assert.ok(ronin.includes('this.syncSpousesForClanChange(busho, oldClanId, 0'));
     assert.ok(ronin.includes('refreshDiplomacy: busho.isHostage !== true'));
 
-    const createAt = src.indexOf('_createSurvivalKunishu(busho, oldClanId, survivalInfo)');
+    const createAt = src.indexOf('\n    _createSurvivalKunishu(');
     const create = src.slice(createAt, src.indexOf('\n    // ★追加：旧家臣が生存スキル', createAt));
     assert.ok(create.includes('this.syncSpousesForClanChange(busho, oldClanId, 0'));
     assert.ok(create.includes('refreshDiplomacy: busho.isHostage !== true'));
@@ -28501,6 +28501,8 @@ test('r629 非城主派閥主を擁立した寝返りは神輿本人の別城移
         BushoStatusRules: { isActive: b => b.status === 'active' },
         LifeStatusRules: { isPresent: b => b.status === 'active' } });
     for (const file of ['js/affiliation_system.js', 'js/faction_system.js', 'js/independence_system.js']) loadScript(ctx, file);
+    // 通常ゲームには常に存在する派閥定数を結合fixtureにも渡す。
+    ctx.WarParams.Faction = global.GameConfig.War.Faction;
     const Aff = vm.runInContext('AffiliationSystem', ctx);
     const Fac = vm.runInContext('FactionSystem', ctx);
     const Indep = vm.runInContext('IndependenceSystem', ctx);
@@ -34882,6 +34884,8 @@ test('r776 非城主派閥主の脱出で仮城主を選ばず旧拠点の所有
     loadScript(ctx, 'js/affiliation_system.js');
     loadScript(ctx, 'js/faction_system.js');
     loadScript(ctx, 'js/independence_system.js');
+    // 通常ゲームには常に存在する派閥定数を結合fixtureにも渡す。
+    ctx.WarParams.Faction = global.GameConfig.War.Faction;
     const Aff = vm.runInContext('AffiliationSystem', ctx);
     const Fac = vm.runInContext('FactionSystem', ctx);
     const Indep = vm.runInContext('IndependenceSystem', ctx);
@@ -34954,6 +34958,8 @@ test('r777 離反時の逃亡・捕縛解放による退避先の仮城主が呼
     loadScript(ctx, 'js/affiliation_system.js');
     loadScript(ctx, 'js/faction_system.js');
     loadScript(ctx, 'js/independence_system.js');
+    // 通常ゲームには常に存在する派閥定数を結合fixtureにも渡す。
+    ctx.WarParams.Faction = global.GameConfig.War.Faction;
     const Aff = vm.runInContext('AffiliationSystem', ctx);
     const Fac = vm.runInContext('FactionSystem', ctx);
     const Indep = vm.runInContext('IndependenceSystem', ctx);
@@ -35385,6 +35391,236 @@ test('r782 謀反引き分け後に呼応しなかった家臣へ一時派閥ID�
     assert.ok([loyalA, loyalB].every(b => b.clan === 1 && b.castleId === 11), '確率判定で合流せず旧家に残る実経路');
     assert.ok([loyalA, loyalB].every(b => b.factionId === 0 && !b.isFactionLeader),
         '旧主家へ残った無派閥家臣に戦闘用の仮派閥を残さない');
+});
+
+// A-109: 旧主家の派閥主が通常独立・引き分けで離脱した後も、
+// 旧家に残った追随者を派閥主不在のまま月末処理へ引き渡さない。
+async function verifyFactionLeaderDepartureAfterIndependence(asDraw) {
+    const fixedMath = Object.create(Math); fixedMath.random = () => 0.95;
+    const ctx = createContext({ Math: fixedMath, setTimeout: fn => fn() });
+    for (const f of ['js/config.js', 'js/affiliation_system.js', 'js/faction_system.js', 'js/independence_system.js']) loadScript(ctx, f);
+    ctx.GameConstants = { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', UNBORN: 'unborn', DEAD: 'dead' } };
+    ctx.LifeStatusRules = { isUnborn: b => b.status === 'unborn', isDead: b => b.status === 'dead' };
+    ctx.BushoStatusRules = { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' };
+    ctx.PersonnelRules = { calcAffinityDiff: (a, b) => Math.min(Math.abs(a-b), 100-Math.abs(a-b)) };
+    ctx.Clan = class { constructor(v) { Object.assign(this, v); } };
+    function make(id, props = {}) {
+        return { id, name: '武将'+id, fullName: '武将'+id, clan: 1, castleId: 11, status: 'active',
+            isDaimyo: false, isCastellan: false, isGunshi: false, isCommander: false, isFactionLeader: false,
+            factionId: 0, personality: 'balanced', familyIds: [id], wifeIds: [], achievementTotal: 1000,
+            loyalty: 65, affinity: 10, innovation: 50, ambition: 70, duty: 70,
+            leadership: 70, strength: 70, politics: 70, diplomacy: 70, intelligence: 70, charm: 70,
+            recognitionNeed: 0, stayHistory: [], battleHistory: [], birthYear: 1520, startYear: 1535,
+            originalEndYear: 9999, deathFlag: false, clanNameStr: '新家', clanYomiStr: 'しんけ',
+            familyName: '家'+id, familyYomi: 'いえ', givenName: '名', givenYomi: 'な',
+            nemesisIds: [], nemesisList: [], arrivalTurn: 18800, ...props };
+    }
+    const daimyo = make(101, { isDaimyo: true, isCastellan: true, achievementTotal: 2000, factionId: 0 });
+    const loyalA = make(102, { factionId: 5, achievementTotal: 100, leadership: 35, strength: 35,
+        politics: 35, diplomacy: 35, intelligence: 35 });
+    const loyalB = make(103, { factionId: 5, achievementTotal: 100, leadership: 35, strength: 35,
+        politics: 35, diplomacy: 35, intelligence: 35 });
+    const rebel = make(201, { castleId: 12, isCastellan: true, isFactionLeader: true,
+        factionId: 5, achievementTotal: 1750, affinity: 75, personality: 'aggressive' });
+    const rebelA = make(202, { castleId: 12, factionId: 5, achievementTotal: 100,
+        affinity: 75, leadership: 35, strength: 35, politics: 35, diplomacy: 35, intelligence: 35 });
+    const rebelB = make(203, { castleId: 12, factionId: 5, achievementTotal: 100,
+        affinity: 75, leadership: 35, strength: 35, politics: 35, diplomacy: 35, intelligence: 35 });
+    const rebelC = make(204, { castleId: 12, factionId: 5, achievementTotal: 1200, affinity: 75 });
+    const bushos = [daimyo, loyalA, loyalB, rebel, rebelA, rebelB, rebelC];
+    const castles = [
+        { id: 11, name: '主家本拠', ownerClan: 1, castellanId: 101, samuraiIds: [101,102,103], x: 0, y: 0, legionId: 0, soldiers: 1000 },
+        { id: 12, name: '反乱拠点', ownerClan: 1, castellanId: 201, samuraiIds: [201,202,203,204], x: 2, y: 0, legionId: 0, soldiers: 1000 }
+    ];
+    const clans = [{ id: 1, name: '旧家', leaderId: 101, color: '#555555', diplomacyValue: {} }];
+    const game = { year: 1570, month: 6, phase: 'game', isProcessingAI: true, playerClanId: 99,
+        bushos, castles, clans, legions: [],
+        getBusho: id => bushos.find(b => b.id === Number(id)) || null,
+        getCastle: id => castles.find(c => c.id === Number(id)) || null,
+        getClan: id => clans.find(c => c.id === Number(id)) || null,
+        getClanBushos: id => bushos.filter(b => b.clan === Number(id)),
+        getClanDaimyo: id => bushos.find(b => b.clan === Number(id) && b.isDaimyo) || null,
+        getCastleBushos: id => game.getCastle(id).samuraiIds.map(id => game.getBusho(id)).filter(Boolean),
+        getClanCastles: id => castles.filter(c => c.ownerClan === Number(id)),
+        getClanTotalSoldiers: () => 2000, updateAllClanPrestige() {}, updateClanPrestige() {},
+        ui: { info: {}, log() {}, async showDialogAsync() {}, renderMap() {}, showMapGuard() {}, hideMapGuard() {},
+            async playBattleBlink() { return true; }, async playCaptureEffect(ids, halfway) { halfway(); return true; }, updateClanColors() {} },
+        lifeSystem: { applyDaimyoNameAndFaceChange() { return null; } },
+        diplomacyManager: { reorganizeRelationsAfterRebellion() {} },
+        castleManager: { setOwnerIdRaw(c, id) { c.ownerClan = id; }, changeOwner(c, id) { c.ownerClan = id; }, disbandLegion() {} }
+    };
+    const Aff = vm.runInContext('AffiliationSystem', ctx);
+    const Fac = vm.runInContext('FactionSystem', ctx);
+    const Indep = vm.runInContext('IndependenceSystem', ctx);
+    game.affiliationSystem = new Aff(game);
+    game.affiliationSystem.updateUI = () => {};
+    game.updateCastleLord = castle => game.affiliationSystem.updateCastleLord(castle);
+    game.factionSystem = new Fac(game);
+    const actualUpdate = game.factionSystem.updateFactions.bind(game.factionSystem);
+    const snapshots = [];
+    game.factionSystem.updateFactions = clanId => {
+        snapshots.push({ clanId, rebelClan: rebel.clan, isDaimyo: daimyo.isDaimyo });
+        return actualUpdate(clanId);
+    };
+    const independence = new Indep(game);
+    independence.generateDistinctColor = () => '#77bb88';
+    independence.calculateLoyaltyScores = () => ({ joinScore: 240, stayScore: 200 });
+    assert.strictEqual(loyalA.factionId, 5, '検証前の忠臣Aは反乱派閥');
+    assert.strictEqual(loyalB.factionId, 5, '検証前の忠臣Bは反乱派閥');
+    if (asDraw) {
+        independence.executeSecretFieldWar = async () => ({ result: 'draw', deadAttacker: 0, deadDefender: 0 });
+        await independence.planCoupDetatOrRebellion(castles[1], rebel, daimyo, 'coup');
+    } else {
+        await independence.executeRebellion(castles[1], rebel, daimyo, 'indep');
+    }
+    assert.strictEqual(rebel.isFactionLeader, false, '離反した旧派閥主の所属データは消える');
+    assert.strictEqual(rebel.clan, 2, '引き分けた反乱首魁は新勢力を創設');
+    assert.ok([loyalA, loyalB].every(b => b.clan === 1 && b.castleId === 11), '確率判定で合流せず旧家に残る実経路');
+    assert.ok([loyalA, loyalB].every(b => b.factionId === 0 && !b.isFactionLeader),
+        '旧主家に派閥主不在の旧派閥IDを残さない');
+    assert.strictEqual(snapshots.length, 1, '通常独立・引き分けとも旧主家の派閥更新は確定後に一度だけ');
+    assert.strictEqual(snapshots[0].clanId, 1);
+    assert.strictEqual(snapshots[0].rebelClan, 2, '独立勢力成立前の一時名簿で再編しない');
+}
+
+test('r784 通常独立で派閥主が去った後に旧家へ派閥主不在の所属者を残さない',
+    () => verifyFactionLeaderDepartureAfterIndependence(false));
+test('r784 謀反引き分けで仮派閥を復旧した後に旧家の派閥を再編する',
+    () => verifyFactionLeaderDepartureAfterIndependence(true));
+
+// A-110: 派閥の選出ルールは FactionSystem に集約し、一括処理中の再選出を抑止する。
+test('r785 月初の複数下野では所属正本を経由し派閥を最終名簿で一度だけ再編', async () => {
+    const fixedMath = Object.create(Math); fixedMath.random = () => 0;
+    const ctx = createContext({ Math: fixedMath });
+    for (const f of ['js/config.js', 'js/affiliation_system.js', 'js/faction_system.js']) loadScript(ctx, f);
+    ctx.GameConstants = { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', UNBORN: 'unborn', DEAD: 'dead' } };
+    ctx.LifeStatusRules = { isPresent: b => b.status === 'active' || b.status === 'ronin', isDead: b => b.status === 'dead' };
+    ctx.BushoStatusRules = { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' };
+    ctx.PersonnelRules = { calcAffinityDiff: (a, b) => Math.min(Math.abs(a-b), 100-Math.abs(a-b)) };
+    function make(id, props = {}) {
+        return { id, name: '武将'+id, clan: 1, castleId: 11, status: 'active',
+            isDaimyo: false, isCastellan: false, isGunshi: false, isCommander: false,
+            isFactionLeader: false, factionId: 5, factionName: '旧派閥',
+            familyIds: [id], wifeIds: [], nemesisIds: [], nemesisList: [], achievementTotal: 100,
+            loyalty: 0, affinity: 20, personality: 'balanced', ...props };
+    }
+    const lord = make(1, { isDaimyo: true, loyalty: 100, factionId: 0 });
+    const first = make(2), second = make(3);
+    const bushos = [lord, first, second];
+    const castle = { id: 11, ownerClan: 1, samuraiIds: [1, 2, 3], castellanId: 1 };
+    const game = { year: 1570, month: 4, bushos, castles: [castle], legions: [],
+        playerClanId: 99, clans: [{ id: 1, name: '旧主家' }], phase: 'game',
+        getCastle: id => Number(id) === 11 ? castle : null,
+        getClan: id => id === 1 ? { id: 1, name: '旧主家' } : null,
+        getClanCastles: id => id === 1 ? [castle] : [],
+        getClanDaimyo: id => id === 1 ? lord : null,
+        getBusho: id => bushos.find(b => b.id === Number(id)) || null,
+        ui: { renderMap() {}, updatePanelHeader() {} },
+        castleManager: { disbandLegion() {} } };
+    const Aff = vm.runInContext('AffiliationSystem', ctx);
+    const Fac = vm.runInContext('FactionSystem', ctx);
+    game.affiliationSystem = new Aff(game);
+    game.affiliationSystem.updateUI = () => {};
+    game.affiliationSystem.updateCastleLord = () => {};
+    game.factionSystem = new Fac(game);
+    const realUpdate = game.factionSystem.updateFactions.bind(game.factionSystem);
+    const snapshots = [];
+    game.factionSystem.updateFactions = clanId => {
+        snapshots.push({ clanId, first: first.clan, second: second.clan });
+        return realUpdate(clanId);
+    };
+    await game.factionSystem.processStartMonth();
+    assert.ok([first, second].every(b => b.clan === 0 && b.status === 'ronin'), '月初対象2名は通常の所属変更窓口で浪人化');
+    assert.deepStrictEqual(snapshots, [{ clanId: undefined, first: 0, second: 0 }],
+        '人数分の途中再編を挟まず、全下野後に共通の全国派閥再編を1回だけ行う');
+});
+
+test('r785 独立中の捕虜処断では死亡正本を使い派閥再編は最終確定まで保留', async () => {
+    const fixedMath = Object.create(Math); fixedMath.random = () => 0;
+    const ctx = createContext({ Math: fixedMath });
+    loadScript(ctx, 'js/independence_system.js');
+    const updates = [];
+    const captives = [{ id: 21, name: '捕虜1', status: 'active' }, { id: 22, name: '捕虜2', status: 'active' }];
+    const game = { year: 1570, month: 5, playerClanId: 99,
+        castles: [{ id: 1, ownerClan: 1 }],
+        factionSystem: { updateFactions: id => updates.push(id) },
+        lifeSystem: { async executeDeath(busho, context = {}) {
+            busho.status = 'dead';
+            // LifeSystem.executeDeath の実契約：明示保留がなければ都度再編。
+            if (!context.deferFactionUpdate) game.factionSystem.updateFactions(1);
+        } },
+        getClanCastles: id => game.castles.filter(c => c.ownerClan === id) };
+    const Independence = vm.runInContext('IndependenceSystem', ctx);
+    await new Independence(game).handleCaptives(captives, 1, 2, { id: 10 });
+    assert.ok(captives.every(b => b.status === 'dead'), 'AIによる捕虜処断は従来どおり死亡処理を通る');
+    assert.deepStrictEqual(updates, [], '捕虜ごとの途中派閥更新を行わない');
+    game.factionSystem.updateFactions(1); // 独立完了時の正本呼び出し（r784）
+    assert.deepStrictEqual(updates, [1], '独立完了後に旧主家の最終名簿だけを再編');
+});
+
+
+test('r785 既存残党諸勢力への合流も一括処理の派閥・画面更新保留を守る', () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', DEAD: 'dead' } },
+        LifeStatusRules: { isPresent: b => b.status !== 'dead' && b.status !== 'unborn' },
+        BushoStatusRules: { isRonin: b => b.status === 'ronin' },
+        SkillManager: { getExtinctionSurvivalInfo: () => null }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const Aff = vm.runInContext('AffiliationSystem', ctx);
+    const oldCastle = { id: 11, name: '旧家城', ownerClan: 3, samuraiIds: [20], castellanId: 0 };
+    const hideout = { id: 22, name: '隠れ里', ownerClan: 0, samuraiIds: [], castellanId: 0 };
+    const updates = [], member = { id: 20, name: '残党', clan: 2, castleId: 11,
+        status: 'active', achievementTotal: 100, wifeIds: [], factionId: 5,
+        isFactionLeader: true, belongKunishuId: 0 };
+    const game = { playerClanId: 99, bushos: [member], legions: [],
+        getCastle: id => [oldCastle, hideout].find(c => c.id === Number(id)) || null,
+        getClanCastles: () => [],
+        kunishuSystem: { kunishus: [{ id: 501, _survivalClanId: 2, castleId: 22, isDestroyed: false }] },
+        factionSystem: { updateFactions: id => updates.push(id) } };
+    const affiliation = new Aff(game);
+    affiliation.updateCastleLord = () => {};
+    let repaint = 0; affiliation.updateUI = () => { repaint++; };
+    affiliation.becomeRonin(member, 'desertion', { deferFactionUpdate: true, deferUI: true });
+    assert.strictEqual(member.belongKunishuId, 501, '残党への合流自体は変えない');
+    assert.strictEqual(member.clan, 0);
+    assert.deepStrictEqual(updates, [], '通常の所属窓口と同じ再編保留指定を守る');
+    assert.strictEqual(repaint, 0, '画面更新も一括処理完了まで保留する');
+});
+
+test('r785 新規の残党諸勢力結成も一括処理の派閥・画面更新保留を守る', () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', DEAD: 'dead' } },
+        LifeStatusRules: { isPresent: b => b.status !== 'dead' && b.status !== 'unborn' },
+        BushoStatusRules: { isRonin: b => b.status === 'ronin' },
+        SkillManager: { getExtinctionSurvivalInfo: () => ({ isSurvive: true, skillName: '抗戦',
+            maxSoldiers: 1000, soldiers: 500, training: 50, morale: 50, maxHorses: 0,
+            horses: 0, guns: 0, maxGuns: 0, maxDefense: 10, defense: 10, ideology: 50 }) },
+        Kunishu: class { constructor(args) { Object.assign(this, args); } }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const Aff = vm.runInContext('AffiliationSystem', ctx);
+    const oldCastle = { id: 11, name: '旧家城', ownerClan: 3, samuraiIds: [20], castellanId: 0 };
+    const updates = [], member = { id: 20, name: '残党', clan: 2, castleId: 11,
+        status: 'active', achievementTotal: 100, wifeIds: [], factionId: 5,
+        isFactionLeader: true, belongKunishuId: 0, familyName: '残', familyYomi: 'ざん' };
+    const logs=[];
+    const game = { playerClanId: 99, bushos: [member], legions: [],
+        getCastle: id => Number(id) === 11 ? oldCastle : null,
+        getClanCastles: () => [],
+        kunishuSystem: { kunishus: [], allocateRegularDynamicKunishuId: () => 501, setRelation() {} },
+        factionSystem: { updateFactions: id => updates.push(id) },
+        ui: { log: msg => logs.push(msg) }, updateClanDisplayNames() {} };
+    const affiliation = new Aff(game);
+    affiliation.updateCastleLord = () => {};
+    let repaint = 0; affiliation.updateUI = () => { repaint++; };
+    affiliation.becomeRonin(member, 'desertion', { deferFactionUpdate: true, deferUI: true });
+    assert.strictEqual(game.kunishuSystem.kunishus.length, 1, '生存スキルによる諸勢力結成は維持');
+    assert.strictEqual(member.belongKunishuId, 501);
+    assert.strictEqual(member.clan, 0);
+    assert.ok(logs.length > 0, '通常の生存告知は維持');
+    assert.deepStrictEqual(updates, [], '新規結成でも一括処理の派閥更新保留を守る');
+    assert.strictEqual(repaint, 0, '一括処理中に画面を再生成しない');
 });
 
 Promise.all(pendingTests).then(() => {

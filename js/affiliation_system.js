@@ -245,7 +245,7 @@ class AffiliationSystem {
             
             // 自分が生存スキルを持っている場合、スキルマネージャーからの情報をもとに諸勢力を結成する
             if (survivalInfo && survivalInfo.isSurvive) {
-                this._createSurvivalKunishu(busho, oldClanId, survivalInfo);
+                this._createSurvivalKunishu(busho, oldClanId, survivalInfo, options);
                 return; // 浪人にはならずに終了
             }
             
@@ -255,8 +255,8 @@ class AffiliationSystem {
                 if (survivalKunishu) {
                     this._joinSurvivalKunishu(busho, survivalKunishu);
                     // 新規結成・通常の浪人化と同じく、旧家側の派閥と表示も更新する。
-                    if (this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
-                    this.updateUI();
+                    if (options.deferFactionUpdate !== true && this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
+                    if (options.deferUI !== true) this.updateUI();
                     return; // 浪人にはならずに終了
                 }
             }
@@ -378,7 +378,7 @@ class AffiliationSystem {
     }
 
     // ★追加：スキルマネージャーの情報をもとに諸勢力を結成
-    _createSurvivalKunishu(busho, oldClanId, survivalInfo) {
+    _createSurvivalKunishu(busho, oldClanId, survivalInfo, options = {}) {
         // 大名家を抜ける処理
         busho.achievementTotal = Math.floor((busho.achievementTotal || 0) / 2);
         this.resetFactionData(busho);
@@ -454,12 +454,15 @@ class AffiliationSystem {
             }
         });
 
-        if (this.game && this.game.factionSystem && oldClanId !== 0) this.game.factionSystem.updateFactions(oldClanId);
+        // 通常の浪人化と同じく、同一事件の一括移籍中は派閥再編を保留できる。
+        if (options.deferFactionUpdate !== true && this.game && this.game.factionSystem && oldClanId !== 0) {
+            this.game.factionSystem.updateFactions(oldClanId);
+        }
         // 動的諸勢力が既存の大名家・諸勢力と同名でも、作成直後から表示名を識別できるようにする。
         if (this.game && typeof this.game.updateClanDisplayNames === 'function') this.game.updateClanDisplayNames();
         
-        // 画面の絵をすぐに描き直す魔法！
-        this.updateUI();
+        // 通常時の描画は維持し、一括処理中だけ最後へまとめる。
+        if (options.deferUI !== true) this.updateUI();
     }
 
     // ★追加：旧家臣が生存スキルの諸勢力に合流する処理
