@@ -672,6 +672,10 @@ class AffiliationSystem {
         this.game.princesses.forEach(princess => {
             if (!princess || Number(princess.currentClanId) !== oldId) return;
             if (princess.status !== 'unmarried' || Number(princess.husbandId || 0) > 0) return;
+            // 滅亡家から引き取る未婚姫は、以後は新主家からの外交婚姻に使われる。
+            // 旧家のままだと婚姻成立後の共通照合が新主家との姻戚を見失う。
+            // 戦争による滅亡時の未婚姫引取と同じ扱いとし、既婚姫の実家は変えない。
+            princess.originalClanId = newId;
             princess.currentClanId = newId;
             if (oldClan && Array.isArray(oldClan.princessIds)) {
                 oldClan.princessIds = oldClan.princessIds.filter(id => Number(id) !== Number(princess.id));

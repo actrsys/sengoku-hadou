@@ -35865,6 +35865,53 @@ test('A-113 臣従で消滅する家の外交人質は第三家預かりも含�
     assert.strictEqual(heldByWinner.clan,1,'既存の預かり家での所属は変えない');
 });
 
+// A-114: 平和的吸収で引き取った未婚姫が、後日の通常外交婚姻で新主家を実家として扱われること。
+test('A-114 臣従で引き取った未婚姫の外交婚姻は新主家との姻戚として維持される', () => {
+    const ctx = createContext({ FamilyLinker: { rebuildAllFamilyIds() {} } });
+    for (const f of ['js/config.js','js/constants.js','js/personnel_rules.js',
+        'js/affiliation_system.js','js/diplomacy.js']) loadScript(ctx,f);
+    const oldClan = { id: 2, name: '旧家', leaderId: 21, princessIds: [900], diplomacyValue: {} };
+    const newClan = { id: 1, name: '新家', leaderId: 11, princessIds: [], diplomacyValue: {} };
+    const otherClan = { id: 3, name: '他家', leaderId: 31, princessIds: [], diplomacyValue: {} };
+    const clans = [newClan, oldClan, otherClan];
+    const makeBusho = (id,clan,castleId) => ({ id,clan,castleId,name:`武将${id}`,
+        status:'active',isDaimyo:id===11 || id===21 || id===31,
+        isCastellan:false,isCommander:false,isFactionLeader:false,
+        affinity:50,loyalty:90,achievementTotal:0,wifeIds:[],factionId:0,belongKunishuId:0 });
+    const bushos = [makeBusho(11,1,10),makeBusho(21,2,20),makeBusho(31,3,30)];
+    const castles = [{id:10,ownerClan:1,samuraiIds:[11]},
+        {id:20,ownerClan:2,samuraiIds:[21]},
+        {id:30,ownerClan:3,samuraiIds:[31]}];
+    const princess = { id:900,status:'unmarried',husbandId:0,
+        originalClanId:2,currentClanId:2 };
+    const marriedPrincess = { id:901,status:'married',husbandId:31,
+        originalClanId:2,currentClanId:3 };
+    const game = { clans,bushos,castles,princesses:[princess,marriedPrincess],legions:[],playerClanId:1,
+        getClan:id=>clans.find(c=>c.id===id),
+        getBusho:id=>bushos.find(b=>b.id===id),
+        getPrincess:id=>id===900 ? princess : null,
+        getClanDaimyo:id=>bushos.find(b=>b.clan===id && b.isDaimyo),
+        getClanBushos:id=>bushos.filter(b=>b.clan===id),
+        getClanCastles:id=>castles.filter(c=>c.ownerClan===id),
+        getCastle:id=>castles.find(c=>c.id===id),
+        castleManager:{ changeOwner(c,id){c.ownerClan=id;},disbandLegion(){} },
+        factionSystem:{updateFactions(){}},updateCastleLord(){} };
+    const classes = vm.runInContext('({AffiliationSystem,DiplomacyManager})',ctx);
+    game.affiliationSystem = new classes.AffiliationSystem(game);
+    game.diplomacyManager = new classes.DiplomacyManager(game);
+    assert.strictEqual(game.affiliationSystem.absorbClan(2,1),true);
+    assert.strictEqual(princess.currentClanId,1,'旧家から新家へ未婚姫を引き取る');
+    assert.strictEqual(princess.originalClanId,1,'外交婚姻の新しい実家も新主家へ移る');
+    assert.strictEqual(marriedPrincess.originalClanId,2,'既婚姫の出身家は変更しない');
+    assert.strictEqual(marriedPrincess.currentClanId,3,'既婚姫の現在の所属も維持する');
+    assert.ok(newClan.princessIds.includes(900),'婚姻可能な新家の姫名簿へ登録');
+    assert.strictEqual(game.diplomacyManager.applyMarriageLinkData(900,31,1,3),true);
+    assert.strictEqual(game.diplomacyManager.getRelation(1,3).isMarriage,true,'婚姻成立時の姻戚');
+    assert.strictEqual(game.diplomacyManager.refreshMarriageRelation(1,3),true,
+        '実際の婚姻照合後も、新家と他家の姻戚関係が成立している');
+    assert.strictEqual(game.diplomacyManager.getRelation(1,3).isMarriage,true);
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
