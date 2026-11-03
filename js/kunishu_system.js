@@ -1063,13 +1063,20 @@ class KunishuSystem {
             const members = this.getKunishuMembers(kunishuId);
             members.forEach(b => {
                 b.belongKunishuId = 0;
-                this.game.affiliationSystem.joinClan(b, this.game.playerClanId, castle.id, null, false, { deferFactionUpdate: true });
+                // 複数人の取込中は、城主選出と画面描画も最終名簿まで保留する。
+                this.game.affiliationSystem.joinClan(b, this.game.playerClanId, castle.id, null, false, {
+                    deferFactionUpdate: true, deferCastleLordUpdate: true, deferUI: true
+                });
             });
 
             kunishu.isDestroyed = true;
             kunishu.soldiers = 0;
-            // 途中の仕官人数で何度も派閥を選ばず、最終所属から一度だけ再編する。
-            if (members.length > 0 && this.game.factionSystem) this.game.factionSystem.updateFactions(this.game.playerClanId);
+            // 全員の仕官後にだけ城主と派閥を確定する。城主不在の拠点でも
+            // 途中の仮城主を任命せず、取込に応じた全員を候補に含める。
+            if (members.length > 0) {
+                this.game.updateCastleLord(castle);
+                if (this.game.factionSystem) this.game.factionSystem.updateFactions(this.game.playerClanId);
+            }
 
             const kunishuName = kunishu.getName(this.game);
             const playerClan = this.game.getClan ? this.game.getClan(this.game.playerClanId) : null;

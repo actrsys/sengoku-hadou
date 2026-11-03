@@ -210,6 +210,46 @@ class AffiliationSystem {
     }
 
     /**
+     * 一つの命令・史実イベントで複数武将が同じ家へ仕官する場合の共通窓口。
+     * 各人の所属・活動・妻・着任履歴は joinClan が確定し、
+     * 城主は全員が移動した後に関係拠点だけ一度ずつ選出する。
+     * 派閥・画面は通常ここで一括更新し、イベントの共通終了処理が
+     * 担当する場合は deferFactionUpdate / deferUI を尊重する。
+     */
+    joinClanGroup(bushos, newClanId, newCastleId, forceLoyalty = null, keepAchievement = false, options = {}) {
+        // 呼出元が後から正式な城主任命を行う場合に備え、影響拠点を返す。
+        // 一括処理の空集合は無操作であり、画面や派閥を更新しない。
+        if (!Array.isArray(bushos) || bushos.length === 0) {
+            return { affectedCastleIds: [], affectedClanIds: [] };
+        }
+        const affectedCastleIds = new Set();
+        const affectedClanIds = new Set();
+        for (const busho of bushos) {
+            if (!busho) continue;
+            const oldCastleId = Number(busho.castleId) || 0;
+            const oldClanId = Number(busho.clan) || 0;
+            if (oldCastleId > 0) affectedCastleIds.add(oldCastleId);
+            if (oldClanId > 0) affectedClanIds.add(oldClanId);
+            this.joinClan(busho, newClanId, newCastleId, forceLoyalty, keepAchievement, {
+                ...options, deferFactionUpdate: true, deferCastleLordUpdate: true, deferUI: true
+            });
+        }
+        if (Number(newCastleId) > 0) affectedCastleIds.add(Number(newCastleId));
+        if (options.deferCastleLordUpdate !== true) {
+            affectedCastleIds.forEach(id => {
+                const castle = this.game.getCastle(id);
+                if (castle) this.updateCastleLord(castle);
+            });
+        }
+        if (Number(newClanId) > 0) affectedClanIds.add(Number(newClanId));
+        if (options.deferFactionUpdate !== true && this.game.factionSystem) {
+            affectedClanIds.forEach(id => this.game.factionSystem.updateFactions(id));
+        }
+        if (options.deferUI !== true) this.updateUI();
+        return { affectedCastleIds: [...affectedCastleIds], affectedClanIds: [...affectedClanIds] };
+    }
+
+    /**
      * ② 追放されたり、下野（自分から辞める）して「浪人」になる時の魔法
      * @param {object} busho - 浪人になる武将
      * @param {string} reason - 浪人になる理由（'banish': 追放, 'desertion': 自発的出奔など）

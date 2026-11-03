@@ -212,6 +212,25 @@ window.EventCheck = {
 // ★ イベント実行用の便利な魔法（新しく追加します）
 // ==========================================
 window.EventAction = {
+    /**
+     * 史実イベントで複数武将が同時に仕官する際の唯一の呼び出し窓口。
+     * 忠誠や功績保持などイベント固有の条件は引数で指定する。
+     * 所属・妻・在城履歴・城主選出の計算は AffiliationSystem に委譲する。
+     * 派閥と画面は EventManager のイベント終了時の共通更新に任せる。
+     * 最後にイベント固有の正式任命がある場合は deferCastleLordUpdate を指定し、
+     * 戻り値の affectedCastleIds を使って全員の配置後に確定する。
+     */
+    joinClanGroup: function(game, bushos, newClanId, newCastleId, {
+        fixedLoyalty = null, keepAchievement = false, deferCastleLordUpdate = false
+    } = {}) {
+        if (!Array.isArray(bushos) || bushos.length === 0) {
+            return { affectedCastleIds: [], affectedClanIds: [] };
+        }
+        return game.affiliationSystem.joinClanGroup(bushos, newClanId, newCastleId,
+            fixedLoyalty, keepAchievement, {
+                deferFactionUpdate: true, deferUI: true, deferCastleLordUpdate
+            });
+    },
     // 歴史イベントの履歴は、定義側の history（当事者）を実行開始時に確定する。
     // 各分岐でclanIdsを再列挙しない。人物の移籍・勢力吸収・死亡後も当時の所属を保持する。
     // HistorySystem/UIManagerが履歴の保存と表示の正本。グローバルな「現在のイベント」は持たない。
@@ -2183,14 +2202,20 @@ window.GameEvents.push({
             castle.castellanId = 0;
         });
 
-        // ② 足利義輝の死亡処理と左馬頭の引継ぎ
-        // life_system に任せれば、将軍だった場合の処理も全部やってくれます！
-        await game.lifeSystem.executeDeath(yoshiteru);
+        // ② 足利義輝の死亡と旧家臣の一括退去。
+        // 役職・生死・所属の判定は専門部署に委ね、派閥はイベント全体の
+        // EventManager → EventAction.refreshScreen() による共通再編まで保留する。
+        // 城主も退去・接収後の転任がすべて確定してから一度だけ選出する。
+        const affectedCastleIds = new Set(ashikagaCastles.map(c => Number(c.id)));
+        const deferredUpdate = { deferFactionUpdate: true, deferCastleLordUpdate: true, deferUI: true };
+        await game.lifeSystem.executeDeath(yoshiteru, { deferFactionUpdate: true });
 
-        // ③ 武将を浪人にする
+        // ③ 旧家臣を浪人にする（生存スキルによる残党化も従来の正規処理に任せる）。
         const ashikagaBushos = game.bushos.filter(b => b.clan === ashikagaClanId && window.BushoStatusRules.isActive(b));
         ashikagaBushos.forEach(b => {
-            game.affiliationSystem.becomeRonin(b);
+            if (Number(b.castleId) > 0) affectedCastleIds.add(Number(b.castleId));
+            game.affiliationSystem.becomeRonin(b, 'desertion', deferredUpdate);
+            if (Number(b.castleId) > 0) affectedCastleIds.add(Number(b.castleId));
         });
 
         // ④ 滅亡処理のフラグ
@@ -2199,13 +2224,17 @@ window.GameEvents.push({
         }
 
         // ⑤ 配置可能な三好家臣だけを通常の転任窓口で補充する。
-        // 不足分は城主不在を許容し、着任月・城内名簿・役職をAffiliationSystemで同期する。
+        // 複数人が同じ拠点から転任しても、元拠点・接収先の仮城主を履歴化しない。
         occupationPlan.forEach(({ castleId, bushoId }) => {
             const busho = game.getBusho(bushoId);
-            if (busho) game.affiliationSystem.moveCastle(busho, castleId, { deferUI: true });
+            if (!busho) return;
+            if (Number(busho.castleId) > 0) affectedCastleIds.add(Number(busho.castleId));
+            affectedCastleIds.add(Number(castleId));
+            game.affiliationSystem.moveCastle(busho, castleId, { deferCastleLordUpdate: true, deferUI: true });
         });
-        ashikagaCastles.forEach(castle => {
-            game.affiliationSystem.updateCastleLord(castle);
+        affectedCastleIds.forEach(castleId => {
+            const castle = game.getCastle(castleId);
+            if (castle) game.affiliationSystem.updateCastleLord(castle);
         });
 
         const yoshitsuguName = yoshitsugu.fullName;
@@ -2340,9 +2369,10 @@ window.GameEvents.push({
             }
         }
 
-        targetBushos.forEach(b => {
-            // 第4引数: 100(忠誠固定), 第5引数: true(功績維持)
-            game.affiliationSystem.joinClan(b, asakuraClanId, targetCastleId, 100, true);
+        // 仕官による実際の所属・在城更新は共通窓口で実施。
+        // 全員の移籍後に城主を確定し、派閥・画面はEventManagerの終了時更新へ委譲する。
+        window.EventAction.joinClanGroup(game, targetBushos, asakuraClanId, targetCastleId, {
+            fixedLoyalty: 100, keepAchievement: true
         });
 
         // 覚慶と細川藤孝、和田惟政の忠誠度が１００になる。
@@ -2696,9 +2726,10 @@ window.GameEvents.push({
             }
         });
 
-        // 移籍実行（功績を半減させないルートを通る）
-        targetBushos.forEach(b => {
-            game.affiliationSystem.joinClan(b, nobunagaClanId, targetCastleId, 100, true);
+        // 移籍は第1段階と同じ所属Systemの一括仕官窓口で処理する。
+        // 功績維持・固定忠誠はそのままに、城主は最終名簿から確定する。
+        window.EventAction.joinClanGroup(game, targetBushos, nobunagaClanId, targetCastleId, {
+            fixedLoyalty: 100, keepAchievement: true
         });
 
         // 足利義昭、細川藤孝、和田惟政、明智光秀とその家臣の忠誠度が１００になる。
@@ -3000,9 +3031,10 @@ window.GameEvents.push({
 
         // --- 6. 発生条件と同じ判定で確定した家臣を新政権へ移す ---
         // リストに入った武将を将軍家のお引越しセンターで移動させます
-        followers.forEach(b => {
-            // ★追加：第4引数に「100」を渡して、イベント専用の固定忠誠度にします
-            game.affiliationSystem.joinClan(b, newClanId, 26, 100); 
+        // 将軍就任の家臣も庇護イベントと同じ一括仕官窓口を通す。
+        // 槇島城主の任命がこの後にあるため、城主だけは配置確定まで保留する。
+        const followersTransfer = window.EventAction.joinClanGroup(game, followers, newClanId, 26, {
+            fixedLoyalty: 100, deferCastleLordUpdate: true
         });
 
         // --- 7. 槇島城の城主を、相性が一番近い配下から選びます ---
@@ -3022,11 +3054,25 @@ window.GameEvents.push({
 
             // 一番相性が近い人を槇島城に送って、城主に任命します
             if (bestFollower) {
-                game.affiliationSystem.moveCastle(bestFollower, 90);
-                // 城主のバッジを直接渡します
+                game.affiliationSystem.moveCastle(bestFollower, 90, {
+                    deferCastleLordUpdate: true, deferUI: true
+                });
+                // 誰を城主とするかは将軍就任の史実イベント固有の選択。
                 bestFollower.isCastellan = true;
                 makishimaCastle.castellanId = bestFollower.id;
             }
+        }
+
+        // 家臣の移籍と、槇島城主の正式配置がすべて決まってから更新する。
+        // 旧拠点・二条御所・槇島城はそれぞれ一度だけ確認する。
+        if (followersTransfer.affectedCastleIds.length > 0) {
+            const finalCastleIds = new Set(followersTransfer.affectedCastleIds);
+            finalCastleIds.add(26);
+            finalCastleIds.add(90);
+            finalCastleIds.forEach(id => {
+                const castle = game.getCastle(id);
+                if (castle) game.affiliationSystem.updateCastleLord(castle);
+            });
         }
 
         // --- 8. 二条城・槇島城、および将軍擁立勢力へのボーナス処理 ---

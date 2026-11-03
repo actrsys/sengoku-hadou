@@ -29139,7 +29139,17 @@ test('r642 将軍就任は家臣候補ゼロでも成立し、適格者がいれ
                 transferClanRaw(b, id) { b.clan = id; },
                 moveCastle(b, id) { b.castleId = id; },
                 moveCastleGroup(group, id) { group.forEach(b => { b.castleId = id; }); },
-                joinClan(b, id, castleId) { b.clan = id; b.castleId = castleId; }
+                joinClan(b, id, castleId) { actions.push('individualJoin'); b.clan = id; b.castleId = castleId; },
+                joinClanGroup(group, id, castleId, forceLoyalty, keepAchievement, options) {
+                    actions.push('groupJoin');
+                    assert.strictEqual(options.deferFactionUpdate, true);
+                    assert.strictEqual(options.deferUI, true);
+                    assert.strictEqual(options.deferCastleLordUpdate, true);
+                    const sources = [...new Set(group.map(b => b.castleId))];
+                    group.forEach(b => { b.clan = id; b.castleId = castleId; b.loyalty = forceLoyalty; });
+                    return { affectedCastleIds: [...new Set([...sources,castleId])], affectedClanIds: [id] };
+                },
+                updateCastleLord(c) { actions.push('lord:' + c.id); }
             },
             castleManager: { changeOwner(c, id) { c.ownerClan = id; c.castellanId = 0; } },
             diplomacyManager: {
@@ -29148,7 +29158,7 @@ test('r642 将軍就任は家臣候補ゼロでも成立し、適格者がいれ
             },
             ui: { log() {}, async showDialogAsync() {}, async focusMapOnCastle() {} }
         };
-        return { game, event, clans, castles, bushos, candidate };
+        return { game, event, clans, castles, bushos, candidate, actions, context };
     };
     const withoutFollower = setup();
     assert.strictEqual(withoutFollower.event.checkCondition(withoutFollower.game), true,
@@ -29181,6 +29191,50 @@ test('r642 将軍就任は家臣候補ゼロでも成立し、適格者がいれ
     assert.strictEqual(castles.find(c => c.id === 90).castellanId, follower.id);
     assert.strictEqual(follower.castleId, 90);
     assert.strictEqual(follower.clan, clanId);
+    assert.strictEqual(withFollower.actions.filter(x => x === 'groupJoin').length, 1,
+        '将軍就任も所属Systemの一括仕官を1回だけ呼ぶ');
+    assert.strictEqual(withFollower.actions.filter(x => x === 'individualJoin').length, 0,
+        '一人ずつの仕官を残さない');
+    assert.deepStrictEqual(withFollower.actions.filter(x => x.startsWith('lord:')).sort(),
+        ['lord:103','lord:26','lord:90'], '一括配置の最後に関係拠点を一度ずつ確定');
+
+    // ここから先は所属Systemの本物のjoinClanGroup / moveCastleを接続した結合経路。
+    const integrated = setup();
+    const joined = {id:1017003,clan:1,castleId:103,status:'active',fullName:'従う家臣',
+        isDaimyo:false,isCastellan:false,isCommander:false,isGunshi:false,belongKunishuId:0,
+        courtRankIds:[],familyIds:[],affinity:51,loyalty:90,achievementTotal:200,wifeIds:[]};
+    integrated.game.bushos.push(joined);
+    integrated.game.castles.forEach(c => {
+        c.samuraiIds=integrated.game.bushos.filter(b=>b.castleId===c.id).map(b=>b.id);
+        c.legionId=0;
+    });
+    integrated.context.LifeStatusRules={isPresent:b=>b.status==='active'||b.status==='ronin'};
+    integrated.context.GameConstants={BushoStatus:{ACTIVE:'active',RONIN:'ronin',UNBORN:'unborn',DEAD:'dead'}};
+    integrated.context.PersonnelRules={calcAffinityDiff:(a,b)=>Math.min(Math.abs(a-b),100-Math.abs(a-b))};
+    const ig=integrated.game;
+    ig.phase='game';ig.legions=[];
+    ig.factionSystem={handleMove(){},updateFactions(){}};
+    ig.historySystem={record(){}};
+    ig.getClanBushos=id=>ig.bushos.filter(b=>b.clan===id);
+    ig.getCastleBushos=id=>ig.bushos.filter(b=>b.castleId===id&&b.status==='active');
+    ig.ui.renderMap=()=>{};ig.ui.updatePanelHeader=()=>{};
+    loadScript(integrated.context,'js/affiliation_system.js');
+    ig.affiliationSystem=vm.runInContext('new AffiliationSystem(game)',
+        Object.assign(integrated.context,{game:ig}));
+    const finalLords=[];
+    const realUpdate=ig.affiliationSystem.updateCastleLord.bind(ig.affiliationSystem);
+    ig.affiliationSystem.updateCastleLord=c=>{finalLords.push(c.id);return realUpdate(c);};
+    assert.strictEqual(integrated.event.checkCondition(ig),true);
+    await integrated.event.execute(ig);
+    const newId=integrated.clans[1].id;
+    assert.strictEqual(joined.clan,newId);
+    assert.strictEqual(joined.castleId,90);
+    assert.strictEqual(joined.loyalty,100);
+    assert.strictEqual(ig.getCastle(90).castellanId,joined.id);
+    assert.strictEqual(ig.getCastle(26).castellanId,integrated.candidate.id);
+    assert.strictEqual(ig.getCastle(103).castellanId,203);
+    assert.strictEqual(finalLords.filter(id=>id===103).length,1,
+        '旧拠点の城主再確認は全移籍の後に一度だけ実行');
 });
 
 
@@ -32068,6 +32122,7 @@ test('r712 諸勢力取込で兵士と士気・訓練度を実受入人数で合
       const k={id:55,castleId:7,isDestroyed:false,ideology:'地縁',soldiers:incomingSoldiers,horses:70,guns:22,morale:30,training:40,leaderId:22,
          getRelation:()=>100, getName:()=> '地縁衆'};
       game.affiliationSystem=new AffiliationSystem(game);
+      game.updateCastleLord = c => game.affiliationSystem.updateCastleLord(c);
       game.kunishuSystem=new KunishuSystem(game);
       game.kunishuSystem.setKunishuData([k]);
       const expectedAccepted=Math.min(incomingSoldiers,Math.max(0,99999-existingSoldiers));
@@ -35700,6 +35755,33 @@ test('r786 諸勢力の一括取込も最終名簿から派閥を一度だけ再
 });
 
 
+
+// A-118: 取込は全員の正式仕官後に城主を選ぶ。途中で城主を決めると既存家臣が
+// 先に城主になり、後から加わるより有力な配下が候補から外れる。
+test('A-118 諸勢力4名の取込では城主確定と地図更新も各1回で、最終名簿から城主を選ぶ', () => {
+    const { game, group, castle, kunishu, getRebuilds, appointmentHistory } = createR786KunishuFixture(true);
+    // 大名は別拠点におり、城主不在の自領拠点に通常家臣（取込の担当者）がいる。
+    // こうした城主不在は正規に許される。取込コマンドはこの拠点を選択して実行可能。
+    const daimyo = game.getBusho(99), doer = game.getBusho(98);
+    daimyo.castleId = 26;
+    castle.samuraiIds = castle.samuraiIds.filter(id => id !== 99);
+    castle.castellanId = 0;
+    doer.achievementTotal = 50;
+    const actualUpdateCastleLord = game.affiliationSystem.updateCastleLord.bind(game.affiliationSystem);
+    let lordCalls = 0, repaints = 0;
+    game.affiliationSystem.updateCastleLord = c => { lordCalls++; return actualUpdateCastleLord(c); };
+    game.ui.renderMap = () => { repaints++; };
+    game.kunishuSystem.executeKunishuIncorporate(doer.id, castle.id, kunishu.id);
+    assert.strictEqual(kunishu.isDestroyed, true);
+    assert.ok(group.every(b => b.clan === 1));
+    assert.strictEqual(getRebuilds(), 1, '派閥も一度だけ確定する');
+    assert.strictEqual(lordCalls, 1, '4名の移籍途中ではなく最終名簿で一度だけ城主を選出する');
+    assert.strictEqual(repaints, 1, '結果モーダル後の描画だけでよい');
+    assert.ok([11, 12].includes(Number(castle.castellanId)), '実績のある新家臣も含め最終名簿で選ぶ');
+    assert.strictEqual(appointmentHistory.filter(msg=>msg.includes('城主任命')).length, 1,
+        '実際の最終任命だけを履歴に記録する');
+});
+
 // A-112: 史実イベントの勢力吸収も、一括移籍後の派閥再編を専門Systemで確定する。
 test('A-112 史実の勢力吸収は最終所属から派閥を確定し、仮再編を残さない', () => {
     const ctx = createContext({
@@ -36072,6 +36154,231 @@ test('A-117 滅亡後の残党結成・合流も仮城主更新を保留し最�
         assert.strictEqual(factionUpdates,1,'旧家の派閥は最終状態で一度だけ再編');
         assert.strictEqual(renders,1,'滅亡中の途中地図描画を行わない');
     }
+});
+
+
+// A-119: 史実イベントの複数人処遇も、独立・滅亡と同じ一括確定契約を用いる。
+test('r793 永禄の変の一括退去・転任では派閥城主画面を最終状態で確定', async () => {
+const ctx=createContext({setTimeout});
+const load=p=>loadScript(ctx,p);
+
+ctx.GameConstants={BushoStatus:{ACTIVE:'active',RONIN:'ronin',UNBORN:'unborn',DEAD:'dead'},DiplomacyStatus:{NORMAL:'normal'}};
+ctx.BushoStatusRules={isActive:b=>b.status==='active',isRonin:b=>b.status==='ronin'};
+ctx.LifeStatusRules={isPresent:b=>b.status==='active'||b.status==='ronin',isDead:b=>b.status==='dead',isUnavailable:b=>b.status==='dead'||b.status==='unborn'};
+ctx.MapGraphService={isAdjacent:()=>true};
+ctx.PersonnelRules={calcAffinityDiff:()=>10};
+load('js/event/historical_event.js');load('js/affiliation_system.js');
+const ev=ctx.GameEvents.find(e=>e.id==='historical_eiroku_no_hen');
+const castles=[{id:26,ownerClan:17,castellanId:1017003,samuraiIds:[1017003,1017029,1017004],legionId:0},{id:90,ownerClan:17,castellanId:1017035,samuraiIds:[1017035],legionId:0},{id:38,ownerClan:20,castellanId:1020021,samuraiIds:[1020021,1020042,1020043],legionId:0},{id:39,ownerClan:20,castellanId:1020024,samuraiIds:[1020024],legionId:0},{id:51,ownerClan:20,castellanId:1020029,samuraiIds:[1020029],legionId:0},{id:127,ownerClan:20,castellanId:1020014,samuraiIds:[1020014],legionId:0}];
+function b(id,clan,castleId,status='active',extras={}){return {id,clan,castleId,status,isCastellan:castles.some(c=>c.castellanId===id),isDaimyo:false,isCommander:false,isGunshi:false,belongKunishuId:0,fullName:String(id),name:String(id),loyalty:90,nemesisIds:[],nemesisList:[],wifeIds:[],achievementTotal:300,leadership:60,strength:60,politics:60,diplomacy:60,intelligence:60,charm:60,affinity:50, ...extras}}
+const bushos=[b(1017003,17,26,'active',{isDaimyo:true}),b(1017035,17,90),b(1017029,17,26),b(1017004,17,26),b(1020005,20,127,'dead'),b(1020014,20,127,'active',{isDaimyo:true}),b(1020021,20,38),b(1020024,20,39),b(1020029,20,51),b(1020042,20,38),b(1020043,20,38)];
+const clans=[{id:17,name:'足利家',isDestroyed:false},{id:20,name:'三好家',isDestroyed:false}];
+let counts={faction:0,lord:0,ui:0,move:0,history:0,opts:[]};
+const game={castles,bushos,clans,legions:[],year:1565,month:5,playerClanId:88,phase:'game',isProcessingAI:false,
+ getBusho(id){return bushos.find(v=>v.id===id)},getCastle(id){return castles.find(v=>v.id===id)},getClanCastles(id){return castles.filter(v=>v.ownerClan===id)},getClanBushos(id){return bushos.filter(v=>v.clan===id)}, getCastleBushos(id){return bushos.filter(v=>v.castleId===id && v.status==='active')}, getClan(id){return clans.find(c=>c.id===id)},getClanDaimyo(id){return bushos.find(v=>v.clan===id&&v.isDaimyo&&v.status==='active')},
+ factionSystem:{handleMove(){},updateFactions(){counts.faction++}},
+ ui:{log(){},async showDialogAsync(){},renderMap(){counts.ui++},updatePanelHeader(){}},
+ historySystem:{record(){counts.history++}},
+ castleManager:{changeOwner(c,id){c.ownerClan=id;c.castellanId=0},disbandLegion(){}},
+ lifeSystem:{async executeDeath(v){v.status='dead';v.isDaimyo=false;v.isCastellan=false;const c=game.getCastle(v.castleId);if(c)c.samuraiIds=c.samuraiIds.filter(id=>id!==v.id);}},
+};ctx.game=game; game.affiliationSystem=vm.runInContext('new AffiliationSystem(game)',ctx);
+const oldUpdate=game.affiliationSystem.updateCastleLord.bind(game.affiliationSystem);game.affiliationSystem.updateCastleLord=(c)=>{counts.lord++;return oldUpdate(c)};
+const oldBecome=game.affiliationSystem.becomeRonin.bind(game.affiliationSystem);game.affiliationSystem.becomeRonin=(v,r,o)=>{counts.opts.push(o||{});return oldBecome(v,r,o)};
+const oldMove=game.affiliationSystem.moveCastle.bind(game.affiliationSystem);game.affiliationSystem.moveCastle=(b,c,o)=>{counts.move++;return oldMove(b,c,o)};
+game.updateCastleLord=(c)=>game.affiliationSystem.updateCastleLord(c);
+
+    assert.strictEqual(ev.checkCondition(game), true, '1565年の実際の史実イベント条件を満たす');
+    await ev.execute(game);
+    assert.strictEqual(counts.faction, 0, '途中の派閥再編はEventManagerの共通画面更新まで保留する');
+    assert.strictEqual(counts.lord, 3, '二つの接収城と一つの転任元の城主を最終状態で各一回だけ確定');
+    assert.strictEqual(counts.ui, 0, '武将ごとの途中描画を行わない');
+    assert.strictEqual(counts.move, 2, '配役計画の実際の転任2件は維持');
+    assert.ok(counts.opts.length===3 && counts.opts.every(o=>o.deferFactionUpdate===true && o.deferCastleLordUpdate===true && o.deferUI===true), '退去者3名へ同じ保留指定を適用する');
+    assert.ok(bushos.filter(b=>b.clan===0).length===3 && game.getBusho(1017003).status==='dead', '旧家臣の浪人化と義輝の死亡は維持');
+    assert.deepStrictEqual(castles.filter(c=>[26,90].includes(c.id)).map(c=>c.ownerClan), [20,20], '足利領の接収を維持');
+    await ctx.EventAction.refreshScreen(game);
+    assert.strictEqual(counts.faction, 1, 'イベントマネージャの共通更新で一度だけ派閥を再編');
+    assert.strictEqual(counts.ui, 1, 'イベント終了時の共通画面更新で一度だけ地図を描画');
+
+});
+
+
+// A-120: 将軍庇護の二段階で複数の武将が仕官する際も、
+// 一人ずつの所属・在城履歴は正規経路で確定し、城主・派閥・描画は一括確定する。
+for (const stage of [1, 2]) {
+    test(`r794 将軍庇護${stage}の複数仕官は中間の城主・派閥・地図更新を発生させない`, async () => {
+        const ctx = createContext({ setTimeout });
+        ctx.BushoStatusRules = {isActive:b => b.status === 'active', isRonin:b => b.status === 'ronin'};
+        ctx.LifeStatusRules = {isPresent:b => b.status === 'active' || b.status === 'ronin', isDead:b => b.status === 'dead'};
+        ctx.GameConstants = {BushoStatus: {ACTIVE:'active', RONIN:'ronin', UNBORN:'unborn', DEAD:'dead'}};
+        ctx.PersonnelRules = {calcAffinityDiff:() => 10};
+        ctx.DiplomacyRules = {isPeaceful:status => ['同盟','従属','支配','友好','和睦'].includes(status), isAllianceOrVassal:status => ['同盟','従属','支配'].includes(status)};
+        loadScript(ctx,'js/event/historical_event.js');
+        loadScript(ctx,'js/affiliation_system.js');
+        const asakura = 7, oda = 6, miyoshi = 20, matsunaga = 22;
+        const castles = stage === 1 ? [
+            {id:16,name:'一乗谷城',provinceId:18,ownerClan:asakura,castellanId:1007008,samuraiIds:[1007008]},
+            {id:26,name:'二条御所',provinceId:30,ownerClan:miyoshi,castellanId:1020014,samuraiIds:[1020014,1017004,1017029,1017030]},
+            {id:90,name:'槇島城',provinceId:30,ownerClan:miyoshi,castellanId:1202004,samuraiIds:[1202004,1017035]}
+        ] : [
+            {id:16,name:'一乗谷城',provinceId:18,ownerClan:asakura,castellanId:1007008,samuraiIds:[1007008,1017004,1017029,1201003,1017030,1017035,1201004]},
+            {id:7,name:'清洲城',provinceId:23,ownerClan:oda,castellanId:1006006,samuraiIds:[1006006]},
+            {id:3,name:'稲葉山城',provinceId:27,ownerClan:oda,castellanId:0,samuraiIds:[]},
+            {id:90,name:'槇島城',provinceId:30,ownerClan:matsunaga,castellanId:1202004,samuraiIds:[1202004]}
+        ];
+        for (const c of castles) {
+            Object.assign(c,{legionId:0, soldiers:100, gold:100, rice:100, population:100, peoplesLoyalty:100});
+        }
+        const sourceId = stage===1 ? 26 : 16;
+        const sourceClan = stage===1 ? 0 : asakura;
+        const sourceStatus = stage===1 ? 'ronin' : 'active';
+        const makeBusho = (id, clan, castleId, extras={}) => ({id,clan,castleId,status:'active',fullName:String(id),name:String(id),
+            givenName:String(id),courtRankIds:[],isDaimyo:false,isCastellan:castles.some(c=>c.castellanId===id),isCommander:false,isGunshi:false,
+            belongKunishuId:0,loyalty:90,affinity:50,achievementTotal:200,leadership:60,strength:60,politics:60,diplomacy:60,intelligence:60,charm:60,
+            wifeIds:[],familyIds:[],factionId:0,isFactionLeader:false, ...extras});
+        const bushos = [
+            makeBusho(1017003,0,0,{status:'dead'}),
+            makeBusho(1007008,asakura,16,{isDaimyo:true}),
+            makeBusho(1017004,sourceClan,sourceId,{status:sourceStatus,courtRankIds:[98]}),
+            makeBusho(1017029,sourceClan,sourceId,{status:sourceStatus}),
+            makeBusho(1017030,sourceClan,sourceId,{status:sourceStatus}),
+            makeBusho(1017035,sourceClan,stage===1?90:16,{status:sourceStatus}),
+            makeBusho(1202004,stage===1?miyoshi:matsunaga,90,{isDaimyo:stage===2}),
+            makeBusho(1020014,miyoshi,26,{isDaimyo:stage===1}),
+            makeBusho(1006006,oda,7,{isDaimyo:true}),
+            makeBusho(1201003,stage===1?0:asakura,16),
+            makeBusho(1201004,stage===1?0:asakura,16),
+            makeBusho(1004009,0,0,{status:'dead'})
+        ];
+        const clans = [
+            {id:asakura,name:'朝倉家',isDestroyed:false,daimyoPrestige:100},
+            {id:oda,name:'織田家',isDestroyed:false,daimyoPrestige:200},
+            {id:miyoshi,name:'三好家',isDestroyed:stage===2,daimyoPrestige:70},
+            {id:matsunaga,name:'松永家',isDestroyed:false,daimyoPrestige:75}
+        ];
+        const counts={lords:[],faction:0,ui:0,history:[],move:0};
+        const game={castles,bushos,clans,legions:[],year:1566,month:6,phase:'game',playerClanId:55,isProcessingAI:false,
+            getBusho(id){return bushos.find(b=>b.id===id)},
+            getCastle(id){return castles.find(c=>c.id===id)},
+            getClan(id){return clans.find(c=>c.id===id)},
+            getClanBushos(id){return bushos.filter(b=>b.clan===id)},
+            getCastleBushos(id){return bushos.filter(b=>b.castleId===id && b.status==='active')},
+            getClanCastles(id){return castles.filter(c=>c.ownerClan===id)},
+            getClanDaimyo(id){return bushos.find(b=>b.clan===id && b.isDaimyo && b.status==='active')},
+            getProvince(id){return {id,shortName:String(id),regionId:5}},provinces:[],
+            courtRankSystem:{RANK_IDS_CANDIDATE:[98,99],getHighestRankName(){return 'なし'}},
+            factionSystem:{handleMove(){counts.move++},updateFactions(){counts.faction++}},
+            historySystem:{record(text){counts.history.push(text)}},
+            diplomacyManager:{getRelation(){return {status:'普通'}},changeStatus(){},setSentimentAbsolute(){},setEventRelationFlag(){}},
+            ui:{log(){},renderMap(){counts.ui++},updatePanelHeader(){},async showDialogAsync(){}},
+        };
+        game.affiliationSystem = vm.runInContext('new AffiliationSystem(game)', Object.assign(ctx,{game}));
+        const realLord = game.affiliationSystem.updateCastleLord.bind(game.affiliationSystem);
+        game.affiliationSystem.updateCastleLord = castle => {counts.lords.push(castle.id);return realLord(castle)};
+        const event = ctx.GameEvents.find(ev=>ev.id===`historical_shogun_protection_${stage}`);
+        assert.strictEqual(event.checkCondition(game),true,'既存の発生条件を実際に満たす');
+        await event.execute(game);
+        const target = stage===1 ? asakura : oda;
+        const targetIds = stage===1 ? [1017004,1017029,1017030,1017035] : [1017004,1201003,1017029,1017030,1017035,1201004];
+        assert.ok(targetIds.every(id=>game.getBusho(id).clan===target),'既存の同伴武将・所属確定を守る');
+        assert.ok(targetIds.every(id=>game.getBusho(id).loyalty===100),'固定忠誠100を守る');
+        assert.ok(targetIds.every(id=>game.getBusho(id).achievementTotal>=200),'功績維持を守る');
+        assert.strictEqual(counts.faction,0,'途中で派閥を選出しない');
+        assert.strictEqual(counts.ui,0,'途中で地図を再描画しない');
+        const expectedCastles = stage===1 ? [16,26,90] : [7,16];
+        assert.deepStrictEqual(counts.lords.sort((a,b)=>a-b),expectedCastles.sort((a,b)=>a-b),'転任元と到着先の城主を各一度だけ最終確定');
+        assert.strictEqual(counts.history.filter(x=>x.includes('【城主任命】')).length,0,'退去途中の仮城主任命を履歴に残さない');
+        await ctx.EventAction.refreshScreen(game);
+        assert.strictEqual(counts.faction,1,'イベント共通更新で派閥を一度再編');
+        assert.strictEqual(counts.ui,1,'イベント共通更新で地図を一度描画');
+    });
+}
+
+
+test('r794 一括仕官の共通窓口は通常実行なら関係する各家・拠点を一度ずつ更新', () => {
+    const ctx = createContext();
+    ctx.BushoStatusRules = {isActive:b=>b.status==='active'};
+    ctx.LifeStatusRules = {isPresent:b=>b.status==='active' || b.status==='ronin'};
+    ctx.GameConstants = {BushoStatus:{ACTIVE:'active',RONIN:'ronin',UNBORN:'unborn'}};
+    ctx.PersonnelRules = {calcAffinityDiff:()=>0};
+    loadScript(ctx,'js/affiliation_system.js');
+    const castles = [
+        {id:1,ownerClan:10,castellanId:11,samuraiIds:[11,12]},
+        {id:2,ownerClan:20,castellanId:21,samuraiIds:[21,22]},
+        {id:3,ownerClan:30,castellanId:31,samuraiIds:[31]}
+    ];
+    const b=(id,clan,castleId,isDaimyo=false)=>({id,clan,castleId,status:'active',isDaimyo,isCastellan:isDaimyo,isCommander:false,
+        isGunshi:false,belongKunishuId:0,loyalty:90,achievementTotal:200,affinity:50,leadership:60,strength:60,politics:60,
+        diplomacy:60,intelligence:60,charm:60, wifeIds:[],fullName:String(id),name:String(id)});
+    const bushos=[b(11,10,1,true),b(12,10,1),b(21,20,2,true),b(22,20,2),b(31,30,3,true)];
+    const result={factions:[],lords:[],ui:0};
+    const game={castles,bushos,legions:[],phase:'game',playerClanId:40,
+        getCastle(id){return castles.find(c=>c.id===id)},getBusho(id){return bushos.find(b=>b.id===id)},
+        getCastleBushos(id){return bushos.filter(b=>b.castleId===id && b.status==='active')},
+        getClanDaimyo(id){return bushos.find(b=>b.clan===id && b.isDaimyo)},getClan(id){return {id,name:String(id)}},
+        factionSystem:{handleMove(){},updateFactions(id){result.factions.push(id)}},
+        historySystem:{record(){}},ui:{renderMap(){result.ui++},updatePanelHeader(){}}
+    };
+    Object.assign(ctx,{game});
+    game.affiliationSystem=vm.runInContext('new AffiliationSystem(game)',ctx);
+    const real=game.affiliationSystem.updateCastleLord.bind(game.affiliationSystem);
+    game.affiliationSystem.updateCastleLord=c=>{result.lords.push(c.id);return real(c)};
+    game.affiliationSystem.joinClanGroup([bushos[1],bushos[3]],30,3,100,true);
+    assert.deepStrictEqual(result.factions.sort((a,b)=>a-b),[10,20,30]);
+    assert.deepStrictEqual(result.lords.sort((a,b)=>a-b),[1,2,3]);
+    assert.strictEqual(result.ui,1);
+    assert.deepStrictEqual(bushos.filter(x=>x.id===12 || x.id===22).map(x=>[x.clan,x.castleId,x.loyalty,x.achievementTotal]),[[30,3,100,200],[30,3,100,200]]);
+    assert.deepStrictEqual(castles[2].samuraiIds.slice().sort((a,b)=>a-b),[12,22,31]);
+});
+
+
+// A-122: 新しい同種イベントはイベント側に仕官順序・中間派閥・描画処理を実装しない。
+test('r795 史実イベント共通の複数仕官窓口はイベント固有の指定だけ受け専門Systemへ委譲する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/event/historical_event.js');
+    const group = [{id:1},{id:2},{id:3}];
+    const calls=[];
+    const game={affiliationSystem:{joinClanGroup(...args){
+        calls.push(args);
+        return {affectedCastleIds:[14,17],affectedClanIds:[8,11]};
+    }}};
+    const result=ctx.EventAction.joinClanGroup(game,group,11,17,{fixedLoyalty:85,keepAchievement:true});
+    assert.strictEqual(calls.length,1);
+    assert.strictEqual(calls[0][0],group);
+    assert.deepStrictEqual(calls[0].slice(1,5),[11,17,85,true]);
+    assert.strictEqual(calls[0][5].deferFactionUpdate,true);
+    assert.strictEqual(calls[0][5].deferUI,true);
+    assert.strictEqual(calls[0][5].deferCastleLordUpdate,false);
+    assert.deepStrictEqual(Array.from(result.affectedCastleIds),[14,17]);
+    const before=calls.length;
+    ctx.EventAction.joinClanGroup(game,[],11,17);
+    assert.strictEqual(calls.length,before,'対象者がいない時は所属・派閥・画面へ触れない');
+});
+
+test('r795 共通一括仕官は任命保留時に影響拠点を返し、後続の正式任命に利用できる', () => {
+    const ctx = createContext();
+    ctx.LifeStatusRules={isPresent:()=>true};
+    ctx.BushoStatusRules={isActive:()=>true};
+    ctx.GameConstants={BushoStatus:{ACTIVE:'active',RONIN:'ronin',DEAD:'dead',UNBORN:'unborn'}};
+    loadScript(ctx,'js/affiliation_system.js');
+    const old={id:7,ownerClan:3,castellanId:71,samuraiIds:[71]},arrival={id:9,ownerClan:8,castellanId:0,samuraiIds:[]};
+    const busho={id:71,clan:3,castleId:7,status:'active',isDaimyo:false,isCastellan:true,
+       isCommander:false,isGunshi:false,belongKunishuId:0,loyalty:80,achievementTotal:200,wifeIds:[],factionId:0};
+    const game={castles:[old,arrival],bushos:[busho],legions:[],phase:'game',playerClanId:5,
+        getCastle:id=>[old,arrival].find(c=>c.id===id),getBusho:id=>id===71?busho:null,
+        getClan:id=>({id}),getClanDaimyo:id=>null,getCastleBushos:id=>[busho].filter(b=>b.castleId===id),
+        getClanBushos:id=>[busho].filter(b=>b.clan===id),
+        factionSystem:{handleMove(){},updateFactions(){throw Error('派閥の途中更新')}}};
+    game.affiliationSystem=vm.runInContext('new AffiliationSystem(game)',Object.assign(ctx,{game}));
+    game.affiliationSystem.updateUI=()=>{throw Error('画面の途中更新')};
+    const result=game.affiliationSystem.joinClanGroup([busho],8,9,95,true,{
+        deferFactionUpdate:true,deferUI:true,deferCastleLordUpdate:true
+    });
+    assert.deepStrictEqual(Array.from(result.affectedCastleIds).sort((a,b)=>a-b),[7,9]);
+    assert.deepStrictEqual(Array.from(result.affectedClanIds).sort((a,b)=>a-b),[3,8]);
+    assert.strictEqual(busho.castleId,9);
+    assert.strictEqual(busho.loyalty,95);
+    assert.strictEqual(old.castellanId,0);
 });
 
 Promise.all(pendingTests).then(() => {
