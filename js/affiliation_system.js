@@ -214,7 +214,9 @@ class AffiliationSystem {
      * @param {object} busho - 浪人になる武将
      * @param {string} reason - 浪人になる理由（'banish': 追放, 'desertion': 自発的出奔など）
      */
-    becomeRonin(busho, reason = 'desertion') {
+    // 同一事件で複数名が逃れる場合は、呼出元が確定した移住先へ直接送り、
+    // 城主再選出とUI更新を全員の移動後にまとめられる。通常の下野は従来どおり。
+    becomeRonin(busho, reason = 'desertion', options = {}) {
         // ★ここから追加：最強の関所！自動で作られた頭領は浪人になれず、ここで消滅します！
         if (busho.isAutoLeader) {
             this.setClanIdRaw(busho, 0);
@@ -223,7 +225,7 @@ class AffiliationSystem {
             busho.isDaimyo = false;
             busho.isCommander = false; // ★ここを追加：国主のバッジも外します
             busho.belongKunishuId = 0; // 諸勢力からも外します
-            this.leaveCastle(busho); // お城から綺麗にいなくなります
+            this.leaveCastle(busho, options); // お城から綺麗にいなくなります
             return; // これ以上下の「浪人になる処理」には進ませません！
         }
 
@@ -288,7 +290,7 @@ class AffiliationSystem {
         });
 
         // 5. お城から出ます
-        this.leaveCastle(busho);
+        this.leaveCastle(busho, options);
         
         // ★追加：大名家が滅亡したわけではない場合（追放や出奔）、元主君を宿敵として記録します
         if (oldClanId !== 0 && !isClanDestroyed) {
@@ -306,7 +308,7 @@ class AffiliationSystem {
             let targetCastle = null;
 
             // 滅亡ではなく、自ら出奔した場合のみ、お引越し先を探します
-            if (oldClanId !== 0 && !isClanDestroyed && currentCastle) {
+            if (!options.destinationCastleId && oldClanId !== 0 && !isClanDestroyed && currentCastle) {
                 // --- 波紋のように道を辿って、一番近いお城を探す魔法（幅優先探索） ---
                 let queue = [{ castle: currentCastle, steps: 0 }];
                 let queueHead = 0;
@@ -357,22 +359,22 @@ class AffiliationSystem {
             }
 
             // 新しい行き先が見つかっていればそこへ、見つからなければ（滅亡時など）元のお城の周辺にとどまります
-            const nextCastleId = targetCastle ? targetCastle.id : busho.castleId;
+            const nextCastleId = options.destinationCastleId || (targetCastle ? targetCastle.id : busho.castleId);
             // 下野先が別城である場合だけ滞在開始月を更新する。
             // 旧城での実際の離脱日が不定なので、架空の滞在履歴は作らない。
             if (Number(busho.castleId) !== Number(nextCastleId)) {
                 this._recordCastleArrival(busho, 0, nextCastleId);
             }
-            this.enterCastle(busho, nextCastleId);
+            this.enterCastle(busho, nextCastleId, options);
         }
 
         // ★軽量化：抜けた元大名家だけ派閥を再編します。
-        if (this.game && this.game.factionSystem && oldClanId !== 0) {
+        if (options.deferFactionUpdate !== true && this.game && this.game.factionSystem && oldClanId !== 0) {
             this.game.factionSystem.updateFactions(oldClanId);
         }
 
         // ★ここから追加：画面の絵をすぐに描き直す魔法！
-        this.updateUI();
+        if (options.deferUI !== true) this.updateUI();
     }
 
     // ★追加：スキルマネージャーの情報をもとに諸勢力を結成

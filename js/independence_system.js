@@ -1239,18 +1239,31 @@ class IndependenceSystem {
                 
                 // ★変更：主家側として戦って負けた武将たちを全員「浪人」にして、逃亡先に移動させます！（討死した大名本人は除外）
                 const roninBushos = []; // 後で一門の子どもたちを探すためのメモ帳です
+                const displacedCastleIds = new Set([Number(escapeCastleId)]);
                 daimyoMembers.forEach(b => {
                     if (b.id !== oldDaimyo.id || !isDaimyoDead) {
-                        this.game.affiliationSystem.becomeRonin(b);
-                        this.game.affiliationSystem.moveCastle(b, escapeCastleId);
+                        if (b.castleId) displacedCastleIds.add(Number(b.castleId));
+                        // 逃亡先は謀反結果で既に確定している。通常の浪人の行先抽選を
+                        // 二重に通さず、複数名の退去中は城主再任命を最後まで保留する。
+                        this.game.affiliationSystem.becomeRonin(b, 'desertion', {
+                            destinationCastleId: escapeCastleId,
+                            deferCastleLordUpdate: true, deferFactionUpdate: true, deferUI: true
+                        });
                         roninBushos.push(b);
                     }
+                });
+                displacedCastleIds.forEach(id => {
+                    const affectedCastle = this.game.getCastle(id);
+                    if (affectedCastle) this.game.updateCastleLord(affectedCastle);
                 });
 
                 // ★追加：主家や逃げた武将の「一門」で、まだ登場していない子どもたちを処理します！
                 const unbornFamily = this.game.bushos.filter(b => {
                     if (!window.LifeStatusRules.isUnborn(b)) return false; // まだ登場していない人だけを探します
-                    
+                    // 他家に登場予定の一門は親族でも旧主家の敗残者ではない。
+                    // 当主死亡時の後継者選定と同じく、旧家所属予定か無所属だけを扱う。
+                    if (Number(b.clan) !== Number(oldClanId) && Number(b.clan) !== 0) return false;
+
                     // 亡くなった旧大名の一門かチェック
                     const isFamilyOfOldDaimyo = b.familyIds.some(fId => oldDaimyo.familyIds.includes(fId));
                     // 逃げた武将たちの一門かチェック
@@ -1341,6 +1354,10 @@ class IndependenceSystem {
                         );
                     }
                 }
+                // 一括逃亡中は旧主家の派閥を途中選挙しない。
+                // 新大名の就任が確定した最終名簿でのみ、所属と派閥主を一度再編する。
+                if (this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
+
                 // 勢力情報が変わったので威信を更新
                 if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige();
 
@@ -1360,6 +1377,12 @@ class IndependenceSystem {
                     }
                 } else if (this.game.ui && typeof this.game.ui.renderMap === 'function') {
                     this.game.ui.renderMap();
+                    // 一括逃亡中のUI更新は保留したため、プレイヤー操作中に開いている
+                    // 拠点パネルだけ最終配置に合わせて一度更新する。
+                    if (!this.game.isProcessingAI && this.game.ui.currentCastle
+                        && typeof this.game.ui.updatePanelHeader === 'function') {
+                        this.game.ui.updatePanelHeader();
+                    }
                 }
 
                 // 結果のメッセージを出します！
@@ -1390,30 +1413,28 @@ class IndependenceSystem {
                 if (!isCurrentFlow()) return;
                 this._logIndependence(`${oldDaimyo.name}が勝利をおさめ、首魁の${rebellionLeader.name}は自領に逃亡しました。`, [oldClanId]);
 
-                // ★追加：後で元に戻せるように、元の功績を覚えておくためのメモ帳を用意します
-                const originalAchievements = new Map();
-
-                // 主家軍の功績を一時的に+3000します
-                daimyoMembers.forEach(b => {
-                    originalAchievements.set(b.id, b.achievementTotal || 0); // 元の数字をメモ！
-                    b.achievementTotal = (b.achievementTotal || 0) + 3000;
-                });
-                
-                // 大名様は普段は派閥主になれないので、一時的に「普通の武将」のフリをしてもらって候補に含めます
-                oldDaimyo.isDaimyo = false;
-
-                // この特別な状態で、派閥の振り分け直しを行います
-                // ★高速化：変化しているのは主家だけなので、全国ではなくこの勢力だけ再編します。
-                this.game.factionSystem.updateFactions(oldClanId);
-
-                // ★追加：計算が終わったら、すべて元の状態（永続化しないように）に戻します！
-                daimyoMembers.forEach(b => {
-                    b.achievementTotal = originalAchievements.get(b.id); // メモを見て元通りに！
-                });
-                oldDaimyo.isDaimyo = true; // 大名様に戻ってもらいます
-
-                // その後、敗れた反乱分子たちは通常の独立処理へ移行
+                // 主家軍の勝利後も、反乱勢力の離脱が確定するまでは元の派閥を維持する。
+                // 一時的に旧大名のisDaimyoを外して選挙すると、大名が派閥主になったまま残る。
+                // 先に敗残側の独立を終え、残留する主家の最終名簿だけで再編する。
                 await this.executeRebellion(castle, castellan, oldDaimyo, 'indep');
+                if (!isCurrentFlow()) return;
+
+                // 勝利した主家側の功績優遇は派閥選出時だけ維持し、実功績には加算しない。
+                // 大名は正式な役職のまま候補から除外し、再編はFactionSystemを正本とする。
+                const loyalSurvivors = daimyoMembers.filter(b =>
+                    Number(b.clan) === Number(oldClanId) && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
+                const originalAchievements = new Map();
+                try {
+                    loyalSurvivors.forEach(b => {
+                        originalAchievements.set(b.id, b.achievementTotal || 0);
+                        b.achievementTotal = (b.achievementTotal || 0) + 3000;
+                    });
+                    if (this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
+                } finally {
+                    loyalSurvivors.forEach(b => {
+                        b.achievementTotal = originalAchievements.get(b.id);
+                    });
+                }
 
             } else {
                 // 【引き分け】
@@ -1421,7 +1442,11 @@ class IndependenceSystem {
                 if (!isCurrentFlow()) return;
                 this._logIndependence(`決着は着かず、首魁の${rebellionLeader.name}は自領に逃亡しました。`, [oldClanId]);
 
-                // 全員を強制的に追従させるため、一時的に派閥IDを反乱リーダーと同じにします
+                // 引き分け時の仮派閥は独立呼応の判定専用。確率判定で旧家に残る
+                // 反乱軍参加者まで、戦闘用IDを持った派閥家臣にしてはならない。
+                const originalFactionStates = new Map(rebelMembers.map(b => [b.id, {
+                    factionId: b.factionId, isFactionLeader: b.isFactionLeader
+                }]));
                 const dummyFactionId = rebellionLeader.factionId || 999;
                 rebellionLeader.factionId = dummyFactionId;
                 rebellionLeader.isFactionLeader = true;
@@ -1429,8 +1454,19 @@ class IndependenceSystem {
                     b.factionId = dummyFactionId;
                 });
 
-                // 通常の独立処理へ
-                await this.executeRebellion(castle, castellan, oldDaimyo, 'indep');
+                // 独立参加者の派閥は従来の所属変更窓口で消去される。
+                // 参加しなかった旧家残留者だけを元の状態へ戻す。
+                try {
+                    await this.executeRebellion(castle, castellan, oldDaimyo, 'indep');
+                } finally {
+                    rebelMembers.forEach(b => {
+                        const original = originalFactionStates.get(b.id);
+                        if (!original || Number(b.clan) !== Number(oldClanId)
+                            || !window.BushoStatusRules.isActive(b) || b.factionId !== dummyFactionId) return;
+                        b.factionId = original.factionId;
+                        b.isFactionLeader = original.isFactionLeader;
+                    });
+                }
             }
 
         } else {
