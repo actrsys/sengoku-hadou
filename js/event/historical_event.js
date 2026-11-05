@@ -362,15 +362,8 @@ window.EventAction = {
     appointCastellan: function(game, busho, castle, { deferCastleLordUpdate = false } = {}) {
         if (!busho || !castle) return;
         
-        // 今いる城主のバッジを外します
-        const oldCastellan = game.getBusho(castle.castellanId);
-        if (oldCastellan && oldCastellan.id !== busho.id) {
-            oldCastellan.isCastellan = false;
-        }
-        
-        // 新しい城主にバッジをつけます
-        busho.isCastellan = true;
-        castle.castellanId = busho.id;
+        // 城主任命のIDと派生バッジは所属Systemの共通更新へ委譲する。
+        game.affiliationSystem.setCastellanRaw(castle, busho);
         
         // システムに報告します
         if (game.affiliationSystem && !deferCastleLordUpdate) {
@@ -871,21 +864,38 @@ window.GameEvents.push({
                 { clanId: imagawaClanId, clanName: imagawaName, excludeId: yoshimoto.id } // 今川家（義元本人は除外）
             ];
 
-            // リストの中身（織田家→今川家）の順番で、同じ処理を繰り返します
-            for (const target of targetClans) {
-                // 本来の寿命（originalEndYear）が1560年以前で、討死フラグがあり、除外IDではない活動中の武将を探します
-                const deadBushos = game.bushos.filter(b => 
-                    b.clan === target.clanId && 
-                    window.BushoStatusRules.isActive(b) && 
-                    b.originalEndYear <= 1560 && 
-                    b.isKilledInBattle && 
-                    b.id !== target.excludeId
-                );
+            // 同一合戦の戦死者が確定するまで、仮城主任命と派閥再編を保留する。
+            // 生死・家族・官位・家督の処理は LifeSystem の正規窓口へ委ねる。
+            const affectedDeathCastleIds = new Set();
+            const deferredDeathUpdates = {
+                deferCastleLordUpdate: true, deferFactionUpdate: true,
+                affectedCastleLordIds: affectedDeathCastleIds
+            };
 
+            // 討死予定者を先に確定し、国主の後任選びにも途中死亡予定者を混入させない。
+            // 処理順（織田家→今川家）と死亡条件は変更しない。
+            const deathsByClan = targetClans.map(target => ({
+                target,
+                deadBushos: game.bushos.filter(b =>
+                    b.clan === target.clanId &&
+                    window.BushoStatusRules.isActive(b) &&
+                    b.originalEndYear <= 1560 &&
+                    b.isKilledInBattle &&
+                    b.id !== target.excludeId
+                )
+            }));
+            const excludedSuccessionCandidateIds = [yoshimoto.id,
+                ...deathsByClan.flatMap(({ deadBushos }) => deadBushos.map(b => b.id))];
+
+            for (const { target, deadBushos } of deathsByClan) {
                 for (const busho of deadBushos) {
                     if (game.lifeSystem) {
-                        // 通常の死亡メッセージを止めて、イベント専用のメッセージを出します
-                        await game.lifeSystem.executeDeath(busho, { skipNormalMessage: true });
+                        if (busho.isCastellan && Number(busho.castleId) > 0) {
+                            affectedDeathCastleIds.add(Number(busho.castleId));
+                        }
+                        await game.lifeSystem.executeDeath(busho, {
+                            skipNormalMessage: true, ...deferredDeathUpdates, excludedSuccessionCandidateIds
+                        });
                     }
                     // プレイヤーが関係している場合のみ、一人ずつメッセージを出します
                     if (isPlayerInvolved) {
@@ -900,11 +910,21 @@ window.GameEvents.push({
                 }
             }
 
-            // ③ 義元の討死処理を行います
-            // 死亡システムに全てお任せして、後継ぎの決定なども自動で行ってもらいます
+            // ③ 義元の討死。家督相続自体は従来どおり LifeSystem へ委ねる。
             if (game.lifeSystem) {
-                await game.lifeSystem.executeDeath(yoshimoto);
+                if (yoshimoto.isCastellan && Number(yoshimoto.castleId) > 0) {
+                    affectedDeathCastleIds.add(Number(yoshimoto.castleId));
+                }
+                await game.lifeSystem.executeDeath(yoshimoto, {
+                    ...deferredDeathUpdates, excludedSuccessionCandidateIds
+                });
             }
+            // 最終的な死亡者名簿が決まってから関係拠点を一度ずつ確定する。
+            // 派閥と画面の更新は EventManager の共通終了処理が担当する。
+            affectedDeathCastleIds.forEach(id => {
+                const castle = game.getCastle(id);
+                if (castle) game.updateCastleLord(castle);
+            });
 
             // ★追加：義元死亡後、今川勢力の拠点の兵力と人口を減らし、その「減った数」をメモしておきます
             let totalLostSoldiers = 0; // 減った兵士の合計を入れる箱です
@@ -2232,7 +2252,7 @@ window.GameEvents.push({
         const ashikagaCastles = game.getClanCastles(ashikagaClanId);
         ashikagaCastles.forEach(castle => {
             game.castleManager.changeOwner(castle, miyoshiClanId, true);
-            castle.castellanId = 0;
+            game.affiliationSystem.setCastellanRaw(castle, null);
         });
 
         // ② 足利義輝の死亡と旧家臣の一括退去。
@@ -3043,8 +3063,7 @@ window.GameEvents.push({
         game.castleManager.changeOwner(makishimaCastle, newClanId, true);
 
         // 将軍が二条城の城主として座るように設定します
-        candidate.isCastellan = true;
-        nijoCastle.castellanId = candidate.id;
+        game.affiliationSystem.setCastellanRaw(nijoCastle, candidate);
 
         // --- 4. 官位の変更（左馬頭を返して、征夷大将軍をもらいます） ---
         const samanoKamiId = candidate.courtRankIds.find(id => game.courtRankSystem.RANK_IDS_CANDIDATE.includes(id));
@@ -3089,8 +3108,7 @@ window.GameEvents.push({
                     deferCastleLordUpdate: true, deferUI: true
                 });
                 // 誰を城主とするかは将軍就任の史実イベント固有の選択。
-                bestFollower.isCastellan = true;
-                makishimaCastle.castellanId = bestFollower.id;
+                game.affiliationSystem.setCastellanRaw(makishimaCastle, bestFollower);
             }
         }
 
@@ -3305,9 +3323,17 @@ window.GameEvents.push({
         const miyoshiClanId = yoshitsugu.clan;
         // 後任が見つかれば配置する。いなければ城主不在のまま出奔を進める。
         const relocationPlan = window.EventCheck.getYoshitsuguExileCastellanPlan(game, yoshitsugu);
+        // 配置する全員が確定するまで、途中の城主選出と地図更新は行わない。
+        // 在城名簿と着任履歴は引き続き所属Systemの正規転任が管理する。
+        const affectedCastleIds = new Set();
         relocationPlan.forEach(({ castleId, bushoId }) => {
             const officer = game.getBusho(bushoId);
-            if (officer) game.affiliationSystem.moveCastle(officer, castleId, { deferUI: true });
+            if (!officer) return;
+            if (Number(officer.castleId) > 0) affectedCastleIds.add(Number(officer.castleId));
+            affectedCastleIds.add(Number(castleId));
+            game.affiliationSystem.moveCastle(officer, castleId, {
+                deferCastleLordUpdate: true, deferUI: true
+            });
         });
 
         
@@ -3335,7 +3361,10 @@ window.GameEvents.push({
         // ② 三好長逸を、今いるお城の城主にします
         const nagayasuCastle = game.getCastle(nagayasu.castleId);
         if (nagayasuCastle) {
-            window.EventAction.appointCastellan(game, nagayasu, nagayasuCastle);
+            window.EventAction.appointCastellan(game, nagayasu, nagayasuCastle, {
+                deferCastleLordUpdate: true
+            });
+            affectedCastleIds.add(Number(nagayasuCastle.id));
             // この史実イベントは通常の家督継承を経由しないため、正式な本拠移転もここで確定する。
             // 一時在城とは区別して保持する Clan.homeCastleId のみを新当主の居城に合わせる。
             if (miyoshiClan) miyoshiClan.homeCastleId = Number(nagayasuCastle.id);
@@ -3344,9 +3373,19 @@ window.GameEvents.push({
         // ③ 三好義継の貢献度（功績）を0にします
         yoshitsugu.achievementTotal = 0;
 
-        // ④ 三好義継を松永家に保護させ、忠誠度を100にする
-        // お引越しセンターの魔法（joinClan）を使って、古いお城から出して新しいお城に入れます
-        game.affiliationSystem.joinClan(yoshitsugu, hisahide.clan, hisahide.castleId, 100);
+        // ④ 三好義継を松永家に保護させ、忠誠度を100にする。
+        // 所属変更そのものは共通窓口を使用し、城主・派閥・描画の途中更新だけ保留する。
+        if (Number(yoshitsugu.castleId) > 0) affectedCastleIds.add(Number(yoshitsugu.castleId));
+        affectedCastleIds.add(Number(hisahide.castleId));
+        game.affiliationSystem.joinClan(yoshitsugu, hisahide.clan, hisahide.castleId, 100, false, {
+            deferCastleLordUpdate: true, deferFactionUpdate: true, deferUI: true
+        });
+        // 旧当主の出奔と新当主の正式配置を終えた実際の在城名簿で一度だけ確定する。
+        // 派閥・画面はEventManagerのイベント終了時の共通更新が担当する。
+        affectedCastleIds.forEach(id => {
+            const castle = game.getCastle(id);
+            if (castle) game.affiliationSystem.updateCastleLord(castle);
+        });
         
         // ★追加：三好長逸家所属の拠点と武将へのペナルティ処理
         // お城の人口・兵士・民忠を減らします
@@ -4371,11 +4410,26 @@ window.GameEvents.push({
         // 戦死処理（山本勘助、武田信繁）
         // 死亡システムに、通常の死亡メッセージを出さないようにお願いして処理させます
         const deadBushos = [kansuke, nobushige];
+        const affectedCastleIds = new Set();
         for (const busho of deadBushos) {
             if (game.lifeSystem) {
-                await game.lifeSystem.executeDeath(busho, { skipNormalMessage: true });
+                if (busho.isCastellan && Number(busho.castleId) > 0) {
+                    affectedCastleIds.add(Number(busho.castleId));
+                }
+                // 同じ事件で戦死する者を途中で後任城主・派閥主に選出しない。
+                // 死亡・婚姻・官位・軍団の後始末は LifeSystem の正規処理に任せる。
+                await game.lifeSystem.executeDeath(busho, {
+                    skipNormalMessage: true, deferCastleLordUpdate: true, deferFactionUpdate: true,
+                    affectedCastleLordIds: affectedCastleIds,
+                    excludedSuccessionCandidateIds: deadBushos.map(b => b.id)
+                });
             }
         }
+        // 城主は全員の処遇後に確定し、派閥は EventManager の終了時共通更新に任せる。
+        affectedCastleIds.forEach(id => {
+            const castle = game.getCastle(id);
+            if (castle) game.updateCastleLord(castle);
+        });
         
         // BGMを元に戻します
         if (window.AudioManager) {

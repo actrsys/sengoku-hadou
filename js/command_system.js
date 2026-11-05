@@ -1515,8 +1515,7 @@ class CommandSystem {
             const bushos = this.game.getBusho(bushoIds[0]);
             if (!bushos) return;
             if (type === 'appoint') { 
-                const old = this.game.getBusho(castle.castellanId); if(old) old.isCastellan = false; 
-                castle.castellanId = bushos.id; bushos.isCastellan = true; 
+                this.game.affiliationSystem.setCastellanRaw(castle, bushos); 
                 // ★追加：もし城主になった人が軍師だったら、軍師のお仕事を外します！
                 if (bushos.isGunshi) {
                     this.game.affiliationSystem.clearGunshiRole(bushos);
@@ -1894,8 +1893,14 @@ class CommandSystem {
         // 一覧が古い場合でも、別軍団の現職国主の在城地を新任国主の本拠で上書きしない。
         if (this.game.castleManager.getActiveCommanderCastleIds(clanId).has(Number(castle.id))) return;
 
-        // 国主任命の別城着任も在城履歴は所属変更窓口が記録する。
-        this.game.affiliationSystem.moveCastle(busho, castleId);
+        // 国主の任命が確定する前に自動城主を選ぶと、仮の任命が履歴へ残る。
+        // 同城の候補は転任させず、別城からの転任だけ所属Systemの正規窓口で保留する。
+        const originalCastleId = Number(busho.castleId);
+        if (originalCastleId !== Number(castleId)) {
+            this.game.affiliationSystem.moveCastle(busho, castleId, {
+                deferCastleLordUpdate: true, deferUI: true
+            });
+        }
 
         if (!this.game.legions) this.game.legions = [];
         let legion = existingSeat;
@@ -1916,17 +1921,18 @@ class CommandSystem {
             legion.establishedTurnId = this.game.getCurrentTurnId();
         }
 
-        const oldCastellan = this.game.getBusho(castle.castellanId);
-        if (oldCastellan) {
-            oldCastellan.isCastellan = false;
-        }
-        castle.castellanId = busho.id;
-        busho.isCastellan = true;
+        this.game.affiliationSystem.setCastellanRaw(castle, busho);
         busho.isCommander = true;
         if (busho.isGunshi) this.game.affiliationSystem.clearGunshiRole(busho);
 
         if (Number(castle.legionId) !== legionNo) castle.isDelegated = true;
         castle.legionId = legionNo;
+
+        // 国主・城主を正式確定した後だけ出発元の後任城主を選ぶ。
+        if (originalCastleId > 0 && originalCastleId !== Number(castle.id)) {
+            const originalCastle = this.game.getCastle(originalCastleId);
+            if (originalCastle) this.game.updateCastleLord(originalCastle);
+        }
 
         const numberNames = ["", "第一席", "第二席", "第三席", "第四席", "第五席", "第六席", "第七席", "第八席"];
         const legionName = numberNames[legionNo] || `第${legionNo}席`;

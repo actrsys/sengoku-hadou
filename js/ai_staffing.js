@@ -499,17 +499,29 @@ class AIStaffing {
         // 番号が割り当てられなかったら失敗として中止します
         if (newLegionNo === -1) return false;
         
-        // 新国主を移動させて国主にする。在城履歴は所属変更窓口が記録する。
-        this.game.affiliationSystem.moveCastle(newCommander, baseCastle.id);
+        // 国主が正式就任する前の到着先で仮城主を選ばない。
+        // 先に出発元の城主だけ確定すると、留守居の新城主が後続の随伴候補に
+        // 混入しないため、既存の「転任後の最新役職で随伴候補を再評価」を維持できる。
+        const originalCommanderCastle = this.game.getCastle(newCommander.castleId);
+        const affectedCastleLordIds = new Set([Number(baseCastle.id)]);
+        if (Number(newCommander.castleId) !== Number(baseCastle.id)) {
+            this.game.affiliationSystem.moveCastle(newCommander, baseCastle.id, {
+                deferCastleLordUpdate: true, deferUI: true
+            });
+            if (originalCommanderCastle) this.game.updateCastleLord(originalCommanderCastle);
+        }
         newCommander.isCommander = true;
         this.game.affiliationSystem.clearGunshiRole(newCommander); // 国主になる時は軍師役職を外す
-        
-        // ★新国主転任後の最新の役職・在城状況で候補を再評価してから移す。
-        // 見積り時の配列を使い回さず、資格・人数式だけ同じ関数を使う。
+
+        // 見積りの人数は保持し、最新の役職資格で随伴者を再評価する。
+        // 複数の転任元・到着先は所属Systemで収集して最後に一度だけ更新する。
         if (newCommander.factionId !== 0) {
-            // 国主転任で旧城主になった候補は除外しつつ、見積り済みの随伴人数は維持する。
-            for (const b of getDirectFactionEscorts(plannedEscortCount)) {
-                this.game.affiliationSystem.moveCastle(b, baseCastle.id);
+            const escorts = getDirectFactionEscorts(plannedEscortCount).filter(b =>
+                Number(b.castleId) !== Number(baseCastle.id));
+            if (escorts.length > 0) {
+                this.game.affiliationSystem.moveCastleGroup(escorts, baseCastle.id, {
+                    deferCastleLordUpdate: true, affectedCastleLordIds, deferUI: true
+                });
             }
         }
 
@@ -519,7 +531,16 @@ class AIStaffing {
             c.isDelegated = true; // AIなので委任
         });
         
-        this.game.updateCastleLord(baseCastle);
+        // 国主席・担当拠点・随伴家臣が確定した後だけ、残りの拠点の城主を選ぶ。
+        // 最初の出発元は随伴者の資格選考時にすでに確定済み。
+        if (originalCommanderCastle && Number(originalCommanderCastle.id) !== Number(baseCastle.id)) {
+            affectedCastleLordIds.delete(Number(originalCommanderCastle.id));
+        }
+        affectedCastleLordIds.forEach(id => {
+            const affected = this.game.getCastle(id);
+            if (affected) this.game.updateCastleLord(affected);
+        });
+        this.game.affiliationSystem.updateUI();
         if (this.game.historySystem) {
             const clan = this.game.getClan(clanId);
             this.game.historySystem.record(`【国主任命】${clan ? clan.name : '大名家'}は${newCommander.fullName || newCommander.name}を国主に任命し、${baseCastle.name}を本拠としました。`, {

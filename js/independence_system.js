@@ -449,7 +449,7 @@ class IndependenceSystem {
                 const extraMsgs = await this.resolveSubordinates(leaderCastle, rebellionLeader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId, deferredRebellionCastleLords);
                 if (!isCurrentFlow()) return;
                 if (extraMsgs.length > 0) captiveMsgs = captiveMsgs.concat(extraMsgs);
-                this.game.updateCastleLord(leaderCastle);
+                deferredRebellionCastleLords.add(Number(leaderCastle.id));
             }
         }
 
@@ -457,8 +457,11 @@ class IndependenceSystem {
         // ★修正：記憶しておいた元の派閥ID(leaderOriginalFactionId)を渡して判定させます
         await this.resolveFactionWideRebellion(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId, deferredRebellionCastleLords);
         if (!isCurrentFlow()) return;
-        this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId);
-        // 呼応の対象と残留者が確定した最終名簿からだけ、脱出元の城主を再選出する。
+        this.resolveDistantFactionMembers(rebellionLeader, oldClanId, newClanId, oldDaimyo,
+            leaderOriginalFactionId, deferredRebellionCastleLords);
+        // 城主確定は全拠点の処遇・転任が終わってから一度だけ行う。
+        // 独立の起点、旧拠点、呼応拠点、遠方家臣の出発元・到着先を同じ集合で扱う。
+        deferredRebellionCastleLords.add(Number(castle.id));
         if (proxyLeaderSourceCastle) deferredRebellionCastleLords.add(Number(proxyLeaderSourceCastle.id));
         deferredRebellionCastleLords.forEach(id => {
             const affectedCastle = this.game.getCastle(id);
@@ -490,7 +493,6 @@ class IndependenceSystem {
             }
         });
 
-        this.game.updateCastleLord(castle);
         // 独立後の最終名簿で旧主家の派閥を確定する。途中の離反者移籍では
         // 旧派閥主が消えても残留家臣の派閥IDが残るため、呼応判定後に一度だけ再編する。
         // 謀反の勝敗別処理は、戦後の専用補正・一時状態の復旧後に再編する。
@@ -800,9 +802,16 @@ class IndependenceSystem {
                     } else {
                         // ★変更：逃げる城がない場合は、潔く野に下る（浪人になる）
                         // 独立の呼応判定が終わるまでは途中名簿で派閥を再編しない。
+                        const departureCastleId = Number(busho.castleId) || 0;
                         this.game.affiliationSystem.becomeRonin(busho, 'desertion', {
-                            deferFactionUpdate: true
+                            deferFactionUpdate: true,
+                            deferCastleLordUpdate: !!deferredCastleLordIds,
+                            deferUI: !!deferredCastleLordIds
                         });
+                        if (deferredCastleLordIds) {
+                            if (departureCastleId > 0) deferredCastleLordIds.add(departureCastleId);
+                            if (Number(busho.castleId) > 0) deferredCastleLordIds.add(Number(busho.castleId));
+                        }
                         this._logIndependence(`  -> ${busho.name}は新体制に従わず、野に下りました。`, [oldClanId, newClanId]);
                     }
                 } else {
@@ -844,13 +853,14 @@ class IndependenceSystem {
                     busho.loyalty = this.calcNewLoyalty(busho, leader);
                     await this.resolveSubordinates(castle, leader, oldDaimyo, newClanId, oldClanId, leaderOriginalFactionId, deferredCastleLordIds);
                     if (!isCurrentFlow()) return;
-                    this.game.updateCastleLord(castle);
+                    if (deferredCastleLordIds) deferredCastleLordIds.add(Number(castle.id));
+                    else this.game.updateCastleLord(castle);
                 }
             }
         }
     }
 
-    resolveDistantFactionMembers(newDaimyo, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId = null) {
+    resolveDistantFactionMembers(newDaimyo, oldClanId, newClanId, oldDaimyo, leaderOriginalFactionId = null, deferredCastleLordIds = null) {
         // ★修正：記憶しておいた元の派閥IDを基準として使います
         const targetFactionId = (leaderOriginalFactionId !== null && leaderOriginalFactionId !== 0) ? leaderOriginalFactionId : newDaimyo.factionId;
         if (!targetFactionId || targetFactionId === 0) return; 
@@ -879,7 +889,10 @@ class IndependenceSystem {
             this.game.affiliationSystem.transferClanRaw(busho, newClanId, { syncSpouses: true });
             busho.loyalty = this.calcNewLoyalty(busho, newDaimyo);
         });
-        this.game.affiliationSystem.moveCastleGroup(joiners, mainCastle.id);
+        this.game.affiliationSystem.moveCastleGroup(joiners, mainCastle.id,
+            deferredCastleLordIds ? {
+                deferCastleLordUpdate: true, affectedCastleLordIds: deferredCastleLordIds, deferUI: true
+            } : {});
         joiners.forEach(busho => {
             this._logIndependence(`  -> ${busho.name}が拠点を脱出し、${newDaimyo.name}の元へ駆けつけました！`, [oldClanId, newClanId]);
         });

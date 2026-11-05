@@ -2703,9 +2703,7 @@ class DiplomacyManager {
                 if (lordB && lordB.isCommander && !b.isDaimyo) {
                     // 何もしない（Aでの城主身分は剥奪のまま）
                 } else {
-                    if (lordB) lordB.isCastellan = false;
-                    b.isCastellan = true;
-                    castleB.castellanId = b.id;
+                    this.game.affiliationSystem.setCastellanRaw(castleB, b);
                 }
             }
 

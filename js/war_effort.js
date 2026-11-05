@@ -207,13 +207,8 @@ Object.assign(WarManager.prototype, {
         });
 
         if (s.atkBushos && s.atkBushos.length > 0) {
-            const previousCastellan = this.game.getBusho(previousCapturedCastellanId);
-            if (previousCastellan && !s.atkBushos.some(b => Number(b.id) === Number(previousCastellan.id))) {
-                previousCastellan.isCastellan = false;
-            }
             const leader = s.atkBushos[0];
-            leader.isCastellan = true;
-            s.defender.castellanId = leader.id;
+            this.game.affiliationSystem.setCastellanRaw(s.defender, leader);
             if (Number(leader.id) !== previousCapturedCastellanId && this.game.historySystem) {
                 const captureClanName = this.getHistoryClanName(s.attacker.ownerClan);
                 this.game.historySystem.record(`【城主任命】${captureClanName}は${leader.fullName || leader.name}を${s.defender.name}の城主に任命しました。`, {
@@ -1558,7 +1553,7 @@ Object.assign(WarManager.prototype, {
                         window.BushoStatusRules.isRonin(busho);
                 });
                 
-                defCastle.castellanId = 0;
+                this.game.affiliationSystem.setCastellanRaw(defCastle, null);
                 this.game.updateCastleLord(defCastle); this.game.updateCastleLord(target);
                 
                 if(s.isPlayerInvolved) {
@@ -2057,7 +2052,7 @@ Object.assign(WarManager.prototype, {
                         }
                     }
                     
-                    targetC.castellanId = 0;
+                    this.game.affiliationSystem.setCastellanRaw(targetC, null);
                     
                     const kunishuMembers = this.game.kunishuSystem.getKunishuMembers(s.attacker.kunishuId).map(b => b.id);
                     
@@ -3976,7 +3971,7 @@ Object.assign(WarManager.prototype, {
         for (const castle of defCastles) {
             if (castle.ownerClan === defClanId) {
                 this.game.castleManager.changeOwner(castle, atkClanId, false, 0);
-                castle.castellanId = 0; // 強制接収した城の城主は不在にします
+                this.game.affiliationSystem.setCastellanRaw(castle, null); // 強制接収した城の城主は不在にします
                 // 城主情報を更新
                 if (this.game.affiliationSystem && typeof this.game.affiliationSystem.updateCastleLord === 'function') {
                     this.game.affiliationSystem.updateCastleLord(castle);

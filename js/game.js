@@ -1316,7 +1316,7 @@ class GameManager {
         }
     }
 
-    changeLeader(clanId, newLeaderId) { 
+    changeLeader(clanId, newLeaderId, { deferCastleLordUpdate = false } = {}) { 
         this.getClanBushos(clanId).forEach(b => b.isDaimyo = false); 
         const newLeader = this.getBusho(newLeaderId); 
         if(newLeader) { 
@@ -1334,7 +1334,7 @@ class GameManager {
                 }
             }
         } 
-        this.updateAllCastlesLords();
+        if (!deferCastleLordUpdate) this.updateAllCastlesLords();
     }
     
     // ==========================================

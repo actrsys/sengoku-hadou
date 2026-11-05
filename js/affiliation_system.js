@@ -607,12 +607,21 @@ class AffiliationSystem {
             if (previousId > 0 && previousId !== Number(newCastleId)) sourceIds.add(previousId);
             this.moveCastle(busho, newCastleId, { deferCastleLordUpdate: true, deferUI: true });
         });
-        sourceIds.forEach(id => {
-            const source = this.game.getCastle(id);
-            if (source) this.updateCastleLord(source);
-        });
         const destination = this.game.getCastle(newCastleId);
-        if (destination) this.updateCastleLord(destination);
+        if (options.deferCastleLordUpdate === true) {
+            // 一括独立など、呼出元が複数の処遇をひとつの操作として確定する場合。
+            // 所属Systemが実際の移動元・移動先を収集し、最終更新だけ呼出元に委ねる。
+            if (options.affectedCastleLordIds) {
+                sourceIds.forEach(id => options.affectedCastleLordIds.add(id));
+                if (destination) options.affectedCastleLordIds.add(Number(destination.id));
+            }
+        } else {
+            sourceIds.forEach(id => {
+                const source = this.game.getCastle(id);
+                if (source) this.updateCastleLord(source);
+            });
+            if (destination) this.updateCastleLord(destination);
+        }
         // 史実イベント等で既に共通の終了描画がある場合のみ、途中描画を保留する。
         // 通常の一括転任やAI人事はこれまでどおり一度だけ即時更新する。
         if (options.deferUI !== true) this.updateUI();
@@ -630,8 +639,7 @@ class AffiliationSystem {
                 
                 // もし自分が城主だったら、城主を空っぽにします
                 if (Number(oldCastle.castellanId) === Number(busho.id)) {
-                    oldCastle.castellanId = 0;
-                    busho.isCastellan = false;
+                    this.setCastellanRaw(oldCastle, null);
                 }
                 if (options.deferCastleLordUpdate !== true) this.updateCastleLord(oldCastle);
             }
@@ -937,32 +945,39 @@ class AffiliationSystem {
     }
 
     /**
+     * 城主任命の低レベル正本。選考・履歴・在城資格は呼出元が決め、
+     * Castle.castellanId と旧・新城主の表示フラグだけを一度に一致させる。
+     * 自動選考と正式任命・戦後配置のどちらからもこの窓口を使う。
+     */
+    setCastellanRaw(castle, newCastellan = null) {
+        if (!castle) return;
+        const nextId = Number(newCastellan?.id || 0);
+        this._clearPreviousCastellanFlag(castle, nextId);
+        castle.castellanId = nextId;
+        if (newCastellan) newCastellan.isCastellan = true;
+    }
+
+    /**
      * ② 城主の自動決定と更新
      */
     updateCastleLord(castle) {
         if (!castle || castle.ownerClan === 0) {
             if (castle) {
-                this._clearPreviousCastellanFlag(castle, 0);
-                castle.castellanId = 0;
+                this.setCastellanRaw(castle, null);
             }
             return;
         }
 
         const bushos = this.game.getCastleBushos(castle.id).filter(b => b.clan === castle.ownerClan && window.BushoStatusRules.isActive(b));
         if (bushos.length === 0) {
-            this._clearPreviousCastellanFlag(castle, 0);
-            castle.castellanId = 0;
+            this.setCastellanRaw(castle, null);
             return;
         }
         
         const daimyo = bushos.find(b => b.isDaimyo);
         if (daimyo) {
-            this._clearPreviousCastellanFlag(castle, daimyo.id);
-            bushos.forEach(b => { 
-                b.isCastellan = false; 
-            });
-            daimyo.isCastellan = true; 
-            castle.castellanId = daimyo.id;
+            bushos.forEach(b => { b.isCastellan = false; });
+            this.setCastellanRaw(castle, daimyo);
             castle.isDelegated = false;
             if (daimyo.isGunshi) this.clearGunshiRole(daimyo);
             return;
@@ -971,12 +986,8 @@ class AffiliationSystem {
         const commander = bushos.find(b => this._isCommanderInCastle(b, castle));
         if (commander) {
             commander.isCommander = true; // 表示用フラグは軍団側の正本から復旧する
-            this._clearPreviousCastellanFlag(castle, commander.id);
-            bushos.forEach(b => { 
-                b.isCastellan = false; 
-            });
-            commander.isCastellan = true; 
-            castle.castellanId = commander.id;
+            bushos.forEach(b => { b.isCastellan = false; });
+            this.setCastellanRaw(castle, commander);
             if (commander.isGunshi) this.clearGunshiRole(commander);
             return;
         }
@@ -989,8 +1000,7 @@ class AffiliationSystem {
             this.electCastellan(castle, lords);
         } else if (lords.length === 1) {
             // 城主が１人だけなら、元々の城主をそのまま維持します
-            this._clearPreviousCastellanFlag(castle, lords[0].id);
-            castle.castellanId = lords[0].id;
+            this.setCastellanRaw(castle, lords[0]);
             if (lords[0].isGunshi) this.clearGunshiRole(lords[0]);
         } else {
             // 城主が誰もいない場合は、城内の全武将から新しい城主を決めます
@@ -1007,7 +1017,7 @@ class AffiliationSystem {
             const currentLord = bushos.find(b => b.id === castle.castellanId);
             if (currentLord) {
                 bushos.forEach(b => b.isCastellan = false);
-                currentLord.isCastellan = true;
+                this.setCastellanRaw(castle, currentLord);
                 return; 
             }
         }
@@ -1057,15 +1067,13 @@ class AffiliationSystem {
         scoredCandidates.sort((a, b) => b.score - a.score);
         const best = scoredCandidates[0].busho;
 
-        this._clearPreviousCastellanFlag(castle, best.id);
         bushos.forEach(b => b.isCastellan = false);
-        best.isCastellan = true;
+        this.setCastellanRaw(castle, best);
         
         if (best.isGunshi) {
             this.clearGunshiRole(best);
         }
         
-        castle.castellanId = best.id;
         if (Number(best.id) !== previousCastellanId && this.game.phase === 'game' && !this.game.isRestoringSave && this.game.historySystem) {
             const clan = this.game.getClan ? this.game.getClan(castle.ownerClan) : null;
             const clanName = clan ? clan.name : '大名家';

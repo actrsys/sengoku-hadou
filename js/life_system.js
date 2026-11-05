@@ -1152,13 +1152,10 @@ class LifeSystem {
             castle.samuraiIds = castle.samuraiIds.filter(id => id !== busho.id);
         }
         
-        // もし城主だったら、役職を外して新しい城主を決めます
-        if (busho.isCastellan) {
-            busho.isCastellan = false;
-            if (castle) {
-                this.game.updateCastleLord(castle);
-            }
-        }
+        // 旧城主の役職を外す。大名・国主の後任がまだ確定していないため、
+        // ここで城主を選び直すと単独死亡でも仮任命履歴が発生する。
+        const wasCastellanAtDeath = busho.isCastellan === true;
+        if (wasCastellanAtDeath) busho.isCastellan = false;
 
         // もし大名だったら、後継ぎを決めます
         if (busho.isDaimyo) {
@@ -1170,7 +1167,7 @@ class LifeSystem {
 
             // ★修正：イベントで「通常の家督相続をしない」指示がなければ、後継ぎを決めます
             if (!context.skipDaimyoSuccession) {
-                await this.handleDaimyoDeath(busho, context.excludedSuccessionCandidateIds);
+                await this.handleDaimyoDeath(busho, context.excludedSuccessionCandidateIds, context);
             } else {
                 busho.isDaimyo = false; // イベントで乗っ取られた場合でも、大名バッジはしっかり外しておきます
             }
@@ -1178,11 +1175,19 @@ class LifeSystem {
 
         // ★もし国主だったら、後任を決めます
         if (busho.isCommander || this._findCommanderLegion(busho)) {
-            await this.handleCommanderDeath(busho);
+            await this.handleCommanderDeath(busho, context.excludedSuccessionCandidateIds, context);
         }
         this.game.affiliationSystem.setClanIdRaw(busho, 0);
         this.game.affiliationSystem.setCastleIdRaw(busho, 0);
         busho.belongKunishuId = 0;
+
+        // 大名・国主継承（または後継不在による軍団解散）が済んでから、
+        // 旧城主の席が空いた場合だけ通常の城主選出を一度実行する。
+        // 同時戦死イベントの保留は従来どおり呼出元の最終確定に委ねる。
+        if (wasCastellanAtDeath && castle && !context.deferCastleLordUpdate
+            && Number(castle.castellanId) === Number(busho.id)) {
+            this.game.updateCastleLord(castle);
+        }
 
         // ★高速化：通常の単発死亡なら、その武将がいた勢力だけ再編します。
         // 月末の一括死亡判定中は checkDeath() 側でまとめて処理します。
@@ -1191,8 +1196,114 @@ class LifeSystem {
         }
     }
 
+    /**
+     * 大名・国主の後継者を既定の居城へ迎える共通手順。
+     * 誰を選ぶか／何の役職に就けるかは呼び出し側の責務に残す。
+     * 所属・実際の転任・着任履歴は所属Systemの窓口で確定する。
+     * すでに同城にいる場合は退去・再入城を行わず、仮城主任命を防ぐ。
+     */
+    _placeSuccessionSuccessor(successor, clanId, baseCastle, options = {}) {
+        if (!baseCastle) return;
+        const oldCastleId = Number(successor.castleId) || 0;
+        const isCastleTransfer = oldCastleId !== Number(baseCastle.id);
+        const wasClanRetainer = oldCastleId > 0 && Number(successor.clan) === Number(clanId)
+            && window.BushoStatusRules.isActive(successor);
+        const affiliation = this.game.affiliationSystem;
+        if (options.deferCastleLordUpdate && options.affectedCastleLordIds) {
+            if (isCastleTransfer && oldCastleId > 0) options.affectedCastleLordIds.add(oldCastleId);
+            options.affectedCastleLordIds.add(Number(baseCastle.id));
+        }
+        if (isCastleTransfer && (window.BushoStatusRules.isRonin(successor) || window.BushoStatusRules.isActive(successor))) {
+            affiliation.leaveCastle(successor,
+                options.deferCastleLordUpdate ? { deferCastleLordUpdate: true } : {});
+        }
+        affiliation.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
+        affiliation.transferClanRaw(successor, clanId, { syncSpouses: true });
+        affiliation.setCastleIdRaw(successor, baseCastle.id, {
+            recordStayHistory: isCastleTransfer,
+            stayHistoryFromCastleId: wasClanRetainer ? undefined : 0
+        });
+        successor.loyalty = 100;
+        if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
+    }
+
+    /**
+     * 大名・国主死亡時の後継候補の共通窓口。
+     * 一門（在職→未登場→AIのみ浪人／諸勢力）を優先し、一門不在の補充範囲だけ役職別に保つ。
+     * 同時戦死・捕虜処遇の予定者は所属状態に関係なく全候補経路から除外する。
+     */
+    _collectSuccessionCandidates(incumbent, role, excludedSuccessionCandidateIds = [], legion = null) {
+        const isCommander = role === 'commander';
+        const excludedIds = new Set((Array.isArray(excludedSuccessionCandidateIds)
+            ? excludedSuccessionCandidateIds : []).map(Number));
+        const seatedCommanderIds = isCommander
+            ? new Set((this.game.legions || []).map(l => Number(l.commanderId || 0)).filter(id => id > 0))
+            : new Set();
+        const eligible = b => b && Number(b.id) !== Number(incumbent.id)
+            && !excludedIds.has(Number(b.id))
+            && (!isCommander || (!b.isDaimyo && !seatedCommanderIds.has(Number(b.id))));
+        const isFamily = b => (incumbent.familyIds || []).some(fId => (b.familyIds || []).includes(fId));
+        const activeBushos = this.game.getClanBushos(incumbent.clan).filter(b =>
+            eligible(b) && window.BushoStatusRules.isActive(b) && !b.isDaimyo);
+        const activeFamily = activeBushos.filter(isFamily);
+        const unbornFamily = this.game.bushos.filter(b => eligible(b)
+            && window.LifeStatusRules.isUnborn(b) && !b.isNotBorn
+            && (Number(b.clan) === Number(incumbent.clan) || Number(b.clan) === 0)
+            && isFamily(b) && Number(b.birthYear) <= Number(this.game.year));
+
+        let externalFamily = [];
+        if (Number(incumbent.clan) !== Number(this.game.playerClanId)) {
+            externalFamily = this.game.bushos.filter(b => {
+                if (!eligible(b) || !isFamily(b)) return false;
+                if (window.BushoStatusRules.isRonin(b)) return true;
+                if (Number(b.belongKunishuId || 0) <= 0 || Number(b.clan) !== 0) return false;
+                const kunishu = this.game.kunishuSystem?.getKunishu(b.belongKunishuId);
+                return !(kunishu && Number(kunishu.leaderId) === Number(b.id));
+            });
+        }
+
+        const familyCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
+        if (familyCandidates.length) return familyCandidates;
+        if (!isCommander) return activeBushos;
+        // 国主のみ、一門不在なら同じ軍団の現役家臣から選出する。
+        return activeBushos.filter(b => Number(this.game.getCastle(b.castleId)?.legionId || 0)
+            === Number(legion?.legionNo));
+    }
+
+    /** 役職共通の比較基準と、大名家督だけの年齢優先基準を一箇所で扱う。 */
+    _sortSuccessionCandidates(incumbent, candidates, role) {
+        const metrics = new Map(candidates.map(b => [Number(b.id), {
+            isRelative: (incumbent.familyIds || []).some(fId => (b.familyIds || []).includes(fId)),
+            affinityDiff: Math.abs((incumbent.affinity || 0) - (b.affinity || 0)),
+            baseScore: b.leadership + b.intelligence,
+            isDirectSon: (b.realFatherId === incumbent.id || b.adoptiveFatherId === incumbent.id)
+        }]));
+        candidates.sort((a, b) => {
+            const am = metrics.get(Number(a.id));
+            const bm = metrics.get(Number(b.id));
+            if (a.isRetired && !b.isRetired) return 1;
+            if (!a.isRetired && b.isRetired) return -1;
+            if (am.isRelative && !bm.isRelative) return -1;
+            if (!am.isRelative && bm.isRelative) return 1;
+            if (am.isRelative && bm.isRelative) {
+                if (am.affinityDiff !== bm.affinityDiff) return am.affinityDiff - bm.affinityDiff;
+                if (am.isDirectSon && !bm.isDirectSon) return -1;
+                if (!am.isDirectSon && bm.isDirectSon) return 1;
+                if (role === 'daimyo') {
+                    const aIsYounger = a.birthYear > incumbent.birthYear;
+                    const bIsYounger = b.birthYear > incumbent.birthYear;
+                    if (aIsYounger && !bIsYounger) return -1;
+                    if (!aIsYounger && bIsYounger) return 1;
+                    if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
+                }
+            }
+            return bm.baseScore - am.baseScore;
+        });
+        return candidates;
+    }
+
     // 大名が亡くなった時の後継ぎ選びです
-    async handleDaimyoDeath(daimyo, excludedSuccessionCandidateIds = []) {
+    async handleDaimyoDeath(daimyo, excludedSuccessionCandidateIds = [], options = {}) {
         // ==========================================
         // ★すでにすべてのお城を失って「滅亡」している場合は、後継ぎは選びません！
         const clanCastles = this.game.getClanCastles(daimyo.clan);
@@ -1204,94 +1315,11 @@ class LifeSystem {
 
         const messages = []; // ★順番に出すメッセージを溜めておくリストを作ります
 
-        // 今のゲームの年を時計で確認します
-        const currentYear = this.game.year;
-
-        // 1. 今活躍している家臣たちを集めます！
-        // 合戦中に捕縛された家臣は、処遇確定前に死亡当主の後継者へ任命しない。
-        // WarManager が当該捕虜だけを渡す。捕虜状態の第二正本を LifeSystem へ増設しない。
-        const excludedSuccessionIds = new Set((Array.isArray(excludedSuccessionCandidateIds)
-            ? excludedSuccessionCandidateIds : []).map(Number));
-        const activeBushos = this.game.getClanBushos(daimyo.clan).filter(b =>
-            b.id !== daimyo.id && window.BushoStatusRules.isActive(b) && !b.isDaimyo
-            && !excludedSuccessionIds.has(Number(b.id)));
-        
-        // その中で「一門」の武将だけを抽出します！
-        const activeFamily = activeBushos.filter(b => daimyo.familyIds.some(fId => b.familyIds.includes(fId)));
-
-        // まだ登場していない一門（※他勢力所属予定の武将を弾くため、自勢力予定か無所属に限定します）
-        const unbornFamily = this.game.bushos.filter(b => window.LifeStatusRules.isUnborn(b) && !b.isNotBorn && (b.clan === daimyo.clan || b.clan === 0) && daimyo.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
-
-        // ★追加：AI大名の場合のみ、浪人や諸勢力に所属している一門武将も探します！
-        let externalFamily = [];
-        if (Number(daimyo.clan) !== Number(this.game.playerClanId)) {
-            externalFamily = this.game.bushos.filter(b => {
-                // 自分自身は除外します
-                if (b.id === daimyo.id) return false;
-                // 一門ではない武将も除外します
-                if (!daimyo.familyIds.some(fId => b.familyIds.includes(fId))) return false;
-                
-                // 浪人なら候補に入れます
-                if (window.BushoStatusRules.isRonin(b)) return true;
-                
-                // 諸勢力に所属している武将の場合
-                if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
-                    // 諸勢力のデータを調べて、その武将が頭領かどうかを確認します
-                    const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
-                    // 頭領だった場合は、候補から外します
-                    if (kunishu && kunishu.leaderId === b.id) {
-                        return false; 
-                    }
-                    // 頭領ではない普通の武将なら候補に入れます
-                    return true;
-                }
-                return false;
-            });
-        }
-
-        // まずは一門だけで候補リストを作ります
-        let allCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
-
-        // もし一門の候補が誰もいなければ、特例として「今活躍している家臣全員」を候補にします！
-        if (allCandidates.length === 0) {
-            allCandidates = [...activeBushos];
-        }
+        const allCandidates = this._sortSuccessionCandidates(daimyo,
+            this._collectSuccessionCandidates(daimyo, 'daimyo', excludedSuccessionCandidateIds), 'daimyo');
 
         if (allCandidates.length > 0) {
             let successor = null;
-
-            // 相続比較用の値は武将モデルへ一時プロパティとして書き込まず、この処理内だけで保持します。
-            const successionMetrics = new Map(allCandidates.map(b => [Number(b.id), {
-                isRelative: daimyo.familyIds.some(fId => b.familyIds.includes(fId)),
-                affinityDiff: Math.abs((daimyo.affinity || 0) - (b.affinity || 0)),
-                baseScore: b.leadership + b.intelligence,
-                isDirectSon: (b.realFatherId === daimyo.id || b.adoptiveFatherId === daimyo.id)
-            }]));
-
-            allCandidates.sort((a, b) => {
-                const am = successionMetrics.get(Number(a.id));
-                const bm = successionMetrics.get(Number(b.id));
-                // ★追加：隠居している武将は優先度を一番低く（後回しに）します！
-                if (a.isRetired && !b.isRetired) return 1;
-                if (!a.isRetired && b.isRetired) return -1;
-
-                // 一門（親戚）を優先します
-                if (am.isRelative && !bm.isRelative) return -1;
-                if (!am.isRelative && bm.isRelative) return 1;
-                
-                if (am.isRelative && bm.isRelative) {
-                    if (am.affinityDiff !== bm.affinityDiff) return am.affinityDiff - bm.affinityDiff;
-                    if (am.isDirectSon && !bm.isDirectSon) return -1;
-                    if (!am.isDirectSon && bm.isDirectSon) return 1;
-
-                    const aIsYounger = a.birthYear > daimyo.birthYear;
-                    const bIsYounger = b.birthYear > daimyo.birthYear;
-                    if (aIsYounger && !bIsYounger) return -1;
-                    if (!aIsYounger && bIsYounger) return 1;
-                    if (a.birthYear !== b.birthYear) return a.birthYear - b.birthYear;
-                }
-                return bm.baseScore - am.baseScore;
-            });
 
             // ★ここから変更：プレイヤーの家なら自分で選ぶ魔法を復活させます！
             // 念のため、文字と数字の違いで誤判定（勝手にAIが決めてしまうバグ）が起きないように Number() で包んで比較します
@@ -1341,7 +1369,7 @@ class LifeSystem {
             const originalClanName = clan ? clan.name : ""; // ★元の家名をメモしておきます
             
             // ★一元化した引き継ぎセットアップ魔法にお任せします（死亡による交代なので、生前退位のフラグは false にします）
-            this.setupNewDaimyo(daimyo, successor, messages, false);
+            this.setupNewDaimyo(daimyo, successor, messages, false, options);
             // ==========================================
             
             // ★メモしておいた家名を使って「〇〇家の」という言葉を作ります
@@ -1376,80 +1404,20 @@ class LifeSystem {
     }
     
     // ★国主が亡くなった時の後任選びです
-    async handleCommanderDeath(commander) {
+    async handleCommanderDeath(commander, excludedSuccessionCandidateIds = [], options = {}) {
         const legion = this._findCommanderLegion(commander);
         if (!legion) {
             commander.isCommander = false;
             return; 
         }
 
-        const messages = []; 
-        const currentYear = this.game.year;
-        
-        // 現役国主かどうかは武将の補助フラグではなく全軍団の commanderId で判断する。
-        // 他の席を持つ武将を後任に選ぶと、一人が二軍団を指揮する矛盾が生じる。
-        const seatedCommanderIds = new Set((this.game.legions || [])
-            .map(l => Number(l.commanderId || 0)).filter(id => id > 0));
-        const activeBushos = this.game.getClanBushos(commander.clan).filter(b =>
-            b.id !== commander.id && window.BushoStatusRules.isActive(b)
-            && !b.isDaimyo && !seatedCommanderIds.has(Number(b.id)));
-        
-        // その中で国主の「一門」の武将だけを抽出します！
-        const activeFamily = activeBushos.filter(b => commander.familyIds.some(fId => b.familyIds.includes(fId)));
-
-        // まだ登場していない一門（※他勢力所属予定の武将を弾くため、自勢力予定か無所属に限定します）
-        const unbornFamily = this.game.bushos.filter(b => window.LifeStatusRules.isUnborn(b) && !b.isNotBorn && (b.clan === commander.clan || b.clan === 0) && !seatedCommanderIds.has(Number(b.id)) && commander.familyIds.some(fId => b.familyIds.includes(fId)) && b.birthYear <= currentYear);
-
-        // ★追加：AI国主の場合のみ、浪人や諸勢力に所属している一門武将も探します！
-        let externalFamily = [];
-        if (Number(commander.clan) !== Number(this.game.playerClanId)) {
-            externalFamily = this.game.bushos.filter(b => {
-                if (b.id === commander.id || b.isDaimyo || seatedCommanderIds.has(Number(b.id))) return false;
-                if (!commander.familyIds.some(fId => b.familyIds.includes(fId))) return false;
-                if (window.BushoStatusRules.isRonin(b)) return true;
-                if ((b.belongKunishuId || 0) > 0 && b.clan === 0) {
-                    const kunishu = this.game.kunishuSystem ? this.game.kunishuSystem.getKunishu(b.belongKunishuId) : null;
-                    if (kunishu && kunishu.leaderId === b.id) return false; 
-                    return true;
-                }
-                return false;
-            });
-        }
-
-        // まずは一門だけで候補リストを作ります
-        let allCandidates = [...activeFamily, ...unbornFamily, ...externalFamily];
-
-        // もし一門の候補が誰もいなければ、特例として「同じ軍団で活躍している家臣」を候補にします！
-        if (allCandidates.length === 0) {
-            allCandidates = activeBushos.filter(b => Number(this.game.getCastle(b.castleId)?.legionId || 0) === Number(legion.legionNo));
-        }
+        const messages = [];
+        const allCandidates = this._sortSuccessionCandidates(commander,
+            this._collectSuccessionCandidates(commander, 'commander', excludedSuccessionCandidateIds, legion),
+            'commander');
 
         if (allCandidates.length > 0) {
             let successor = null;
-
-            // 国主継承の比較値も武将本体へ残さず、ローカルな比較データとして扱います。
-            const successionMetrics = new Map(allCandidates.map(b => [Number(b.id), {
-                isRelative: commander.familyIds.some(fId => b.familyIds.includes(fId)),
-                affinityDiff: Math.abs((commander.affinity || 0) - (b.affinity || 0)),
-                baseScore: b.leadership + b.intelligence,
-                isDirectSon: (b.realFatherId === commander.id || b.adoptiveFatherId === commander.id)
-            }]));
-
-            allCandidates.sort((a, b) => {
-                const am = successionMetrics.get(Number(a.id));
-                const bm = successionMetrics.get(Number(b.id));
-                if (a.isRetired && !b.isRetired) return 1;
-                if (!a.isRetired && b.isRetired) return -1;
-
-                if (am.isRelative && !bm.isRelative) return -1;
-                if (!am.isRelative && bm.isRelative) return 1;
-                if (am.isRelative && bm.isRelative) {
-                    if (am.affinityDiff !== bm.affinityDiff) return am.affinityDiff - bm.affinityDiff;
-                    if (am.isDirectSon && !bm.isDirectSon) return -1;
-                    if (!am.isDirectSon && bm.isDirectSon) return 1;
-                }
-                return bm.baseScore - am.baseScore;
-            });
 
             // ★並び替えて一番上に来た人を、自動で後任の国主にします！
             successor = allCandidates[0];
@@ -1474,26 +1442,7 @@ class LifeSystem {
 
             // 選ばれた後任者を、死亡した国主がいた城に移動させます
             const baseCastle = this.game.getCastle(commander.castleId);
-            if (baseCastle) {
-                // 別城の在職家臣は旧城の在城履歴を区切る。浪人・諸勢力・未登場者を
-                // 外部から迎える場合は旧所属の期間を推定せず、着任月だけ確定する。
-                const isCastleTransfer = Number(successor.castleId) !== Number(baseCastle.id);
-                const shouldRecordFormerCastle = Number(successor.castleId) > 0
-                    && Number(successor.clan) === Number(commander.clan)
-                    && window.BushoStatusRules.isActive(successor);
-                if (window.BushoStatusRules.isRonin(successor) || window.BushoStatusRules.isActive(successor)) {
-                    this.game.affiliationSystem.leaveCastle(successor);
-                }
-
-                this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
-                this.game.affiliationSystem.transferClanRaw(successor, commander.clan, { syncSpouses: true });
-                this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id, {
-                    recordStayHistory: isCastleTransfer,
-                    stayHistoryFromCastleId: shouldRecordFormerCastle ? undefined : 0
-                });
-                successor.loyalty = 100;
-                if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
-            }
+            this._placeSuccessionSuccessor(successor, commander.clan, baseCastle, options);
 
             // 国主の役職を引き継ぎます
             commander.isCommander = false;
@@ -1501,16 +1450,9 @@ class LifeSystem {
             if (successor.isGunshi) this.game.affiliationSystem.clearGunshiRole(successor);
             legion.commanderId = successor.id;
             
-            // 国主になったら城主にします
-            successor.isCastellan = true;
+            // 国主はその在城拠点の城主とする。実際のIDと表示フラグは所属正本で同期する。
             const targetCastle = this.game.getCastle(successor.castleId);
-            if (targetCastle) {
-                const oldCastellan = this.game.getBusho(targetCastle.castellanId);
-                if (oldCastellan && Number(oldCastellan.id) !== Number(successor.id)) {
-                    oldCastellan.isCastellan = false;
-                }
-                targetCastle.castellanId = successor.id;
-            }
+            if (targetCastle) this.game.affiliationSystem.setCastellanRaw(targetCastle, successor);
 
             const clan = this.game.getClan(commander.clan);
             const clanPrefix = clan ? `${clan.name}の` : "";
@@ -1665,7 +1607,7 @@ class LifeSystem {
     // ==========================================
     // ★新旧の大名が交代する時の「引き継ぎ作業」をひとまとめにした魔法です！
     // ==========================================
-    setupNewDaimyo(oldDaimyo, successor, messages, isAliveSuccession = false) {
+    setupNewDaimyo(oldDaimyo, successor, messages, isAliveSuccession = false, options = {}) {
         // 1. 生前退位（家督相続コマンドやイベント）の時だけの特別な処理です
         if (isAliveSuccession) {
             // 功績の譲渡
@@ -1693,43 +1635,15 @@ class LifeSystem {
             oldDaimyo.isDaimyo = false;
             oldDaimyo.isRetired = true;
         }
-        if (baseCastle) {
-            // 生前譲位・死亡継承とも、実際に別城へ着任すれば着任月を更新する。
-            // 在職家臣の転任は旧城の滞在歴を記録するが、浪人・諸勢力・未登場者を
-            // 外部から迎える場合は旧所属の期間を推定せず、移動元0として着任月だけ確定する。
-            const isCastleTransfer = Number(successor.castleId) !== Number(baseCastle.id);
-            const shouldRecordFormerCastle = Number(successor.castleId) > 0
-                && Number(successor.clan) === Number(oldDaimyo.clan)
-                && window.BushoStatusRules.isActive(successor);
-            if (window.BushoStatusRules.isRonin(successor) || window.BushoStatusRules.isActive(successor)) {
-                this.game.affiliationSystem.leaveCastle(successor);
-            }
-            this.game.affiliationSystem.setActivityStatusRaw(successor, window.GameConstants.BushoStatus.ACTIVE);
-            this.game.affiliationSystem.transferClanRaw(successor, oldDaimyo.clan, { syncSpouses: true });
-            this.game.affiliationSystem.setCastleIdRaw(successor, baseCastle.id, {
-                recordStayHistory: isCastleTransfer,
-                stayHistoryFromCastleId: shouldRecordFormerCastle ? undefined : 0
-            });
-            successor.loyalty = 100;
-            if (!baseCastle.samuraiIds.includes(successor.id)) {
-                baseCastle.samuraiIds.push(successor.id);
-            }
-        }
+        this._placeSuccessionSuccessor(successor, oldDaimyo.clan, baseCastle, options);
 
         // 4. 新しい大名を任命し、城主のバッジもつけます
         successor.isDaimyo = true;
-        successor.isCastellan = true;
         if (successor.isGunshi) {
             this.game.affiliationSystem.clearGunshiRole(successor);
         }
 
-        if (baseCastle) {
-            const oldCastellan = this.game.getBusho(baseCastle.castellanId);
-            if (oldCastellan && Number(oldCastellan.id) !== Number(successor.id)) {
-                oldCastellan.isCastellan = false;
-            }
-            baseCastle.castellanId = successor.id;
-        }
+        if (baseCastle) this.game.affiliationSystem.setCastellanRaw(baseCastle, successor);
 
         // 5. 大名就任時の改名と顔変更を行います
         this.applyDaimyoNameAndFaceChange(successor, messages);
@@ -1748,10 +1662,12 @@ class LifeSystem {
         }
 
         // 7. システム上のリーダー情報を書き換えます
-        this.game.changeLeader(oldDaimyo.clan, successor.id);
+        this.game.changeLeader(oldDaimyo.clan, successor.id, {
+            deferCastleLordUpdate: options.deferCastleLordUpdate === true
+        });
 
-        // 城主が入れ替わったことをシステムに報告します
-        if (baseCastle && this.game.affiliationSystem) {
+        // 史実の同時戦死処理中は、他の死亡予定者を仮城主へ選ばない。
+        if (baseCastle && this.game.affiliationSystem && !options.deferCastleLordUpdate) {
             this.game.affiliationSystem.updateCastleLord(baseCastle);
         }
 
@@ -1904,7 +1820,7 @@ class LifeSystem {
             // 城主や大名がまだ城に残っている判定になっていれば、お城を空っぽにします
             clanCastles.forEach(c => {
                 this.game.castleManager.changeOwner(c, 0);
-                c.castellanId = 0;
+                this.game.affiliationSystem.setCastellanRaw(c, null);
                 this.game.getCastleBushos(c.id).forEach(l => {
                     if (window.LifeStatusRules.isUnavailable(l)) return;
                     // 後継者不在で処分するのは滅亡した大名家の通常武将だけ。
