@@ -1950,16 +1950,7 @@ Object.assign(WarManager.prototype, {
                     const kunishuName = kunishu && typeof kunishu.getName === 'function' ? kunishu.getName(this.game) : s.defender.name;
                     const atkHistoryClan = this.getHistoryClanName(s.attacker.ownerClan, atkDaimyoName);
                     this.recordWarHistory(`【諸勢力壊滅】${kunishuName}は${atkHistoryClan}に制圧され、壊滅しました。`, this.getWarHistoryClanIds(s));
-                    if (kunishu) {
-                        kunishu.isDestroyed = true;
-                        kunishu.soldiers = 0;
-                        const members = this.game.kunishuSystem.getKunishuMembers(kunishu.id);
-                        members.forEach(b => {
-                            b.belongKunishuId = 0; // 諸勢力の所属を外します
-                            // ★ここを書き換え！関所を通らずに勝手に浪人になる古い魔法を消して、お引越しセンターにお願いします！
-                            this.game.affiliationSystem.becomeRonin(b);
-                        });
-                    }
+                    if (kunishu) this.game.kunishuSystem.disbandDestroyedKunishu(kunishu);
                 } else {
                     resultMsg = `${atkDaimyoName}の${leaderName}は、${s.defender.name}の鎮圧に失敗しました……`;
                     this.game.ui.log(`【諸勢力制圧】${atkDaimyoName}の${leaderName}は、${s.defender.name}の鎮圧に失敗しました……`, { history: false });
@@ -2059,6 +2050,7 @@ Object.assign(WarManager.prototype, {
                     // 蜂起による同一処理内の退避は、逃亡先が分かれても途中では
                     // 城主を選出しない。すべての移動を終えてから最終状態で確定する。
                     const retreatDestinationIds = new Set();
+                    let changedToRonin = false;
                     this.game.getCastleBushos(targetC.id).forEach(b => {
                         // 蜂起で退避・浪人化するのは、陥落前の城主家に所属する通常武将だけ。
                         // 同居する別の諸勢力・浪人・他家武将は、その勢力とは無関係なので巻き込まない。
@@ -2070,7 +2062,12 @@ Object.assign(WarManager.prototype, {
                             retreatDestinationIds.add(escapeCastle.id);
                             this.handleDaimyoEscape(b, escapeCastle);
                         } else {
-                            this.game.affiliationSystem.becomeRonin(b);
+                            // 最終拠点喪失時は複数名が一斉に浪人化する。
+                            // 各人の城主・派閥・画面更新を保留し、最後に一度だけ確定する。
+                            this.game.affiliationSystem.becomeRonin(b, 'desertion', {
+                                deferCastleLordUpdate: true, deferFactionUpdate: true, deferUI: true
+                            });
+                            changedToRonin = true;
                         }
                     });
                     
@@ -2078,7 +2075,9 @@ Object.assign(WarManager.prototype, {
                         const destination = this.game.getCastle(id);
                         if (destination) this.game.affiliationSystem.updateCastleLord(destination);
                     });
-                    if (retreatDestinationIds.size > 0) this.game.affiliationSystem.updateUI();
+                    if (changedToRonin && Number(oldOwner) > 0 && this.game.factionSystem) {
+                        this.game.factionSystem.updateFactions(oldOwner);
+                    }
 
                     // 所属変更APIが旧城主家の武将を名簿から外すので、同居する無関係な人物はそのまま残す。
                     targetC.samuraiIds = targetC.samuraiIds.filter(id => {
@@ -2089,6 +2088,11 @@ Object.assign(WarManager.prototype, {
                             window.BushoStatusRules.isRonin(busho) ||
                             kunishuMembers.includes(id);
                     });
+                    
+                    // 退避先と占領元の最終在城名簿が確定してから描画する。
+                    if (retreatDestinationIds.size > 0 || changedToRonin) {
+                        this.game.affiliationSystem.updateUI();
+                    }
                     
                     resultMsg = `諸勢力の反乱により、${targetC.name}が陥落し空白地となりました。`;
                     this.game.ui.log(`【諸勢力蜂起】諸勢力の反乱により、${targetC.name}が陥落し空白地となりました。`, { history: false });

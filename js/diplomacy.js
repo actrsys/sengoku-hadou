@@ -2714,17 +2714,19 @@ class DiplomacyManager {
         // 旧城・移動先の最終城主と在城履歴は AffiliationSystem が一度だけ整合させる。
         this.game.affiliationSystem.moveCastleGroup(bushosInA, castleB.id);
 
-        // ★追加：合流先の訓練と士気を割合に応じて再計算します！
-        const totalSoldiers = castleB.soldiers + castleA.soldiers;
-        if (totalSoldiers > 0) {
-            castleB.training = GameMath.weightedAverageFloor(castleB.training || 0, castleB.soldiers, castleA.training || 0, castleA.soldiers);
-            castleB.morale = GameMath.weightedAverageFloor(castleB.morale || 0, castleB.soldiers, castleA.morale || 0, castleA.soldiers);
+        // 割譲時の兵士受入も、実際に収容できた人数だけを士気・訓練度へ反映する。
+        // 上限超過で失われる兵士を重みに含めない（計算式はGameMathが正本）。
+        const acceptedSoldiers = Math.min(castleA.soldiers,
+            Math.max(0, GameConfig.Limits.CastleStock - castleB.soldiers));
+        if (acceptedSoldiers > 0) {
+            castleB.training = GameMath.weightedAverageFloor(castleB.training || 0, castleB.soldiers, castleA.training || 0, acceptedSoldiers);
+            castleB.morale = GameMath.weightedAverageFloor(castleB.morale || 0, castleB.soldiers, castleA.morale || 0, acceptedSoldiers);
         }
 
         // ★追加：物資（金・兵糧・兵士・馬・鉄砲）を全て引越し先のお城に運びます！
         castleB.gold = Math.min(GameConfig.Limits.CastleStock, castleB.gold + castleA.gold);
         castleB.rice = Math.min(GameConfig.Limits.CastleStock, castleB.rice + castleA.rice);
-        castleB.soldiers = Math.min(GameConfig.Limits.CastleStock, castleB.soldiers + castleA.soldiers);
+        castleB.soldiers += acceptedSoldiers;
         castleB.horses = Math.min(GameConfig.Limits.CastleStock, (castleB.horses || 0) + (castleA.horses || 0));
         castleB.guns = Math.min(GameConfig.Limits.CastleStock, (castleB.guns || 0) + (castleA.guns || 0));
 

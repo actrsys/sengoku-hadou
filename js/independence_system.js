@@ -1273,11 +1273,6 @@ class IndependenceSystem {
                         roninBushos.push(b);
                     }
                 });
-                displacedCastleIds.forEach(id => {
-                    const affectedCastle = this.game.getCastle(id);
-                    if (affectedCastle) this.game.updateCastleLord(affectedCastle);
-                });
-
                 // ★追加：主家や逃げた武将の「一門」で、まだ登場していない子どもたちを処理します！
                 const unbornFamily = this.game.bushos.filter(b => {
                     if (!window.LifeStatusRules.isUnborn(b)) return false; // まだ登場していない人だけを探します
@@ -1303,12 +1298,21 @@ class IndependenceSystem {
                         b.isCastellan = false;
                         b.isDaimyo = false;
                         // お引越しセンターの魔法で、安全に逃亡先の城に入れます
-                        this.game.affiliationSystem.enterCastle(b, escapeCastleId);
+                        this.game.affiliationSystem.enterCastle(b, escapeCastleId, {
+                            deferCastleLordUpdate: true
+                        });
                         
                         // フルネームから「|」を消して綺麗なお名前にします
                         const cleanName = b.name.replace('|', '');
                         this._logIndependence(`【逃亡】${cleanName}は一門の危機に元服を早め、行動を共にしました。`, [oldClanId]);
                     }
+                });
+
+                // 敗残者・急遽元服した一門の配置がすべて確定してから、
+                // 同一の拠点を一度だけ再選出する。移動・在城名簿は所属Systemが正本。
+                displacedCastleIds.forEach(id => {
+                    const affectedCastle = this.game.getCastle(id);
+                    if (affectedCastle) this.game.updateCastleLord(affectedCastle);
                 });
 
                 // ★安全装置：反乱リーダーが新しい大名になるため、軍団長バッジや派閥などの過去の役職を綺麗にリセットします！

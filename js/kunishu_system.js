@@ -751,6 +751,40 @@ class KunishuSystem {
         // ★修正ここまで
     }
 
+    /**
+     * 諸勢力壊滅の確定窓口。鎮圧戦と兵力0の月末処理が共用する。
+     * 壊滅判定は呼出元が担当し、所属・在城・自動頭領の消滅は AffiliationSystem へ委譲する。
+     * 城主選考と表示は全員の処遇が終わった後だけ確定する。
+     */
+    disbandDestroyedKunishu(kunishu) {
+        if (!kunishu) return;
+        const members = this.getKunishuMembers(kunishu.id);
+        kunishu.isDestroyed = true;
+        kunishu.soldiers = 0;
+        if (members.length === 0) return;
+
+        const affectedCastleIds = new Set();
+        const affectedClanIds = new Set();
+        for (const busho of members) {
+            const fromCastleId = Number(busho.castleId) || 0;
+            const fromClanId = Number(busho.clan) || 0;
+            if (fromCastleId > 0) affectedCastleIds.add(fromCastleId);
+            if (fromClanId > 0) affectedClanIds.add(fromClanId);
+            // 自動生成頭領は既存の所属Systemが死亡・名簿除籍まで担当する。
+            this.game.affiliationSystem.becomeRonin(busho, 'desertion', {
+                deferCastleLordUpdate: true, deferFactionUpdate: true, deferUI: true
+            });
+            const toCastleId = Number(busho.castleId) || 0;
+            if (toCastleId > 0) affectedCastleIds.add(toCastleId);
+        }
+        affectedCastleIds.forEach(id => {
+            const castle = this.game.getCastle(id);
+            if (castle) this.game.affiliationSystem.updateCastleLord(castle);
+        });
+        if (this.game.factionSystem) affectedClanIds.forEach(id => this.game.factionSystem.updateFactions(id));
+        this.game.affiliationSystem.updateUI();
+    }
+
     // 壊滅と継承のチェック（★変更：async を付けます）
     async checkDestroyed(kunishu) {
         const isCurrentFlow = this._captureKunishuFlow();
@@ -777,28 +811,7 @@ class KunishuSystem {
 
         // 兵力が0になったら壊滅します
         if (kunishu.soldiers <= 0) {
-            kunishu.isDestroyed = true;
-            kunishu.soldiers = 0;
-            
-            // 残った武将（今いるメンバーのみ）の行き先を決めます
-            members.forEach(b => {
-                b.belongKunishuId = 0; // 諸勢力から外れます
-
-                // ★ここを書き換え！：名前ではなく「秘密のシール」が貼ってあるか調べます
-                if (b.isAutoLeader) {
-                    // 自動で作られた頭領なら「死亡（消滅）」の印をつけます
-                    this.game.lifeSystem.setLifeStatusRaw(b, window.GameConstants.BushoStatus.DEAD);
-                    
-                    // お城の名簿からも、この頭領の名前を消しゴムで消しておきます
-                    const castle = this.game.getCastle(b.castleId);
-                    if (castle) {
-                        castle.samuraiIds = castle.samuraiIds.filter(id => id !== b.id);
-                    }
-                } else {
-                    // 頭領以外の普通の武将は、今まで通り浪人になります
-                    this.game.affiliationSystem.becomeRonin(b);
-                }
-            });
+            this.disbandDestroyedKunishu(kunishu);
             const destroyedCastle = this.game.getCastle(kunishu.castleId);
             const destroyedName = kunishu.getName(this.game);
             this.game.ui.log(`【諸勢力壊滅】${destroyedName}${destroyedCastle ? `（${destroyedCastle.name}）` : ''}は壊滅しました。`, {

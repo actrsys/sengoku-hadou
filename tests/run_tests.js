@@ -28263,6 +28263,70 @@ test('r624 城割譲で他城へ退避した家臣の在城履歴を更新する
 });
 
 
+// A-140: 外交条件による拠点割譲は実ゲームで資源・兵が一括退避する。
+// 退避先が収容上限近くにある場合、実際に収容した兵数だけを士気・訓練度へ加重する。
+test('A-140 拠点割譲の士気・訓練度は収容できた兵数だけで加重平均する', () => {
+    const ctx = createContext({
+        BushoStatusRules: { isActive: b => b?.status === 'active' },
+        LifeStatusRules: { isPresent: b => b?.status === 'active' }
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    const Affiliation = vm.runInContext('AffiliationSystem', ctx);
+    const Diplomacy = vm.runInContext('DiplomacyManager', ctx);
+
+    const runCession = (destinationSoldiers, incomingSoldiers) => {
+        const source = { id: 1, name: '割譲元', ownerClan: 2, legionId: 0,
+            castellanId: 11, samuraiIds: [11], soldiers: incomingSoldiers,
+            training: 10, morale: 20, gold: 200, rice: 300, horses: 0, guns: 0,
+            defense: 250, maxDefense: 500, peoplesLoyalty: 80 };
+        const destination = { id: 2, name: '退避先', ownerClan: 2, legionId: 0,
+            castellanId: 10, samuraiIds: [10], soldiers: destinationSoldiers,
+            training: 90, morale: 80, gold: 200, rice: 300, horses: 0, guns: 0,
+            defense: 250, maxDefense: 500, peoplesLoyalty: 80 };
+        const daimyo = { id: 10, clan: 2, castleId: 2, status: 'active',
+            isDaimyo: true, isCastellan: true, isCommander: false, isGunshi: false };
+        const officer = { id: 11, clan: 2, castleId: 1, status: 'active',
+            isDaimyo: false, isCastellan: true, isCommander: false, isGunshi: false,
+            achievementTotal: 0, loyalty: 90, leadership: 80, strength: 80, intelligence: 80 };
+        const people = [daimyo, officer], castles = [source, destination];
+        const game = { year: 1570, month: 7, playerClanId: 9,
+            bushos: people, castles, legions: [],
+            getCastle: id => castles.find(c => c.id === Number(id)) || null,
+            getBusho: id => people.find(b => b.id === Number(id)) || null,
+            getClanCastles: id => castles.filter(c => c.ownerClan === Number(id)),
+            getClanDaimyo: id => Number(id) === 2 ? daimyo : null,
+            getCastleBushos: id => (castles.find(c => c.id === Number(id))?.samuraiIds || [])
+                .map(id => people.find(b => b.id === id)).filter(Boolean),
+            getClan: id => ({ id, name: id === 2 ? '旧領主家' : '割譲先家' }),
+            castleManager: { changeOwner(c, id) { c.ownerClan = id; } },
+            historySystem: { record() {} }, factionSystem: { handleMove() {} }
+        };
+        game.affiliationSystem = new Affiliation(game);
+        game.affiliationSystem.updateUI = () => {};
+        const diplomacy = new Diplomacy(game);
+        diplomacy.applyCastleCessionData(1, 2, 3);
+        assert.strictEqual(officer.castleId, 2, '割譲元の武将は退避先へ転任する');
+        assert.strictEqual(source.ownerClan, 3, '割譲元の所有者は新しい勢力となる');
+        return destination;
+    };
+    // 受入枠が1人だけなら士気・訓練度への寄与も1人分。
+    const capped = runCession(99998, 30000);
+    assert.strictEqual(capped.soldiers, GameConfig.Limits.CastleStock);
+    assert.strictEqual(capped.training, GameMath.weightedAverageFloor(90, 99998, 10, 1));
+    assert.strictEqual(capped.morale, GameMath.weightedAverageFloor(80, 99998, 20, 1));
+    // 上限未満の通常割譲では全員受け入れ、既存の加重平均式を維持する。
+    const normal = runCession(2000, 3000);
+    assert.strictEqual(normal.soldiers, 5000);
+    assert.strictEqual(normal.training, GameMath.weightedAverageFloor(90, 2000, 10, 3000));
+    assert.strictEqual(normal.morale, GameMath.weightedAverageFloor(80, 2000, 20, 3000));
+    // 受入枠が無い場合、退避先の既存の士気・訓練度を変更しない。
+    const full = runCession(99999, 3000);
+    assert.strictEqual(full.soldiers, 99999);
+    assert.strictEqual(full.training, 90);
+    assert.strictEqual(full.morale, 80);
+});
+
 // r625: 戦後の捕虜解放は「移動元=0」で在城履歴を区切る。
 // 0は実在する城IDではないため、複数の捕虜が同じ架空城で長期間同居したと記録してはならない。
 test('r625 捕虜解放時の移動元0は架空城の在城履歴を作らない', () => {
@@ -35259,6 +35323,13 @@ test('r779 謀反勝利後に旧主家と無関係な予定所属の未登場一
         castleManager: { setOwnerIdRaw(c, clan) { c.ownerClan = clan; }, disbandLegion() {} }
     };
     game.affiliationSystem = new Aff(game);
+    // A-138: 敗残者の一括逃亡では、急遽元服した一門の入城中にも仮城主を選ばない。
+    const castleLordUpdates = [];
+    const originalUpdateCastleLord = game.affiliationSystem.updateCastleLord.bind(game.affiliationSystem);
+    game.affiliationSystem.updateCastleLord = castle => {
+        castleLordUpdates.push(Number(castle.id));
+        return originalUpdateCastleLord(castle);
+    };
     game.affiliationSystem.updateUI = () => {};
     game.updateCastleLord = c => game.affiliationSystem.updateCastleLord(c);
     const independence = new Indep(game);
@@ -35267,6 +35338,8 @@ test('r779 謀反勝利後に旧主家と無関係な予定所属の未登場一
     assert.strictEqual(ownFuture.clan, 0, '元主家所属の生まれている未登場一門は逃亡とともに早期元服できる');
     assert.strictEqual(ownFuture.status, 'ronin', 'シナリオ開始時に未誕生でも現在年までに生まれた早期元服者は浪人として活動する');
     assert.strictEqual(ownFuture.castleId, 21, '早期元服者は確定した逃亡先に合流する');
+    assert.strictEqual(castleLordUpdates.filter(id => id === 21).length, 1,
+        '一括逃亡では早期元服者の入城が終わってから退避先を一度だけ確定する');
     assert.strictEqual(otherFuture.clan, 3, '他家の未登場一門の予定所属は変更されない');
     assert.strictEqual(otherFuture.status, 'unborn', '他家の未登場一門を早期元服させない');
     assert.strictEqual(otherFuture.castleId, 31, '他家の登場予定拠点を勝手に変更しない');
@@ -37640,6 +37713,114 @@ test('r808 AI国主新設は転任途中の仮城主任命履歴と重複描画�
     assert.strictEqual(history.filter(t=>t.includes('【城主任命】')&&t.includes('直轄2')).length,0,
         '国主席確定前の一時的な城主選考・任命履歴を発生させない');
     assert.strictEqual(paints,1,'任命が済んでから描画をまとめて一度だけ行う');
+});
+
+
+// A-137: 諸勢力蜂起の最終拠点喪失（退避先なし）は戦後の実ゲーム経路。
+// 一括浪人化でも、城主・派閥・画面は最終名簿ができてから一度だけ確定する。
+test('A-137 諸勢力蜂起で最終拠点を失う複数家臣の浪人化を一括確定する', () => {
+    const ctx = createContext({
+        GameConstants: {BushoStatus: {ACTIVE:'active',RONIN:'ronin',DEAD:'dead',UNBORN:'unborn'}},
+        BushoStatusRules: {isActive: b=>b.status==='active',isRonin: b=>b.status==='ronin'},
+        LifeStatusRules: {isPresent: b=>b.status==='active'||b.status==='ronin'}
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    const Aff=vm.runInContext('AffiliationSystem',ctx);
+    const castle={id:11,name:'旧家最後の拠点',ownerClan:0,castellanId:0,legionId:0,samuraiIds:[201,202,203],adjacentCastleIds:[]};
+    const makeBusho=(id,extra={})=>({id,name:`家臣${id}`,fullName:`家臣${id}`,clan:8,castleId:11,
+        status:'active',isDaimyo:false,isCastellan:false,isCommander:false,isFactionLeader:false,isGunshi:false,
+        recognitionNeed:0,factionId:0,achievementTotal:100,loyalty:70,nemesisIds:[],nemesisList:[],
+        wifeIds:[],...extra});
+    const bushos=[makeBusho(201),makeBusho(202),makeBusho(203)];
+    let factionUpdates=0, renders=0, lordUpdates=0;
+    const game={phase:'game',isWatchMode:true,year:1560,month:6,playerClanId:99,
+        castles:[castle],bushos,legions:[],
+        getCastle:id=>Number(id)===11?castle:null,
+        getBusho:id=>bushos.find(b=>b.id===Number(id))||null,
+        getClan:()=>({id:8,name:'旧家'}),
+        getClanCastles:id=>Number(id)===8?[]:[],
+        getClanDaimyo:()=>null,
+        getCastleBushos:id=>Number(id)===11?castle.samuraiIds.map(id=>bushos.find(b=>b.id===id)).filter(Boolean):[],
+        factionSystem:{updateFactions:id=>{assert.strictEqual(Number(id),8); factionUpdates++;},handleMove(){}},
+        ui:{renderMap(){renders++;}},
+    };
+    game.affiliationSystem=new Aff(game);
+    const originalLordUpdate=game.affiliationSystem.updateCastleLord.bind(game.affiliationSystem);
+    game.affiliationSystem.updateCastleLord=castle=>{lordUpdates++;originalLordUpdate(castle);};
+    const effort=read('js/war_effort.js');
+    const at=effort.indexOf('if (s.attacker.isKunishu) {',effort.indexOf('async endWar('));
+    const start=effort.indexOf('const retreatDestinationIds = new Set();',at);
+    const end=effort.indexOf('resultMsg = `諸勢力の反乱により',start);
+    assert.ok(at>=0 && start>at && end>start);
+    const fn=vm.runInContext(`(function(targetC,oldOwner,friendlyCastles,kunishuMembers){${effort.slice(start,end)}})`,ctx);
+    fn.call({game,handleDaimyoEscape(){}},castle,8,[],[]);
+    assert.ok(bushos.every(b=>b.status==='ronin'&&b.clan===0&&b.castleId===11));
+    assert.deepStrictEqual(castle.samuraiIds,[201,202,203], '最後の拠点に残留する浪人の在城名簿は保持');
+    assert.strictEqual(lordUpdates,0,'城主不在の中立拠点を人物ごとに再選考しない');
+    assert.strictEqual(factionUpdates,1,'旧主家の派閥は最後の浪人化後だけ更新');
+    assert.strictEqual(renders,1,'描画は一括処遇後に一度だけ更新');
+});
+
+
+
+// A-139: 鎮圧戦と月末の兵力0壊滅は、同じ所属・消滅確定窓口を使う。
+// 旧実装は1人の浪人化につき退城・再入城で城主を2回選出していた。
+test('A-139 諸勢力の兵力0壊滅では構成員を全員処遇して城主・画面を一度だけ確定する', async () => {
+    const ctx = createContext({
+        GameConstants: {BushoStatus: {ACTIVE:'active',RONIN:'ronin',DEAD:'dead',UNBORN:'unborn'}},
+        BushoStatusRules: {isActive: b=>b.status==='active',isRonin: b=>b.status==='ronin'},
+        LifeStatusRules: {isPresent: b=>b.status==='active'||b.status==='ronin',isUnborn:b=>b.status==='unborn'}
+    });
+    loadScript(ctx,'js/affiliation_system.js');
+    loadScript(ctx,'js/kunishu_system.js');
+    const Aff=vm.runInContext('AffiliationSystem',ctx);
+    const Kun=vm.runInContext('KunishuSystem',ctx);
+    const castle={id:15,name:'国衆の居所',ownerClan:1,castellanId:99,legionId:0,
+        samuraiIds:[99,201,202,203],adjacentCastleIds:[]};
+    const makeBusho=(id,extra={})=>({id,name:`人物${id}`,clan:0,castleId:15,status:'active',
+        belongKunishuId:7,achievementTotal:100,loyalty:70,isAutoLeader:false,isDaimyo:false,
+        isCastellan:false,isCommander:false,isGunshi:false,isFactionLeader:false,
+        factionId:0,recognitionNeed:0,wifeIds:[],nemesisIds:[],nemesisList:[],...extra});
+    const houseLord=makeBusho(99,{clan:1,belongKunishuId:0,isCastellan:true});
+    const bushos=[houseLord,makeBusho(201),makeBusho(202),makeBusho(203,{isAutoLeader:true})];
+    const kunishu={id:7,name:'国衆',castleId:15,leaderId:203,soldiers:0,isDestroyed:false,
+        getName:()=> '国衆'};
+    let lordUpdates=0,paints=0,deadCalls=0;
+    const game={phase:'game',year:1560,month:6,playerClanId:1,bushos,castles:[castle],legions:[],
+        getCastle:id=>Number(id)===15?castle:null,
+        getBusho:id=>bushos.find(b=>b.id===Number(id))||null,
+        getCastleBushos:()=>castle.samuraiIds.map(id=>bushos.find(b=>b.id===id)).filter(Boolean),
+        getClan:id=>({id,name:'大名家'}),getClanCastles:()=>[castle],getClanDaimyo:()=>houseLord,
+        ui:{renderMap(){paints++;},log(){}},
+        factionSystem:{updateFactions(){},handleMove(){}},
+        lifeSystem:{setLifeStatusRaw(b,status){deadCalls++;b.status=status;}}
+    };
+    game.affiliationSystem=new Aff(game);
+    const elect=game.affiliationSystem.updateCastleLord.bind(game.affiliationSystem);
+    game.affiliationSystem.updateCastleLord=c=>{lordUpdates++;elect(c);};
+    game.kunishuSystem=new Kun(game);
+    game.kunishuSystem.setKunishuData([kunishu]);
+    await game.kunishuSystem.checkDestroyed(kunishu);
+    assert.strictEqual(kunishu.isDestroyed,true);
+    assert.strictEqual(kunishu.soldiers,0);
+    assert.ok(bushos.slice(1,3).every(b=>b.status==='ronin'&&b.clan===0&&b.belongKunishuId===0));
+    assert.strictEqual(bushos[3].status,'dead','自動生成頭領は浪人ではなく消滅する');
+    assert.strictEqual(deadCalls,1);
+    assert.deepStrictEqual(castle.samuraiIds,[99,201,202], '同居する通常大名家臣は保持し自動頭領だけ除籍');
+    assert.strictEqual(lordUpdates,1,'一括処遇完了後に関係拠点を一度だけ確認する');
+    assert.strictEqual(paints,1,'描画は最終状態から一回だけ行う');
+});
+
+test('A-139 鎮圧戦勝利は諸勢力Systemの共通壊滅窓口へ委譲する', () => {
+    const war=read('js/war_effort.js');
+    const i=war.indexOf('if (s.isKunishuSubjugation) {',war.indexOf('async endWar('));
+    const j=war.indexOf('const srcC = this.game.getCastle',i);
+    assert.ok(i>=0&&j>i,'実際の鎮圧戦終了分岐を検査する');
+    const block=war.slice(i,j);
+    assert.ok(block.includes('this.game.kunishuSystem.disbandDestroyedKunishu(kunishu)'),
+        '鎮圧戦では兵力0と同じ正本へ壊滅・処遇を委譲する');
+    assert.ok(!block.includes('this.game.affiliationSystem.becomeRonin(b)'),
+        '鎮圧戦に個別浪人化ループを複製しない');
 });
 
 Promise.all(pendingTests).then(() => {
