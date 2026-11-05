@@ -68,7 +68,9 @@ class StatPresenter {
     static getBushoRankName(busho, game) {
         if (!busho) return "武将";
         const S = (window.GameConstants && window.GameConstants.BushoStatus) || { ACTIVE: 'active', RONIN: 'ronin', UNBORN: 'unborn' };
-        if (busho.status === S.UNBORN) return busho.isNotBorn ? "出生前" : "元服前";
+        if (busho.status === S.UNBORN) {
+            return game && window.LifeStatusRules.isBornByYear(busho, game.year) ? "元服前" : "出生前";
+        }
         if (busho.isDaimyo) return "大名";
         if (busho.isGunshi) return "軍師";
         const isLegionCommander = busho.isCommander || !!(game && game.legions && game.legions.some(l => Number(l.commanderId) === Number(busho.id)));

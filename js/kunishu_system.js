@@ -800,8 +800,7 @@ class KunishuSystem {
         if (!leaderAlive && leader) {
             const currentYear = this.game.year;
             unbornFamily = this.game.bushos.filter(b =>
-                window.LifeStatusRules.isUnborn(b) &&
-                b.birthYear <= currentYear &&
+                window.LifeStatusRules.canAppearEarly(b, currentYear) &&
                 // 頭領の死で他家・別諸勢力に登場予定の一門を横取りしない。
                 // 同じ諸勢力への所属予定か、まだ所属先を持たない一門だけを候補にする。
                 Number(b.clan) === 0 &&

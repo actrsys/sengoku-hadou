@@ -143,11 +143,12 @@ const CAN_EXECUTE_RULES = {
     },
     // メニューの実行可否と実際の候補一覧は同じ資格を使う。
     // 取得方法（some/filter）と候補の並び替えは各呼出元の責務のままにする。
-    isSuccessorCandidate: (b, daimyo, daimyoFamily) => {
+    isSuccessorCandidate: (b, daimyo, daimyoFamily, currentYear) => {
         // active（登場済み）または unborn（元服前）、隠居・出生前は除外。
         if (b.isDaimyo || b.isRetired) return false;
         if (!window.BushoStatusRules.isActive(b) && !window.LifeStatusRules.isUnborn(b)) return false;
-        if (window.LifeStatusRules.isUnborn(b) && b.isNotBorn) return false;
+        if (window.LifeStatusRules.isUnborn(b)
+            && !window.LifeStatusRules.canAppearEarly(b, currentYear)) return false;
         const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
         return bFamily.includes(daimyo.id) || daimyoFamily.includes(b.id);
     },
@@ -160,7 +161,7 @@ const CAN_EXECUTE_RULES = {
         if (!daimyo) return false;
         const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
         return game.getClanBushos(game.playerClanId).some(b =>
-            CAN_EXECUTE_RULES.isSuccessorCandidate(b, daimyo, dFamily));
+            CAN_EXECUTE_RULES.isSuccessorCandidate(b, daimyo, dFamily, game.year));
     },
     canAdoptSon: (game) => {
         // 家督相続候補がいる場合は養子縁組を開始しない。

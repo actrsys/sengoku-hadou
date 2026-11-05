@@ -1292,7 +1292,7 @@ class IndependenceSystem {
                 unbornFamily.forEach(b => {
                     this.game.affiliationSystem.setClanIdRaw(b, 0); // ★まだ生まれていない武将も含め、大名家IDを0にして浪人として登場するようにします
                     
-                    if (b.birthYear <= currentYear) {
+                    if (window.LifeStatusRules.canAppearEarly(b, currentYear)) {
                         // すでに生まれているなら、今すぐ元服して一緒に逃げます
                         this.game.affiliationSystem.setActivityStatusRaw(b, window.GameConstants.BushoStatus.RONIN); // 浪人にします
                         b.loyalty = 50;

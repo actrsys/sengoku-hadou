@@ -42,6 +42,20 @@ window.LifeStatusRules = Object.freeze({
         return this._statusOf(personOrStatus) === window.GameConstants.BushoStatus.UNBORN;
     },
 
+    // 年次同期前やシナリオ開始直後も、生年を出生判定の正本として参照する。
+    // isNotBorn は派生フラグであり、未設定のままでも出生前を許可しない。
+    isBornByYear(person, currentYear) {
+        return !!person && Number.isFinite(Number(person.birthYear))
+            && Number.isFinite(Number(currentYear))
+            && Number(person.birthYear) <= Number(currentYear);
+    },
+
+    // 元服・継承・史実イベントでの早期登場に共通する出生資格。
+    // 別家への予定所属や継承順位は各専門Systemが個別に判断する。
+    canAppearEarly(person, currentYear) {
+        return this.isUnborn(person) && this.isBornByYear(person, currentYear);
+    },
+
     isPresent(personOrStatus) {
         const status = this._statusOf(personOrStatus);
         return status !== window.GameConstants.BushoStatus.DEAD && status !== window.GameConstants.BushoStatus.UNBORN;

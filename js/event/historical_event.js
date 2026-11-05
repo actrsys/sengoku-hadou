@@ -1664,7 +1664,7 @@ window.GameEvents.push({
         // 武将の出生前フラグは年次同期で更新されるため、開始年の途中では未設定となる。
         // 養子入りによる早期元服は、実際の生年に達している場合だけ許可する。
         if (window.LifeStatusRules.isUnborn(katsunaga)
-            && (katsunaga.isNotBorn || Number(katsunaga.birthYear) > Number(game.year))) return false;
+            && !window.LifeStatusRules.canAppearEarly(katsunaga, game.year)) return false;
         
         // 勝長の所属が織田家か、未登場なら父親の所属が織田家か確認します
         let belongsToOda = false;

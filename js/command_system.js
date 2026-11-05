@@ -247,7 +247,7 @@ class CommandSystem {
             if (daimyo) {
                 const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
                 bushos = this.game.getClanBushos(this.game.playerClanId).filter(b =>
-                    CAN_EXECUTE_RULES.isSuccessorCandidate(b, daimyo, dFamily));
+                    CAN_EXECUTE_RULES.isSuccessorCandidate(b, daimyo, dFamily, this.game.year));
             }
             infoHtml = "<div>家督を譲る一門武将を選択してください</div>";
         }

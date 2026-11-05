@@ -24939,7 +24939,8 @@ test('r560 国主補助フラグ欠落でも死亡時に現役軍団の後任を
         LifeStatusRules: { isUnborn: b => b.status === 'unborn' },
         BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' }
     });
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     const Life = vm.runInContext('LifeSystem', ctx);
     const former = { id: 11, clan: 4, castleId: 2, fullName: '旧国主', familyIds: [1], status: 'active',
         isCommander: false, isDaimyo: false, isCastellan: false, wifeIds: [], courtRankIds: [] };
@@ -24976,7 +24977,8 @@ test('r560 国主後継者は他の現役軍団の国主を補助フラグ欠落
         LifeStatusRules: { isUnborn: b => b.status === 'unborn' },
         BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' }
     });
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     const Life = vm.runInContext('LifeSystem', ctx);
     const former = { id: 11, clan: 4, castleId: 2, fullName: '旧国主', familyIds: [1], status: 'dead' };
     const occupied = { id: 12, clan: 4, castleId: 3, fullName: '別軍団国主', familyIds: [1], status: 'active',
@@ -27951,7 +27953,8 @@ test('r622 国主死亡時に後任の在城履歴を実際の異動だけ記録
         LifeStatusRules: { isUnborn: () => false }
     });
     loadScript(ctx, 'js/affiliation_system.js');
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     loadScript(ctx, 'js/faction_system.js');
     const Affiliation = vm.runInContext('AffiliationSystem', ctx);
     const Life = vm.runInContext('LifeSystem', ctx);
@@ -28009,7 +28012,8 @@ test('r638 AI国主死亡時に別城の浪人を迎えたら着任月を新し�
         LifeStatusRules: { isUnborn: () => false }
     });
     loadScript(ctx, 'js/affiliation_system.js');
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     loadScript(ctx, 'js/faction_system.js');
     const Affiliation = vm.runInContext('AffiliationSystem', ctx);
     const Life = vm.runInContext('LifeSystem', ctx);
@@ -28069,7 +28073,8 @@ test('r623 大名家督継承は別城からの着任で在城履歴を記録し
         LifeStatusRules: { isUnborn: b => b.status === 'unborn' }
     });
     loadScript(ctx, 'js/affiliation_system.js');
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     loadScript(ctx, 'js/faction_system.js');
     const Affiliation = vm.runInContext('AffiliationSystem', ctx);
     const Life = vm.runInContext('LifeSystem', ctx);
@@ -28141,7 +28146,8 @@ test('r638 外部から迎えた後継者の本拠着任月は、旧浪人居城
         LifeStatusRules: { isUnborn: b => b.status === 'unborn' }
     });
     loadScript(ctx, 'js/affiliation_system.js');
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     loadScript(ctx, 'js/faction_system.js');
     const Affiliation = vm.runInContext('AffiliationSystem', ctx);
     const Life = vm.runInContext('LifeSystem', ctx);
@@ -30602,12 +30608,13 @@ test('r663 AI居城移転・軍団新設の拠点相対評価算術は旧式と�
 
 // r665: 家督・養子のメニュー実行可否と武将選択の資格判定だけを共有する。
 // r594で撤回した「非同期中に武将状態が変わる」ことを仮定する事前/確定時ガードは追加しない。
-test('r665 家督・養子の選択候補と事前有効判定は旧式と一致し、同じ資格正本を使う', () => {
+test('r665/r819 家督・養子の候補と事前有効判定は同じ出生資格を使う', () => {
     const ctx = createContext({
         BushoStatusRules: { isActive: b => b.status === 'active' },
         LifeStatusRules: { isUnborn: b => b.status === 'unborn' },
         StatPresenter: { getPerceivedStatValue: b => b.strength || 0 }
     });
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/command_catalog.js');
     loadScript(ctx, 'js/command_system.js');
     const rules = vm.runInContext('CAN_EXECUTE_RULES', ctx);
@@ -30615,7 +30622,7 @@ test('r665 家督・養子の選択候補と事前有効判定は旧式と一致
     const oldSuccessor = (b, daimyo) => {
         if (b.isDaimyo || b.isRetired) return false;
         if (b.status !== 'active' && b.status !== 'unborn') return false;
-        if (b.status === 'unborn' && b.isNotBorn) return false;
+        if (b.status === 'unborn' && b.birthYear > game.year) return false;
         const bFamily = Array.isArray(b.familyIds) ? b.familyIds : [];
         const dFamily = Array.isArray(daimyo.familyIds) ? daimyo.familyIds : [];
         return bFamily.includes(daimyo.id) || dFamily.includes(b.id);
@@ -30625,7 +30632,7 @@ test('r665 家督・養子の選択候補と事前有効判定は旧式と一致
     const daimyo = { id: 1, birthYear: 1510, familyIds: [12, 15] };
     const roster = [];
     const game = {
-        playerClanId: 1,
+        playerClanId: 1, year: 1560,
         getClanDaimyo: () => daimyo,
         getClanBushos: () => roster,
         getClanGunshi: () => null
@@ -30644,7 +30651,7 @@ test('r665 家督・養子の選択候補と事前有効判定は旧式と一致
                 isRetired: rnd(8) === 0,
                 isDaimyo: rnd(11) === 0,
                 isNotBorn: rnd(5) === 0,
-                birthYear: 1510 + rnd(34),
+                birthYear: 1510 + rnd(75),
                 familyIds: rnd(4) === 0 ? null : (rnd(3) === 0 ? [1] : [100])
             });
         }
@@ -30671,7 +30678,7 @@ test('r665 家督・養子の選択候補と事前有効判定は旧式と一致
     const catalog = read('js/command_catalog.js');
     const commandSource = read('js/command_system.js');
     assert.ok(catalog.includes('isSuccessorCandidate:') && catalog.includes('isAdoptableCandidate:'));
-    assert.ok(commandSource.includes('CAN_EXECUTE_RULES.isSuccessorCandidate(b, daimyo, dFamily)'));
+    assert.ok(commandSource.includes('CAN_EXECUTE_RULES.isSuccessorCandidate(b, daimyo, dFamily, this.game.year)'));
     assert.ok(commandSource.includes('CAN_EXECUTE_RULES.isAdoptableCandidate(b, daimyo)'));
 });
 
@@ -31433,6 +31440,7 @@ test('r685 史実データの女性当主継承後は婿候補ゼロの婚姻先
         LifeStatusRules: { isUnborn: b => b && b.status === 'unborn' },
         StatPresenter: { getPerceivedStatValue: (b, key) => b[key] || 0 }
     });
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/family_system.js');
     loadScript(ctx, 'js/life_system.js');
     loadScript(ctx, 'js/command_catalog.js');
@@ -35281,6 +35289,7 @@ test('r779 謀反勝利後に旧主家と無関係な予定所属の未登場一
         PersonnelRules: { calcAffinityDiff: (a, b) => Math.min(Math.abs(a - b), 100 - Math.abs(a - b)) }
     });
     loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/independence_system.js');
     const Aff = vm.runInContext('AffiliationSystem', ctx);
     const Indep = vm.runInContext('IndependenceSystem', ctx);
@@ -36973,7 +36982,8 @@ test('r803 同じ合戦の戦死予定者は国主死亡時の後任候補から
         BushoStatusRules:{isActive:b=>b.status==='active',isRonin:b=>b.status==='ronin'},
         LifeStatusRules:{isUnborn:b=>b.status==='unborn'}
     });
-    loadScript(ctx,'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx,'js/life_system.js');
     const Life=vm.runInContext('LifeSystem',ctx);
     const commander={id:11,clan:2,castleId:5,status:'dead',isCommander:true,isCastellan:true,
         familyIds:[100],fullName:'戦死した国主'};
@@ -37003,6 +37013,7 @@ test('r804 家督と国主の後継候補は同時死亡予定者を未登場・
         BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
         LifeStatusRules: { isUnborn: b => b.status === 'unborn' }
     });
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/life_system.js');
     const Life = vm.runInContext('LifeSystem', ctx);
     const former = { id: 1, clan: 8, familyIds: [30], birthYear: 1500, affinity: 50 };
@@ -37059,7 +37070,8 @@ test('r804 除外一門が高能力でも実際の大名継承では生存家臣
         BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
         LifeStatusRules: { isUnborn: b => b.status === 'unborn' }
     });
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     const Life = vm.runInContext('LifeSystem', ctx);
     const old = { id: 1, clan: 9, familyIds: [90], birthYear: 1500, affinity: 40,
         fullName: '先代', isDaimyo: true };
@@ -37087,7 +37099,8 @@ test('r804 同時戦死中の後任国主転任では旧拠点の仮城主任命
         LifeStatusRules: { isUnborn: b => b.status === 'unborn', isPresent: b => b.status === 'active' }
     });
     loadScript(ctx, 'js/affiliation_system.js');
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     const Life = vm.runInContext('LifeSystem', ctx);
     const Affiliation = vm.runInContext('AffiliationSystem', ctx);
     const former = { id: 10, clan: 2, castleId: 1, status: 'dead', familyIds: [10], fullName: '前国主',
@@ -37236,7 +37249,8 @@ test('r805 国主死亡で後任が同城にいる場合、仮城主を任命・
         LifeStatusRules: { isUnborn: b => b.status === 'unborn', isPresent: b => b.status === 'active' }
     });
     loadScript(ctx, 'js/affiliation_system.js');
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     const Affiliation = vm.runInContext('AffiliationSystem', ctx);
     const Life = vm.runInContext('LifeSystem', ctx);
     const old = { id: 20, clan: 2, castleId: 1, status: 'dead', familyIds: [7],
@@ -37326,7 +37340,8 @@ test('r806 単発の大名死亡では家督確定まで仮城主任命履歴を
         LifeStatusRules: { isUnborn: b => b.status === 'unborn' }
     });
     loadScript(ctx, 'js/affiliation_system.js');
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     const Affiliation = vm.runInContext('AffiliationSystem', ctx);
     const Life = vm.runInContext('LifeSystem', ctx);
     const clan = { id: 2, leaderId: 30, homeCastleId: 1, name: '検証家', courtContribution: 100 };
@@ -37374,7 +37389,8 @@ test('r806 単発の国主死亡では継承確定まで仮城主任命履歴を
         LifeStatusRules: { isUnborn: b => b.status === 'unborn' }
     });
     loadScript(ctx, 'js/affiliation_system.js');
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     const Affiliation = vm.runInContext('AffiliationSystem', ctx);
     const Life = vm.runInContext('LifeSystem', ctx);
     const old = { id: 40, clan: 2, castleId: 1, status: 'active', isCommander: true,
@@ -37851,6 +37867,7 @@ test('r814 諸勢力頭領の早期継承は別家・別諸勢力の未登場一
         LifeStatusRules: { isPresent: b => b.status === 'active' || b.status === 'ronin', isUnborn: b => b.status === 'unborn' },
         GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', UNBORN: 'unborn', DEAD: 'dead' } }
     });
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/kunishu_system.js');
     const Kun = vm.runInContext('KunishuSystem', ctx);
     const make = (id, clan, belongKunishuId, status, affinity, familyIds) => ({
@@ -37893,6 +37910,7 @@ test('r814 同所属の未登場一門がいなければ在籍する現役構成
         LifeStatusRules: { isPresent: b => b.status === 'active' || b.status === 'ronin', isUnborn: b => b.status === 'unborn' },
         GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', UNBORN: 'unborn', DEAD: 'dead' } }
     });
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/kunishu_system.js');
     const Kun = vm.runInContext('KunishuSystem', ctx);
     const busho = (id, status, clan, belongKunishuId, familyIds) => ({
@@ -37927,7 +37945,8 @@ test('r815 大名家督は死亡済みの諸勢力一門を後任に選ばない
         LifeStatusRules: { isUnborn: b => b.status === 'unborn' },
         BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' }
     });
-    loadScript(ctx, 'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx, 'js/life_system.js');
     const Life = vm.runInContext('LifeSystem', ctx);
     const leader = { id:1017004, name:'一乗院覚慶', clan:17, status:'active', birthYear:1537, affinity:42, leadership:60, intelligence:60, familyIds:[1017004,999] };
     const dead = { id:1017006, name:'足利義栄', clan:0, belongKunishuId:48, status:'dead', birthYear:1538, endYear:1568, affinity:42, leadership:80, intelligence:80, familyIds:[1017006,999] };
@@ -37946,7 +37965,8 @@ test('r815 国主継承でも死亡済み諸勢力一門を除外し同軍団現
         LifeStatusRules:{isUnborn:b=>b.status==='unborn'},
         BushoStatusRules:{isActive:b=>b.status==='active',isRonin:b=>b.status==='ronin'}
     });
-    loadScript(ctx,'js/life_system.js');
+
+    loadScript(ctx, 'js/constants.js');    loadScript(ctx,'js/life_system.js');
     const Life=vm.runInContext('LifeSystem',ctx);
     const commander={id:100,clan:7,castleId:9,legionId:3,status:'active',familyIds:[100,88],birthYear:1520,affinity:40};
     const dead={id:101,clan:0,belongKunishuId:15,status:'dead',familyIds:[101,88],birthYear:1540,affinity:40,leadership:95,intelligence:90};
@@ -37965,6 +37985,7 @@ test('r815 諸勢力の生存一門・浪人・出生済み未登場は継承候
         LifeStatusRules:{isUnborn:b=>b.status==='unborn'},
         BushoStatusRules:{isActive:b=>b.status==='active',isRonin:b=>b.status==='ronin'}
     });
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx,'js/life_system.js');
     const Life=vm.runInContext('LifeSystem',ctx);
     const lord={id:11,clan:6,status:'active',familyIds:[11,77],birthYear:1510};
@@ -37991,6 +38012,7 @@ test('r816 大名・国主の早期元服候補は別諸勢力への登場予定
         LifeStatusRules:{isUnborn:b=>b.status==='unborn'},
         BushoStatusRules:{isActive:b=>b.status==='active',isRonin:b=>b.status==='ronin'}
     });
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx,'js/life_system.js');
     const Life=vm.runInContext('LifeSystem',ctx);
     const incumbent={id:1,clan:9,status:'active',familyIds:[1,99],birthYear:1525,castleId:10};
@@ -38092,6 +38114,63 @@ test('r818 遠山景任死亡イベントは1560年の未出生勝長を養子�
         assert.strictEqual(event.checkCondition(game, { deadBusho }), expected,
             `${startYear}年: 出生前は拒否し、出生済み元服前なら従来どおり許容`);
     }
+});
+
+
+// r819: 1560年開始時、武将の isNotBorn は未初期化なので、同フラグだけで家督譲渡候補を選ばない。
+// 寿命・出生前状態の共有Rulesを、通常の家督譲渡と死亡時の家督継承が共用する。
+test('r819 出生年は早期元服・継承の共通資格であり年次同期前の派生フラグを信頼しない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/stat_presenter.js');
+    const eligibility = ctx.LifeStatusRules;
+    const unborn = { status: 'unborn', birthYear: 1565 };
+    assert.strictEqual(eligibility.canAppearEarly(unborn, 1560), false, '未初期化isNotBornでも1560年の出生前は除外');
+    assert.strictEqual(ctx.StatPresenter.getBushoRankName(unborn, {year:1560}), '出生前', '表示も生年の正本を使う');
+    assert.strictEqual(eligibility.canAppearEarly(unborn, 1565), true, '出生年到達後は元服前でも候補になる');
+    assert.strictEqual(ctx.StatPresenter.getBushoRankName(unborn, {year:1565}), '元服前', '生年到達後の表示は元服前');
+    unborn.isNotBorn = true;
+    assert.strictEqual(eligibility.canAppearEarly(unborn, 1565), true, '年次同期前の古い派生フラグより生年が正本');
+    assert.strictEqual(eligibility.canAppearEarly({status:'dead',birthYear:1540},1565),false,'死亡者を早期登場させない');
+    assert.strictEqual(eligibility.canAppearEarly({status:'active',birthYear:1540},1565),false,'すでに登場済みの武将を早期登場扱いしない');
+});
+
+test('r819 1560年の織田信長は出生前の一門を家督譲渡候補に表示しない', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const ctx = createContext({ StatPresenter: { getPerceivedStatValue: (b, k) => b[k] || 0 } });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/family_system.js');
+    loadScript(ctx, 'js/command_catalog.js');
+    loadScript(ctx, 'js/command_system.js');
+    const states = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+    const people = common.warriorsMaster.map(master => {
+        const b = { ...master, ...(states.get(Number(master.id)) || {}) };
+        for (const key of ['id','clan','belongKunishuId','birthYear','startYear','endYear','realFatherId']) {
+            b[key] = Number(b[key]) || 0;
+        }
+        b.adoptiveFatherId = Number(b.adoptiveFather) || 0;
+        b.status = b.startYear === 9999 || b.endYear < 1560 ? 'dead'
+            : b.startYear > 1560 ? 'unborn' : b.clan === 0 && b.belongKunishuId === 0 ? 'ronin' : 'active';
+        return b;
+    });
+    ctx.FamilyLinker.rebuildAllFamilyIds(people, []);
+    const oda = people.find(b => b.id === 1006006);
+    const katsunaga = people.find(b => b.id === 1006013);
+    assert.strictEqual(katsunaga.isNotBorn, undefined, '実際の初期化で武将の出生前フラグは未設定');
+    const roster = people.filter(b => b.clan === oda.clan);
+    const game = {
+        year: 1560, playerClanId: oda.clan,
+        getClanDaimyo: () => oda,
+        getClanBushos: () => roster,
+        getClanGunshi: () => null
+    };
+    const rules = vm.runInContext('CAN_EXECUTE_RULES', ctx);
+    const candidates = new (vm.runInContext('CommandSystem', ctx))(game)
+        .getBushoSelectorData('succession_target', null, null, {id: 7,ownerClan: oda.clan}).bushos;
+    assert.ok(!candidates.some(b => Number(b.birthYear) > game.year), '実データの家督譲渡候補から出生前を全員除外');
+    assert.ok(!candidates.some(b => b.id === katsunaga.id), '1565年生まれの織田勝長を1560年に選べない');
+    assert.ok(!rules.isSuccessorCandidate(katsunaga, oda, oda.familyIds, game.year), 'メニュー有効判定も同一資格');
+    assert.ok(candidates.every(b => rules.isSuccessorCandidate(b, oda, oda.familyIds, game.year)), '候補一覧と同一の正本');
 });
 
 Promise.all(pendingTests).then(() => {
