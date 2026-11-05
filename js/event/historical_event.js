@@ -319,8 +319,47 @@ window.EventAction = {
         game.affiliationSystem.moveCastle(busho, targetCastleId);
     },
 
+    /**
+     * 正式任命を伴う複数転任の共通窓口。移動先が異なっても全員の移動を
+     * 完了してから城主を確定し、退去途中の仮城主を履歴に記録しない。
+     * 人物と任命先だけをイベント側が指定し、在城履歴・城主更新は専門Systemに委譲する。
+     */
+    moveAndAppointCastellans: function(game, placements) {
+        if (!game || !game.affiliationSystem || !Array.isArray(placements) || placements.length === 0) return;
+        const valid = placements.filter(p => p && p.busho && p.castle);
+        if (valid.length === 0) return;
+        const vacatedCastleIds = new Set();
+        for (const { busho, castle } of valid) {
+            const previousId = Number(busho.castleId) || 0;
+            const destinationId = Number(castle.id);
+            if (previousId > 0 && previousId !== destinationId) vacatedCastleIds.add(previousId);
+            if (previousId !== destinationId) {
+                game.affiliationSystem.moveCastle(busho, destinationId, {
+                    deferCastleLordUpdate: true, deferUI: true
+                });
+            }
+        }
+        // 正式任命の後に一括確定する。移動元が別人の任命先でも途中選出しない。
+        for (const { busho, castle } of valid) {
+            this.appointCastellan(game, busho, castle, { deferCastleLordUpdate: true });
+        }
+        // 任命先を先に確定し、重複する旧拠点は再計算しない。
+        const affectedCastleIds = new Set(valid.map(({ castle }) => Number(castle.id)));
+        vacatedCastleIds.forEach(id => affectedCastleIds.add(id));
+        for (const id of affectedCastleIds) {
+            const affected = game.getCastle(id);
+            if (affected) game.affiliationSystem.updateCastleLord(affected);
+        }
+    },
+
+    // 単独の正式任命も複数転任と同じ手順を使う。
+    moveAndAppointCastellan: function(game, busho, targetCastle) {
+        if (!busho || !targetCastle || !game.affiliationSystem) return;
+        this.moveAndAppointCastellans(game, [{ busho, castle: targetCastle }]);
+    },
+
     // ③ 武将を新しい城主に任命して、お城の看板も書き換えます（新魔法）
-    appointCastellan: function(game, busho, castle) {
+    appointCastellan: function(game, busho, castle, { deferCastleLordUpdate = false } = {}) {
         if (!busho || !castle) return;
         
         // 今いる城主のバッジを外します
@@ -334,7 +373,7 @@ window.EventAction = {
         castle.castellanId = busho.id;
         
         // システムに報告します
-        if (game.affiliationSystem) {
+        if (game.affiliationSystem && !deferCastleLordUpdate) {
             game.affiliationSystem.updateCastleLord(castle);
         }
     },
@@ -435,6 +474,9 @@ window.GameEvents.push({
         // 万が一データが見つからなかった時のための安全装置です
         if (!motoyasu || !okazakiCastle) return;
 
+        // 同じイベントで正式に任命する転任をまとめて確定する。
+        // 国主が他拠点へ退く場合も、元康入城前に岡崎の仮城主を選ばない。
+        const formalPlacements = [];
         // ★追加：岡崎城がすでにどこかの軍団に所属していた場合の処理
         if (okazakiCastle.legionId !== 0) {
             const oldLegionId = okazakiCastle.legionId;
@@ -457,16 +499,8 @@ window.GameEvents.push({
                         const otherCastles = game.castles.filter(c => c.ownerClan === motoyasu.clan && c.legionId === oldLegionId && c.id !== 48);
                         
                         if (otherCastles.length > 0) {
-                            // 別のお城があるなら、その中の一つへ国主をお引越しさせます
-                            const newCastle = otherCastles[0];
-                            game.affiliationSystem.moveCastle(commander, newCastle.id);
-                            
-                            // 前の城主バッジを外して、新しいお城の城主に任命し直します
-                            commander.isCastellan = true;
-                            newCastle.castellanId = commander.id;
-                            if (game.affiliationSystem) {
-                                game.affiliationSystem.updateCastleLord(newCastle);
-                            }
+                            // 退去先への正式任命を元康の入城とまとめて確定する。
+                            formalPlacements.push({ busho: commander, castle: otherCastles[0] });
                         } else {
                             // 別のお城がなければ、軍団解散の正規窓口へまとめて任せます。
                             game.castleManager.disbandLegion(legion.id);
@@ -481,11 +515,9 @@ window.GameEvents.push({
             motoyasu.achievementTotal = 700;
         }
         
-        // 2. 家康が別のお城にいる場合、安全に岡崎城へお引越しさせます
-        window.EventAction.moveBusho(game, motoyasu, 48);
-
-        // 3. 岡崎城にいる他の武将の城主バッジを外し、家康を新しい城主にします
-        window.EventAction.appointCastellan(game, motoyasu, okazakiCastle);
+        // 2・3. 国主の退去と元康の入城を、途中選出なしでまとめて確定する。
+        formalPlacements.push({ busho: motoyasu, castle: okazakiCastle });
+        window.EventAction.moveAndAppointCastellans(game, formalPlacements);
 
         // ★追加：今川家の国主（軍団1～8）に空きがあるなら、家康を国主にする処理
         if (game.aiStaffing) {
@@ -1677,11 +1709,8 @@ window.GameEvents.push({
         }
         
         if (targetCastle) {
-            // 勝長をそのお城へ移動させます
-            window.EventAction.moveBusho(game, katsunaga, targetCastleId);
-
-            // 勝長を新しい城主に任命します
-            window.EventAction.appointCastellan(game, katsunaga, targetCastle);
+            // 勝長の転任と正式城主任命を共通窓口で確定する。
+            window.EventAction.moveAndAppointCastellan(game, katsunaga, targetCastle);
 
             // ★Round25：養子入りによる家督継承も、継承後の勝長の実際の居城へ
             // メッセージ表示前にぬるっとカメラを寄せます。
@@ -1866,8 +1895,7 @@ window.GameEvents.push({
             
             // もし織田信長本人が岐阜城にいない場合、岐阜城に強制的にお引越しさせて城主にします
             if (nobunaga.castleId !== 3) {
-                window.EventAction.moveBusho(game, nobunaga, 3);
-                window.EventAction.appointCastellan(game, nobunaga, inabayama);
+                window.EventAction.moveAndAppointCastellan(game, nobunaga, inabayama);
             }
             // AIによる正式な岐阜への居城移転を本拠地記録へ反映する。
             const clan = game.getClan(odaClanId);
@@ -1986,8 +2014,7 @@ window.GameEvents.push({
             
             // もし徳川家康本人が浜松城にいない場合、浜松城に強制的にお引越しさせて城主にします
             if (motoyasu.castleId !== 12) {
-                window.EventAction.moveBusho(game, motoyasu, 12);
-                window.EventAction.appointCastellan(game, motoyasu, hikuma);
+                window.EventAction.moveAndAppointCastellan(game, motoyasu, hikuma);
             }
             // これは出陣ではなく史実イベントによる正式な居城移転。
             const clan = game.getClan(matsudairaClanId);
@@ -2880,11 +2907,8 @@ window.GameEvents.push({
         const nijo = game.getCastle(26);
         if (!nijo) return;
 
-        // 2. 将軍候補を二条城（26）へお引越しさせます
-        game.affiliationSystem.moveCastle(candidate, 26);
-
-        // 3. 城主の正本（castle.castellanId）を使って将軍候補を新しい城主に任命します
-        window.EventAction.appointCastellan(game, candidate, nijo);
+        // 2・3. 二条城への転任と正式城主任命を共通窓口で確定する。
+        window.EventAction.moveAndAppointCastellan(game, candidate, nijo);
 
         // ★ここから追加：所属勢力に軍団の空き（1〜8）があるか確認し、空きがあれば国主に任命します
         if (game.aiStaffing && nijo) {
@@ -3002,15 +3026,16 @@ window.GameEvents.push({
         const sponsorDaimyo = game.getClanDaimyo(sponsorClanId);
         const destinationCastleId = sponsorDaimyo.castleId;
 
-        // 二条城(26)と槇島城(90)にいる「擁立勢力の武将（将軍候補以外）」を全員、大名の元へ送ります
-        [26, 90].forEach(castleId => {
-            const residents = game.bushos.filter(b => b.castleId === castleId && b.clan === sponsorClanId && b.id !== candidate.id);
-            if (residents.length === 0) return;
-            // 一回の将軍就任で退く武将は、仮城主を途中で選ばず最終配置から確定する。
-            // 個々の在城履歴・所属移動は AffiliationSystem の共通窓口に任せる。
-            residents.forEach(b => { b.isCastellan = false; });
-            window.EventAction.moveBushoGroup(game, residents, destinationCastleId);
-        });
+        // 二条城(26)と槇島城(90)から擁立者の居城へ退く武将は、一件の一括転任として扱う。
+        // 移動元ごとに処理を分けると、同じ到着先の城主を途中で再選出してしまう。
+        // 両拠点の順序と退避対象は従来どおり維持し、城主は全員の移動後に確定する。
+        const departingResidents = [26, 90].flatMap(castleId => game.bushos.filter(b =>
+            b.castleId === castleId && b.clan === sponsorClanId && b.id !== candidate.id
+        ));
+        if (departingResidents.length > 0) {
+            departingResidents.forEach(b => { b.isCastellan = false; });
+            window.EventAction.moveBushoGroup(game, departingResidents, destinationCastleId);
+        }
 
         // お城の持ち主を新しい将軍家に変えます
         // ★第3引数に true を渡し、イベントによる平和的な所有者変更として扱います。
@@ -3451,15 +3476,10 @@ window.GameEvents.push({
         const shigisanCastle = matsunagaCastles.find(c => c.id === 39);
         let targetCastle = hisahideCastle;
         
-        if (shigisanCastle) {
-            targetCastle = shigisanCastle;
-            window.EventAction.moveBusho(game, hisahide, 39);
-        }
-        
-        // 城主のバッジを渡します
-        if (targetCastle) {
-            window.EventAction.appointCastellan(game, hisahide, targetCastle);
-        }
+        if (shigisanCastle) targetCastle = shigisanCastle;
+
+        // 配置先と正式城主を共通の一括確定窓口で処理する。
+        if (targetCastle) window.EventAction.moveAndAppointCastellan(game, hisahide, targetCastle);
 
         // 臣従先の勢力に軍団の空き（1〜8）があるか確認し、空きがあれば国主に任命します
         if (game.aiStaffing && targetCastle) {
