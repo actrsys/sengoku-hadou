@@ -1276,9 +1276,10 @@ class IndependenceSystem {
                 // ★追加：主家や逃げた武将の「一門」で、まだ登場していない子どもたちを処理します！
                 const unbornFamily = this.game.bushos.filter(b => {
                     if (!window.LifeStatusRules.isUnborn(b)) return false; // まだ登場していない人だけを探します
-                    // 他家に登場予定の一門は親族でも旧主家の敗残者ではない。
-                    // 当主死亡時の後継者選定と同じく、旧家所属予定か無所属だけを扱う。
-                    if (Number(b.clan) !== Number(oldClanId) && Number(b.clan) !== 0) return false;
+                    // 旧主家または所属未定の一門のみを扱い、別大名家だけでなく
+                    // 別諸勢力へ登場予定の未登場者も敗残者として横取りしない。
+                    if ((Number(b.clan) !== Number(oldClanId) && Number(b.clan) !== 0)
+                        || Number(b.belongKunishuId || 0) !== 0) return false;
 
                     // 亡くなった旧大名の一門かチェック
                     const isFamilyOfOldDaimyo = b.familyIds.some(fId => oldDaimyo.familyIds.includes(fId));

@@ -1248,7 +1248,10 @@ class LifeSystem {
         const activeFamily = activeBushos.filter(isFamily);
         const unbornFamily = this.game.bushos.filter(b => eligible(b)
             && window.LifeStatusRules.isUnborn(b) && !b.isNotBorn
-            && (Number(b.clan) === Number(incumbent.clan) || Number(b.clan) === 0)
+            // 他の諸勢力へ登場予定の未登場一門は、家督・国主継承で早期元服させない。
+            // 現役の諸勢力一門は下の externalFamily 経路で従来どおり迎えられる。
+            && (Number(b.clan) === Number(incumbent.clan)
+                || (Number(b.clan) === 0 && Number(b.belongKunishuId || 0) === 0))
             && isFamily(b) && Number(b.birthYear) <= Number(this.game.year));
 
         let externalFamily = [];
@@ -1256,7 +1259,10 @@ class LifeSystem {
             externalFamily = this.game.bushos.filter(b => {
                 if (!eligible(b) || !isFamily(b)) return false;
                 if (window.BushoStatusRules.isRonin(b)) return true;
-                if (Number(b.belongKunishuId || 0) <= 0 || Number(b.clan) !== 0) return false;
+                // 諸勢力から迎える外部一門は現役構成員のみ。死亡者や未登場者は
+                // この経路で拾わない（元服前の候補は上記unbornFamilyで年齢を確認する）。
+                if (!window.BushoStatusRules.isActive(b)
+                    || Number(b.belongKunishuId || 0) <= 0 || Number(b.clan) !== 0) return false;
                 const kunishu = this.game.kunishuSystem?.getKunishu(b.belongKunishuId);
                 return !(kunishu && Number(kunishu.leaderId) === Number(b.id));
             });

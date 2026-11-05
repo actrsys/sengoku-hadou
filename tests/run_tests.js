@@ -29356,7 +29356,13 @@ test('r772 将軍就任の二条・槇島からの複数退避は途中の仮城
         isCastellan: i === 0, status: 'active', courtRankIds: [], familyIds: [], fullName: `退避武将${i}` }));
     const resident26 = { id: 904, clan: 1, castleId: 26, isCastellan: false,
         status: 'active', courtRankIds: [], familyIds: [], fullName: '二条城退避武将' };
-    const bushos = [candidate, sponsor, resident26, ...residents];
+    // 1570年開始データにも二条・槇島には未登場・死亡済みの人物情報が残る。
+    // 月初の将軍就任が発生しても、その将来配置・故人の履歴位置を変えてはならない。
+    const notYetAppeared = { id: 1017020, clan: 1, castleId: 26, isCastellan: false,
+        status: 'unborn', courtRankIds: [], familyIds: [], fullName: '未登場の仁木義治' };
+    const alreadyDead = { id: 1017002, clan: 1, castleId: 26, isCastellan: false,
+        status: 'dead', courtRankIds: [], familyIds: [], fullName: '死亡済みの足利義晴' };
+    const bushos = [candidate, sponsor, resident26, ...residents, notYetAppeared, alreadyDead];
     const clans = [{ id: 1, name: '擁立家' }];
     const singleMoves = [];
     const groups = [];
@@ -29395,6 +29401,8 @@ test('r772 将軍就任の二条・槇島からの複数退避は途中の仮城
     assert.ok(residents.every(b => b.castleId === 12 && b.clan === 1), '退避先と所属は維持する');
     assert.ok(residents.every(b => !singleMoves.includes(b.id)), '途中の城主再選出を伴う個別移動は呼ばない');
     assert.strictEqual(resident26.castleId, 12, '二条城の退避者も擁立者の居城へ移る');
+    assert.strictEqual(notYetAppeared.castleId, 26, '未登場武将は将来の登場拠点を変えない');
+    assert.strictEqual(alreadyDead.castleId, 26, '死亡済み武将の配置情報を書き換えない');
     assert.strictEqual(groups.length, 1, '二条城と槇島城から同じ目的地へ退避するとき一括転任は1回だけ');
     assert.deepStrictEqual(Array.from(groups[0].ids).sort((a,b)=>a-b), [901,902,903,904],
         '出発元が異なっていても全退避者を同じ一括転任へ渡す');
@@ -35292,7 +35300,10 @@ test('r779 謀反勝利後に旧主家と無関係な予定所属の未登場一
     const ownFuture = makeBusho(103, 1, 11, 'unborn', { birthYear: 1565, isNotBorn: true });
     const otherFuture = makeBusho(301, 3, 31, 'unborn');
     const notYetBorn = makeBusho(104, 1, 11, 'unborn', { birthYear: 1580, isNotBorn: true });
-    const bushos = [oldDaimyo, rebel, ally, ownFuture, otherFuture, notYetBorn];
+    const plannedKunishu = makeBusho(401, 0, 31, 'unborn', { belongKunishuId: 60, birthYear: 1566 });
+    const plannedKunishuUnborn = makeBusho(402, 0, 31, 'unborn', { belongKunishuId: 61, birthYear: 1580, isNotBorn: true });
+    const unassignedRelative = makeBusho(403, 0, 31, 'unborn', { belongKunishuId: 0, birthYear: 1566 });
+    const bushos = [oldDaimyo, rebel, ally, ownFuture, otherFuture, notYetBorn, plannedKunishu, plannedKunishuUnborn, unassignedRelative];
     const castles = [
         { id: 11, name: '旧主家居城', ownerClan: 1, castellanId: 101, samuraiIds: [101], x: 0, y: 0, legionId: 0 },
         { id: 12, name: '反乱拠点', ownerClan: 1, castellanId: 102, samuraiIds: [102], x: 1, y: 0, legionId: 0 },
@@ -35345,6 +35356,14 @@ test('r779 謀反勝利後に旧主家と無関係な予定所属の未登場一
     assert.strictEqual(otherFuture.castleId, 31, '他家の登場予定拠点を勝手に変更しない');
     assert.strictEqual(notYetBorn.clan, 0, '旧主家一門の未誕生者は従来どおり将来の浪人登場予定へ移す');
     assert.strictEqual(notYetBorn.status, 'unborn', '未誕生者を今すぐ元服させない');
+    assert.strictEqual(plannedKunishu.status, 'unborn', '別諸勢力に登場予定の出生済み一門を早期元服させない');
+    assert.strictEqual(plannedKunishu.clan, 0, '別諸勢力に登場予定の一門の大名家所属を変更しない');
+    assert.strictEqual(plannedKunishu.belongKunishuId, 60, '別諸勢力の登場予定所属を維持');
+    assert.strictEqual(plannedKunishu.castleId, 31, '登場予定の所在を変更しない');
+    assert.strictEqual(plannedKunishuUnborn.status, 'unborn', '未出生で別諸勢力予定の一門も保護');
+    assert.strictEqual(plannedKunishuUnborn.belongKunishuId, 61, '別諸勢力の未出生者の予定所属を維持');
+    assert.strictEqual(unassignedRelative.status, 'ronin', '所属未定の出生済み一門は従来どおり逃亡に合流');
+    assert.strictEqual(unassignedRelative.castleId, 21, '所属未定一門は退避先で早期元服する');
 });
 
 // A-106: 実際の派閥再編を謀反勝利に接続し、新当主就任後の派閥孤児を防ぐ。
@@ -37821,6 +37840,258 @@ test('A-139 鎮圧戦勝利は諸勢力Systemの共通壊滅窓口へ委譲す�
         '鎮圧戦では兵力0と同じ正本へ壊滅・処遇を委譲する');
     assert.ok(!block.includes('this.game.affiliationSystem.becomeRonin(b)'),
         '鎮圧戦に個別浪人化ループを複製しない');
+});
+
+
+// A-143: 諸勢力の頭領死亡は実際の月末処理で発生し、初期データには
+// 同族だが別家・別諸勢力への所属が予定されている未登場武将がいる。
+// 同一門という理由だけで将来の予定所属を破棄しない。
+test('r814 諸勢力頭領の早期継承は別家・別諸勢力の未登場一門を奪わない', async () => {
+    const ctx = createContext({
+        LifeStatusRules: { isPresent: b => b.status === 'active' || b.status === 'ronin', isUnborn: b => b.status === 'unborn' },
+        GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', UNBORN: 'unborn', DEAD: 'dead' } }
+    });
+    loadScript(ctx, 'js/kunishu_system.js');
+    const Kun = vm.runInContext('KunishuSystem', ctx);
+    const make = (id, clan, belongKunishuId, status, affinity, familyIds) => ({
+        id, name: `武将${id}`, fullName: `武将${id}`, clan, belongKunishuId,
+        castleId: belongKunishuId === 61 ? 61 : 65, status, affinity,
+        familyIds, birthYear: 1560, startYear: 1575, leadership: 50, intelligence: 50,
+        isAutoLeader: false, loyalty: 50
+    });
+    const deceased = make(201, 0, 61, 'dead', 40, [201, 900]);
+    const member = make(202, 0, 61, 'active', 30, [202]);
+    const plannedOtherClan = make(301, 26, 0, 'unborn', 40, [301, 900]);
+    const plannedOtherKunishu = make(302, 0, 60, 'unborn', 41, [302, 900]);
+    const plannedSameKunishu = make(303, 0, 61, 'unborn', 50, [303, 900]);
+    const bushos = [deceased, member, plannedOtherClan, plannedOtherKunishu, plannedSameKunishu];
+    const castle = { id: 61, samuraiIds: [202] };
+    const kunishu = { id: 61, name: '因島衆', leaderId: 201, castleId: 61, soldiers: 800, isDestroyed: false, getName() { return this.name; } };
+    const game = { year: 1570, month: 8, bushos, castles: [castle],
+        getBusho: id => bushos.find(b => b.id === Number(id)) || null,
+        getCastle: id => Number(id) === 61 ? castle : null,
+        affiliationSystem: {
+            setActivityStatusRaw(b, v) { b.status = v; },
+            setClanIdRaw(b, v) { b.clan = v; },
+            setCastleIdRaw(b, v) { b.castleId = v; }
+        },
+        ui: { log() {}, async showDialogAsync() {} }
+    };
+    const sys = new Kun(game);
+    await sys.checkDestroyed(kunishu);
+    assert.strictEqual(kunishu.leaderId, 303, '同じ諸勢力への加入予定者を後任に選ぶ');
+    assert.strictEqual(plannedSameKunishu.status, 'active', '同じ諸勢力への早期元服は維持');
+    assert.strictEqual(plannedOtherClan.status, 'unborn', '別大名家の登場予定は守る');
+    assert.strictEqual(plannedOtherClan.clan, 26, '別大名家の予定所属を奪わない');
+    assert.strictEqual(plannedOtherKunishu.status, 'unborn', '別諸勢力の登場予定は守る');
+    assert.strictEqual(plannedOtherKunishu.belongKunishuId, 60, '別諸勢力の予定所属を奪わない');
+    assert.deepStrictEqual(castle.samuraiIds, [202, 303], '実際の登場者だけを在城名簿に加える');
+});
+
+test('r814 同所属の未登場一門がいなければ在籍する現役構成員が頭領を継ぐ', async () => {
+    const ctx = createContext({
+        LifeStatusRules: { isPresent: b => b.status === 'active' || b.status === 'ronin', isUnborn: b => b.status === 'unborn' },
+        GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', UNBORN: 'unborn', DEAD: 'dead' } }
+    });
+    loadScript(ctx, 'js/kunishu_system.js');
+    const Kun = vm.runInContext('KunishuSystem', ctx);
+    const busho = (id, status, clan, belongKunishuId, familyIds) => ({
+        id, name:`武将${id}`, fullName:`武将${id}`, status, clan, belongKunishuId,
+        familyIds, castleId:71, birthYear:1550, startYear:1567, affinity:50,
+        leadership:60, intelligence:60
+    });
+    const former = busho(501,'dead',0,71,[501,999]);
+    const member = busho(502,'active',0,71,[502]);
+    const futureOtherClan = busho(503,'unborn',24,0,[503,999]);
+    const people = [former, member, futureOtherClan];
+    const kunishu = {id:71,name:'国衆',leaderId:501,castleId:71,soldiers:500,isDestroyed:false,getName(){return this.name;}};
+    const game = {year:1560, month:9, bushos:people, getBusho:id=>people.find(b=>b.id===id),
+        getCastle:id=>Number(id)===71?{id:71,samuraiIds:[502]}:null,
+        affiliationSystem: {
+            setActivityStatusRaw(b, v) { b.status = v; },
+            setClanIdRaw(b, v) { b.clan = v; },
+            setCastleIdRaw(b, v) { b.castleId = v; }
+        },
+        ui:{log(){},async showDialogAsync(){}}
+    };
+    await new Kun(game).checkDestroyed(kunishu);
+    assert.strictEqual(kunishu.leaderId,502,'現役の所属武将を継承者に選ぶ');
+    assert.strictEqual(futureOtherClan.status,'unborn','他家所属予定の血縁者は未登場のまま');
+});
+
+
+// A-144: 1570姉川の足利家は死亡済みの足利義栄が諸勢力所属IDを保持する。
+// 通常大名の死亡時にその旧所属IDだけを根拠に家督を継がせてはならない。
+test('r815 大名家督は死亡済みの諸勢力一門を後任に選ばない', () => {
+    const ctx = createContext({
+        LifeStatusRules: { isUnborn: b => b.status === 'unborn' },
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' }
+    });
+    loadScript(ctx, 'js/life_system.js');
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const leader = { id:1017004, name:'一乗院覚慶', clan:17, status:'active', birthYear:1537, affinity:42, leadership:60, intelligence:60, familyIds:[1017004,999] };
+    const dead = { id:1017006, name:'足利義栄', clan:0, belongKunishuId:48, status:'dead', birthYear:1538, endYear:1568, affinity:42, leadership:80, intelligence:80, familyIds:[1017006,999] };
+    const ordinaryRetainer = { id:17111, name:'足利家臣', clan:17, belongKunishuId:0, status:'active', birthYear:1540, affinity:50, leadership:50, intelligence:50, familyIds:[17111] };
+    const people=[leader,dead,ordinaryRetainer];
+    const game={year:1570,playerClanId:1,legions:[],bushos:people,
+        getClanBushos:clanId=>people.filter(b=>b.clan===clanId),
+        kunishuSystem:{getKunishu:id=>({id,leaderId:1017005})}};
+    const sys=new Life(game);
+    const candidates=sys._sortSuccessionCandidates(leader,sys._collectSuccessionCandidates(leader,'daimyo'),'daimyo');
+    assert.deepStrictEqual(Array.from(candidates,b=>b.id),[ordinaryRetainer.id], '死亡済みの別諸勢力一門を家督候補に含めない');
+});
+
+test('r815 国主継承でも死亡済み諸勢力一門を除外し同軍団現役家臣へ継がせる', () => {
+    const ctx=createContext({
+        LifeStatusRules:{isUnborn:b=>b.status==='unborn'},
+        BushoStatusRules:{isActive:b=>b.status==='active',isRonin:b=>b.status==='ronin'}
+    });
+    loadScript(ctx,'js/life_system.js');
+    const Life=vm.runInContext('LifeSystem',ctx);
+    const commander={id:100,clan:7,castleId:9,legionId:3,status:'active',familyIds:[100,88],birthYear:1520,affinity:40};
+    const dead={id:101,clan:0,belongKunishuId:15,status:'dead',familyIds:[101,88],birthYear:1540,affinity:40,leadership:95,intelligence:90};
+    const retainer={id:102,clan:7,castleId:10,status:'active',familyIds:[102],leadership:55,intelligence:60};
+    const people=[commander,dead,retainer];
+    const game={year:1570,playerClanId:1,legions:[],bushos:people,
+        getClanBushos:id=>people.filter(b=>b.clan===id),getCastle:id=>({id,legionId:3}),
+        kunishuSystem:{getKunishu:()=>({leaderId:123})}};
+    const sys=new Life(game);
+    const candidates=sys._collectSuccessionCandidates(commander,'commander',[],{legionNo:3});
+    assert.deepStrictEqual(Array.from(candidates,b=>b.id),[102], '国主の候補にも死亡者を含めず、同軍団の現役家臣に戻る');
+});
+
+test('r815 諸勢力の生存一門・浪人・出生済み未登場は継承候補として維持する', () => {
+    const ctx=createContext({
+        LifeStatusRules:{isUnborn:b=>b.status==='unborn'},
+        BushoStatusRules:{isActive:b=>b.status==='active',isRonin:b=>b.status==='ronin'}
+    });
+    loadScript(ctx,'js/life_system.js');
+    const Life=vm.runInContext('LifeSystem',ctx);
+    const lord={id:11,clan:6,status:'active',familyIds:[11,77],birthYear:1510};
+    const activeKunishuKin={id:12,clan:0,belongKunishuId:8,status:'active',familyIds:[12,77],birthYear:1540};
+    const ronin={id:13,clan:0,belongKunishuId:0,status:'ronin',familyIds:[13,77],birthYear:1540};
+    const bornUnborn={id:14,clan:0,belongKunishuId:0,status:'unborn',isNotBorn:false,familyIds:[14,77],birthYear:1557};
+    const unbornChild={id:15,clan:0,belongKunishuId:8,status:'unborn',isNotBorn:true,familyIds:[15,77],birthYear:1580};
+    const people=[lord,activeKunishuKin,ronin,bornUnborn,unbornChild];
+    const game={year:1570,playerClanId:1,legions:[],bushos:people,
+        getClanBushos:id=>people.filter(b=>b.clan===id),kunishuSystem:{getKunishu:()=>({leaderId:99})}};
+    const sys=new Life(game);
+    const ids=Array.from(sys._collectSuccessionCandidates(lord,'daimyo'),b=>b.id);
+    assert.strictEqual(ids.filter(id=>id===activeKunishuKin.id).length,1,'現役諸勢力一門は従来通り資格あり');
+    assert.strictEqual(ids.filter(id=>id===ronin.id).length,1,'浪人一門は従来通り資格あり');
+    assert.strictEqual(ids.filter(id=>id===bornUnborn.id).length,1,'出生済み未登場者の早期元服は維持し、二重候補にしない');
+    assert.ok(!ids.includes(unbornChild.id),'まだ生まれていない武将を後継候補に含めない');
+});
+
+
+// r816: まだ元服前で別の諸勢力に所属予定の親族は、家督・国主の早期元服で奪わない。
+// 諸勢力からの現役一門の招致と、所属未定／同じ大名家の早期元服は保護する。
+test('r816 大名・国主の早期元服候補は別諸勢力への登場予定を侵害しない', () => {
+    const ctx=createContext({
+        LifeStatusRules:{isUnborn:b=>b.status==='unborn'},
+        BushoStatusRules:{isActive:b=>b.status==='active',isRonin:b=>b.status==='ronin'}
+    });
+    loadScript(ctx,'js/life_system.js');
+    const Life=vm.runInContext('LifeSystem',ctx);
+    const incumbent={id:1,clan:9,status:'active',familyIds:[1,99],birthYear:1525,castleId:10};
+    const otherPlanned={id:2,clan:0,belongKunishuId:45,status:'unborn',isNotBorn:false,
+        familyIds:[2,99],birthYear:1555,startYear:1570,leadership:98,intelligence:98};
+    const sameClanPlanned={id:3,clan:9,belongKunishuId:0,status:'unborn',isNotBorn:false,
+        familyIds:[3,99],birthYear:1555,startYear:1570,leadership:30,intelligence:30};
+    const unassignedPlanned={id:4,clan:0,belongKunishuId:0,status:'unborn',isNotBorn:false,
+        familyIds:[4,99],birthYear:1558,startYear:1570,leadership:40,intelligence:40};
+    const activeKunishu={id:5,clan:0,belongKunishuId:45,status:'active',
+        familyIds:[5,99],birthYear:1530,leadership:50,intelligence:50};
+    const ronin={id:6,clan:0,belongKunishuId:0,status:'ronin',
+        familyIds:[6,99],birthYear:1530,leadership:50,intelligence:50};
+    const people=[incumbent,otherPlanned,sameClanPlanned,unassignedPlanned,activeKunishu,ronin];
+    const game={year:1560,playerClanId:88,legions:[],bushos:people,
+        getClanBushos:id=>people.filter(b=>b.clan===id),
+        kunishuSystem:{getKunishu:()=>({leaderId:999})}};
+    const life=new Life(game);
+    for (const role of ['daimyo','commander']) {
+        const ids=Array.from(life._collectSuccessionCandidates(incumbent,role,[],{legionNo:1}),b=>b.id);
+        assert.ok(!ids.includes(otherPlanned.id),`${role}: 別諸勢力の元服前一門を奪わない`);
+        assert.ok(ids.includes(sameClanPlanned.id),`${role}: 自家で元服前の一門は候補に残す`);
+        assert.ok(ids.includes(unassignedPlanned.id),`${role}: 所属未定の元服前一門は候補に残す`);
+        assert.ok(ids.includes(activeKunishu.id),`${role}: 現役の諸勢力一門は従来どおり`);
+        assert.ok(ids.includes(ronin.id),`${role}: 浪人一門は従来どおり`);
+    }
+});
+
+// 実データ1560年: 河野通宣→得居通幸（来島衆所属予定）の横取りを防止。
+test('r816 1560年河野家の継承は他諸勢力へ登場予定の得居通幸を奪わない', () => {
+    const data=JSON.parse(zlib.inflateSync(fs.readFileSync(path.join(ROOT,'data/common.bin'))));
+    const scenario=JSON.parse(zlib.inflateSync(fs.readFileSync(path.join(ROOT,'data/scenarios/1560_okehazama/scenario.bin'))));
+    const ctx=createContext();
+    loadScript(ctx,'js/constants.js');
+    loadScript(ctx,'js/family_system.js');
+    loadScript(ctx,'js/life_system.js');
+    const states=new Map(scenario.warriorsState.map(b=>[Number(b.id),b]));
+    const people=data.warriorsMaster.map(b=>{
+        const merged={...b,...states.get(Number(b.id))};
+        for(const key of ['id','clan','belongKunishuId','birthYear','startYear','endYear','realFatherId','realMotherId','adoptiveFather']) merged[key]=Number(merged[key])||0;
+        merged.adoptiveFatherId=merged.adoptiveFather;
+        merged.status=(merged.startYear===9999||merged.endYear<1560)?'dead':merged.startYear>1560?'unborn':merged.clan===0&&merged.belongKunishuId===0?'ronin':'active';
+        merged.isNotBorn=merged.birthYear>1560;
+        return merged;
+    });
+    const princessStates=new Map(scenario.princessState.map(p=>[Number(p.id),p]));
+    ctx.FamilyLinker.rebuildAllFamilyIds(people,data.princessMaster.map(p=>({...p,...princessStates.get(Number(p.id))})));
+    const leader=people.find(b=>b.id===1049003);
+    const assignedToKunishu=people.find(b=>b.id===2060005);
+    const game={year:1560,playerClanId:1,legions:[],bushos:people,
+        getClanBushos:id=>people.filter(b=>b.clan===id),
+        kunishuSystem:{getKunishu:id=>scenario.kunishus.find(k=>k.id===id)}};
+    const life=new (vm.runInContext('LifeSystem',ctx))(game);
+    const ranked=life._sortSuccessionCandidates(leader,life._collectSuccessionCandidates(leader,'daimyo'),'daimyo');
+    assert.strictEqual(assignedToKunishu.status,'unborn');
+    assert.strictEqual(assignedToKunishu.belongKunishuId,60);
+    assert.ok(!ranked.some(b=>b.id===assignedToKunishu.id),'他諸勢力へ登場予定の一門を家督候補に混入させない');
+    assert.strictEqual(ranked[0]?.id,1049001,'現役家臣の河野通直へ正しく継承順位を戻す');
+});
+
+// r818: 遠山家の当主死亡イベントは開始年から到達でき、初期化時の
+// 武将 isNotBorn 未設定を「出生済み」と取り違えてはならない。
+test('r818 遠山景任死亡イベントは1560年の未出生勝長を養子にせず1570年の出生済み勝長を許容する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    const event = ctx.GameEvents.find(e => e.id === 'historical_toyama_takeover');
+    assert.ok(event && event.timing === 'busho_death');
+    for (const [folder, expected] of [['1560_okehazama', false], ['1570_anegawa', true]]) {
+        const { common, scenario } = getRuntimeData(folder);
+        const startYear = Number(scenario.scenario.startYear);
+        const states = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+        const leaders = new Map(scenario.clansState.map(c => [Number(c.id), Number(c.leaderId)]));
+        const people = new Map([1006006, 1006013, 1012007].map(id => {
+            const master = common.warriorsMaster.find(b => Number(b.id) === id);
+            const b = { ...master, ...states.get(id), id };
+            b.clan = Number(b.clan);
+            b.birthYear = Number(b.birthYear);
+            b.startYear = Number(b.startYear);
+            b.endYear = Number(b.endYear);
+            b.isDaimyo = leaders.get(b.clan) === id;
+            b.status = b.startYear === 9999 || b.endYear < startYear ? 'dead'
+                : b.startYear > startYear ? 'unborn' : 'active';
+            // DataManager.joinData の武将初期化では、このフラグを設定しない。
+            return [id, b];
+        }));
+        const katsunaga = people.get(1006013);
+        const deadBusho = people.get(1012007);
+        assert.strictEqual(katsunaga.status, 'unborn', '両シナリオとも勝長は元服前');
+        assert.strictEqual(katsunaga.isNotBorn, undefined, '起動直後に出生前フラグは未設定');
+        const relation = scenario.diplomacy.find(r => Number(r.sourceClanId) === deadBusho.clan
+            && Number(r.targetClanId) === people.get(1006006).clan);
+        assert.strictEqual(relation?.relationType, '従属', '初期から遠山家は織田家に従属');
+        const game = {
+            year: startYear, playerClanId: 1,
+            getBusho: id => people.get(Number(id)),
+            diplomacyManager: { getRelation: () => ({ status: relation.relationType }) }
+        };
+        assert.strictEqual(event.checkCondition(game, { deadBusho }), expected,
+            `${startYear}年: 出生前は拒否し、出生済み元服前なら従来どおり許容`);
+    }
 });
 
 Promise.all(pendingTests).then(() => {

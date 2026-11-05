@@ -1659,10 +1659,12 @@ window.GameEvents.push({
 
         // 7. 織田勝長（ID: 1006013）が存在し、織田信長勢力に所属しているか（生まれていて未登場の場合も含む）確認します
         const katsunaga = game.getBusho(1006013);
-        if (!katsunaga || window.LifeStatusRules.isDead(katsunaga) || katsunaga.status === 'not_born') return false;
-        
-        // 勝長が「生まれているが未登場（unborn）」で、出生前フラグが立っている場合はダメ
-        if (window.LifeStatusRules.isUnborn(katsunaga) && katsunaga.isNotBorn) return false;
+        if (!katsunaga || window.LifeStatusRules.isDead(katsunaga)) return false;
+
+        // 武将の出生前フラグは年次同期で更新されるため、開始年の途中では未設定となる。
+        // 養子入りによる早期元服は、実際の生年に達している場合だけ許可する。
+        if (window.LifeStatusRules.isUnborn(katsunaga)
+            && (katsunaga.isNotBorn || Number(katsunaga.birthYear) > Number(game.year))) return false;
         
         // 勝長の所属が織田家か、未登場なら父親の所属が織田家か確認します
         let belongsToOda = false;
@@ -3051,6 +3053,7 @@ window.GameEvents.push({
         // 両拠点の順序と退避対象は従来どおり維持し、城主は全員の移動後に確定する。
         const departingResidents = [26, 90].flatMap(castleId => game.bushos.filter(b =>
             b.castleId === castleId && b.clan === sponsorClanId && b.id !== candidate.id
+                && window.BushoStatusRules.isActive(b)
         ));
         if (departingResidents.length > 0) {
             departingResidents.forEach(b => { b.isCastellan = false; });
