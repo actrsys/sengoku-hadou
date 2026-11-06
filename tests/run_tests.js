@@ -11433,7 +11433,7 @@ test('臣従・吸収は婚姻と派閥を所属Systemの一括移管窓口で�
     const common = read('js/event/common_events.js');
     const diplomacy = read('js/diplomacy.js');
     const historical = read('js/event/historical_event.js');
-    assert.ok(common.includes('game.affiliationSystem.absorbClan(subordinateClanId, dominantClanId);'));
+    assert.ok(common.includes('game.affiliationSystem.absorbClan(subordinateClanId, dominantClanId, { deferFactionUpdate: true });'));
     assert.ok(diplomacy.includes('this.game.affiliationSystem.absorbClan(myClanId, targetClanId);'));
     assert.ok(historical.includes('game.affiliationSystem.absorbClan(subordinateClanId, dominantClanId, {'));
     const start = aff.indexOf('    absorbClan(subordinateClanId, dominantClanId, {');
@@ -35110,6 +35110,12 @@ test('r776 非城主派閥主の脱出で仮城主を選ばず旧拠点の所有
     };
     game.affiliationSystem = new Aff(game);
     game.factionSystem = new Fac(game);
+    const factionRebuilds = [];
+    const originalFactionRebuild = game.factionSystem.updateFactions.bind(game.factionSystem);
+    game.factionSystem.updateFactions = clanId => {
+        factionRebuilds.push(clanId);
+        return originalFactionRebuild(clanId);
+    };
     game.affiliationSystem.updateUI = () => {};
     game.updateCastleLord = c => game.affiliationSystem.updateCastleLord(c);
     const sys = new Indep(game);
@@ -35124,6 +35130,8 @@ test('r776 非城主派閥主の脱出で仮城主を選ばず旧拠点の所有
     assert.deepStrictEqual(leaderCastle.samuraiIds, [], '全員脱出後の在城名簿');
     assert.strictEqual(leaderCastle.castellanId, 0, '城主不在の最終状態');
     assert.strictEqual(history.filter(m => m.includes('【城主任命】')).length, 0, '途中だけの城主任命履歴なし');
+    assert.deepStrictEqual(factionRebuilds, [2, 3],
+        'r831: 既存勢力への寝返りでは旧主家・受入側の派閥を最終名簿で一度ずつ再編する');
 });
 
 // r777: 決起側から旧主家へ脱出した武将が城主不在拠点へ入っても、
@@ -35503,9 +35511,10 @@ test('r781 主家軍勝利時は独立確定後の残留家臣だけで派閥を
     assert.strictEqual(daimyo.isDaimyo, true, '主家軍勝利後も旧当主が大名');
     assert.strictEqual(rebel.clan, 2, '反乱側は新勢力として通常の独立処理を完了');
     assert.strictEqual(daimyo.isFactionLeader, false, '大名は派閥主を兼任しない');
-    assert.strictEqual(snapshots.length, 1, '主家の派閥更新は一括独立確定後に一度だけ');
-    assert.strictEqual(snapshots[0].rebelClan, 2, '離反者が退去した最終名簿で派閥選挙');
-    assert.strictEqual(snapshots[0].isDaimyo, true, '派閥主選出の間も大名として除外する');
+    assert.deepStrictEqual(snapshots.map(s => s.clanId), [1, 2],
+        'r831: 主家の特例再編後、独立側も最終名簿から一度だけ派閥を再編する');
+    assert.ok(snapshots.every(s => s.rebelClan === 2), '離反者が退去した最終名簿で派閥選挙');
+    assert.strictEqual(snapshots[0].isDaimyo, true, '主家選挙では大名を候補から除外する');
     assert.ok([loyalA, loyalB].every(b => b.achievementTotal === 100), '勝利時の一時的な功績補正は永続化しない');
     const survivors = bushos.filter(b => b.clan === 1 && b.status === 'active');
     assert.ok(survivors.every(b => b.factionId === 0 || survivors.some(l => l.factionId === b.factionId && l.isFactionLeader)),
@@ -35681,9 +35690,10 @@ async function verifyFactionLeaderDepartureAfterIndependence(asDraw) {
     assert.ok([loyalA, loyalB].every(b => b.clan === 1 && b.castleId === 11), '確率判定で合流せず旧家に残る実経路');
     assert.ok([loyalA, loyalB].every(b => b.factionId === 0 && !b.isFactionLeader),
         '旧主家に派閥主不在の旧派閥IDを残さない');
-    assert.strictEqual(snapshots.length, 1, '通常独立・引き分けとも旧主家の派閥更新は確定後に一度だけ');
-    assert.strictEqual(snapshots[0].clanId, 1);
-    assert.strictEqual(snapshots[0].rebelClan, 2, '独立勢力成立前の一時名簿で再編しない');
+    assert.deepStrictEqual(snapshots.map(s => s.clanId), [1, 2],
+        'r831: 通常独立・引き分けとも旧家・新勢力を最終名簿で一度ずつ再編する');
+    assert.ok(snapshots.every(s => s.rebelClan === 2),
+        '独立勢力成立前の一時名簿で再編しない');
 }
 
 test('r784 通常独立で派閥主が去った後に旧家へ派閥主不在の所属者を残さない',
@@ -38616,6 +38626,241 @@ test('r829 断交人質の脱走・捕虜化は元所属へ戻す際に旧派閥
         assert.deepStrictEqual(updates.slice(before).sort(), [3, 4],
             `${label}の処遇完了後、両家の派閥を一度ずつ再編`);
     }
+});
+
+
+// r832: 成功した城主引抜では通常家臣と違って joinClan() を通らない。
+// 旧家の派閥主本人と配下が離反すると、旧当主に消滅した派閥IDが残る。
+// 引抜担当がAIでもプレイヤーでも applyHeadhuntEffect() を通る実経路で検証する。
+test('r832 城主引抜の家臣処遇後に旧家・受入家の派閥を一度ずつ最終再編する', async () => {
+    const ctx = createContext();
+    for (const f of ['js/config.js', 'js/affiliation_system.js', 'js/faction_system.js',
+        'js/independence_system.js', 'js/strategy_system.js']) loadScript(ctx, f);
+    ctx.WarParams = { Faction: global.GameConfig.War.Faction };
+    ctx.GameConstants = { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', UNBORN: 'unborn', DEAD: 'dead' } };
+    ctx.BushoStatusRules = { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' };
+    ctx.LifeStatusRules = { isPresent: b => b.status === 'active' || b.status === 'ronin', isDead: b => b.status === 'dead' };
+    ctx.PersonnelRules = { calcAffinityDiff: (a, b) => Math.min(Math.abs(a - b), 100 - Math.abs(a - b)) };
+    const Aff = vm.runInContext('AffiliationSystem', ctx);
+    const Fac = vm.runInContext('FactionSystem', ctx);
+    const Indep = vm.runInContext('IndependenceSystem', ctx);
+    const Strategy = vm.runInContext('StrategySystem', ctx);
+    const make = (id, clan, castleId, more = {}) => ({
+        id, clan, castleId, status: 'active', name: '武将'+id, fullName: '武将'+id,
+        familyName: '氏'+id, familyYomi: 'うじ', givenName: '武将', givenYomi: 'ぶしょう', yomi: 'ぶしょう',
+        factionId: 0, isFactionLeader: false, factionSeikaku: '無所属', factionHoshin: '無所属',
+        factionName: '', factionYomi: '', recognitionNeed: 0,
+        loyalty: 95, achievementTotal: 2000, innovation: 30,
+        affinity: id % 2 === 0 ? 4 : 54, personality: 'balanced',
+        leadership: 70, strength: 70, intelligence: 70, politics: 70, diplomacy: 70, charm: 70,
+        isDaimyo: false, isCastellan: false, isCommander: false, isGunshi: false,
+        belongKunishuId: 0, familyIds: [], wifeIds: [], battleHistory: [], stayHistory: [],
+        arrivalTurn: 1560 * 12 + 4, duty: 50, ambition: 50, ...more
+    });
+    const oldKing = make(10, 1, 10, { isDaimyo: true, isCastellan: true });
+    const newKing = make(20, 2, 20, { isDaimyo: true, isCastellan: true });
+    const target = make(11, 1, 11, { isCastellan: true, affinity: 4 });
+    const oldMembers = [12,13,14,15].map(id => make(id, 1, 11, { affinity: id % 2 ? 4 : 54 }));
+    const newMembers = [22,23,24,25].map(id => make(id, 2, 20));
+    const doer = make(26, 2, 20, { affinity: 4 });
+    const bushos = [oldKing, target, ...oldMembers, newKing, ...newMembers, doer];
+    const castles = [
+        { id: 10, name: '旧主家本拠', ownerClan: 1, castellanId: 10, samuraiIds: [10], legionId: 0 },
+        { id: 11, name: '引抜対象城', ownerClan: 1, castellanId: 11, samuraiIds: [11,12,13,14,15], legionId: 0 },
+        { id: 20, name: '受入家本拠', ownerClan: 2, castellanId: 20, samuraiIds: [20,22,23,24,25,26], legionId: 0 }
+    ];
+    const clans = [{ id: 1, name: '旧家' }, { id: 2, name: '受入家' }];
+    const game = { year: 1560, month: 5, phase: 'game', playerClanId: 2,
+        bushos, castles, clans, legions: [],
+        getBusho(id) { return bushos.find(b => b.id === Number(id)) || null; },
+        getCastle(id) { return castles.find(c => c.id === Number(id)) || null; },
+        getClan(id) { return clans.find(c => c.id === Number(id)) || null; },
+        getClanDaimyo(id) { return bushos.find(b => b.clan === Number(id) && b.isDaimyo) || null; },
+        getClanBushos(id) { return bushos.filter(b => b.clan === Number(id)); },
+        getCastleBushos(id) { const c = this.getCastle(id); return c ? c.samuraiIds.map(i => this.getBusho(i)).filter(Boolean) : []; },
+        getClanCastles(id) { return castles.filter(c => c.ownerClan === Number(id)); },
+        castleManager: { changeOwner(c, id) { c.ownerClan = id; }, disbandLegion() {} },
+        ui: { info: { refreshOpenFactionList() {} }, log() {}, showDialog() {} },
+        historySystem: { record() {} }
+    };
+    game.affiliationSystem = new Aff(game);
+    game.affiliationSystem.updateUI = () => {};
+    game.factionSystem = new Fac(game);
+    game.independenceSystem = new Indep(game);
+    game.strategySystem = new Strategy(game);
+    game.updateCastleLord = c => game.affiliationSystem.updateCastleLord(c);
+    game.independenceSystem.calculateLoyaltyScores = () => ({ joinScore: 1000, stayScore: 0 });
+    game.independenceSystem.calcNewLoyalty = () => 90;
+    game.factionSystem.updateFactions(1);
+    game.factionSystem.updateFactions(2);
+    assert.ok(target.factionId > 0 && oldKing.factionId > 0, '修正前に本物の派閥選出が成立している');
+    const fromFaction = target.factionId;
+    const rebuilt = [];
+    let subordinatesFinished = false;
+    const realResolve = game.independenceSystem.resolveSubordinates.bind(game.independenceSystem);
+    game.independenceSystem.resolveSubordinates = async (...args) => {
+        const result = await realResolve(...args);
+        subordinatesFinished = true;
+        return result;
+    };
+    const originalUpdate = game.factionSystem.updateFactions.bind(game.factionSystem);
+    game.factionSystem.updateFactions = id => {
+        rebuilt.push({ id, subordinatesFinished });
+        return originalUpdate(id);
+    };
+    await game.strategySystem.applyHeadhuntEffect(doer, target, game.getCastle(20), true);
+    assert.strictEqual(target.clan, 2, '城主本人は受入家へ移籍');
+    assert.ok(oldMembers.every(b => b.clan === 2), '本物の家臣呼応判定による転籍完了');
+    assert.strictEqual(game.getCastle(11).ownerClan, 2, '引抜城の所有者更新');
+    assert.deepStrictEqual(rebuilt, [{ id: 1, subordinatesFinished: true }, { id: 2, subordinatesFinished: true }],
+        '家臣処遇後に旧家・受入家を重複せずそれぞれ一度再編');
+    assert.strictEqual(oldKing.factionId, 0, '旧派閥主が全員離反しても当主に孤立した派閥IDを残さない');
+    assert.ok(target.factionId > 0 && target.factionId !== fromFaction,
+        '引抜城主は受入先の実際の派閥選出で所属を確定');
+    for (const clanId of [1, 2]) {
+        const members = bushos.filter(b => b.status === 'active' && b.clan === clanId);
+        assert.ok(members.every(b => b.factionId === 0 || members.some(leader =>
+            leader.isFactionLeader && leader.factionId === b.factionId)),
+            '勢力'+clanId+'の家臣に派閥主不在のIDを残さない');
+    }
+    const source = fs.readFileSync(path.join(ROOT, 'js/ai.js'), 'utf8');
+    assert.ok(source.includes('this.game.strategySystem.applyHeadhuntEffect(doer, targetBusho, castle, isSuccess)'),
+        'AIも同じ引抜確定入口を使用');
+});
+
+
+// A-146: 月次共通イベントの「画面更新」と「派閥再選挙」を分離。
+// 毎月の民忠・交易など、武将所属が変わらない処理で二重選挙を起こさない。
+test('r833 月初の非人事イベントは画面・威信だけ更新し派閥を再選挙しない', async () => {
+    const ctx = createContext({ setTimeout });
+    ctx.BushoStatusRules = { isRonin: b => b.status === 'ronin', isActive: b => b.status === 'active' };
+    ctx.GameEvents = [];
+    loadScript(ctx, 'js/event/common_events.js');
+    ctx.GameEvents = ctx.GameEvents.filter(e => ['peoples_loyalty_decrease_monthly', 'ronin_employment_monthly', 'ai_vassalage_offer_monthly'].includes(e.id));
+    loadScript(ctx, 'js/event_manager.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    let factions = 0, prestige = 0, maps = 0;
+    const castle = { id: 10, ownerClan: 1, population: 5000, peoplesLoyalty: 60 };
+    const game = { phase: 'game', year: 1570, month: 6, playerClanId: 1,
+        flags: {}, castles: [castle], clans: [], bushos: [],
+        getClan(){ return null; }, getClanDaimyo(){ return null; },
+        updateAllClanPrestige(){ prestige++; },
+        factionSystem: { updateFactions(){ factions++; } },
+        ui: { renderMap(){ maps++; }, updatePanelHeader(){} }
+    };
+    const EventManager = vm.runInContext('EventManager', ctx);
+    game.eventManager = new EventManager(game);
+    await game.eventManager.processEvents('startMonth_after');
+    assert.strictEqual(castle.peoplesLoyalty, 59, '経済イベント自体の効果は変更しない');
+    assert.strictEqual(factions, 0, '浪人仕官・臣従の成立がなければ全国派閥再編は不要');
+    assert.strictEqual(prestige, 1, '威信更新を省略しない');
+    assert.strictEqual(maps, 1, '画面更新を省略しない');
+});
+
+test('r833 月次浪人二人のAI仕官は途中再編を保留してイベント末尾で全国一度だけ再編', async () => {
+    const math = Object.create(Math);
+    math.random = () => 0;
+    const ctx = createContext({ setTimeout, Math: math });
+    ctx.BushoStatusRules = { isRonin: b => b.status === 'ronin', isActive: b => b.status === 'active' };
+    ctx.LifeStatusRules = { isDead: b => b.status === 'dead' };
+    ctx.PersonnelRules = { hasActiveNemesisInClan: () => false, calcAffinityDiff: () => 0 };
+    ctx.GameEvents = [];
+    loadScript(ctx, 'js/event/common_events.js');
+    ctx.GameEvents = ctx.GameEvents.filter(e => e.id === 'ronin_employment_monthly');
+    loadScript(ctx, 'js/event_manager.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    const daimyo = { id: 100, clan: 2, status: 'active', affinity: 0 };
+    const ronins = [101, 102].map(id => ({ id, clan: 0, castleId: 20, status: 'ronin', affinity: 0, name: '浪人', belongKunishuId: 0, isAutoLeader: false }));
+    const castle = { id: 20, ownerClan: 2 };
+    let factions = 0, recruits = 0;
+    const game = { phase: 'game', year: 1570, month: 6, flags: {}, playerClanId: 1,
+        bushos: [daimyo, ...ronins], castles: [castle], clans: [{ id: 2 }],
+        getCastle(id){ return id === 20 ? castle : null; },
+        getClanBushos(id){ return this.bushos.filter(b => b.clan === id); },
+        getClanDaimyo(id){ return id === 2 ? daimyo : null; },
+        getClan(id){ return this.clans.find(c => c.id === id); },
+        factionSystem: { updateFactions(){ factions++; assert.strictEqual(recruits, 2, '全員が加入後に再選挙する'); } },
+        affiliationSystem: { joinClan(b, clanId, castleId, loyalty, keepAchievement, options) {
+            assert.strictEqual(options.deferFactionUpdate, true);
+            assert.strictEqual(options.deferUI, true);
+            b.clan = clanId; b.status = 'active'; recruits++;
+        } },
+        updateAllClanPrestige(){}, ui: { renderMap(){}, updatePanelHeader(){} }
+    };
+    game.eventManager = new (vm.runInContext('EventManager', ctx))(game);
+    await game.eventManager.processEvents('startMonth_after');
+    assert.strictEqual(recruits, 2);
+    assert.strictEqual(factions, 1, '全国の派閥更新は一度だけ');
+});
+
+test('r833 月次AI臣従の複数家臣は吸収共通処理の最終派閥更新へ委譲', async () => {
+    const math = Object.create(Math); math.random = () => 0;
+    const ctx = createContext({ setTimeout, Math: math });
+    ctx.BushoStatusRules = { isActive: b => b.status === 'active' };
+    ctx.PersonnelRules = { calcAffinityDiff: () => 0 };
+    ctx.GameEvents = [];
+    loadScript(ctx, 'js/event/common_events.js');
+    ctx.GameEvents = ctx.GameEvents.filter(e => e.id === 'ai_vassalage_offer_monthly');
+    loadScript(ctx, 'js/event_manager.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    const source = { id: 2, name: '旧主家', daimyoPrestige: 1, diplomacyValue: { 3: { status: '従属', subordinateMonths: 24, sentiment: 100 } } };
+    const target = { id: 3, name: '新主家', daimyoPrestige: 100 };
+    const oldDaimyo = { id: 20, clan: 2, status: 'active', affinity: 0, name: '旧当主', castleId: 2 };
+    const newDaimyo = { id: 30, clan: 3, status: 'active', affinity: 0, name: '新当主', castleId: 3 };
+    let factionUpdates = 0, absorbs = 0;
+    const game = { phase: 'game', flags: {}, year: 1570, month: 6, playerClanId: 1,
+        clans: [source, target], bushos: [oldDaimyo, newDaimyo],
+        getClan(id){ return this.clans.find(c => c.id === id); },
+        getClanDaimyo(id){ return id === 2 ? oldDaimyo : id === 3 ? newDaimyo : null; },
+        getClanCastles(){ return []; },
+        affiliationSystem: { absorbClan(a,b,opts) {
+            assert.strictEqual(a, 2); assert.strictEqual(b, 3);
+            assert.strictEqual(opts.deferFactionUpdate, true, '通常の外交コマンドではなく、イベント全体の確定へ委譲');
+            absorbs++; source.isDestroyed = true;
+        } },
+        factionSystem: { updateFactions(){ factionUpdates++; assert.strictEqual(absorbs, 1); } },
+        updateAllClanPrestige(){},
+        ui: { async showDialogAsync(){}, log(){}, updatePanelHeader(){}, renderCommandMenu(){}, renderMap(){} }
+    };
+    game.eventManager = new (vm.runInContext('EventManager',ctx))(game);
+    await game.eventManager.processEvents('startMonth_after');
+    assert.strictEqual(absorbs, 1);
+    assert.strictEqual(factionUpdates, 1);
+});
+
+test('r833 史実イベントの全国派閥再編は従来どおり省略しない', async () => {
+    const ctx = createContext({ setTimeout });
+    ctx.GameEvents = [{ id:'historical_test', timing:'startMonth_after', isOneTime:true,
+        checkCondition(){ return true; }, async execute(game){ game.called = true; } }];
+    loadScript(ctx,'js/event_manager.js'); loadScript(ctx,'js/event/historical_event.js');
+    let factions = 0;
+    const game = { phase:'game', flags:{}, called:false,
+        factionSystem:{ updateFactions(){ factions++; } }, ui:{ renderMap(){}, updatePanelHeader(){} } };
+    game.eventManager = new (vm.runInContext('EventManager',ctx))(game);
+    await game.eventManager.processEvents('startMonth_after');
+    assert.strictEqual(game.called,true);
+    assert.strictEqual(factions,1);
+    assert.strictEqual(game.flags.historical_test,true);
+});
+
+test('r833 月次一括人事の途中失敗でも確定済み移籍に対する派閥再編を漏らさない', async () => {
+    const ctx = createContext({ setTimeout });
+    ctx.GameEvents = [{ id:'test_partial_recruit', timing:'startMonth_after', isOneTime:false,
+        factionRefreshMode:'ifChanged', checkCondition(){ return true; },
+        async execute(game){ game.recruited = true; throw Error('処理途中の失敗'); } }];
+    loadScript(ctx,'js/event_manager.js');
+    loadScript(ctx,'js/event/historical_event.js');
+    const warnings = [];
+    ctx.console = { ...console, warn(...args){ warnings.push(args); } };
+    let factions = 0, screens = 0;
+    const game = { phase:'game', flags:{}, recruited:false,
+        factionSystem:{ updateFactions(){ factions++; assert.strictEqual(game.recruited,true); } },
+        ui:{ renderMap(){ screens++; }, updatePanelHeader(){} } };
+    game.eventManager = new (vm.runInContext('EventManager',ctx))(game);
+    await game.eventManager.processEvents('startMonth_after');
+    assert.strictEqual(factions,1);
+    assert.strictEqual(screens,1);
+    assert.strictEqual(warnings.length,1);
 });
 
 Promise.all(pendingTests).then(() => {

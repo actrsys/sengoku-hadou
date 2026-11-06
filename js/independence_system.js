@@ -32,6 +32,18 @@ class IndependenceSystem {
     }
 
     /**
+     * 独立・寝返り確定後に変化した大名家の派閥を再編する唯一の終端窓口。
+     * 派閥の選出はFactionSystemが正本。途中での更新は親の勝敗処理に保留する。
+     * 一つの家を重複して再編しない（同家を二重指定する特殊ケースも許容）。
+     */
+    _rebuildFactionsAfterRebellion(...clanIds) {
+        const factions = this.game && this.game.factionSystem;
+        if (!factions) return;
+        const ids = new Set(clanIds.map(id => Number(id) || 0).filter(id => id > 0));
+        ids.forEach(id => factions.updateFactions(id));
+    }
+
+    /**
      * 月末に呼び出されるメイン処理
      */
     async checkIndependence() {
@@ -493,10 +505,10 @@ class IndependenceSystem {
             }
         });
 
-        // 独立後の最終名簿で旧主家の派閥を確定する。途中の離反者移籍では
-        // 旧派閥主が消えても残留家臣の派閥IDが残るため、呼応判定後に一度だけ再編する。
-        // 謀反の勝敗別処理は、戦後の専用補正・一時状態の復旧後に再編する。
-        if (!deferFactionUpdate && this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
+        // 独立・寝返り後は旧主家と新勢力の双方に所属の増減が発生する。
+        // 途中の離反者移籍では選挙せず、両家の最終名簿で一度ずつ確定する。
+        // 謀反の勝敗別処理では補正・仮派閥復旧の後まで親が保留する。
+        if (!deferFactionUpdate) this._rebuildFactionsAfterRebellion(oldClanId, newClanId);
         
         // ★Round7：独立・寝返りで実際に値が変わった旧勢力と新勢力だけ威信を更新します。
         // 全勢力の再計算はイベント終了後の共通更新でも行われるため、演出直前の瞬間負荷を抑えます。
@@ -1382,7 +1394,7 @@ class IndependenceSystem {
                 }
                 // 一括逃亡中は旧主家の派閥を途中選挙しない。
                 // 新大名の就任が確定した最終名簿でのみ、所属と派閥主を一度再編する。
-                if (this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
+                this._rebuildFactionsAfterRebellion(oldClanId);
 
                 // 勢力情報が変わったので威信を更新
                 if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige();
@@ -1455,11 +1467,16 @@ class IndependenceSystem {
                         originalAchievements.set(b.id, b.achievementTotal || 0);
                         b.achievementTotal = (b.achievementTotal || 0) + 3000;
                     });
-                    if (this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
+                    // 主家のみ戦勝時の一時功績補正で選出する。
+                    this._rebuildFactionsAfterRebellion(oldClanId);
                 } finally {
                     loyalSurvivors.forEach(b => {
                         b.achievementTotal = originalAchievements.get(b.id);
                     });
+                }
+                // 敗残者が創設した新家は、主家の特別な功績補正を適用せず別途確定する。
+                if (Number(rebellionLeader.clan) !== Number(oldClanId)) {
+                    this._rebuildFactionsAfterRebellion(rebellionLeader.clan);
                 }
 
             } else {
@@ -1494,8 +1511,8 @@ class IndependenceSystem {
                     });
                 }
                 if (!isCurrentFlow()) return;
-                // 戦闘専用の派閥情報を復旧してから、旧主家の派閥を最終名簿で再編する。
-                if (this.game.factionSystem) this.game.factionSystem.updateFactions(oldClanId);
+                // 戦闘専用の仮派閥を復旧した後、旧主家と独立側の双方を最終名簿で再編する。
+                this._rebuildFactionsAfterRebellion(oldClanId, rebellionLeader.clan);
             }
 
         } else {

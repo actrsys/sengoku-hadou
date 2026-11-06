@@ -266,7 +266,7 @@ window.EventAction = {
         };
     },
     // ① 画面の見た目や情報を最新の状態に描き直します（お片付け）
-    refreshScreen: async function(game) {
+    refreshScreen: async function(game, { refreshFactions = true } = {}) {
         const flowGeneration = window.EventFlowGuard ? window.EventFlowGuard.capture(game) : null;
         const assertCurrentFlow = () => {
             if (window.EventFlowGuard) window.EventFlowGuard.assertCurrent(game, flowGeneration);
@@ -279,9 +279,11 @@ window.EventAction = {
         await new Promise(resolve => setTimeout(resolve, 0));
         assertCurrentFlow();
 
-        if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:faction:start');
-        if (game.factionSystem) game.factionSystem.updateFactions();
-        if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:faction:done');
+        if (refreshFactions) {
+            if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:faction:start');
+            if (game.factionSystem) game.factionSystem.updateFactions();
+            if (game && typeof game.writeSystemDiagnostic === 'function') game.writeSystemDiagnostic('event_refresh:faction:done');
+        }
 
         await new Promise(resolve => setTimeout(resolve, 0));
         assertCurrentFlow();

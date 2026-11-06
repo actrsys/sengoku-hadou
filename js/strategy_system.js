@@ -764,6 +764,15 @@ class StrategySystem {
                 });
                 
                 this.game.updateCastleLord(oldCastle);
+                // 城主ごとの引抜は joinClan() ではなく transferClanRaw() を用い、
+                // 家臣の呼応・逃亡・捕虜処遇まで一括で確定する。途中で再編せず、
+                // 最後に旧家・受入家の双方を FactionSystem の正規選出へ渡す。
+                if (this.game.factionSystem) {
+                    const affectedClanIds = new Set([Number(oldClanId), Number(newClanId)]);
+                    affectedClanIds.forEach(id => {
+                        if (id > 0) this.game.factionSystem.updateFactions(id);
+                    });
+                }
             } else {
                 target.belongKunishuId = 0; 
                 target.isActionDone = true; 

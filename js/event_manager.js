@@ -458,6 +458,9 @@ class EventManager {
         let historicalEventOccurred = false;
         // ★追加：お片付け（画面更新）が必要かどうかをメモするシールを用意します
         let needRefreshScreen = false;
+        // 派閥再編は画面更新とは別責務。非人事イベントで再選挙を起こさず、
+        // 人事イベントでは全ての所属処理が完了してから一度だけ実行する。
+        let needFactionRefresh = false;
 
         for (const ev of targetEvents) {
             const isHistorical = ev.id && ev.id.startsWith("historical_");
@@ -497,7 +500,7 @@ class EventManager {
                     if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                         this.game.writeSystemDiagnostic(`event:${timing}:${ev.id}:execute`);
                     }
-                    await ev.execute(this.game, context);
+                    const eventResult = await ev.execute(this.game, context);
                     if (!isCurrentFlow()) return;
                     if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                         this.game.writeSystemDiagnostic(`event:${timing}:${ev.id}:done`);
@@ -505,6 +508,12 @@ class EventManager {
 
                     // ★追加：イベントが実行されたので、後でお片付けをするためのシールを貼ります
                     needRefreshScreen = true;
+                    // 未指定は従来どおり再編（史実等への後方互換）。
+                    // 「none」は派閥に無関係、「ifChanged」はtrueを返した場合だけ再編。
+                    if (ev.factionRefreshMode !== 'none'
+                        && (ev.factionRefreshMode !== 'ifChanged' || eventResult === true)) {
+                        needFactionRefresh = true;
+                    }
 
                     // 一度きりイベントは「正常終了後」にスタンプを押します
                     if (ev.isOneTime) {
@@ -522,7 +531,11 @@ class EventManager {
 
                 } catch (error) {
                     if (window.EventFlowGuard.isAbortError(error) || !isCurrentFlow()) return;
-                    // 裏側で透明なエラーが起きても、ゲームが止まらないようにしてここで受け止めます
+                    // 一括人事の途中でエラーが出ても、すでに確定した所属に対する
+                    // 派閥保留を持ち越さず、正常なイベントの終了時と同じ共通窓口で収束させる。
+                    // 非人事イベントのエラーでは画面だけを更新する。
+                    needRefreshScreen = true;
+                    if (ev.factionRefreshMode !== 'none') needFactionRefresh = true;
                     console.warn(`イベント ${ev.id} の実行中にエラーが出ましたが、進行を継続します:`, error);
                 }
             }
@@ -536,7 +549,7 @@ class EventManager {
             }
             // event_managerの中では「this.game」という名前でゲームデータを管理しているので、それを渡します
             // ★Round10：段階更新が終わるまで待ちます。
-            await window.EventAction.refreshScreen(this.game);
+            await window.EventAction.refreshScreen(this.game, { refreshFactions: needFactionRefresh });
             if (!isCurrentFlow()) return;
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic(`event:${timing}:refresh_done`);

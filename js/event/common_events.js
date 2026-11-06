@@ -889,6 +889,7 @@ window.GameEvents.push({
     id: "peoples_loyalty_decrease_monthly",
     timing: "startMonth_after", // ★ 月初（収入処理の後）に指定しました！
     isOneTime: false,
+    factionRefreshMode: 'none',
     
     checkCondition: function(game) {
         return true; // 毎月必ず発生させたいので、いつでもOK
@@ -920,6 +921,7 @@ window.GameEvents.push({
     id: "ikki_event_monthly",
     timing: "startMonth_before", // 収入の前に実行します
     isOneTime: false,
+    factionRefreshMode: 'none',
     
     checkCondition: function(game) {
         return true; // 毎月必ずチェックします
@@ -1014,6 +1016,7 @@ window.GameEvents.push({
     id: "harvest_event_september",
     timing: "startMonth_after", 
     isOneTime: false,
+    factionRefreshMode: 'none',
     
     checkCondition: function(game) {
         return game.month === 9; 
@@ -1266,6 +1269,7 @@ window.GameEvents.push({
     id: "famine_event_october",
     timing: "startMonth_after", // 10月の開始時（月初の処理後）に実行します
     isOneTime: false,
+    factionRefreshMode: 'none',
     
     checkCondition: function(game) {
         // １０月に実行します
@@ -1337,6 +1341,7 @@ window.GameEvents.push({
     id: "epidemic_event_random",
     timing: "endMonth_after", // 月末の処理が終わった後に判定します
     isOneTime: false,
+    factionRefreshMode: 'none',
     
     checkCondition: function(game) {
         // 0.2%（1000回に2回）の確率で、疫病のスイッチが入ります
@@ -1395,6 +1400,7 @@ window.GameEvents.push({
     id: "earthquake_event_random",
     timing: "endMonth_after", // これも月末の処理が終わった後に判定します
     isOneTime: false,
+    factionRefreshMode: 'none',
     
     checkCondition: function(game) {
         // 5%（100回に5回）の確率で、地震のスイッチが入ります！
@@ -1542,6 +1548,7 @@ window.GameEvents.push({
     id: "heavy_snow_trigger",
     timing: "startMonth_before", 
     isOneTime: false,
+    factionRefreshMode: 'none',
     
     checkCondition: function(game) {
         // 12月、1月、2月の時だけ実行します
@@ -1654,6 +1661,7 @@ window.GameEvents.push({
     id: "heavy_snow_damage_and_clear",
     timing: "startMonth_before", // ★毎月の各処理が始まる「前」に実行します
     isOneTime: false,
+    factionRefreshMode: 'none',
     
     checkCondition: function(game) {
         // 毎月必ずチェックします
@@ -1753,6 +1761,7 @@ window.GameEvents.push({
     id: "trade_income_monthly",
     timing: "startMonth_after", // 月初の収入処理が終わった後に実行します
     isOneTime: false,
+    factionRefreshMode: 'none',
     
     checkCondition: function(game) {
         return true; // 毎月必ず実行します
@@ -1827,6 +1836,7 @@ window.GameEvents.push({
     id: "ronin_employment_monthly",
     timing: "startMonth_after", 
     isOneTime: false,
+    factionRefreshMode: 'ifChanged',
     
     checkCondition: function(game) {
         return true; 
@@ -1838,6 +1848,7 @@ window.GameEvents.push({
         
         // 今月すでに処理した浪人をメモしておく箱です（追い払われた人が移動先で再度判定されないようにします）
         const processedRonins = new Set();
+        let hasNewRetainers = false;
         
         for (const ronin of ronins) {
             if (processedRonins.has(ronin.id)) continue;
@@ -1907,7 +1918,10 @@ window.GameEvents.push({
                     });
                     
                     if (isEmployed) {
-                        game.affiliationSystem.joinClan(ronin, clanId, currentCastle.id);
+                        game.affiliationSystem.joinClan(ronin, clanId, currentCastle.id, null, false, {
+                            deferFactionUpdate: true, deferUI: true
+                        });
+                        hasNewRetainers = true;
                         
                         // ここから追加した部分です。勢力（大名家）の名前を調べて、メッセージ画面を出します。
                         const clanData = game.getClan(clanId);
@@ -1937,10 +1951,14 @@ window.GameEvents.push({
                         }
                     }
                 } else {
-                    game.affiliationSystem.joinClan(ronin, clanId, currentCastle.id);
+                    game.affiliationSystem.joinClan(ronin, clanId, currentCastle.id, null, false, {
+                        deferFactionUpdate: true, deferUI: true
+                    });
+                    hasNewRetainers = true;
                 }
             }
         }
+        return hasNewRetainers;
     }
 });
 
@@ -1951,6 +1969,7 @@ window.GameEvents.push({
     id: "ai_vassalage_offer_monthly",
     timing: "startMonth_after",
     isOneTime: false,
+    factionRefreshMode: 'ifChanged',
     
     checkCondition: function(game) {
         return true; 
@@ -1972,7 +1991,7 @@ window.GameEvents.push({
 
         // ★ 相手の勢力を自分の勢力に吸収する共通の魔法（臣従の処理）
         const processSubordination = (subordinateClanId, dominantClanId) => {
-            game.affiliationSystem.absorbClan(subordinateClanId, dominantClanId);
+            game.affiliationSystem.absorbClan(subordinateClanId, dominantClanId, { deferFactionUpdate: true });
             absorbedClans.add(subordinateClanId);
             needMapUpdate = true;
         };
@@ -2214,5 +2233,6 @@ window.GameEvents.push({
                 if (game.ui.renderMap) game.ui.renderMap();
             }
         }
+        return needMapUpdate;
     }
 });
