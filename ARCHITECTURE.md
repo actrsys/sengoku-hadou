@@ -32,6 +32,7 @@
 | 状態文字列と意味判定 | `GameConstants` / `LifeStatusRules` / `BushoStatusRules` / `DiplomacyRules` |
 | 武将の所属・所在・活動・軍師役職 | `AffiliationSystem`。`joinClan` / `becomeRonin` / `moveCastle` 等の正規経路を使う | <!-- RULE:STATE-AFFILIATION -->
 | 武将・姫の生死・登場 | `LifeSystem`。低レベル変更は `setLifeStatusRaw()`、武将死亡と後処理は **`executeDeath()`**。廃止済み `processDeath()` を呼ばない | <!-- RULE:STATE-LIFE -->
+| 官位の授与・返還と現役の称号保持者 | 授与・返還は `CourtRankSystem`。史実イベントで将軍・左馬頭の保持者を照会する場合は `EventCheck` の共通検索を使い、`LifeStatusRules.isPresent()` によって死亡・未登場者の初期官位情報を現役の保持者と混同しない |
 | 姫死亡時の名簿・夫婦参照 | `LifeSystem` の死亡確定窓口で整合。死亡理由ごとの同じ除籍を複製しない |
 | 拠点所有・城主・国主軍団 | `CastleManager`。軍団の正本は `Legion.commanderId`、`Castle.legionId` は勢力内番号 |
 | 拠点の隣接・通行・積雪経路 | `MapGraphService` / 既存の到達性Rules |

@@ -32,14 +32,22 @@ const _historicalEventWaitChoice = (game, registerChoice) => {
 // ★ イベント用の便利なチェック係（共通の魔法）
 // ==========================================
 window.EventCheck = {
-    // 1. 将軍候補（左馬頭を持つ武将）を探して渡す魔法
-    getCandidateBusho: function(game) {
-        return game.bushos.find(b => b.courtRankIds && game.courtRankSystem.RANK_IDS_CANDIDATE.some(id => b.courtRankIds.includes(id)));
+    // 将軍・左馬頭の人物検索は、開始データに残る故人の官位記録を現役資格と混同しない。
+    // 官位IDの正本は朝廷System、生死・登場状態の正本は共通LifeStatusRules。
+    _findPresentRankHolder: function(game, rankIds, clanId = null) {
+        return game.bushos.find(b => window.LifeStatusRules.isPresent(b) &&
+            (clanId === null || b.clan === clanId) &&
+            b.courtRankIds && rankIds.some(id => b.courtRankIds.includes(id)));
     },
 
-    // 2. 将軍を探して渡す魔法
+    // 1. 将軍候補（左馬頭を持つ武将）を探す
+    getCandidateBusho: function(game) {
+        return this._findPresentRankHolder(game, game.courtRankSystem.RANK_IDS_CANDIDATE);
+    },
+
+    // 2. 現在の将軍を探す
     getShogunBusho: function(game) {
-        return game.bushos.find(b => b.courtRankIds && b.courtRankIds.includes(game.courtRankSystem.RANK_ID_SHOGUN));
+        return this._findPresentRankHolder(game, [game.courtRankSystem.RANK_ID_SHOGUN]);
     },
 
     // 将軍就任で新政権へ加わる城主候補の判定正本。発生条件と実行時に共用する。
@@ -1554,7 +1562,8 @@ window.GameEvents.push({
         if (oichi.status !== 'unmarried' || Number(oichi.currentClanId) !== Number(nobunaga.clan)) return false;
 
         // 8. ここを追加します：織田信長勢力が将軍候補（または将軍）を抱えているか確認します
-        const candidate = game.bushos.find(b => b.clan === nobunaga.clan && b.courtRankIds && (game.courtRankSystem.RANK_IDS_CANDIDATE.some(id => b.courtRankIds.includes(id)) || b.courtRankIds.includes(game.courtRankSystem.RANK_ID_SHOGUN)));
+        const candidate = window.EventCheck._findPresentRankHolder(game,
+            [...game.courtRankSystem.RANK_IDS_CANDIDATE, game.courtRankSystem.RANK_ID_SHOGUN], nobunaga.clan);
         if (!candidate) return false;
 
         // 9. 六角義賢（ID: 1018003）・六角義治（ID: 1018004）・六角義定（ID: 1018005）のいずれかが大名であるか確認します
@@ -1595,7 +1604,8 @@ window.GameEvents.push({
         if (!oichi || !nobunagaClan || !nagamasaClan) return; // 万が一データがない場合の安全装置です
 
         // 将軍候補の情報を取得しておきます
-        const candidate = game.bushos.find(b => b.clan === nobunaga.clan && b.courtRankIds && (game.courtRankSystem.RANK_IDS_CANDIDATE.some(id => b.courtRankIds.includes(id)) || b.courtRankIds.includes(game.courtRankSystem.RANK_ID_SHOGUN)));
+        const candidate = window.EventCheck._findPresentRankHolder(game,
+            [...game.courtRankSystem.RANK_IDS_CANDIDATE, game.courtRankSystem.RANK_ID_SHOGUN], nobunaga.clan);
         const candidateName = candidate ? candidate.fullName : "将軍";
 
         // ①〜④ 婚姻そのものと外交関係の更新は DiplomacyManager に一元化します。

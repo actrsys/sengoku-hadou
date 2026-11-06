@@ -29196,6 +29196,7 @@ test('r642 将軍就任は家臣候補ゼロでも成立し、適格者がいれ
         };
         context.DiplomacyRules = { isAllianceOrVassal: () => false };
         context.Clan = class Clan { constructor(data) { Object.assign(this, data); } };
+        loadScript(context, 'js/constants.js');
         loadScript(context, 'js/event/historical_event.js');
         const event = context.GameEvents.find(e => e.id === 'historical_shogun_coronation');
         assert.ok(event, '将軍就任イベント');
@@ -29346,6 +29347,7 @@ test('r772 将軍就任の二条・槇島からの複数退避は途中の仮城
     ctx.BushoStatusRules = { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' };
     ctx.DiplomacyRules = { isAllianceOrVassal: () => false };
     ctx.Clan = class Clan { constructor(data) { Object.assign(this, data); } };
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/event/historical_event.js');
     const coronation = ctx.GameEvents.find(e => e.id === 'historical_shogun_coronation');
     const castles = [26, 90, 12, 103, 104, 105, 106, 107, 108].map((id, i) => ({
@@ -38171,6 +38173,75 @@ test('r819 1560年の織田信長は出生前の一門を家督譲渡候補に�
     assert.ok(!candidates.some(b => b.id === katsunaga.id), '1565年生まれの織田勝長を1560年に選べない');
     assert.ok(!rules.isSuccessorCandidate(katsunaga, oda, oda.familyIds, game.year), 'メニュー有効判定も同一資格');
     assert.ok(candidates.every(b => rules.isSuccessorCandidate(b, oda, oda.familyIds, game.year)), '候補一覧と同一の正本');
+});
+
+
+// r820: 将軍・左馬頭の検索は、称号IDだけでなく現在の登場・生存資格を見る。
+// r821: 1570年開始データに残っていた死亡者の官位は、管理ExcelとBINの両方から削除。
+test('r820 1570姉川の将軍検索で死亡済み義藤より現役の覚慶を選ぶ', () => {
+    const { common, scenario } = getRuntimeData('1570_anegawa');
+    const states = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+    const byId = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const initial = [1017003, 1017004].map(id => {
+        const b = byId.get(id);
+        const state = states.get(id);
+        assert.ok(b && state, '実データに対象人物がいる');
+        return { id, clan: Number(state.clan), fullName: String(b.name).replace('|', ''),
+            isDaimyo: id === 1017004, courtRankIds: String(state.courtRank || '').split('|').filter(Boolean).map(Number),
+            status: Number(b.startYear) === 9999 || Number(b.endYear) < 1570 ? 'dead'
+                : Number(b.startYear) > 1570 ? 'unborn' : 'active' };
+    });
+    assert.strictEqual(initial[0].status, 'dead', '旧将軍は初期状態で死亡');
+    assert.strictEqual(initial[1].status, 'active', '現将軍は初期状態で活動中');
+    assert.ok(!initial[0].courtRankIds.includes(1) && initial[1].courtRankIds.includes(1), '1570年シナリオでは義藤の官位を削除し、覚慶の将軍官位を維持');
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    const game = { bushos: initial, courtRankSystem: { RANK_ID_SHOGUN: 1, RANK_IDS_CANDIDATE: [98,99] },
+        flags: { shogun_sponsor_clan_id: 3 },
+        diplomacyManager: { getRelation: () => ({ status: '同盟' }) } };
+    assert.strictEqual(ctx.EventCheck.getShogunBusho(game)?.id, 1017004,
+        '死亡済みの義藤ではなく現役の覚慶を将軍と認定する');
+    assert.strictEqual(ctx.EventCheck.getShogunInfo(game)?.shogunClanId, 17,
+        '将軍家の情報も現将軍の所属で確定する');
+});
+
+test('r821 1570姉川の開始時死亡者は官位を持たず、生存者の官位を残す', () => {
+    const {common, scenario} = getRuntimeData('1570_anegawa');
+    const master = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const states = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+    const removedIds = [1004009,1010015,1010019,1017003,1020005,1020011,1020013,
+                        1038004,1039006,1039012,1043004,1051002,1069009];
+    for (const id of removedIds) {
+        assert.ok(master.has(id) && Number(master.get(id).endYear) < 1570, `${id} は1570年開始時に死亡済み`);
+        assert.strictEqual(String(states.get(id)?.courtRank ?? ''), '', `${id} の初期官位は空`);
+    }
+    for (const state of scenario.warriorsState) {
+        const b = master.get(Number(state.id));
+        if (!b) continue;
+        if (Number(b.endYear) < 1570 || Number(b.startYear) === 9999) {
+            assert.strictEqual(String(state.courtRank ?? ''), '', `${b.name} は死亡・ダミー状態で初期官位を持たない`);
+        }
+    }
+    assert.strictEqual(String(states.get(1017004).courtRank), '1', '義昭の将軍官位を維持');
+    assert.strictEqual(String(states.get(1001015).courtRank), '82', '上杉謙信の官位を維持');
+});
+
+test('r820 将軍候補検索でも死亡・未登場の官位記録を後任と誤認しない', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    const game = { bushos: [
+        {id:1,status:'dead',courtRankIds:[98]},
+        {id:2,status:'unborn',courtRankIds:[99]},
+        {id:3,status:'active',courtRankIds:[99]},
+        {id:4,status:'ronin',courtRankIds:[98]}
+    ], courtRankSystem: { RANK_IDS_CANDIDATE:[98,99],RANK_ID_SHOGUN:1 } };
+    assert.strictEqual(ctx.EventCheck.getCandidateBusho(game)?.id,3,
+        '初期官位情報の残る死亡者・未登場者を候補から外す');
+    game.bushos[2].courtRankIds=[];
+    assert.strictEqual(ctx.EventCheck.getCandidateBusho(game)?.id,4,
+        '元服済み浪人の官位は従来どおり検索対象に残す');
 });
 
 Promise.all(pendingTests).then(() => {
