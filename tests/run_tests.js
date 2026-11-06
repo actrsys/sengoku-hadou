@@ -28701,7 +28701,7 @@ test('r631 仕官拒否した浪人の移動月が次の登用・派閥在城履
         GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin' } },
         BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
         LifeStatusRules: { isPresent: b => b.status === 'active' || b.status === 'ronin', isDead: b => b.status === 'dead' },
-        PersonnelRules: { calcAffinityDiff: () => 0 } });
+        PersonnelRules: { calcAffinityDiff: () => 0, hasActiveNemesisInClan: () => false } });
     for (const filename of ['js/affiliation_system.js', 'js/faction_system.js', 'js/event/common_events.js']) {
         loadScript(ctx, filename);
     }
@@ -38408,6 +38408,65 @@ test('r826 捕虜登用の相性差はPersonnelRules共通の循環計算を使�
         assert.ok(Math.abs(actual - expected) < 1e-10,
             `相性差3の+0.1補正と一致（滅亡=${isExtinct}, 実測=${actual}, 期待=${expected}）`);
     }
+});
+
+// r828: 開始時の宿敵関係でも、登場予定だけの人物を「在籍宿敵」としない。
+// 1560年の毛利元就には尼子政久（startYear=9999、尼子家所属予定）が宿敵にいる。
+test('r828 未登場の尼子政久を毛利元就の登用・引抜の在籍宿敵としない（1560年実データ）', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const master = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const state = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+    const motonariRow = [...master.values()].find(b => String(b.name) === '毛利|元就');
+    const masahisaRow = [...master.values()].find(b => String(b.name) === '尼子|政久');
+    assert.ok(motonariRow && masahisaRow && String(motonariRow.nemesis).includes(String(masahisaRow.id)), '実データの宿敵');
+    const motonari = { ...motonariRow, ...state.get(Number(motonariRow.id)), status: 'ronin', clan: 0,
+        belongKunishuId: 0, nemesisIds: [Number(masahisaRow.id)], familyIds: [motonariRow.id] };
+    const masahisa = { ...masahisaRow, ...state.get(Number(masahisaRow.id)), status: 'unborn' };
+    assert.strictEqual(Number(masahisa.startYear), 9999, '尼子政久は将来の通常登場対象外');
+    assert.ok(Number(masahisa.clan) > 0 && Number(motonariRow.startYear) <= 1560, '現役の元就と未登場予定所属の関係');
+    const ctx = createContext({ MainParams: { Strategy: { EmploymentDiff: 1 } } });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    const recruiter = { id: -1, clan: Number(masahisa.clan), charm: 70, affinity: motonari.affinity, status: 'active' };
+    const game = { getBusho: id => Number(id) === Number(masahisa.id) ? masahisa : null,
+        getClanBushos: clanId => Number(clanId) === recruiter.clan ? [masahisa, recruiter] : [] };
+    assert.strictEqual(ctx.PersonnelRules.hasActiveNemesisInClan(game, motonari, recruiter.clan), false,
+        '未登場の予定所属は在籍宿敵に数えない');
+    const without = ctx.PersonnelRules.getEmployProb(recruiter, motonari, 100, 0, game);
+    masahisa.status = 'active';
+    assert.strictEqual(ctx.PersonnelRules.hasActiveNemesisInClan(game, motonari, recruiter.clan), true,
+        '登場後は宿敵として扱う');
+    const withActive = ctx.PersonnelRules.getEmployProb(recruiter, motonari, 100, 0, game);
+    assert.ok(without > 0 && Math.abs(withActive - without * 0.5) < 1e-10,
+        `現役宿敵だけ半減を適用（未登場 ${without}、現役 ${withActive}）`);
+    masahisa.status = 'dead';
+    assert.strictEqual(ctx.PersonnelRules.hasActiveNemesisInClan(game, motonari, recruiter.clan), false);
+    assert.ok(Math.abs(ctx.PersonnelRules.getEmployProb(recruiter, motonari, 100, 0, game) - without) < 1e-10,
+        '死亡済みも在籍宿敵として数えない');
+});
+
+test('r828 捕虜登用は予定所属の未登場宿敵で半減せず、現役宿敵だけ半減する', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const masahisaRow = common.warriorsMaster.find(b => b.name === '尼子|政久');
+    const motonariRow = common.warriorsMaster.find(b => b.name === '毛利|元就');
+    const state = scenario.warriorsState.find(b => Number(b.id) === Number(masahisaRow.id));
+    const nemesis = { ...masahisaRow, ...state, status: 'unborn' };
+    const captive = { ...motonariRow, id: Number(motonariRow.id), status: 'active', isDaimyo: false,
+        loyalty: 50, nemesisIds: [Number(nemesis.id)], familyIds: [Number(motonariRow.id)] };
+    const fixedMath = Object.create(Math); fixedMath.random = () => 0.5;
+    const ctx = createContext({ Math: fixedMath, WarManager: class WarManager {} });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    loadScript(ctx, 'js/war_effort.js');
+    const war = new ctx.WarManager();
+    war.game = { getBusho: id => Number(id) === Number(nemesis.id) ? nemesis : null,
+        getClanBushos: id => Number(id) === Number(nemesis.clan) ? [nemesis] : [] };
+    const recruiter = { charm: 70, affinity: captive.affinity };
+    const without = war.calcPrisonerHireProb(recruiter, captive, Number(nemesis.clan), true);
+    nemesis.status = 'active';
+    const withActive = war.calcPrisonerHireProb(recruiter, captive, Number(nemesis.clan), true);
+    assert.ok(without > 0 && Math.abs(withActive - without * 0.5) < 1e-10,
+        `捕虜登用は実在宿敵のみ半減する（未登場 ${without}、現役 ${withActive}）`);
 });
 
 // r827: 人事の循環相性（0と99が近い）を、家督・国主・諸勢力の後継順位でも共用する。

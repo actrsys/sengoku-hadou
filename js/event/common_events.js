@@ -1854,13 +1854,7 @@ window.GameEvents.push({
             if (!daimyo) continue;
             
             // 仕官先の勢力に、浪人の「宿敵」がいるかチェックします
-            let hasNemesis = false;
-            if (ronin.nemesisIds && ronin.nemesisIds.length > 0) {
-                hasNemesis = ronin.nemesisIds.some(nId => {
-                    const nBusho = game.getBusho(nId);
-                    return nBusho && nBusho.clan === clanId && !window.LifeStatusRules.isDead(nBusho);
-                });
-            }
+            const hasNemesis = PersonnelRules.hasActiveNemesisInClan(game, ronin, clanId);
             // 宿敵がいれば絶対に仕官しないので、次の浪人のチェックへ進みます
             if (hasNemesis) continue; 
             

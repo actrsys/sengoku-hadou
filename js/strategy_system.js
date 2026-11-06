@@ -417,14 +417,8 @@ class StrategySystem {
         else if (officerStatus === 1) successRate -= 0.10;
         
         // ★ここから追加：引抜先に自分の宿敵がいる場合は、成功率が半分になります！
-        if (target.nemesisIds && target.nemesisIds.length > 0) {
-            const hasNemesis = target.nemesisIds.some(nId => {
-                const nBusho = this.game.getBusho(nId);
-                return nBusho && nBusho.clan === doer.clan && !window.LifeStatusRules.isDead(nBusho);
-            });
-            if (hasNemesis) {
-                successRate *= 0.5;
-            }
+        if (PersonnelRules.hasActiveNemesisInClan(this.game, target, doer.clan)) {
+            successRate *= 0.5;
         }
         
         // ★修正：スキルの一元管理魔法を呼び出して確率を増減させます！

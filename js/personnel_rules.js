@@ -64,6 +64,17 @@ class PersonnelRules {
         );
     }
 
+    // 宿敵の関係自体は人物データに残すが、登用先に「在籍している宿敵」だけが
+    // 登用・引抜・浪人仕官の判断を妨げる。将来所属だけの未登場者は数えない。
+    static hasActiveNemesisInClan(game, person, clanId) {
+        if (!game || !person || !Array.isArray(person.nemesisIds) || person.nemesisIds.length === 0) return false;
+        return person.nemesisIds.some(id => {
+            const other = game.getBusho(id);
+            return !!other && Number(other.clan) === Number(clanId)
+                && window.BushoStatusRules.isActive(other) && Number(other.belongKunishuId || 0) <= 0;
+        });
+    }
+
     static getEmployProb(recruiter, target, recruiterClanPower, targetClanPower, game) {
         // ★追加：諸勢力に所属している武将（頭領など）は引き抜けないようにガードします！
         if ((target.belongKunishuId || 0) > 0) return 0;
@@ -89,14 +100,8 @@ class PersonnelRules {
         }
 
         // ★追加：宿敵が登用主の大名家にいる場合は、成功率を半分にします！
-        if (target.nemesisIds && target.nemesisIds.length > 0 && game) {
-            const hasNemesis = target.nemesisIds.some(nId => {
-                const nBusho = game.getBusho(nId);
-                return nBusho && nBusho.clan === recruiter.clan && nBusho.status !== window.GameConstants.BushoStatus.DEAD;
-            });
-            if (hasNemesis) {
-                prob *= 0.5;
-            }
+        if (this.hasActiveNemesisInClan(game, target, recruiter.clan)) {
+            prob *= 0.5;
         }
         
         // ★追加：スキルマネージャーから登用の成功率ボーナスを受け取ります

@@ -2569,13 +2569,8 @@ class AIEngine {
                             }
                             
                             // ★追加：ターゲットが自家の武将を「宿敵」として恨んでいないかチェックします
-                            let hasNemesis = false;
-                            if (targetBusho.nemesisIds && targetBusho.nemesisIds.length > 0) {
-                                hasNemesis = targetBusho.nemesisIds.some(nId => {
-                                    const nBusho = this.game.getBusho(nId);
-                                    return nBusho && nBusho.clan === castle.ownerClan && !window.LifeStatusRules.isDead(nBusho);
-                                });
-                            }
+                            const hasNemesis = PersonnelRules.hasActiveNemesisInClan(
+                                this.game, targetBusho, castle.ownerClan);
                             
                             // ★大魔法：内政の邪魔をしないように、優先度を「小数点」として基本スコアに足します！
                             // 例：基本スコア8、優先度45なら「8.45点」となり、最大10点強の枠に収まります。

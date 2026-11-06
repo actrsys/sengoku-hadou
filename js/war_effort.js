@@ -3809,14 +3809,8 @@ Object.assign(WarManager.prototype, {
         }
 
         // 宿敵が登用先の大名家にいる場合は成功率を半分にします
-        if (prisoner.nemesisIds && prisoner.nemesisIds.length > 0) {
-            const hasNemesis = prisoner.nemesisIds.some(nId => {
-                const nBusho = this.game.getBusho(nId);
-                return nBusho && nBusho.clan === targetClanId && !window.LifeStatusRules.isDead(nBusho);
-            });
-            if (hasNemesis) {
-                hireProb *= 0.5;
-            }
+        if (PersonnelRules.hasActiveNemesisInClan(this.game, prisoner, targetClanId)) {
+            hireProb *= 0.5;
         }
         
         return hireProb;
