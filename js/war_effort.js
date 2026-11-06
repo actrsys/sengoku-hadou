@@ -3784,7 +3784,7 @@ Object.assign(WarManager.prototype, {
         let randomBonus = (Math.random() * 0.2) - 0.1;
         const recruiterAffinity = recruiter.affinity || 0;
         const prisonerAffinity = prisoner.affinity || 0;
-        const affinityDiff = Math.abs(recruiterAffinity - prisonerAffinity);
+        const affinityDiff = PersonnelRules.calcAffinityDiff(recruiterAffinity, prisonerAffinity);
         
         let affinityBonus = 0;
         if (affinityDiff <= 10) affinityBonus = 0.1;
@@ -3802,7 +3802,7 @@ Object.assign(WarManager.prototype, {
         }
 
         // 一門の武将が自勢力にいる場合は成功率+0.2
-        const hasFamily = this.game.getClanBushos(targetClanId).some(b => !window.LifeStatusRules.isDead(b) && b.id !== prisoner.id && b.familyIds && prisoner.familyIds && b.familyIds.some(fId => prisoner.familyIds.includes(fId)));
+        const hasFamily = PersonnelRules.hasActiveKinsmanInClan(this.game, prisoner, targetClanId);
         if (hasFamily) {
             hireProb += 0.2;
             hireProb = Math.max(0, Math.min(0.99, hireProb));

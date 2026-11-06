@@ -38227,6 +38227,26 @@ test('r821 1570姉川の開始時死亡者は官位を持たず、生存者の�
     assert.strictEqual(String(states.get(1001015).courtRank), '82', '上杉謙信の官位を維持');
 });
 
+// r822: 1560桶狭間も死亡済みの初期官位を管理Excel・BINから取り除く。
+test('r822 1560桶狭間の死亡済み武将に初期官位が残らない', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const master = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const states = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+    for (const id of [1010015, 1010019]) {
+        assert.ok(Number(master.get(id)?.endYear) < 1560, `${id} は開始前に死亡している`);
+        assert.strictEqual(String(states.get(id)?.courtRank ?? ''), '', `${id} の初期官位は空`);
+    }
+    for (const state of scenario.warriorsState) {
+        const b = master.get(Number(state.id));
+        if (!b) continue;
+        if (Number(b.endYear) < 1560 || Number(b.startYear) === 9999) {
+            assert.strictEqual(String(state.courtRank ?? ''), '', `${b.name} は死亡済み・ダミーで官位を持たない`);
+        }
+    }
+    assert.ok(scenario.warriorsState.some(state => state.courtRank &&
+        Number(master.get(Number(state.id))?.endYear) >= 1560), '生存者の官位は保持');
+});
+
 test('r820 将軍候補検索でも死亡・未登場の官位記録を後任と誤認しない', () => {
     const ctx = createContext();
     loadScript(ctx, 'js/constants.js');
@@ -38242,6 +38262,143 @@ test('r820 将軍候補検索でも死亡・未登場の官位記録を後任と
     game.bushos[2].courtRankIds=[];
     assert.strictEqual(ctx.EventCheck.getCandidateBusho(game)?.id,4,
         '元服済み浪人の官位は従来どおり検索対象に残す');
+});
+
+// r823: 捕虜登用の一門補正は、予定所属だけを持つ未登場者に適用しない。
+test('r823 捕虜登用の一門補正は現役一門だけが対象（1560年の実データ）', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const masterById = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const stateById = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+    const father = { ...masterById.get(1017016), ...stateById.get(1017016),
+        id: 1017016, status: 'active', loyalty: 50, affinity: 30 };
+    const son = { ...masterById.get(1017017), ...stateById.get(1017017),
+        id: 1017017, status: 'unborn' };
+    assert.ok(Number(father.startYear) <= 1560 && Number(father.clan) !== Number(son.clan),
+        '実データで捕虜役はすでに登場済みの別家家臣');
+    assert.ok(Number(son.startYear) > 1560 && Number(son.clan) === 44,
+        '実データで血縁者は他家への登場予定だけを持ち、未登場');
+    const fixedMath = Object.create(Math);
+    fixedMath.random = () => 0.5;
+    const ctx = createContext({ Math: fixedMath, WarManager: class WarManager {} });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/family_system.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    ctx.FamilyLinker.rebuildAllFamilyIds([father, son], []);
+    assert.ok(father.familyIds.some(id => son.familyIds.includes(id)),
+        '現行FamilyLinkerの正規一門判定でも父子関係が成立する');
+    loadScript(ctx, 'js/war_effort.js');
+    const war = new ctx.WarManager();
+    const recruitingClan = Number(son.clan);
+    war.game = { getClanBushos: clanId => Number(clanId) === recruitingClan ? [son] : [] };
+    const recruiter = { charm: 50, affinity: 30 };
+    const withoutActiveKin = war.calcPrisonerHireProb(recruiter, father, recruitingClan, true);
+    assert.ok(Math.abs(withoutActiveKin - 0.6) < 1e-9,
+        `未登場者だけのとき一門補正は0（実測 ${withoutActiveKin}）`);
+    son.status = 'active';
+    const withActiveKin = war.calcPrisonerHireProb(recruiter, father, recruitingClan, true);
+    assert.ok(Math.abs(withActiveKin - 0.8) < 1e-9,
+        '同じ一門が実際に登場・仕官した後は従来どおり+0.2');
+});
+
+
+// r824: 諸勢力壊滅後に浪人となった一門は通常登用の対象となり得る。
+// 将来登場する子の予定所属だけで、現役一門の+20ポイントを加算してはならない。
+test('r824 通常登用の一門補正は現役のみ（1560年の諸勢力から浪人化する父子）', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const master = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const state = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+    const father = { ...master.get(2025004), ...state.get(2025004), status: 'ronin', clan: 0,
+        belongKunishuId: 0 };
+    const son = { ...master.get(2025007), ...state.get(2025007), status: 'unborn' };
+    assert.ok(Number(state.get(2025004).belongKunishuId) > 0, '開始時は諸勢力武将で、壊滅後に浪人となる対象');
+    assert.strictEqual(Number(son.clan), 2, '長尾顕長は家臣としての将来所属を持つ');
+    assert.ok(Number(son.startYear) > 1560, '1560年時点では未登場');
+    const ctx = createContext({ MainParams: { Strategy: { EmploymentDiff: 1 } } });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/family_system.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    ctx.FamilyLinker.rebuildAllFamilyIds([father, son], []);
+    assert.ok(father.familyIds.some(id => son.familyIds.includes(id)), '正規の一門判定で父子関係を確認');
+    const recruiter = { id: -1, clan: 2, charm: 43, affinity: 38 };
+    const game = { getClanBushos: id => Number(id) === 2 ? [recruiter, son] : [],
+        getBusho: id => Number(id) === Number(son.id) ? son : null };
+    const before = ctx.PersonnelRules.getEmployProb(recruiter, father, 100, 0, game);
+    assert.ok(Math.abs(before - 0.5) < 1e-10,
+        `未登場の子の予定所属だけでは補正なし（実測 ${before}）`);
+    son.status = 'active';
+    const after = ctx.PersonnelRules.getEmployProb(recruiter, father, 100, 0, game);
+    assert.ok(Math.abs(after - 0.7) < 1e-10,
+        `実際に家臣となった子がいる場合のみ+0.2（実測 ${after}）`);
+    son.status = 'dead';
+    const dead = ctx.PersonnelRules.getEmployProb(recruiter, father, 100, 0, game);
+    assert.ok(Math.abs(dead - 0.5) < 1e-10, '死亡済みの子は一門補正を与えない');
+});
+
+// r825: 通常登用の基礎確率が100%でも宿敵補正の計算を飛ばさない。
+// 1560年に波多野元秀が浪人となり、敵視対象の三好長慶が登用する経路。
+test('r825 通常登用の上限到達後も宿敵補正を適用（1560年の実データ）', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const master = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const state = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+    const target = { ...master.get(1014003), ...state.get(1014003),
+        status: 'ronin', clan: 0, belongKunishuId: 0, nemesisIds: [1020005] };
+    const recruiter = { ...master.get(1020005), ...state.get(1020005), status: 'active' };
+    assert.strictEqual(master.get(1014003).nemesis, '1020005:120', '対象と宿敵の関係は実データを使用');
+    assert.strictEqual(Number(state.get(1014003).clan), 14, '波多野元秀は通常勢力出身');
+    assert.strictEqual(Number(recruiter.clan), 20, '三好長慶は1560年の三好家所属');
+    const fixedMath = Object.create(Math);
+    fixedMath.random = () => 0.75;
+    const ctx = createContext({ Math: fixedMath, MainParams: { Strategy: { EmploymentDiff: 1 } } });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    const game = {
+        playerClanId: Number(recruiter.clan),
+        getBusho: id => Number(id) === Number(recruiter.id) ? recruiter : null,
+        getClanBushos: id => Number(id) === Number(recruiter.clan) ? [recruiter] : [],
+        getCastle: id => Number(id) === Number(target.castleId)
+            ? { id, ownerClan: Number(recruiter.clan) } : null
+    };
+    assert.ok(ctx.PersonnelRules.canEmployRonin(game, target), '自領内浪人の正規登用資格');
+    const withNemesis = ctx.PersonnelRules.getEmployProb(recruiter, target, 100, 0, game);
+    assert.ok(Math.abs(withNemesis - 0.5) < 1e-10,
+        `基礎100%に宿敵半減を適用（実測 ${withNemesis}）`);
+    assert.strictEqual(ctx.PersonnelRules.calcEmploymentSuccess(recruiter, target, 100, 0, game), false,
+        '75%の乱数では登用失敗になる');
+    target.nemesisIds = [];
+    assert.strictEqual(ctx.PersonnelRules.getEmployProb(recruiter, target, 100, 0, game), 1,
+        '宿敵がいなければ基礎100%を維持');
+});
+
+
+// r826: 捕虜登用もほかの人事と同じ循環する相性差(0～50)で判定する。
+// 1560年の隣接勢力・織田信長(0)と斎藤利治(97)は相性差3である。
+test('r826 捕虜登用の相性差はPersonnelRules共通の循環計算を使用（1560年実データ）', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const master = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const state = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+    const recruiter = { ...master.get(1006006), ...state.get(1006006), status: 'active' };
+    const prisoner = { ...master.get(1005005), ...state.get(1005005), status: 'active' };
+    assert.strictEqual(Number(recruiter.affinity), 0);
+    assert.strictEqual(Number(prisoner.affinity), 97);
+    assert.strictEqual(Number(recruiter.clan), 1);
+    assert.strictEqual(Number(prisoner.clan), 6);
+    const fixedMath = Object.create(Math);
+    fixedMath.random = () => 0.5;
+    const ctx = createContext({ Math: fixedMath, WarManager: class WarManager {} });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    loadScript(ctx, 'js/war_effort.js');
+    assert.strictEqual(ctx.PersonnelRules.calcAffinityDiff(recruiter.affinity, prisoner.affinity), 3,
+        '相性0と97の距離は3');
+    const war = new ctx.WarManager();
+    war.game = { getClanBushos: () => [], getBusho: () => null };
+    for (const isExtinct of [false, true]) {
+        const actual = war.calcPrisonerHireProb(recruiter, prisoner, Number(recruiter.clan), isExtinct);
+        const expected = Math.max(0, Math.min(0.99,
+            98 * 1.5 / (95 * 3) - (isExtinct ? 0 : 0.4) + 0.1));
+        assert.ok(Math.abs(actual - expected) < 1e-10,
+            `相性差3の+0.1補正と一致（滅亡=${isExtinct}, 実測=${actual}, 期待=${expected}）`);
+    }
 });
 
 Promise.all(pendingTests).then(() => {

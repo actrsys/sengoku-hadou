@@ -53,6 +53,17 @@ class PersonnelRules {
             && !target.isDaimyo && !target.isCastellan;
     }
 
+    // 所属予定の未登場者を、在籍中の一門として数えない。
+    // 人物関係の意味はFamilyLinker、現在の活動資格はBushoStatusRulesが正本。
+    static hasActiveKinsmanInClan(game, person, clanId) {
+        if (!game || !person || !Array.isArray(person.familyIds) || person.familyIds.length === 0) return false;
+        const familyIds = new Set(person.familyIds);
+        return game.getClanBushos(clanId).some(b =>
+            b.id !== person.id && window.BushoStatusRules.isActive(b)
+            && Array.isArray(b.familyIds) && b.familyIds.some(id => familyIds.has(id))
+        );
+    }
+
     static getEmployProb(recruiter, target, recruiterClanPower, targetClanPower, game) {
         // ★追加：諸勢力に所属している武将（頭領など）は引き抜けないようにガードします！
         if ((target.belongKunishuId || 0) > 0) return 0;
@@ -65,13 +76,12 @@ class PersonnelRules {
         if (base <= 0) return 0;
         const threshold = resistance / base - 0.5;
         if (threshold >= 1.0) return 0;
-        if (threshold <= 0.0) return 1.0;
-        
-        let prob = 1.0 - threshold;
+        // 基礎確率が100%に達しても、後続の一門・宿敵・スキル補正を省略しない。
+        let prob = threshold <= 0.0 ? 1.0 : 1.0 - threshold;
         
         // ★追加：一門の武将が自勢力にいる場合は成功率+0.2
         if (game) {
-            const hasFamily = game.getClanBushos(recruiter.clan).some(b => b.status !== window.GameConstants.BushoStatus.DEAD && b.id !== target.id && b.familyIds && target.familyIds && b.familyIds.some(fId => target.familyIds.includes(fId)));
+            const hasFamily = this.hasActiveKinsmanInClan(game, target, recruiter.clan);
             if (hasFamily) {
                 prob += 0.2;
                 prob = Math.max(0, Math.min(1.0, prob));
