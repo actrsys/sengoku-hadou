@@ -1420,7 +1420,9 @@ class LifeSystem {
         } else {
             // ★誰もいなかったら、新しく作った滅亡チェックの魔法にバトンタッチします！
             daimyo.isDaimyo = false;
-            await this.checkClanExtinction(daimyo.clan, 'no_heir', 0, excludedSuccessionCandidateIds);
+            await this.checkClanExtinction(daimyo.clan, 'no_heir', 0, excludedSuccessionCandidateIds, {
+                deferFactionUpdate: options.deferFactionUpdate === true
+            });
         }
     }
     
@@ -1732,7 +1734,7 @@ class LifeSystem {
     }
 
     // ★大名家の滅亡を処理する魔法です！
-    async checkClanExtinction(clanId, reason = 'no_castle', killerClanId = 0, pendingCaptiveIds = []) {
+    async checkClanExtinction(clanId, reason = 'no_castle', killerClanId = 0, pendingCaptiveIds = [], { deferFactionUpdate = false } = {}) {
         if (!clanId || clanId === 0) return;
         // 滅亡に伴う所属・拠点処理は会話前に確定するが、会話終了後の
         // ゲームオーバーや旧当主の処分は同じゲーム状態にだけ適用する。
@@ -1857,7 +1859,9 @@ class LifeSystem {
                 if (affectedCastle) this.game.updateCastleLord(affectedCastle);
             });
 
-            if (hadExtinctionDepartures && this.game.factionSystem) {
+            // 月末死亡処理から呼ばれた場合は、死亡者全員の確定後に
+            // checkDeath() が旧家を一度だけ再編する。合戦等からの単独滅亡は従来どおり即時更新。
+            if (hadExtinctionDepartures && !deferFactionUpdate && this.game.factionSystem) {
                 this.game.factionSystem.updateFactions(clanId);
             }
             clan.isDestroyed = true; 

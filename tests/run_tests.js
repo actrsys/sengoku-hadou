@@ -10394,7 +10394,7 @@ test('前回AI停止位置の診断表示は静的inline styleとonclick代入�
 
 test('断交時のAI捕虜処遇はasync完了を待ってから結果を表示する', () => {
     const diplomacy = read('js/diplomacy.js');
-    assert.ok(diplomacy.includes('await this.game.warManager.autoResolvePrisoners(hostages, captorClanId);'));
+    assert.ok(diplomacy.includes('await this.game.warManager.autoResolvePrisoners(hostages, captorClanId, { deferFactionUpdate: true });'));
     assert.ok(diplomacy.includes('capturedHostageRecords'));
     assert.ok(diplomacy.includes('_convertCapturedHostageToPrisoner(record)'));
 });
@@ -38602,7 +38602,7 @@ test('r829 断交人質の脱走・捕虜化は元所属へ戻す際に旧派閥
         assert.ok(hostage.factionId > 0 && hostage.factionName,
             '月次と同じ本物の派閥選出で預かり家の派閥に所属できる');
         assert.strictEqual(hostage.clan, 4);
-        return { game, hostage, updates, diplomacy: game.diplomacyManager };
+        return { game, hostage, updates, diplomacy: game.diplomacyManager, ctx };
     };
 
     for (const [label, randomValue, resultKey] of [['脱走', 0, 'escapedHostageRecords'], ['捕虜化', 0.99, 'capturedHostageRecords']]) {
@@ -38626,6 +38626,79 @@ test('r829 断交人質の脱走・捕虜化は元所属へ戻す際に旧派閥
         assert.deepStrictEqual(updates.slice(before).sort(), [3, 4],
             `${label}の処遇完了後、両家の派閥を一度ずつ再編`);
     }
+
+    // r838: 人質の捕虜化後にAIが登用する本物の捕虜処遇経路。
+    // joinClan() の旧家/受入家即時再編と断交最終再編を二重実行してはいけない。
+    const { game, hostage, updates, diplomacy, ctx } = setup(0.99);
+    ctx.WarManager = class WarManager {};
+    loadScript(ctx, 'js/war_effort.js');
+    const War = vm.runInContext('WarManager', ctx);
+    game.warManager = new War();
+    game.warManager.game = game;
+    game.warManager.calcPrisonerHireProb = () => 1;
+    game.warManager.isTotalTakeoverPending = () => false;
+    game.warManager.registerNemesisForExecuted = () => {};
+
+    const breakResult = diplomacy.applyBreakAlliancePenalty(3, 4);
+    assert.strictEqual(breakResult.capturedHostageRecords.length, 1,
+        '捕虜化した人質が実際のAI捕虜処遇へ渡る');
+    const before = updates.length;
+    await diplomacy.resolveBreakAllianceConsequences(breakResult);
+    assert.strictEqual(hostage.clan, 4, 'AIが実コードで人質を登用する');
+    assert.deepStrictEqual(updates.slice(before), [3, 4],
+        '断交を所有する外交担当が最終名簿から旧家・預かり家を各1回再編する');
+
+    // 同じ捕虜処遇を外交以外の通常戦後処理として呼べば、従来の即時再編を保つ。
+    const normal = setup(0.99);
+    const normalCtx = normal.ctx;
+    normalCtx.WarManager = class WarManager {};
+    loadScript(normalCtx, 'js/war_effort.js');
+    const NormalWar = vm.runInContext('WarManager', normalCtx);
+    normal.game.warManager = new NormalWar();
+    normal.game.warManager.game = normal.game;
+    normal.game.warManager.calcPrisonerHireProb = () => 1;
+    normal.game.warManager.isTotalTakeoverPending = () => false;
+    normal.game.warManager.registerNemesisForExecuted = () => {};
+    const normalBreak = normal.diplomacy.applyBreakAlliancePenalty(3, 4);
+    const normalRecord = normalBreak.capturedHostageRecords[0];
+    normal.diplomacy._convertCapturedHostageToPrisoner(normalRecord);
+    const normalBefore = normal.updates.length;
+    await normal.game.warManager.autoResolvePrisoners([normalRecord.busho], 4);
+    assert.deepStrictEqual(normal.updates.slice(normalBefore), [3, 4],
+        '通常戦後のAI捕虜処遇は所属変更と同時に再編する');
+});
+
+
+// 断交用の捕虜処遇は画面で登用/処断/解放を選んでも、最終再編は外交側が所有する。
+// 通常の戦後捕虜UIは従来の即時更新を維持するため、オプションは契約で受け渡す。
+test('r838 断交のプレイヤー捕虜処遇は死亡・解放の再編保留を最後まで伝える', async () => {
+    const ctx = createContext({ WarManager: class WarManager {} });
+    loadScript(ctx, 'js/war_effort.js');
+    const War = vm.runInContext('WarManager', ctx);
+    const methods = [];
+    let completed = 0;
+    const game = { playerClanId: 4, castles: [],
+        affiliationSystem: {
+            becomeRonin(busho, reason, opts) { methods.push(['ronin', opts?.deferFactionUpdate]); }
+        },
+        lifeSystem: {
+            async executeDeath(busho, opts) { methods.push(['death', opts?.deferFactionUpdate]); }
+        },
+        ui: { log() {} }
+    };
+    const war = new War();
+    war.game = game;
+    war._prisonerPhaseFlow = { finishing: false };
+    war._isPrisonerPhaseCurrent = session => session === war._prisonerPhaseFlow;
+    war._prisonerPhaseContext = { skipWarCleanup: true, deferFactionUpdate: true, onComplete() { completed++; } };
+    war.pendingKills = [{ id: 11, clan: 3, name: '処断対象' }];
+    war.pendingPrisoners = [{ id: 12, clan: 3, name: '解放対象', belongKunishuId: 0 }];
+    war.registerNemesisForExecuted = () => {};
+    await war.finishPrisonerPhase();
+    assert.deepStrictEqual(methods, [['death', true], ['ronin', true]],
+        '捕虜画面の最終処遇を保留したまま外交側へ制御を戻す');
+    assert.strictEqual(completed, 1, '全処遇の確定後に外交担当へ一度だけ完了通知');
+    assert.strictEqual(war._prisonerPhaseFlow, null);
 });
 
 
@@ -39049,6 +39122,68 @@ test('r836 史実死亡イベントがない通常の複数死亡では変化し
     game.eventManager = new EventManager(game);
     await game.lifeSystem.checkDeath();
     assert.deepStrictEqual(calls,[7],'旧仕様どおり当該勢力に対してのみ一度更新');
+});
+
+
+// r837: 月末の後継者不在滅亡は、死亡処理の最終派閥再編まで保留する。
+// 戦争からの直接滅亡呼出しは即時再編という従来契約を保持する。
+function createR837NoHeirGame() {
+    const ctx = createContext({ setTimeout });
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/life_system.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const clan = {id:10,name:'旧家',leaderId:1,isDestroyed:false};
+    const leader = {id:1,clan:10,status:'active',isDaimyo:true,endYear:1500,deathFlag:false};
+    const retainer = {id:2,clan:10,status:'active',castleId:5,endYear:1900,deathFlag:false};
+    const castle = {id:5,ownerClan:10,samuraiIds:[2],castellanId:2};
+    const updates = [];
+    const game = {
+        year:1570,month:4,gameStartYear:1560,gameStartMonth:1,
+        playerClanId:99,clans:[clan],castles:[castle],bushos:[leader,retainer],princesses:[],
+        getClan:id=>id===10?clan:null,
+        getClanCastles:id=>id===10 && castle.ownerClan===10?[castle]:[],
+        getClanBushos:id=>id===10 && retainer.clan===10?[retainer]:[],
+        getCastle:id=>id===5?castle:null,
+        getCastleBushos:id=>id===5 && retainer.castleId===5?[retainer]:[],
+        getBusho:id=>id===1?leader:id===2?retainer:null,
+        updateCastleLord(){},
+        factionSystem:{updateFactions(id){updates.push(id)}},
+        castleManager:{changeOwner(c,id){c.ownerClan=id;}},
+        affiliationSystem:{
+            becomeRonin(b){b.clan=0;b.status='ronin';b.castleId=0;},
+            setCastellanRaw(c,b){c.castellanId=b?.id||0;}
+        },
+        ui:{log(){},async showDialogAsync(){},renderMap(){}}
+    };
+    const life = new LifeSystem(game);
+    life._collectSuccessionCandidates=()=>[];
+    life._sortSuccessionCandidates=()=>[];
+    return {life,game,clan,leader,retainer,updates};
+}
+
+test('r837 月末大名死亡→後継不在滅亡は最終派閥再編1回',async()=>{
+    const {life,game,clan,leader,retainer,updates}=createR837NoHeirGame();
+    // 本体の月末処理・大名後継処理・滅亡処理を通す。
+    // このテストで不要な裁判所・姫処理だけ省いた死亡副作用の最小fixture。
+    life.executeDeath=async function(b,context){
+        b.status='dead';
+        await this.handleDaimyoDeath(b,[],context);
+        b.clan=0;
+    };
+    await life.checkDeath();
+    assert.strictEqual(clan.isDestroyed,true);
+    assert.strictEqual(retainer.clan,0);
+    assert.deepStrictEqual(updates,[10], '途中の滅亡処理は再編せず月末最後に旧主家を1回');
+});
+
+test('r837 合戦からの独立した滅亡処理は派閥を即時再編する',async()=>{
+    const {life,game,clan,retainer,updates}=createR837NoHeirGame();
+    // 合戦で最後の城を既に奪われた状態から滅亡処理が呼ばれる。
+    game.castles[0].ownerClan=0;
+    await life.checkClanExtinction(10,'no_castle');
+    assert.strictEqual(clan.isDestroyed,true);
+    assert.strictEqual(retainer.clan,0);
+    assert.deepStrictEqual(updates,[10], '戦後の滅亡呼出しは即時の1回を保持');
 });
 
 Promise.all(pendingTests).then(() => {

@@ -525,7 +525,7 @@ class DiplomacyManager {
                 const playerOriginRecords = clanRecords
                     .filter(record => Number(record.originClanId) === playerClanId && record.busho);
 
-                await this.game.warManager.autoResolvePrisoners(hostages, captorClanId);
+                await this.game.warManager.autoResolvePrisoners(hostages, captorClanId, { deferFactionUpdate: true });
 
                 // AI処遇後の表示でも「どの家からどの家へ送られていた人質か」を失わないよう、
                 // 武将だけへ写して元recordを捨てず、履歴の当事者IDも同じrecordを正本にする。
@@ -556,6 +556,7 @@ class DiplomacyManager {
                 this.game.warManager.pendingKills = [];
                 this.game.warManager.startPrisonerPhase({
                     skipWarCleanup: true,
+                    deferFactionUpdate: true,
                     onComplete: resolve
                 });
             });
@@ -1364,7 +1365,7 @@ class DiplomacyManager {
             ? this.game.getClanCastles(originClanId) : [];
         if (outcome === 'escaped' && friendlyCastles.length === 0) {
             // 実家の拠点がない脱走者は、従来どおり浪人化の専門窓口を使う。
-            this.game.affiliationSystem.becomeRonin(hostage);
+            this.game.affiliationSystem.becomeRonin(hostage, 'desertion', { deferFactionUpdate: true });
             return hostage;
         }
         if (originClanId > 0) {

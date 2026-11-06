@@ -2663,7 +2663,8 @@ Object.assign(WarManager.prototype, {
                     prisoner.belongKunishuId = 0;
                     const targetC = this.game.getCastle(prisoner.castleId) || this.game.getCurrentTurnCastle(); 
                     if(targetC) { 
-                        this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id);
+                        this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id,
+                            null, false, { deferFactionUpdate: this._prisonerPhaseContext?.deferFactionUpdate === true });
                     }
                     this.game.ui.showDialog(`「もはや趨勢は決したか……致し方あるまい」`, false, this._guardPrisonerPhaseCallback(() => {
                         this.game.ui.showDialog(`${prisoner.name}は当家に臣従を誓いました！`, false, nextStep);
@@ -2691,7 +2692,8 @@ Object.assign(WarManager.prototype, {
                     : this.isTotalTakeoverPending();
                 await this.game.lifeSystem.executeDeath(prisoner, {
                     skipDaimyoSuccession: skipSuccession,
-                    excludedSuccessionCandidateIds: [...this.pendingPrisoners, ...(this.pendingKills || [])].map(p => p.id)
+                    excludedSuccessionCandidateIds: [...this.pendingPrisoners, ...(this.pendingKills || [])].map(p => p.id),
+                    deferFactionUpdate: this._prisonerPhaseContext?.deferFactionUpdate === true
                 });
                 if (!this._isPrisonerPhaseCurrent(actionSession)) {
                     if (this._prisonerPhaseFlow === actionSession) this._invalidatePrisonerPhase();
@@ -2714,7 +2716,8 @@ Object.assign(WarManager.prototype, {
                 this.game.affiliationSystem.setActivityStatusRaw(prisoner, window.GameConstants.BushoStatus.ACTIVE); 
                 prisoner.isCastellan = false;
             } else {
-                this.game.affiliationSystem.becomeRonin(prisoner);
+                this.game.affiliationSystem.becomeRonin(prisoner, 'desertion',
+                    { deferFactionUpdate: this._prisonerPhaseContext?.deferFactionUpdate === true });
             }
             this.game.ui.showDialog(`「生きて恥を晒せと申すか……」`, false, this._guardPrisonerPhaseCallback(() => {
                 this.game.ui.showDialog(`${prisoner.name}を解放しました。`, false, nextStep);
@@ -2806,7 +2809,8 @@ Object.assign(WarManager.prototype, {
                         ? currentTurnCastle
                         : this.game.getClanCastles(this.game.playerClanId)[0]);
                 if(targetC) { 
-                    this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id);
+                    this.game.affiliationSystem.joinClan(prisoner, this.game.playerClanId, targetC.id,
+                            null, false, { deferFactionUpdate: this._prisonerPhaseContext?.deferFactionUpdate === true });
                 }
                 hiredNames.push(prisoner.name);
                 // 成功した人はリストから消します
@@ -2953,7 +2957,9 @@ Object.assign(WarManager.prototype, {
                 : this.isTotalTakeoverPending(); // ★追加：総取りの事前確認
             for (let p of this.pendingKills) {
                 this.registerNemesisForExecuted(p, this.game.playerClanId);
-                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: skipSuccession, excludedSuccessionCandidateIds });
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: skipSuccession,
+                    excludedSuccessionCandidateIds,
+                    deferFactionUpdate: prisonerPhaseContext?.deferFactionUpdate === true });
                 if (!this._isPrisonerPhaseCurrent(session)) {
                     if (this._prisonerPhaseFlow === session) this._invalidatePrisonerPhase();
                     return;
@@ -2985,7 +2991,8 @@ Object.assign(WarManager.prototype, {
                         this.game.affiliationSystem.setActivityStatusRaw(prisoner, window.GameConstants.BushoStatus.ACTIVE); 
                         prisoner.isCastellan = false;
                     } else { 
-                        this.game.affiliationSystem.becomeRonin(prisoner);
+                        this.game.affiliationSystem.becomeRonin(prisoner, 'desertion',
+                            { deferFactionUpdate: prisonerPhaseContext?.deferFactionUpdate === true });
                     }
                 }
                 releasedNames.push(prisoner.name);
@@ -3026,7 +3033,9 @@ Object.assign(WarManager.prototype, {
         this.game.finishTurn();
     },
     
-    async autoResolvePrisoners(captives, winnerClanId) { // ★ async を追加
+    async autoResolvePrisoners(captives, winnerClanId, { deferFactionUpdate = false } = {}) {
+        // 断交の捕虜処遇は外交担当が複数人の最終状態から派閥を確定する。
+        // 通常の戦後処遇では従来どおり各処遇の即時更新を保持する。
         // AI処遇の各人を順番に処理する間、同時に捕縛された家臣を後継当主に任命しない。
         const excludedSuccessionCandidateIds = captives.map(p => p.id);
         // ★軽量化：勝者勢力の全武将を毎回filterせず、既存の大名索引を使います。
@@ -3047,14 +3056,16 @@ Object.assign(WarManager.prototype, {
             // ★討死フラグがあり、本来の寿命を過ぎている武将は必ず処断します！
             if (p.isKilledInBattle && this.game.year >= p.originalEndYear) {
                 this.registerNemesisForExecuted(p, winnerClanId);
-                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending(), excludedSuccessionCandidateIds });
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending(),
+                    excludedSuccessionCandidateIds, deferFactionUpdate });
                 continue; 
             }
 
             // ★変更：fe_system.js の魔法にお任せします！
             if (p.isDaimyo && !isExtinct) { 
                 this.registerNemesisForExecuted(p, winnerClanId);
-                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending(), excludedSuccessionCandidateIds });
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending(),
+                    excludedSuccessionCandidateIds, deferFactionUpdate });
                 continue; 
             }
             
@@ -3073,7 +3084,8 @@ Object.assign(WarManager.prototype, {
                 const targetC = this.game.getCastle(p.castleId);
                 if (targetC) { 
                     // ★新しいお引越しセンターの魔法を使います！
-                    this.game.affiliationSystem.joinClan(p, winnerClanId, targetC.id);
+                    this.game.affiliationSystem.joinClan(p, winnerClanId, targetC.id,
+                        null, false, { deferFactionUpdate });
                 }
                 continue; 
             } 
@@ -3116,7 +3128,8 @@ Object.assign(WarManager.prototype, {
                 // ==========================================
                 // ★処断される場合も、life_system.js の魔法にお任せします！
                 this.registerNemesisForExecuted(p, winnerClanId);
-                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending(), excludedSuccessionCandidateIds });
+                await this.game.lifeSystem.executeDeath(p, { skipDaimyoSuccession: this.isTotalTakeoverPending(),
+                    excludedSuccessionCandidateIds, deferFactionUpdate });
                 // ==========================================
             } else {
                 // ★大名が解放される場合、滅亡していたら看板を下ろします
@@ -3143,7 +3156,7 @@ Object.assign(WarManager.prototype, {
                         p.isCastellan = false;
                     } else {
                         // ★新しいお引越しセンターの魔法を使います！
-                        this.game.affiliationSystem.becomeRonin(p);
+                        this.game.affiliationSystem.becomeRonin(p, 'desertion', { deferFactionUpdate });
                     }
                 }
             }
