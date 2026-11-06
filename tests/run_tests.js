@@ -73,6 +73,15 @@ function createContext(extra = {}) {
 }
 
 function loadScript(context, relativePath) {
+    // 本番index.htmlではPersonnelRulesが継承担当より先に読み込まれる。
+    // 単体VMでもその読み込み順を維持し、実装側へテスト専用fallbackを作らない。
+    if (relativePath === 'js/personnel_rules.js' && context.__autoLoadedPersonnelRules === true) return;
+    if ((relativePath === 'js/life_system.js' || relativePath === 'js/kunishu_system.js')
+        && typeof context.PersonnelRules === 'undefined') {
+        const dependency = path.join(ROOT, 'js/personnel_rules.js');
+        vm.runInContext(fs.readFileSync(dependency, 'utf8'), context, { filename: dependency });
+        context.__autoLoadedPersonnelRules = true;
+    }
     const filename = path.join(ROOT, relativePath);
     const code = fs.readFileSync(filename, 'utf8');
     vm.runInContext(code, context, { filename });
@@ -38399,6 +38408,60 @@ test('r826 捕虜登用の相性差はPersonnelRules共通の循環計算を使�
         assert.ok(Math.abs(actual - expected) < 1e-10,
             `相性差3の+0.1補正と一致（滅亡=${isExtinct}, 実測=${actual}, 期待=${expected}）`);
     }
+});
+
+// r827: 人事の循環相性（0と99が近い）を、家督・国主・諸勢力の後継順位でも共用する。
+// 1560年の織田家では信長(0)と長益(90)の距離は10、信広(16)の距離は16。
+test('r827 1560織田家の家督・国主後継順位は循環相性を用いる', () => {
+    const { common, scenario } = getRuntimeData('1560_okehazama');
+    const master = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const state = new Map(scenario.warriorsState.map(b => [Number(b.id), b]));
+    const getPerson = id => ({ ...master.get(id), ...state.get(id), id,
+        status: Number(master.get(id).startYear) <= 1560 ? 'active' : 'unborn' });
+    const father = getPerson(1006004);
+    const incumbent = getPerson(1006006);
+    const nobuhiro = getPerson(1006005);
+    const nagamasu = getPerson(1006020);
+    assert.ok([incumbent, nobuhiro, nagamasu].every(b => Number(b.startYear) <= 1560));
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/family_system.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    loadScript(ctx, 'js/life_system.js');
+    ctx.FamilyLinker.rebuildAllFamilyIds([father, incumbent, nobuhiro, nagamasu], []);
+    assert.ok(incumbent.familyIds.some(id => nobuhiro.familyIds.includes(id))
+        && incumbent.familyIds.some(id => nagamasu.familyIds.includes(id)), '一門関係は実際のFamilyLinkerで確認する');
+    assert.strictEqual(ctx.PersonnelRules.calcAffinityDiff(incumbent.affinity, nobuhiro.affinity), 16);
+    assert.strictEqual(ctx.PersonnelRules.calcAffinityDiff(incumbent.affinity, nagamasu.affinity), 10);
+    const life = new (vm.runInContext('LifeSystem', ctx))({});
+    for (const role of ['daimyo', 'commander']) {
+        const sorted = life._sortSuccessionCandidates(incumbent, [nobuhiro, nagamasu], role);
+        assert.strictEqual(sorted[0].id, nagamasu.id, `${role} の相性優先では長益が先になる`);
+    }
+});
+
+// 諸勢力も同じ相性基準を用いる。所属集団は同一世帯2人の限定fixtureとする。
+test('r827 諸勢力頭領の後継者選出も循環相性の共通計算を用いる', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/personnel_rules.js');
+    loadScript(ctx, 'js/kunishu_system.js');
+    const leader = { id: 1, name: '先代|頭領', status: 'dead', affinity: 0,
+        familyIds: [1, 2, 3] };
+    const near = { id: 2, name: '候補|近', status: 'active', affinity: 90,
+        familyIds: [1, 2, 3], leadership: 30, intelligence: 30, birthYear: 1540 };
+    const far = { id: 3, name: '候補|遠', status: 'active', affinity: 16,
+        familyIds: [1, 2, 3], leadership: 30, intelligence: 30, birthYear: 1540 };
+    const kunishu = { id: 50, name: '試験用諸勢力', getName() { return this.name; },
+        leaderId: leader.id, castleId: 3, soldiers: 100, isDestroyed: false };
+    const game = { year: 1560, month: 5, bushos: [leader, far, near],
+        getBusho: id => [leader, far, near].find(b => b.id === id),
+        ui: { log() {}, async showDialogAsync() {} } };
+    const sys = new (vm.runInContext('KunishuSystem', ctx))(game);
+    sys.getKunishuMembers = () => [far, near];
+    await sys.checkDestroyed(kunishu);
+    assert.strictEqual(kunishu.leaderId, near.id,
+        '頭領も相性差10を差16より優先し、直線差90を遠いと誤解しない');
 });
 
 Promise.all(pendingTests).then(() => {

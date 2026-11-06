@@ -2,7 +2,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const path=require('path');const root=path.resolve(__dirname,'..');
 const math=Object.create(Math);math.random=()=>0.75;
 const ctx=vm.createContext({console, Math:math, window:{}, WarManager:class WarManager{},MapGraphService:{isReachable:()=>true}});
-for(const f of ['js/constants.js','js/affiliation_system.js','js/life_system.js','js/war_effort.js']) vm.runInContext(fs.readFileSync(`${root}/${f}`,'utf8'),ctx,{filename:f});
+for(const f of ['js/constants.js','js/personnel_rules.js','js/affiliation_system.js','js/life_system.js','js/war_effort.js']) vm.runInContext(fs.readFileSync(`${root}/${f}`,'utf8'),ctx,{filename:f});
 const get=(expr)=>vm.runInContext(expr,ctx);
 const WarManager=get('WarManager'),AffiliationSystem=get('AffiliationSystem'),LifeSystem=get('LifeSystem');
 const castles=[{id:1,ownerClan:1,legionId:0,samuraiIds:[],name:'攻城側'},{id:2,ownerClan:2,legionId:0,samuraiIds:[20,21],name:'本拠'},{id:3,ownerClan:2,legionId:0,samuraiIds:[22],name:'残存城'}];

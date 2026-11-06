@@ -42,7 +42,7 @@
 | 大名の本拠 | `GameManager.getDaimyoHomeCastle()` 等の現在当主所在の正規問い合わせ（プレイヤー）。拠点一覧先頭や古い固定居城を代用しない | <!-- RULE:STATE-HOME -->
 | 月次・ターンの進行 | `TurnManager`。個別の具体的ルールは専門System / Rulesへ委譲 |
 | 兵力・援軍・戦争結果 | `WarManager` / `TroopAllocationService` / `ReinforcementService` 等、既存の個別正本 |
-| 経済・交易・内政・人事の相性差 | `EconomyRules` / `DomesticRules` / `PersonnelRules`。相性差は `PersonnelRules.calcAffinityDiff()` の循環計算を正本とし、捕虜登用でも独自の単純差を使用しない。AI側に同じ算式を複製しない |
+| 経済・交易・内政・人事の相性差 | `EconomyRules` / `DomesticRules` / `PersonnelRules`。相性差は `PersonnelRules.calcAffinityDiff()` の循環計算を正本とし、捕虜登用・大名／国主の継承順位・諸勢力頭領の後継順位でも独自の単純差を使用しない。AI側に同じ算式を複製しない |
 | セーブの読み書きと安全性 | `SaveManager`。スキーマ・復号・照合・スロット整合もここで扱う |
 | 画面遷移・ロード幕と表示 | `UIManager` と専門View。固定DOMは `index.html`、静的外観は `css/style.css` |
 | 会話格・口調・忠誠情報 | `ConversationStandingRules` / `LoyaltyInsightRules` / `InterviewSystem`。各画面の重複判定を禁止 |

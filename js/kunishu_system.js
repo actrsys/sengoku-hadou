@@ -843,7 +843,7 @@ class KunishuSystem {
 
             const successionMetrics = new Map(allCandidates.map(b => [Number(b.id), {
                 isRelative: leader ? leader.familyIds.some(fId => b.familyIds.includes(fId)) : false,
-                affinityDiff: leader ? Math.abs((leader.affinity || 0) - (b.affinity || 0)) : 0,
+                affinityDiff: leader ? PersonnelRules.calcAffinityDiff(leader.affinity, b.affinity) : 0,
                 baseScore: b.leadership + b.intelligence
             }]));
 

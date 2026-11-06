@@ -1280,7 +1280,7 @@ class LifeSystem {
     _sortSuccessionCandidates(incumbent, candidates, role) {
         const metrics = new Map(candidates.map(b => [Number(b.id), {
             isRelative: (incumbent.familyIds || []).some(fId => (b.familyIds || []).includes(fId)),
-            affinityDiff: Math.abs((incumbent.affinity || 0) - (b.affinity || 0)),
+            affinityDiff: PersonnelRules.calcAffinityDiff(incumbent.affinity, b.affinity),
             baseScore: b.leadership + b.intelligence,
             isDirectSon: (b.realFatherId === incumbent.id || b.adoptiveFatherId === incumbent.id)
         }]));
