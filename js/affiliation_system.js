@@ -745,7 +745,7 @@ class AffiliationSystem {
      */
     absorbClan(subordinateClanId, dominantClanId, {
         excludeBushoId = 0, fixedLoyalty = null, includeDead = true,
-        markExtinctionNotified = false
+        markExtinctionNotified = false, deferFactionUpdate = false
     } = {}) {
         const oldId = Number(subordinateClanId) || 0;
         const newId = Number(dominantClanId) || 0;
@@ -788,7 +788,9 @@ class AffiliationSystem {
         if (fixedLoyalty !== null && typeof this.game.updateCastleLord === 'function') {
             castles.forEach(c => this.game.updateCastleLord(c));
         }
-        if (this.game.factionSystem) {
+        // 通常の臣従はここで最終確定する。史実イベントのように
+        // 上位の共通終了処理が全国を再編する場合だけ、その一度へ委譲する。
+        if (!deferFactionUpdate && this.game.factionSystem) {
             this.game.factionSystem.updateFactions(oldId);
             this.game.factionSystem.updateFactions(newId);
         }

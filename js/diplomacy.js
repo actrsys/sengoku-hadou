@@ -559,7 +559,7 @@ class DiplomacyManager {
                     onComplete: resolve
                 });
             });
-            if (prisonerResult === false) return;
+            if (prisonerResult === false) return false;
         }
     }
 
@@ -589,7 +589,19 @@ class DiplomacyManager {
             }
         }
 
-        await this._resolveCapturedHostagesAfterBreak(result.capturedHostageRecords || []);
+        const completed = await this._resolveCapturedHostagesAfterBreak(result.capturedHostageRecords || []);
+        if (completed === false) return;
+
+        // 同じ断交で複数の人質が帰還・処遇されても、途中の仮派閥を作らない。
+        // 元の所属と預かり先を記録した結果レコードから最終状態だけを再編する。
+        if (this.game.factionSystem) {
+            const affectedClanIds = new Set();
+            [...escapedRecords, ...(result.capturedHostageRecords || [])].forEach(record => {
+                if (Number(record?.originClanId) > 0) affectedClanIds.add(Number(record.originClanId));
+                if (Number(record?.captorClanId) > 0) affectedClanIds.add(Number(record.captorClanId));
+            });
+            affectedClanIds.forEach(id => this.game.factionSystem.updateFactions(id));
+        }
     }
 
     _countHostileClans(clanId, { directOnly = false } = {}) {
@@ -1356,9 +1368,10 @@ class DiplomacyManager {
             return hostage;
         }
         if (originClanId > 0) {
-            // 人質の受入時の功績・派閥処理をもう一度実行しない。
-            this.game.affiliationSystem.setClanIdRaw(hostage, originClanId);
-            this.game.affiliationSystem.syncSpousesForClanChange(hostage, holderClanId, originClanId, { refreshDiplomacy: false });
+            // 受入時のjoinClanによる功績減算は繰り返さない。
+            // 派閥情報だけは預かり家から持ち帰らず、所属担当の移籍窓口で整理する。
+            const previousClanId = this.game.affiliationSystem.transferClanRaw(hostage, originClanId);
+            this.game.affiliationSystem.syncSpousesForClanChange(hostage, previousClanId, originClanId, { refreshDiplomacy: false });
         }
         if (outcome === 'escaped') {
             const escapeCastle = friendlyCastles[Math.floor(Math.random() * friendlyCastles.length)];

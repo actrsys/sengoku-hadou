@@ -1090,6 +1090,7 @@ test('人質の脱走は実家所属まで復元し、拘束継続時は通常�
             getClanCastles(id) { return this.castles.filter(c => Number(c.ownerClan) === Number(id)); },
             affiliationSystem: {
                 setClanIdRaw(b, id) { b.clan = Number(id) || 0; },
+                transferClanRaw(b, id) { const old = b.clan; this.setClanIdRaw(b, id); b.factionId = 0; return old; },
                 syncSpousesForClanChange() {},
                 moveCastle(b, id) { b.castleId = Number(id) || 0; },
                 becomeRonin(b) { b.clan = 0; b.castleId = 0; b.status = 'ronin'; }
@@ -1357,6 +1358,7 @@ test('r697 和睦満了で敵対へ戻ると人質は通常の断交同様に帰
         affiliationSystem: {
             joinClan(b, clanId, castleId) { b.clan = clanId; b.castleId = castleId; },
             setClanIdRaw(b, clanId) { b.clan = clanId; },
+            transferClanRaw(b, id) { const old = b.clan; this.setClanIdRaw(b, id); b.factionId = 0; return old; },
             syncSpousesForClanChange() {},
             moveCastle(b, castleId) { b.castleId = castleId; },
             becomeRonin(b) { b.clan = 0; b.status = 'ronin'; }
@@ -1406,7 +1408,9 @@ test('r697 和睦満了で敵対化した人質が拘束された場合は捕虜
     const game = {
         clans, bushos: [hostage], princesses: [], playerClanId: 1,
         getClan(id) { return clans.find(c => c.id === Number(id)); },
-        affiliationSystem: { setClanIdRaw(b, id) { b.clan = id; }, syncSpousesForClanChange() {} },
+        affiliationSystem: { setClanIdRaw(b, id) { b.clan = id; },
+            transferClanRaw(b, id) { const old = b.clan; this.setClanIdRaw(b, id); b.factionId = 0; return old; },
+            syncSpousesForClanChange() {} },
         ui: { log() {}, async showDialogAsync() {} },
         warManager: { async autoResolvePrisoners(prisoners, captorId) {
             calls++;
@@ -1447,6 +1451,7 @@ test('r698 和睦から普通に復帰した後の正規友好度低下で敵対
         affiliationSystem: {
             joinClan(b, clanId, castleId) { b.clan = clanId; b.castleId = castleId; },
             setClanIdRaw(b, clanId) { b.clan = clanId; },
+            transferClanRaw(b, id) { const old = b.clan; this.setClanIdRaw(b, id); b.factionId = 0; return old; },
             syncSpousesForClanChange() {},
             moveCastle(b, castleId) { b.castleId = castleId; },
             becomeRonin(b) { b.clan = 0; b.status = 'ronin'; }
@@ -35934,11 +35939,12 @@ test('A-118 諸勢力4名の取込では城主確定と地図更新も各1回で
 });
 
 // A-112: 史実イベントの勢力吸収も、一括移籍後の派閥再編を専門Systemで確定する。
-test('A-112 史実の勢力吸収は最終所属から派閥を確定し、仮再編を残さない', () => {
+test('A-112 史実の勢力吸収は最終所属から派閥を確定し、仮再編を残さない', async () => {
     const ctx = createContext({
         LifeStatusRules: { isDead: b => b.status === 'dead', isPresent: b => b.status === 'active' },
         BushoStatusRules: { isActive: b => b.status === 'active' }
     });
+    ctx.setTimeout = setTimeout;
     for (const f of ['js/config.js','js/constants.js','js/personnel_rules.js','js/affiliation_system.js','js/event/historical_event.js']) loadScript(ctx,f);
     const oldClan = { id: 2, name: '旧家', leaderId: 21, extinctionNotified: false };
     const targetClan = { id: 1, name: '新家', leaderId: 11 };
@@ -35962,14 +35968,17 @@ test('A-112 史実の勢力吸収は最終所属から派閥を確定し、仮�
         updateCastleLord: c=>changes.push(c.id),
         castleManager: { changeOwner(c,id){c.ownerClan=id;}, disbandLegion() {} },
         factionSystem: { updateFactions(id){rebuilt.push(id);} },
-        princesses: [], ui:{ renderMap(){} }
+        princesses: [], ui:{ renderMap(){}, updatePanelHeader(){} }
     };
     game.affiliationSystem = new (vm.runInContext('AffiliationSystem',ctx))(game);
     ctx.EventAction.absorbClan(game, 2, 1);
     assert.deepStrictEqual(arrivals.map(p=>p.clan), [1,1,1]);
     assert.strictEqual(castles[1].ownerClan,1);
     assert.strictEqual(oldClan.extinctionNotified,true,'史実イベントの消滅通知を維持');
-    assert.deepStrictEqual(rebuilt,[2,1],'吸収の一括移籍後、旧主家と新主家の派閥を各1回だけ再編');
+    assert.deepStrictEqual(rebuilt, [], '史実イベント内では途中再編せず、EventManagerの共通終端へ委譲する');
+    // 実際にイベント終了で呼ぶ公開共通処理を通し、全国の再編が1回だけ起きることを検査。
+    await ctx.EventAction.refreshScreen(game);
+    assert.deepStrictEqual(rebuilt, [undefined], 'イベント終了時に1回だけ全国再編し、途中の2回を重複させない');
 });
 
 
@@ -35994,7 +36003,7 @@ test('A-112 固定忠誠の史実吸収は全員の加入後に派閥と城主�
     ctx.EventAction.absorbClan(game, 2, 1, 0, 100);
     assert.ok(group.every(b => b.clan===1 && b.loyalty===100),'固定忠誠と所属を維持');
     assert.ok(group.every(b => !b.isDaimyo),'旧大名の役職は解除');
-    assert.strictEqual(getRebuilds(),2,'旧家・新家を最終名簿から一度ずつ再編');
+    assert.strictEqual(getRebuilds(),0,'史実イベント内では終端まで派閥再編を保留する');
     assert.strictEqual(appointmentHistory.filter(msg=>msg.includes('城主任命')).length,1,
         '一括加入中の仮城主ではなく旧居城の最終城主を一度だけ確定');
     assert.strictEqual(game.princesses[0].currentClanId,1,'未婚姫は新家へ移籍');
@@ -38521,6 +38530,92 @@ test('r827 諸勢力頭領の後継者選出も循環相性の共通計算を用
     await sys.checkDestroyed(kunishu);
     assert.strictEqual(kunishu.leaderId, near.id,
         '頭領も相性差10を差16より優先し、直線差90を遠いと誤解しない');
+});
+
+// r829: 外交人質も預かり家では通常の派閥に参加し得る。
+// 同盟破棄で帰還・捕虜化したときに、預かり家の派閥IDを元家に持ち帰らない。
+test('r829 断交人質の脱走・捕虜化は元所属へ戻す際に旧派閥を破棄し、処遇後一括再編する', async () => {
+    const setup = (randomValue) => {
+        const boundedMath = Object.assign(Object.create(Math), { random: () => randomValue });
+        const ctx = createContext({ Math: boundedMath });
+        for (const file of ['js/config.js', 'js/constants.js', 'js/personnel_rules.js',
+            'js/faction_system.js', 'js/affiliation_system.js', 'js/diplomacy.js']) loadScript(ctx, file);
+        const createBusho = (id, clan, castleId, affinity, achievementTotal = 100) => ({
+            id, clan, castleId, name: `武将${id}`, fullName: `武将${id}`, status: 'active',
+            affinity, achievementTotal, leadership: 70, strength: 60, politics: 50,
+            diplomacy: 50, intelligence: 70, charm: 60, innovation: 40, loyalty: 90,
+            factionId: 0, isFactionLeader: false, recognitionNeed: 0, factionSeikaku: '無所属',
+            factionHoshin: '無所属', factionName: '', factionYomi: '', personality: 'ordinary',
+            familyName: `家${id}`, familyYomi: 'け', yomi: 'ひと',
+            wifeIds: [], familyIds: [], battleHistory: [], stayHistory: [],
+            arrivalTurn: 1560 * 12 + 5, belongKunishuId: 0
+        });
+        const sourceLord = createBusho(1, 3, 31, 25, 600); sourceLord.isDaimyo = true;
+        const holderLord = createBusho(2, 4, 41, 40, 600); holderLord.isDaimyo = true;
+        const hostage = createBusho(3, 3, 31, 0, 150);
+        const leaderA = createBusho(4, 4, 41, 0, 3000);
+        const leaderB = createBusho(5, 4, 41, 48, 3000);
+        const followers = [0, 0, 50, 50, 50].map((affinity, i) => createBusho(i + 6, 4, 41, affinity, 10));
+        const castles = [
+            { id: 31, ownerClan: 3, legionId: 0, castellanId: 1, samuraiIds: [1, 3] },
+            { id: 41, ownerClan: 4, legionId: 0, castellanId: 2, samuraiIds: [2, 4, 5, 6, 7, 8, 9, 10] }
+        ];
+        const clans = [{ id: 3, name: '武田', leaderId: 1, diplomacyValue: {} },
+            { id: 4, name: '北条', leaderId: 2, diplomacyValue: {} }];
+        const game = { year: 1560, month: 5, phase: 'game', playerClanId: 3,
+            bushos: [sourceLord, holderLord, hostage, leaderA, leaderB, ...followers],
+            castles, clans, princesses: [], legions: [],
+            getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); },
+            getClan(id) { return this.clans.find(c => Number(c.id) === Number(id)); },
+            getCastle(id) { return this.castles.find(c => Number(c.id) === Number(id)); },
+            getClanDaimyo(id) { return this.bushos.find(b => b.clan === Number(id) && b.isDaimyo); },
+            getClanCastles(id) { return this.castles.filter(c => c.ownerClan === Number(id)); },
+            getClanBushos(id) { return this.bushos.filter(b => b.clan === Number(id) && b.status === 'active'); },
+            getCastleBushos(id) { const c = this.getCastle(id); return c ? c.samuraiIds.map(i => this.getBusho(i)) : []; },
+            getLegionByClanNo() { return null; },
+            ui: { log() {}, renderMap() {}, async showDialogAsync() {}, info: { refreshOpenFactionList() {} } }
+        };
+        const Faction = vm.runInContext('FactionSystem', ctx);
+        const Affiliation = vm.runInContext('AffiliationSystem', ctx);
+        const Diplomacy = vm.runInContext('DiplomacyManager', ctx);
+        game.factionSystem = new Faction(game);
+        game.affiliationSystem = new Affiliation(game);
+        game.diplomacyManager = new Diplomacy(game);
+        game.affiliationSystem.updateCastleLord = () => {};
+        game.affiliationSystem.updateUI = () => {};
+        const updates = [];
+        const updateFactions = game.factionSystem.updateFactions.bind(game.factionSystem);
+        game.factionSystem.updateFactions = id => { updates.push(id); return updateFactions(id); };
+        game.diplomacyManager.changeStatus(3, 4, '同盟');
+        game.diplomacyManager.applyHostageData(3, 3, 4);
+        game.factionSystem.updateFactions(4);
+        assert.ok(hostage.factionId > 0 && hostage.factionName,
+            '月次と同じ本物の派閥選出で預かり家の派閥に所属できる');
+        assert.strictEqual(hostage.clan, 4);
+        return { game, hostage, updates, diplomacy: game.diplomacyManager };
+    };
+
+    for (const [label, randomValue, resultKey] of [['脱走', 0, 'escapedHostageRecords'], ['捕虜化', 0.99, 'capturedHostageRecords']]) {
+        const { game, hostage, updates, diplomacy } = setup(randomValue);
+        // 捕虜化では通常のAI戦後処遇の「解放」を模した結果を与え、
+        // 断交直後の所属巻き戻しと派閥再編を実コードで検査する。
+        game.warManager = { async autoResolvePrisoners(captives, captorClanId) {
+            assert.strictEqual(captorClanId, 4);
+            assert.strictEqual(captives[0].clan, 3, '捕虜処遇担当へは元所属で引き渡す');
+        } };
+        const result = diplomacy.applyBreakAlliancePenalty(3, 4);
+        assert.strictEqual(result.becameHostile, true);
+        assert.strictEqual(result[resultKey].length, 1, `${label}は実際の敵対化分岐で発生`);
+        assert.strictEqual(hostage.clan, label === '脱走' ? 3 : 4);
+        const before = updates.length;
+        await diplomacy.resolveBreakAllianceConsequences(result);
+        assert.strictEqual(hostage.clan, 3, `${label}の元所属復元`);
+        assert.strictEqual(hostage.factionId, 0, `${label}で預かり家の旧派閥IDを持ち帰らない`);
+        assert.strictEqual(hostage.factionName, '', `${label}で預かり家の旧派閥名を持ち帰らない`);
+        assert.strictEqual(hostage.isHostage, false, `${label}後に人質印を解除`);
+        assert.deepStrictEqual(updates.slice(before).sort(), [3, 4],
+            `${label}の処遇完了後、両家の派閥を一度ずつ再編`);
+    }
 });
 
 Promise.all(pendingTests).then(() => {

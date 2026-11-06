@@ -404,7 +404,8 @@ window.EventAction = {
         // 史実イベント側は発生条件だけを決め、移管は所属Systemの共通窓口へ委譲する。
         // 元の対象規則（死亡者を除外／対象人物を除外）と消滅通知は維持する。
         game.affiliationSystem.absorbClan(subordinateClanId, dominantClanId, {
-            excludeBushoId, fixedLoyalty, includeDead: false, markExtinctionNotified: true
+            excludeBushoId, fixedLoyalty, includeDead: false, markExtinctionNotified: true,
+            deferFactionUpdate: true
         });
     }
 };
