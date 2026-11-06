@@ -35922,6 +35922,36 @@ test('r786 諸勢力の一括取込も最終名簿から派閥を一度だけ再
 
 
 
+// r839: 取込の一括仕官だけでなく、同じ成功命令による担当者の功績も
+// 確定してから派閥選挙を1回行う。500の候補閾値を跨ぐことは通常の成長で到達可能。
+test('r839 諸勢力取込の派閥再編は担当者の功績確定後に一度だけ実行する', () => {
+    const { game, castle, kunishu, getRebuilds } = createR786KunishuFixture(true);
+    const doer = game.getBusho(98);
+    doer.achievementTotal = 490;
+    const receivedAchievements = [];
+    const meritAtCastleSelection = [];
+    const originalCastleUpdate = game.updateCastleLord;
+    game.updateCastleLord = castle => {
+        meritAtCastleSelection.push(doer.achievementTotal);
+        return originalCastleUpdate(castle);
+    };
+    const originalUpdate = game.factionSystem.updateFactions.bind(game.factionSystem);
+    game.factionSystem.updateFactions = id => {
+        receivedAchievements.push(doer.achievementTotal);
+        originalUpdate(id);
+    };
+    game.kunishuSystem.executeKunishuIncorporate(doer.id, castle.id, kunishu.id);
+    assert.strictEqual(kunishu.isDestroyed, true, '成功時の通常の取込経路を実行');
+    assert.ok(doer.achievementTotal >= 500, '担当者の功績が派閥主の候補閾値を跨ぐ');
+    assert.deepStrictEqual(meritAtCastleSelection, [doer.achievementTotal],
+        '城主の自動選考も同じ命令の功績確定後に一度だけ実行する');
+    assert.deepStrictEqual(receivedAchievements, [doer.achievementTotal],
+        '一括仕官と担当者の功績確定後、最終状態で一度だけ選挙する');
+    assert.strictEqual(getRebuilds(), 1, '派閥の再編回数を増やさない');
+});
+
+
+
 // A-118: 取込は全員の正式仕官後に城主を選ぶ。途中で城主を決めると既存家臣が
 // 先に城主になり、後から加わるより有力な配下が候補から外れる。
 test('A-118 諸勢力4名の取込では城主確定と地図更新も各1回で、最終名簿から城主を選ぶ', () => {
@@ -38801,6 +38831,60 @@ test('r832 城主引抜の家臣処遇後に旧家・受入家の派閥を一度
         'AIも同じ引抜確定入口を使用');
 });
 
+
+// r840: 引抜の所属変更処理と功績加算の順序。担当者が派閥主候補の功績閾値を跨ぐ場合も、
+// 加算後の最終名簿を一度だけ FactionSystem へ渡す。通常家臣・城主の双方で同じ契約を使う。
+test('r840 通常家臣・城主引抜は担当者の功績確定後に旧家と受入家の派閥を一度だけ再編する', async () => {
+    for (const isCastellan of [false, true]) {
+        const ctx = createContext({
+            GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin' } },
+            LifeStatusRules: { isPresent: b => b.status === 'active' },
+            BushoStatusRules: { isActive: b => b.status === 'active' }
+        });
+        loadScript(ctx, 'js/affiliation_system.js');
+        loadScript(ctx, 'js/strategy_system.js');
+        const Aff = vm.runInContext('AffiliationSystem', ctx);
+        const Strategy = vm.runInContext('StrategySystem', ctx);
+        const oldCastle = { id: 20, name: '旧領', ownerClan: 2 };
+        const destination = { id: 10, name: '受入領', ownerClan: 1 };
+        const doer = { id: 1, name: '引抜担当', clan: 1, status: 'active',
+            achievementTotal: 490, intelligence: 100, strength: 80, leadership: 80,
+            charm: 80, diplomacy: 80 };
+        const target = { id: 2, name: '引抜対象', clan: 2, castleId: 20,
+            status: 'active', isCastellan, achievementTotal: 1200,
+            strength: 100, intelligence: 70, leadership: 70, charm: 70, diplomacy: 70,
+            factionId: 201, isFactionLeader: false };
+        const observations = [];
+        let screenRefreshes = 0;
+        const game = {
+            legions: [],
+            getCastle: id => id === 20 ? oldCastle : id === 10 ? destination : null,
+            getClanDaimyo: () => ({ affinity: 50 }),
+            getCastleBushos: () => [],
+            updateCastleLord() {},
+            factionSystem: {
+                updateRecognition() {},
+                updateFactions(id) { observations.push({ id, doerMerit: doer.achievementTotal }); }
+            },
+            castleManager: { changeOwner(c, clanId) { c.ownerClan = clanId; } },
+            independenceSystem: { resolveSubordinates: async () => [] }
+        };
+        game.affiliationSystem = new Aff(game);
+        game.affiliationSystem.leaveCastle = () => {};
+        game.affiliationSystem.enterCastle = (b, id) => { b.castleId = id; };
+        game.affiliationSystem.syncSpousesForClanChange = () => {};
+        game.affiliationSystem.updateLoyaltyForNewLord = () => {};
+        game.affiliationSystem.updateUI = () => { screenRefreshes++; };
+        const strategy = new Strategy(game);
+        await strategy.applyHeadhuntEffect(doer, target, destination, true);
+        assert.strictEqual(target.clan, 1, '引抜対象は受入家へ移籍');
+        assert.strictEqual(doer.achievementTotal, 520, '通常の引抜成功功績30を維持');
+        assert.deepStrictEqual(observations, [
+            { id: 2, doerMerit: 520 }, { id: 1, doerMerit: 520 }
+        ], `${isCastellan ? '城主' : '通常家臣'}引抜の再編は担当者の最終功績を参照`);
+        if (!isCastellan) assert.strictEqual(screenRefreshes, 1, '通常家臣引抜は最終確定後に一度画面更新');
+    }
+});
 
 // A-146: 月次共通イベントの「画面更新」と「派閥再選挙」を分離。
 // 毎月の民忠・交易など、武将所属が変わらない処理で二重選挙を起こさない。

@@ -734,8 +734,9 @@ class StrategySystem {
             const oldCastle = this.game.getCastle(target.castleId);
             const oldClanId = target.clan;
             const newClanId = doer.clan;
-            
-            if (target.isCastellan && oldCastle) {
+            const isCastellanTransfer = !!(target.isCastellan && oldCastle);
+
+            if (isCastellanTransfer) {
                 // 城主の移籍は transferClanRaw を使うため、ここで一度だけ功績を半減する。
                 // 通常家臣は joinClan 側が半減を担当するので、先に減らさない。
                 if (oldClanId !== 0 && oldClanId !== newClanId) {
@@ -764,24 +765,28 @@ class StrategySystem {
                 });
                 
                 this.game.updateCastleLord(oldCastle);
-                // 城主ごとの引抜は joinClan() ではなく transferClanRaw() を用い、
-                // 家臣の呼応・逃亡・捕虜処遇まで一括で確定する。途中で再編せず、
-                // 最後に旧家・受入家の双方を FactionSystem の正規選出へ渡す。
-                if (this.game.factionSystem) {
-                    const affectedClanIds = new Set([Number(oldClanId), Number(newClanId)]);
-                    affectedClanIds.forEach(id => {
-                        if (id > 0) this.game.factionSystem.updateFactions(id);
-                    });
-                }
             } else {
-                target.belongKunishuId = 0; 
-                target.isActionDone = true; 
-                this.game.affiliationSystem.joinClan(target, newClanId, destCastle.id);
+                target.belongKunishuId = 0;
+                target.isActionDone = true;
+                // 通常家臣の引抜でも、担当者の功績加算前に派閥を選び直さない。
+                // 所属変更と功績半減は joinClan() に委譲したまま最終再編だけ保留する。
+                this.game.affiliationSystem.joinClan(target, newClanId, destCastle.id, null, false, {
+                    deferFactionUpdate: true, deferUI: true
+                });
             }
-            
+
             const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
             doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(maxStat * 0.3);
             if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 25);
+            // 城主引抜は家臣・捕虜まで、通常家臣引抜は本人までの所属処遇を終え、
+            // 同じ命令の功績・承認欲求も確定してから旧家と受入家を一度ずつ再編する。
+            if (this.game.factionSystem) {
+                const affectedClanIds = new Set([Number(oldClanId), Number(newClanId)]);
+                affectedClanIds.forEach(id => {
+                    if (id > 0) this.game.factionSystem.updateFactions(id);
+                });
+            }
+            if (!isCastellanTransfer) this.game.affiliationSystem.updateUI();
         } else {
             doer.achievementTotal = (doer.achievementTotal || 0) + 5;
             if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 10);

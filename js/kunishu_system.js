@@ -1087,6 +1087,10 @@ class KunishuSystem {
 
             kunishu.isDestroyed = true;
             kunishu.soldiers = 0;
+            // 同じ取込命令による功績・承認欲求も、城主・派閥選出前に確定する。
+            // 派閥主候補資格と城主選考では功績を使うため、中間値で選び直さない。
+            doer.achievementTotal += Math.floor(doer.diplomacy * 0.3) + 30;
+            this.game.factionSystem.updateRecognition(doer, 30);
             // 全員の仕官後にだけ城主と派閥を確定する。城主不在の拠点でも
             // 途中の仮城主を任命せず、取込に応じた全員を候補に含める。
             if (members.length > 0) {
@@ -1102,9 +1106,6 @@ class KunishuSystem {
                 });
             }
             resultMsg = `${doer.name}の説得により、${kunishuName}が我が傘下に加わりました！`;
-            
-            doer.achievementTotal += Math.floor(doer.diplomacy * 0.3) + 30;
-            this.game.factionSystem.updateRecognition(doer, 30);
         } else {
             const kunishuName = kunishu.getName(this.game);
             resultMsg = `${doer.name}は${kunishuName}に合流を提案しましたが、\n丁重に断られてしまいました……`;
