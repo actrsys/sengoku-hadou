@@ -221,7 +221,8 @@ class TurnManager {
         
         // 月初イベント【前】をチェックして実行します
         if (game.eventManager) {
-            await game.eventManager.processEvents('startMonth_before');
+            // 月初の元服・下野後に全国派閥を再編するため、このイベント群はその1回へ委ねる。
+            await game.eventManager.processEvents('startMonth_before', null, { deferFactionRefreshToMonthStart: true });
             if (!isCurrentFlow()) return;
             game.writeSystemDiagnostic('month_start:event_before_done');
         }

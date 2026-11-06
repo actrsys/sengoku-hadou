@@ -814,6 +814,10 @@ class LifeSystem {
         // ★高速化：同じ月に複数人が死亡しても、死亡者ごとに全国の派閥を再編しません。
         // 変化した勢力IDだけを集め、死亡判定が終わった後に各勢力1回だけ再編します。
         const factionDirtyClanIds = new Set();
+        // 死亡直前の史実イベントが勢力吸収などを行った場合は、旧家だけでなく
+        // 受入家や他家にも変更が及ぶ。イベント前の全国再編を行わず、
+        // 全死亡処理完了後に一度だけ全国再編へ切り替える。
+        let needsNationwideFactionRebuild = false;
         
         // 【変更点①】没年の「1年前（endYear - 1）」を迎えている武将を探すようにしました！
         const targetBushos = this.game.bushos.filter(b => {
@@ -839,8 +843,11 @@ class LifeSystem {
                 const formerClanId = Number(b.clan) || 0;
                 let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false, deferFactionUpdate: true };
                 if (this.game.eventManager) {
-                    await this.game.eventManager.processEvents('busho_death', context);
+                    await this.game.eventManager.processEvents('busho_death', context, {
+                        deferFactionRefreshToDeathCheck: true
+                    });
                     if (!isCurrentFlow()) return;
+                    if (context.factionRebuildRequestedAfterDeath === true) needsNationwideFactionRebuild = true;
                 }
 
                 await this.executeDeath(b, context); // ★修正：イベントの結果（context）を渡します
@@ -882,8 +889,11 @@ class LifeSystem {
                 const formerClanId = Number(b.clan) || 0;
                 let context = { deadBusho: b, skipNormalMessage: false, skipDaimyoSuccession: false, deferFactionUpdate: true };
                 if (this.game.eventManager) {
-                    await this.game.eventManager.processEvents('busho_death', context);
+                    await this.game.eventManager.processEvents('busho_death', context, {
+                        deferFactionRefreshToDeathCheck: true
+                    });
                     if (!isCurrentFlow()) return;
+                    if (context.factionRebuildRequestedAfterDeath === true) needsNationwideFactionRebuild = true;
                 }
 
                 await this.executeDeath(b, context); // ★修正：イベントの結果（context）を渡します
@@ -900,9 +910,14 @@ class LifeSystem {
         }
 
         // ★高速化：死亡で変化した勢力だけ、まとめて1回ずつ派閥を再編します。
-        if (this.game.factionSystem && factionDirtyClanIds.size > 0) {
-            for (const clanId of factionDirtyClanIds) {
-                this.game.factionSystem.updateFactions(clanId);
+        if (this.game.factionSystem && (factionDirtyClanIds.size > 0 || needsNationwideFactionRebuild)) {
+            if (needsNationwideFactionRebuild) {
+                // 史実の勢力吸収などが絡む月は、死亡後の最終名簿から全国を一度だけ再編。
+                this.game.factionSystem.updateFactions();
+            } else {
+                for (const clanId of factionDirtyClanIds) {
+                    this.game.factionSystem.updateFactions(clanId);
+                }
             }
             // 大きな月でもブラウザへ制御を返す機会を作ります。
             await new Promise(resolve => setTimeout(resolve, 0));

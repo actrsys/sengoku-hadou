@@ -13235,7 +13235,7 @@ test('TurnManagerはturnQueue欠損をisDone参照より先に処理する', () 
 
 test('通常イベントも条件判定例外を局所隔離して進行を継続する', () => {
     const source = read('js/event_manager.js');
-    const at = source.indexOf('async processEvents(timing, context = null)');
+    const at = source.indexOf('async processEvents(timing, context = null');
     const block = source.slice(at, at + 7000);
     assert.ok(block.includes('matched = !!ev.checkCondition(this.game, context);'));
     assert.ok(block.includes('条件判定中にエラーが出ましたが、進行を継続します'));
@@ -38861,6 +38861,194 @@ test('r833 月次一括人事の途中失敗でも確定済み移籍に対する
     assert.strictEqual(factions,1);
     assert.strictEqual(screens,1);
     assert.strictEqual(warnings.length,1);
+});
+
+
+// r834: 月初「前」史実イベントの全国派閥再編は、直後に必ず実行される
+// FactionSystem.processStartMonth() へまとめる。画面と威信は従来どおり更新する。
+test('r834 月初前イベント後の派閥再編は月初定例の一回に集約し画面更新は維持', async () => {
+    const ctx = createContext({ setTimeout });
+    ctx.GameEvents = [{ id: 'historical_r834_month_before', timing: 'startMonth_before',
+        isOneTime: true, checkCondition(){ return true; },
+        async execute(game){ game.historicalApplied = true; } }];
+    loadScript(ctx, 'js/event_manager.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/faction_system.js');
+    ctx.WarParams = ctx.GameConfig.War;
+    ctx.BushoStatusRules = { isActive: b => b.status === 'active' };
+    let factionCalls = 0, maps = 0, prestige = 0;
+    const game = { phase: 'game', year: 1570, month: 6, flags: {},
+        bushos: [], clans: [], historicalApplied: false,
+        ui: { renderMap(){ maps++; }, updatePanelHeader(){} },
+        updateAllClanPrestige(){ prestige++; }
+    };
+    const Faction = vm.runInContext('FactionSystem', ctx);
+    const EventMgr = vm.runInContext('EventManager', ctx);
+    game.factionSystem = new Faction(game);
+    const originalRebuild = game.factionSystem.updateFactions.bind(game.factionSystem);
+    game.factionSystem.updateFactions = (...args) => { factionCalls++; return originalRebuild(...args); };
+    game.eventManager = new EventMgr(game);
+    // 月初進行を所有するTurnManagerからの明示的な保留契約。
+    await game.eventManager.processEvents('startMonth_before', null, { deferFactionRefreshToMonthStart: true });
+    assert.strictEqual(game.historicalApplied, true);
+    assert.strictEqual(maps, 1, '史実イベント直後の画面更新は維持');
+    assert.strictEqual(prestige, 1, '威信更新は維持');
+    await game.factionSystem.processStartMonth();
+    assert.strictEqual(factionCalls, 1, '二度の全国選挙を発火させない');
+    assert.strictEqual(game.flags.historical_r834_month_before, true);
+});
+
+test('r834 月初定例再編のない単独イベントでは従来の即時更新を維持', async () => {
+    const ctx = createContext({ setTimeout });
+    ctx.GameEvents = [{ id: 'historical_r834_standalone_before', timing: 'startMonth_before',
+        checkCondition(){ return true; }, async execute(game){ game.applied = true; } }];
+    loadScript(ctx, 'js/event_manager.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    let rebuilds = 0, maps = 0;
+    const game = { phase: 'game', flags: {},
+        factionSystem: { updateFactions(){ rebuilds++; } },
+        ui: { renderMap(){ maps++; }, updatePanelHeader(){} } };
+    game.eventManager = new (vm.runInContext('EventManager', ctx))(game);
+    await game.eventManager.processEvents('startMonth_before');
+    assert.strictEqual(rebuilds, 1, '月次の確定手段がなければ従来どおりイベントの再編を行う');
+    assert.strictEqual(maps, 1);
+});
+
+test('r835 実FactionSystemを持つ単独の月初前イベントは即時再編する', async () => {
+    const ctx = createContext({ setTimeout });
+    ctx.GameEvents = [{ id:'historical_r835_direct_before', timing:'startMonth_before',
+        checkCondition(){ return true; }, async execute(game){ game.applied = true; } }];
+    loadScript(ctx,'js/event_manager.js');
+    loadScript(ctx,'js/event/historical_event.js');
+    loadScript(ctx,'js/config.js');
+    loadScript(ctx,'js/faction_system.js');
+    ctx.WarParams = ctx.GameConfig.War;
+    ctx.BushoStatusRules = { isActive: b => b.status === 'active' };
+    let rebuilds = 0;
+    const game = { phase:'game', year:1570, month:6, flags:{},
+        bushos:[], clans:[],
+        ui:{ renderMap(){}, updatePanelHeader(){} }
+    };
+    game.factionSystem = new (vm.runInContext('FactionSystem',ctx))(game);
+    const oldUpdate = game.factionSystem.updateFactions.bind(game.factionSystem);
+    game.factionSystem.updateFactions = (...args) => { rebuilds++; return oldUpdate(...args); };
+    game.eventManager = new (vm.runInContext('EventManager',ctx))(game);
+    await game.eventManager.processEvents('startMonth_before');
+    assert.strictEqual(game.applied,true);
+    assert.strictEqual(rebuilds,1,'実システムの存在だけを理由に保留しない');
+});
+
+test('r835 TurnManagerが月初前イベントの再編保留を明示し定例再編へ接続する', () => {
+    const turn = read('js/turn_manager.js');
+    const start = turn.indexOf('async startMonth()');
+    const end = turn.indexOf('game.factionSystem.processStartMonth();', start);
+    assert.ok(start >= 0 && end > start);
+    const block = turn.slice(start, end + 46);
+    assert.ok(block.includes("game.eventManager.processEvents('startMonth_before', null, { deferFactionRefreshToMonthStart: true })"));
+    assert.ok(block.includes('await game.lifeSystem.processStartMonth();'));
+    assert.ok(block.includes('await game.factionSystem.processStartMonth();'));
+});
+
+test('r835 月初以外のイベントは月初保留オプションを誤って適用しない', async () => {
+    const ctx = createContext({ setTimeout });
+    ctx.GameEvents = [{ id:'historical_r835_other_timing', timing:'startMonth_after',
+        checkCondition(){ return true; }, async execute(game){ game.applied = true; } }];
+    loadScript(ctx,'js/event_manager.js'); loadScript(ctx,'js/event/historical_event.js');
+    let rebuilds = 0;
+    const game = { phase:'game', flags:{}, factionSystem:{ updateFactions(){rebuilds++;} },
+        ui:{renderMap(){}, updatePanelHeader(){}} };
+    game.eventManager = new (vm.runInContext('EventManager',ctx))(game);
+    await game.eventManager.processEvents('startMonth_after', null, { deferFactionRefreshToMonthStart:true });
+    assert.strictEqual(rebuilds,1);
+});
+
+test('r834 月初前以外の史実イベントはイベント終了時の再編を維持', async () => {
+    const ctx = createContext({ setTimeout });
+    ctx.GameEvents = [{ id: 'historical_r834_month_after', timing: 'startMonth_after',
+        isOneTime: true, checkCondition(){ return true; }, async execute(game){ game.applied = true; } }];
+    loadScript(ctx, 'js/event_manager.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    let rebuilds = 0;
+    const game = { phase: 'game', flags: {},
+        factionSystem: { updateFactions(){ rebuilds++; } },
+        ui: { renderMap(){}, updatePanelHeader(){} } };
+    game.eventManager = new (vm.runInContext('EventManager', ctx))(game);
+    await game.eventManager.processEvents('startMonth_after');
+    assert.strictEqual(rebuilds, 1);
+});
+
+// r836: 死亡直前の史実イベントで所属が変わる場合も、死亡確定前の再編を行わない。
+test('r836 武将死亡イベントの派閥再編は死亡確定後に一度だけ行う', async () => {
+    const ctx = createContext({ setTimeout });
+    ctx.GameEvents = [{
+        id: 'historical_r836_death_event', timing: 'busho_death', isOneTime: true,
+        checkCondition(game, context) { return Number(context?.deadBusho?.id) === 1; },
+        async execute(game) { game.eventChangedAffiliation = true; }
+    }];
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/event_manager.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    loadScript(ctx, 'js/life_system.js');
+    const rebuildAt = [];
+    const dying = { id: 1, name: '死亡対象', clan: 1, status: 'active', endYear: 1500, deathFlag: false };
+    const game = {
+        phase: 'game', flags: {}, year: 1570, month: 1, gameStartYear: 1560, gameStartMonth: 1,
+        bushos: [dying], princesses: [], playerClanId: 99, eventChangedAffiliation: false,
+        factionSystem: { updateFactions(targetId = null) { rebuildAt.push({ targetId, status: dying.status }); } },
+        ui: { renderMap() {}, updatePanelHeader() {}, log() {}, showDialogAsync: async () => {} },
+        updateAllClanPrestige() {},
+    };
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const EventManager = vm.runInContext('EventManager', ctx);
+    game.lifeSystem = new LifeSystem(game);
+    // 死亡判定とイベントのつなぎを検証するため、死亡本体の個別副作用だけを分離する。
+    game.lifeSystem.executeDeath = async b => { b.status = 'dead'; b.clan = 0; };
+    game.eventManager = new EventManager(game);
+    await game.lifeSystem.checkDeath();
+    assert.strictEqual(game.eventChangedAffiliation, true, '史実イベントが実行された');
+    assert.strictEqual(dying.status, 'dead', 'イベント後に死亡が確定した');
+    assert.strictEqual(rebuildAt.length, 1, '事件と死亡処理全体で全国再編は一度だけ');
+    assert.strictEqual(rebuildAt[0].targetId, null, '勢力吸収を含むイベントなので全国を再編する');
+    assert.strictEqual(rebuildAt[0].status, 'dead', '死亡前の中間名簿で再編しない');
+});
+
+test('r836 死亡イベントを単独で呼ぶ場合は即時再編を維持する', async () => {
+    const ctx = createContext({ setTimeout });
+    ctx.GameEvents = [{ id:'historical_r836_direct_death', timing:'busho_death',
+        checkCondition(){ return true; }, async execute(game){ game.executed = true; } }];
+    loadScript(ctx, 'js/event_manager.js');
+    loadScript(ctx, 'js/event/historical_event.js');
+    const calls = [];
+    const game = { phase:'game', flags:{}, executed:false,
+        factionSystem:{updateFactions(id = null){calls.push(id);}},
+        ui:{renderMap(){},updatePanelHeader(){}}, updateAllClanPrestige(){} };
+    const EventManager = vm.runInContext('EventManager',ctx);
+    await new EventManager(game).processEvents('busho_death', { deadBusho:{id:1} });
+    assert.strictEqual(game.executed,true);
+    assert.deepStrictEqual(calls,[null],'死後の再編を約束しない単独呼出しは即時に更新');
+});
+
+test('r836 史実死亡イベントがない通常の複数死亡では変化した勢力だけ一度再編する', async () => {
+    const ctx = createContext({ setTimeout });
+    ctx.GameEvents = [];
+    loadScript(ctx,'js/constants.js');
+    loadScript(ctx,'js/event_manager.js');
+    loadScript(ctx,'js/life_system.js');
+    const members = [1,2].map(id => ({id, clan:7, status:'active', endYear:1500, deathFlag:false}));
+    const calls = [];
+    const game = {phase:'game',flags:{},year:1570,month:1,gameStartYear:1560,gameStartMonth:1,
+        bushos:members,princesses:[],playerClanId:99,
+        factionSystem:{updateFactions(id=null){calls.push(id);}},
+        ui:{renderMap(){},updatePanelHeader(){},log(){},showDialogAsync:async()=>{}},
+        updateAllClanPrestige(){} };
+    const LifeSystem = vm.runInContext('LifeSystem',ctx);
+    const EventManager = vm.runInContext('EventManager',ctx);
+    game.lifeSystem = new LifeSystem(game);
+    game.lifeSystem.executeDeath = async b => {b.status='dead';b.clan=0;};
+    game.eventManager = new EventManager(game);
+    await game.lifeSystem.checkDeath();
+    assert.deepStrictEqual(calls,[7],'旧仕様どおり当該勢力に対してのみ一度更新');
 });
 
 Promise.all(pendingTests).then(() => {

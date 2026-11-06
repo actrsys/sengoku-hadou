@@ -436,7 +436,7 @@ class EventManager {
     }
 
     // 指定したタイミング（引き出し）のイベントをまとめて実行する魔法です
-    async processEvents(timing, context = null) { 
+    async processEvents(timing, context = null, { deferFactionRefreshToMonthStart = false, deferFactionRefreshToDeathCheck = false } = {}) { 
         const targetEvents = this.events[timing];
         if (!targetEvents) return;
         const flowGeneration = window.EventFlowGuard.capture(this.game);
@@ -543,13 +543,26 @@ class EventManager {
 
         // ★追加：全てのイベントのチェックと実行が終わった後、お片付けシールが貼られていたら1回だけ画面を更新します
         if (!isCurrentFlow()) return;
+        // 武将死亡イベントは本来の死亡より先に起きる。呼出元のLifeSystemが
+        // 死亡者全員とイベントで動いた勢力を最終状態にした後、全国を一度だけ再編する。
+        // 単独processEvents呼出しでは従来の即時再編を維持する。
+        const deferToDeathCheck = timing === 'busho_death' && deferFactionRefreshToDeathCheck === true;
+        if (deferToDeathCheck && needFactionRefresh && context && typeof context === 'object') {
+            context.factionRebuildRequestedAfterDeath = true;
+        }
         if (needRefreshScreen && timing !== 'game_start' && window.EventAction && window.EventAction.refreshScreen) {
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic(`event:${timing}:refresh`);
             }
             // event_managerの中では「this.game」という名前でゲームデータを管理しているので、それを渡します
             // ★Round10：段階更新が終わるまで待ちます。
-            await window.EventAction.refreshScreen(this.game, { refreshFactions: needFactionRefresh });
+            // 再編を後続へ委ねられるのは、月初全体の進行を所有するTurnManagerが
+            // 直後の元服・下野確定と全国再編を実行する契約を明示した場合だけ。
+            // メソッドの存在から実行予定を推測しない。単独イベントは即時再編する。
+            const deferToMonthStart = timing === 'startMonth_before' && deferFactionRefreshToMonthStart === true;
+            await window.EventAction.refreshScreen(this.game, {
+                refreshFactions: needFactionRefresh && !deferToMonthStart && !deferToDeathCheck
+            });
             if (!isCurrentFlow()) return;
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic(`event:${timing}:refresh_done`);
