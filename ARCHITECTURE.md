@@ -40,7 +40,7 @@
 | 和睦確定・交渉条件 | `DiplomacyManager.applyTruceData()` / `_applyNegotiatedConditionData()`。履行結果から結果文を再利用し、婚姻・人質・拠点割譲の移転元と移転先を結果表示と履歴の双方で明示する | <!-- RULE:STATE-TRUCE -->
 | 外交履歴の保存・分類 | `HistorySystem`。発生事象の内容は当該Systemが確定し、当事者の `clanIds` を明示する | <!-- RULE:STATE-HISTORY -->
 | 大名の本拠 | `GameManager.getDaimyoHomeCastle()` 等の現在当主所在の正規問い合わせ（プレイヤー）。拠点一覧先頭や古い固定居城を代用しない | <!-- RULE:STATE-HOME -->
-| 月次・ターンの進行 | `TurnManager`。個別の具体的ルールは専門System / Rulesへ委譲 |
+| 月次・ターンの進行 | `TurnManager`。個別の具体的ルールは専門System / Rulesへ委譲。同一シナリオ世代・年月の月末処理は重複開始せず、一度だけイベントと月送りを確定する。世代変更後の新処理は旧実行に妨げられず、旧処理が新実行の保護状態を解除しない |
 | 兵力・援軍・戦争結果 | `WarManager` / `TroopAllocationService` / `ReinforcementService` 等、既存の個別正本 |
 | 経済・交易・内政・人事の相性差 | `EconomyRules` / `DomesticRules` / `PersonnelRules`。相性差は `PersonnelRules.calcAffinityDiff()` の循環計算を正本とし、捕虜登用・大名／国主の継承順位・諸勢力頭領の後継順位でも独自の単純差を使用しない。AI側に同じ算式を複製しない |
 | セーブの読み書きと安全性 | `SaveManager`。スキーマ・復号・照合・スロット整合もここで扱う |

@@ -39477,6 +39477,81 @@ test('r843 生前家督譲渡は旧派閥主を新大名として確定後に一
     assert.ok(displayCount > 0, '通常の相続通知は維持する');
 });
 
+// r844: 実際の拠点キュー終了窓口を複数回経由しても月送りを二重確定しない。
+test('月末待機中のprocessTurn再入は同月のイベントと月送りを一度だけ実行する', async () => {
+    const ctx = createContext({setTimeout, clearTimeout, Promise});
+    loadScript(ctx, 'js/turn_manager.js');
+    const TurnManager = vm.runInContext('TurnManager', ctx);
+    let releaseBefore;
+    const beforeGate = new Promise(resolve => { releaseBefore = resolve; });
+    let beforeCount = 0, endingCount = 0;
+    const game = {
+        phase: 'game', year: 1560, month: 1, currentIndex: 1, turnQueue: [{id: 10}],
+        isProcessingAI: false, selectionMode: null, warManager: {state: {active: false}},
+        ui: {waitForDialogs: async () => {}}, writeSystemDiagnostic() {},
+        eventManager: {async processEvents(stage) {
+            if (stage === 'endMonth_before') { beforeCount++; await beforeGate; }
+        }},
+        updateClanDisplayNames() {},
+        endingSystem: {async checkEnding() { endingCount++; return true; }}
+    };
+    const tm = new TurnManager(game);
+    game.endMonth = () => tm.endMonth();
+    const first = tm.processTurn();
+    const second = tm.processTurn();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    releaseBefore();
+    await Promise.all([first, second]);
+    assert.strictEqual(beforeCount, 1, '月末前イベントは一度だけ実行する');
+    assert.strictEqual(endingCount, 1, '終了判定を繰り返さない');
+    assert.strictEqual(game.month, 2, '1月から2月へ一度だけ進める');
+});
+
+test('月末再入の所有権はシナリオ世代別に隔離し古いfinallyで新ロックを消さない', async () => {
+    const ctx = createContext(); loadScript(ctx, 'js/turn_manager.js');
+    const TurnManager = vm.runInContext('TurnManager', ctx);
+    const releases = [];
+    const game = {
+        phase: 'game', year: 1560, month: 1, ui: {}, writeSystemDiagnostic() {},
+        eventManager: {processEvents(stage) {
+            if (stage !== 'endMonth_before') return Promise.resolve();
+            return new Promise(resolve => releases.push(resolve));
+        }},
+        updateClanDisplayNames() {}, endingSystem: {checkEnding: async () => true}
+    };
+    const tm = new TurnManager(game);
+    const oldRun = tm.endMonth();
+    assert.strictEqual(releases.length, 1);
+    tm.abortForScenarioTransition();
+    const currentRun = tm.endMonth();
+    assert.strictEqual(releases.length, 2, '新しいシナリオ世代は旧処理に待たされない');
+    releases[0]();
+    await oldRun;
+    const repeatedCurrentRun = tm.endMonth();
+    const before = releases.length;
+    releases.forEach(resolve => resolve());
+    await Promise.all([currentRun, repeatedCurrentRun]);
+    assert.strictEqual(before, 2, '古いfinallyは新世代の二重起動防止を解除しない');
+    assert.strictEqual(game.month, 2);
+});
+
+test('月末処理で例外が発生しても実行権を解放し次の呼び出しを妨げない', async () => {
+    const ctx = createContext(); loadScript(ctx, 'js/turn_manager.js');
+    const TurnManager = vm.runInContext('TurnManager', ctx);
+    let attempts = 0;
+    const game = {
+        phase: 'game', year: 1560, month: 1, ui: {}, writeSystemDiagnostic() {},
+        eventManager: {async processEvents(stage) {
+            if (stage === 'endMonth_before' && ++attempts === 1) throw new Error('検証用一時障害');
+        }}, updateClanDisplayNames() {}, endingSystem: {checkEnding: async () => true}
+    };
+    const tm = new TurnManager(game);
+    await assert.rejects(tm.endMonth(), /検証用一時障害/);
+    await tm.endMonth();
+    assert.strictEqual(attempts, 2);
+    assert.strictEqual(game.month, 2);
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);

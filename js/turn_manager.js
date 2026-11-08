@@ -15,6 +15,9 @@ class TurnManager {
         // 会話・選択待ちなどtimerを持たないawaitも、シナリオ切替時に旧Promiseを参照ごと残さない。
         // 世代更新の正本はこのTurnManagerに残し、購読者は中断通知だけを受ける。
         this._turnFlowAbortSubscribers = new Set();
+        // 同一年月・同一シナリオ世代の月末処理は、最初の実行だけが確定する。
+        // 世代が切り替わった後の新処理は旧Promiseに妨げられない。
+        this._endMonthRun = null;
     }
 
     abortForScenarioTransition() {
@@ -718,109 +721,121 @@ class TurnManager {
             && Number(game.year) === expectedYear
             && Number(game.month) === expectedMonth;
         if (!isCurrentFlow()) return;
-        game.writeSystemDiagnostic('month_end:start');
+        // processTurn() の同じ拠点キュー終了が重なっても、月末イベントと月送りを二重実行しない。
+        // 世代・年月を分けて管理することで、新規開始・ロードの旧処理は新しい処理を塞がない。
+        const existingRun = this._endMonthRun;
+        if (existingRun && existingRun.generation === turnFlowGeneration
+            && existingRun.year === expectedYear && existingRun.month === expectedMonth) return;
+        const run = { generation: turnFlowGeneration, year: expectedYear, month: expectedMonth };
+        this._endMonthRun = run;
+        try {
+            game.writeSystemDiagnostic('month_end:start');
 
-        // 月末の派閥・独立・外交・寿命などは端末によって数秒かかることがあるため、
-        // 既存のAIガードを再利用して「停止ではなく処理中」であることを明示する。
-        if (game.ui && typeof game.ui.showProcessingStatus === 'function') {
-            game.ui.showProcessingStatus('月末処理中...');
-            if (typeof game.ui.waitForNextPaint === 'function') {
-                await game.ui.waitForNextPaint();
-            } else {
-                await new Promise(resolve => setTimeout(resolve, 0));
+            // 月末の派閥・独立・外交・寿命などは端末によって数秒かかることがあるため、
+            // 既存のAIガードを再利用して「停止ではなく処理中」であることを明示する。
+            if (game.ui && typeof game.ui.showProcessingStatus === 'function') {
+                game.ui.showProcessingStatus('月末処理中...');
+                if (typeof game.ui.waitForNextPaint === 'function') {
+                    await game.ui.waitForNextPaint();
+                } else {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+                if (!isCurrentFlow()) return;
             }
-            if (!isCurrentFlow()) return;
-        }
-        // ==========================================
-        // ★ 新しい一元管理の魔法：「画面にメッセージが出ている間は絶対に待つ」という最強の関所を作ります！
-        const waitIfBusy = async () => {
-            if (game.ui && typeof game.ui.waitForDialogs === 'function') {
-                await game.ui.waitForDialogs();
+            // ==========================================
+            // ★ 新しい一元管理の魔法：「画面にメッセージが出ている間は絶対に待つ」という最強の関所を作ります！
+            const waitIfBusy = async () => {
+                if (game.ui && typeof game.ui.waitForDialogs === 'function') {
+                    await game.ui.waitForDialogs();
+                }
+                if (!isCurrentFlow()) return false;
+                // waitForDialogs() 自身が、会話消失後に500ms＋100msの猶予を持っています。
+                // ここでさらに固定300msを足すと、その間だけ「月末処理中…」が復帰して
+                // 次の会話との間でチラつくため、重複待機は置きません。
+                return true;
+            };
+            // ==========================================
+    
+            // ★ここを書き足し！：月末イベント【前】（寿命などの処理が始まる前）を実行します
+            if (game.eventManager) {
+                await game.eventManager.processEvents('endMonth_before');
+                if (!isCurrentFlow()) return;
+                game.writeSystemDiagnostic('month_end:event_before_done');
             }
-            if (!isCurrentFlow()) return false;
-            // waitForDialogs() 自身が、会話消失後に500ms＋100msの猶予を持っています。
-            // ここでさらに固定300msを足すと、その間だけ「月末処理中…」が復帰して
-            // 次の会話との間でチラつくため、重複待機は置きません。
-            return true;
-        };
-        // ==========================================
+            if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
-        // ★ここを書き足し！：月末イベント【前】（寿命などの処理が始まる前）を実行します
-        if (game.eventManager) {
-            await game.eventManager.processEvents('endMonth_before');
-            if (!isCurrentFlow()) return;
-            game.writeSystemDiagnostic('month_end:event_before_done');
-        }
-        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
+            // 1つ目の係員：派閥
+            if (game.factionSystem && typeof game.factionSystem.processEndMonth === 'function') {
+                await game.factionSystem.processEndMonth(); 
+                if (!isCurrentFlow()) return;
+                game.writeSystemDiagnostic('month_end:faction_done');
+            }
+            if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
-        // 1つ目の係員：派閥
-        if (game.factionSystem && typeof game.factionSystem.processEndMonth === 'function') {
-            await game.factionSystem.processEndMonth(); 
-            if (!isCurrentFlow()) return;
-            game.writeSystemDiagnostic('month_end:faction_done');
-        }
-        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
-    
-        // 2つ目の係員：独立（反乱して空白地になる処理など）
-        if (game.independenceSystem && typeof game.independenceSystem.checkIndependence === 'function') {
-            await game.independenceSystem.checkIndependence();
-            if (!isCurrentFlow()) return;
-            game.writeSystemDiagnostic('month_end:independence_done');
-        }
-        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
+            // 2つ目の係員：独立（反乱して空白地になる処理など）
+            if (game.independenceSystem && typeof game.independenceSystem.checkIndependence === 'function') {
+                await game.independenceSystem.checkIndependence();
+                if (!isCurrentFlow()) return;
+                game.writeSystemDiagnostic('month_end:independence_done');
+            }
+            if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
         
-        // 3つ目の係員：外交
-        if (game.diplomacyManager && typeof game.diplomacyManager.processEndMonth === 'function') {
-            await game.diplomacyManager.processEndMonth();
-            if (!isCurrentFlow()) return;
-            game.writeSystemDiagnostic('month_end:diplomacy_done');
-        }
-        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
+            // 3つ目の係員：外交
+            if (game.diplomacyManager && typeof game.diplomacyManager.processEndMonth === 'function') {
+                await game.diplomacyManager.processEndMonth();
+                if (!isCurrentFlow()) return;
+                game.writeSystemDiagnostic('month_end:diplomacy_done');
+            }
+            if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
-        // 4つ目の係員：諸勢力（反乱など）
-        if (game.kunishuSystem && typeof game.kunishuSystem.processEndMonth === 'function') {
-            await game.kunishuSystem.processEndMonth();
-            if (!isCurrentFlow()) return;
-            game.writeSystemDiagnostic('month_end:kunishu_done');
-        }
-        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
+            // 4つ目の係員：諸勢力（反乱など）
+            if (game.kunishuSystem && typeof game.kunishuSystem.processEndMonth === 'function') {
+                await game.kunishuSystem.processEndMonth();
+                if (!isCurrentFlow()) return;
+                game.writeSystemDiagnostic('month_end:kunishu_done');
+            }
+            if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
         
-        // 5つ目の係員：寿命
-        if (game.lifeSystem && typeof game.lifeSystem.processEndMonth === 'function') {
-            await game.lifeSystem.processEndMonth(); 
-            if (!isCurrentFlow()) return;
-            game.writeSystemDiagnostic('month_end:life_done');
-        }
-        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
+            // 5つ目の係員：寿命
+            if (game.lifeSystem && typeof game.lifeSystem.processEndMonth === 'function') {
+                await game.lifeSystem.processEndMonth(); 
+                if (!isCurrentFlow()) return;
+                game.writeSystemDiagnostic('month_end:life_done');
+            }
+            if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
-        // 6つ目の係員：月末の特別イベント（災害など）
-        if (game.eventManager) {
-            await game.eventManager.processEvents('endMonth_after');
-            if (!isCurrentFlow()) return;
-            game.writeSystemDiagnostic('month_end:event_after_done');
-        }
-        if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
+            // 6つ目の係員：月末の特別イベント（災害など）
+            if (game.eventManager) {
+                await game.eventManager.processEvents('endMonth_after');
+                if (!isCurrentFlow()) return;
+                game.writeSystemDiagnostic('month_end:event_after_done');
+            }
+            if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
-        // すべての月末イベントとメッセージが完全に終わってから、ようやく時間を進めます！
-        game.month++;
-        if(game.month > 12) { game.month = 1; game.year++; }
-        // この月送りだけは意図した変化。以後のエンディング待機は進めた先の年月を照合する。
-        const advancedYear = Number(game.year);
-        const advancedMonth = Number(game.month);
-        const isAdvancedMonthCurrent = () => this._isTurnFlowCurrent(turnFlowGeneration)
-            && Number(game.year) === advancedYear
-            && Number(game.month) === advancedMonth;
+            // すべての月末イベントとメッセージが完全に終わってから、ようやく時間を進めます！
+            game.month++;
+            if(game.month > 12) { game.month = 1; game.year++; }
+            // この月送りだけは意図した変化。以後のエンディング待機は進めた先の年月を照合する。
+            const advancedYear = Number(game.year);
+            const advancedMonth = Number(game.month);
+            const isAdvancedMonthCurrent = () => this._isTurnFlowCurrent(turnFlowGeneration)
+                && Number(game.year) === advancedYear
+                && Number(game.month) === advancedMonth;
         
-        // ★ここから追加：月末のタイミングで大名家の表示名を更新して同名被りを防ぎます！
-        game.updateClanDisplayNames();
+            // ★ここから追加：月末のタイミングで大名家の表示名を更新して同名被りを防ぎます！
+            game.updateClanDisplayNames();
         
-        // ★修正：クリアとゲームオーバーの判定を EndingSystem (エンディング係) に任せます！
-        const isEnding = await game.endingSystem.checkEnding();
-        if (!isAdvancedMonthCurrent()) return;
-        if (!isEnding) {
-            // エンディングでなければ次の月へ進みます
-            game.writeSystemDiagnostic('month_end:before_startMonth');
-            await game.startMonth(); 
+            // ★修正：クリアとゲームオーバーの判定を EndingSystem (エンディング係) に任せます！
+            const isEnding = await game.endingSystem.checkEnding();
+            if (!isAdvancedMonthCurrent()) return;
+            if (!isEnding) {
+                // エンディングでなければ次の月へ進みます
+                game.writeSystemDiagnostic('month_end:before_startMonth');
+                await game.startMonth(); 
+            }
+        } finally {
+            // 中断した旧処理が、後から始まった新世代の実行権を消さない。
+            if (this._endMonthRun === run) this._endMonthRun = null;
         }
     }
 
