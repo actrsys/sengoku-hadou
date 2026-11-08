@@ -9981,6 +9981,97 @@ test('ゲームオーバーは短い暗転開始直後から入力を遮断し�
     assert.ok(ui.includes('const loadingAlreadyVisible = options.loadingAlreadyVisible === true'));
 });
 
+// エンディングの暗転・入力遮断は、初回paint失敗も含めUIManagerのタイトル復帰へ委譲する。
+function createEndingExceptionFixture({ failPaintAt = null, failTitle = false, switchScenario = false } = {}) {
+    const elements = new Map();
+    const getElement = id => {
+        if (!elements.has(id)) {
+            const classes = new Set(['hidden']);
+            elements.set(id, {
+                inert: false, style: {}, offsetHeight: 120, innerText: '', innerHTML: '',
+                classList: {
+                    add(name) { classes.add(name); },
+                    remove(name) { classes.delete(name); },
+                    contains(name) { return classes.has(name); }
+                }
+            });
+        }
+        return elements.get(id);
+    };
+    let paintCount = 0;
+    const calls = { title: [], loading: [] };
+    const ui = {
+        async waitForNextPaint() {
+            paintCount++;
+            if (paintCount === failPaintAt) {
+                if (switchScenario) game.phase = 'title';
+                throw new Error('検証用描画失敗');
+            }
+        },
+        showLoadingScreen(...args) { calls.loading.push(args); },
+        async returnToTitle(options = {}) {
+            calls.title.push(options);
+            if (failTitle) throw new Error('検証用タイトル復帰失敗');
+            game.phase = 'title';
+            return true;
+        }
+    };
+    const game = { phase: 'game', ui };
+    const ctx = createContext({
+        document: { getElementById: getElement, activeElement: null },
+        setTimeout: resolve => { resolve(); return 0; }
+    });
+    loadScript(ctx, 'js/ending_system.js');
+    const Ending = vm.runInContext('EndingSystem', ctx);
+    return { ending: new Ending(game), getElement, game, calls };
+}
+
+test('エンディング最初の描画失敗でもタイトルへ復帰し入力遮断を解除する', async () => {
+    const fixture = createEndingExceptionFixture({ failPaintAt: 1 });
+    await assert.rejects(fixture.ending.playEndingSequence('終焉', 'テスト', false), /検証用描画失敗/);
+    assert.strictEqual(fixture.calls.title.length, 1);
+    assert.strictEqual(fixture.calls.title[0].loadingAlreadyVisible, false);
+    assert.strictEqual(fixture.game.phase, 'title');
+    assert.strictEqual(fixture.getElement('app').inert, false);
+    assert.strictEqual(fixture.getElement('app').style.pointerEvents, '');
+    assert.strictEqual(fixture.getElement('ending-screen').classList.contains('hidden'), true);
+});
+
+test('エンディングのロード幕表示後に描画失敗しても共通のタイトル復帰へ進む', async () => {
+    const fixture = createEndingExceptionFixture({ failPaintAt: 2 });
+    await assert.rejects(fixture.ending.playEndingSequence('終焉', 'テスト', false), /検証用描画失敗/);
+    assert.strictEqual(fixture.calls.loading.length, 1);
+    assert.strictEqual(fixture.calls.title.length, 1);
+    assert.strictEqual(fixture.calls.title[0].loadingAlreadyVisible, true);
+    assert.strictEqual(fixture.getElement('app').inert, false);
+    assert.strictEqual(fixture.getElement('ending-screen').classList.contains('hidden'), true);
+});
+
+test('エンディング正常終了とタイトル復帰エラーのどちらも入力を解放する', async () => {
+    for (const failTitle of [false, true]) {
+        const fixture = createEndingExceptionFixture({ failTitle });
+        if (failTitle) {
+            await assert.rejects(fixture.ending.playEndingSequence('終焉', 'テスト', false), /検証用タイトル復帰失敗/);
+        } else {
+            await fixture.ending.playEndingSequence('終焉', 'テスト', true);
+        }
+        assert.strictEqual(fixture.calls.loading.length, 1);
+        assert.strictEqual(fixture.calls.title.length, 1, 'タイトル復帰の二重呼び出し禁止');
+        assert.strictEqual(fixture.calls.title[0].loadingAlreadyVisible, true);
+        assert.strictEqual(fixture.getElement('app').inert, false);
+        assert.strictEqual(fixture.getElement('app').style.pointerEvents, '');
+        assert.strictEqual(fixture.getElement('ending-screen').classList.contains('hidden'), true);
+    }
+});
+
+test('エンディング待機中にシナリオ遷移した場合は旧演出から再度タイトルを開かない', async () => {
+    const fixture = createEndingExceptionFixture({ failPaintAt: 1, switchScenario: true });
+    await assert.rejects(fixture.ending.playEndingSequence('終焉', 'テスト', false), /検証用描画失敗/);
+    assert.strictEqual(fixture.calls.title.length, 0);
+    assert.strictEqual(fixture.getElement('app').inert, false);
+    assert.strictEqual(fixture.getElement('ending-screen').classList.contains('hidden'), true);
+});
+
 test('観戦終了予約メッセージはbodyではなく固定論理画面内へ配置する', () => {
     const ui = read('js/ui.js');
     const css = read('css/style.css');
