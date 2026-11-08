@@ -1715,12 +1715,10 @@ class CommandSystem {
         if (success) { 
             const currentC = this.game.getCurrentTurnCastle(); 
             
-            this.game.affiliationSystem.joinClan(target, this.game.playerClanId, currentC.id);
-            
+            // AIと共通の通常登用確定窓口で、仕官・功績・承認欲求→派閥選出を一度で確定する。
+            PersonnelRules.applyEmploymentSuccess(this.game, doer, target, this.game.playerClanId, currentC.id);
             msg = `${target.name}の登用に成功しました！`;
-            const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
-            doer.achievementTotal += Math.floor(maxStat * 0.3);
-            this.game.factionSystem.updateRecognition(doer, 20); 
+            this.game.affiliationSystem.updateUI();
         } else { 
             msg = `${target.name}は登用に応じませんでした……`; 
             doer.achievementTotal += 5; 

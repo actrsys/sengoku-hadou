@@ -2723,13 +2723,9 @@ class AIEngine {
                     const success = PersonnelRules.calcEmploymentSuccess(doer, targetRonin, myPower, 0, this.game);
                     
                     if (success) {
-                        // ★新しいお引越しセンターの魔法を使います！
-                        this.game.affiliationSystem.joinClan(targetRonin, castle.ownerClan, castle.id);
-                        
-                        // ★プレイヤーと同じ！成功したらしっかり功績と承認欲求のご褒美をあげます
-                        const maxStat = Math.max(targetRonin.strength, targetRonin.intelligence, targetRonin.leadership, targetRonin.charm, targetRonin.diplomacy);
-                        doer.achievementTotal = (doer.achievementTotal || 0) + Math.floor(maxStat * 0.3);
-                        if (this.game.factionSystem && this.game.factionSystem.updateRecognition) this.game.factionSystem.updateRecognition(doer, 20);
+                        // プレイヤーと同じ登用確定窓口を通し、功績の最終値で派閥を一度だけ選出する。
+                        PersonnelRules.applyEmploymentSuccess(this.game, doer, targetRonin, castle.ownerClan, castle.id);
+                        this.game.affiliationSystem.updateUI();
                     } else {
                         // 失敗しても少しだけ慰めのご褒美をあげます
                         doer.achievementTotal = (doer.achievementTotal || 0) + 5;

@@ -26275,6 +26275,10 @@ function createR577PersonnelCase() {
                 && Number(game.getCastle(target.castleId)?.ownerClan) === Number(game.playerClanId)
         }
     });
+    // モックは成否・対象条件だけ。成功後の確定処理は実際の人事正本を使用する。
+    const rulesCtx = createContext();
+    loadScript(rulesCtx, 'js/personnel_rules.js');
+    ctx.PersonnelRules.applyEmploymentSuccess = rulesCtx.PersonnelRules.applyEmploymentSuccess;
     loadScript(ctx, 'js/command_system.js');
     const Command = vm.runInContext('CommandSystem', ctx);
     const castle = {id:1,name:'本城',ownerClan:1,gold:100};
@@ -26292,8 +26296,8 @@ function createR577PersonnelCase() {
         getClanBushos:id=>Array.from(map.values()).filter(x=>Number(x.clan)===Number(id)),
         getClanTotalSoldiers:()=>1000,
         ui:{showDialog:msg=>dialog.push(msg)},
-        factionSystem:{updateRecognition:(person,score)=>changes.push([person.id,score])},
-        affiliationSystem:{becomeRonin:person=>{person.clan=0;person.status='ronin';},joinClan:(person,clan,id)=>{person.clan=clan;person.castleId=id;person.status='active';}}
+        factionSystem:{updateRecognition:(person,score)=>changes.push([person.id,score]),updateFactions(){}},
+        affiliationSystem:{becomeRonin:person=>{person.clan=0;person.status='ronin';},joinClan:(person,clan,id)=>{person.clan=clan;person.castleId=id;person.status='active';},updateUI(){}}
     };
     const command = new Command(game);
     command.finishCommand=()=>finished++;
@@ -28084,7 +28088,8 @@ test('r623 大名家督継承は別城からの着任で在城履歴を記録し
     const ctx = createContext({
         GameConstants: { BushoStatus: { ACTIVE: 'active' } },
         BushoStatusRules: { isRonin: b => b.status === 'ronin', isActive: b => b.status === 'active' },
-        LifeStatusRules: { isUnborn: b => b.status === 'unborn' }
+        LifeStatusRules: { isUnborn: b => b.status === 'unborn' },
+        WarParams: global.GameConfig.War
     });
     loadScript(ctx, 'js/affiliation_system.js');
 
@@ -28109,7 +28114,7 @@ test('r623 大名家督継承は別城からの着任で在城履歴を記録し
         if (isHomeHeir) { home.samuraiIds.push(12); branch.samuraiIds = [13]; branch.castellanId = 13; }
         const people = [old, heir, other];
         const game = {
-            year: 1570, month: 6, playerClanId: isDeath ? 99 : 4, bushos: people, legions: [],
+            year: 1570, month: 6, playerClanId: isDeath ? 99 : 4, bushos: people, clans: [clan], legions: [],
             getBusho: id => people.find(b => b.id === Number(id)),
             getClan: id => Number(id) === 4 ? clan : null,
             getCastle: id => [home, branch].find(c => c.id === Number(id)),
@@ -38886,6 +38891,68 @@ test('r840 通常家臣・城主引抜は担当者の功績確定後に旧家と
     }
 });
 
+// r841: プレイヤーの通常浪人登用も、引抜・諸勢力取込と同じく
+// 担当者の功績・承認欲求の確定後に一度だけ派閥を再編する。
+test('r841 浪人登用の派閥再編は担当者の功績確定後に一度だけ行う', () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', UNBORN: 'unborn', DEAD: 'dead' } },
+        LifeStatusRules: { isPresent: b => b.status === 'active' || b.status === 'ronin' },
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
+        PersonnelRules: {
+            calcEmploymentSuccess: () => true,
+            canEmployRonin: (game, b) => b?.status === 'ronin' && Number(b.clan) === 0
+                && Number(b.belongKunishuId || 0) === 0 && Number(game.getCastle(b.castleId)?.ownerClan) === game.playerClanId
+        }
+    });
+    // 人事の成否は固定し、成功後の共有確定処理だけは製品コードを使う。
+    const rulesCtx = createContext();
+    loadScript(rulesCtx, 'js/personnel_rules.js');
+    ctx.PersonnelRules.applyEmploymentSuccess = rulesCtx.PersonnelRules.applyEmploymentSuccess;
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/command_system.js');
+    const Aff = vm.runInContext('AffiliationSystem', ctx);
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const castle = { id: 10, ownerClan: 1, samuraiIds: [101, 102] };
+    const doer = { id: 101, name: '登用担当', fullName: '登用担当', status: 'active', clan: 1, castleId: 10,
+        isActionDone: false, isDaimyo: false, achievementTotal: 490, intelligence: 70, diplomacy: 70 };
+    const target = { id: 102, name: '浪人', fullName: '浪人', status: 'ronin', clan: 0, castleId: 10,
+        belongKunishuId: 0, achievementTotal: 0, strength: 100, intelligence: 70,
+        leadership: 70, charm: 70, diplomacy: 70, isCastellan: false, isDaimyo: false };
+    const observations = [];
+    let uiRefreshes = 0;
+    const game = {
+        playerClanId: 1, bushos: [doer, target], castles: [castle],
+        getBusho(id) { return this.bushos.find(b => b.id === Number(id)); },
+        getCastle(id) { return Number(id) === 10 ? castle : null; },
+        getCurrentTurnCastle() { return castle; },
+        getClan() { return { name: '受入家' }; },
+        getClanDaimyo() { return { affinity: 50 }; },
+        getClanTotalSoldiers() { return 1000; },
+        factionSystem: {
+            updateRecognition() {},
+            updateFactions(id) { observations.push({ clanId: id, doerMerit: doer.achievementTotal, targetClan: target.clan }); }
+        },
+        ui: { showDialog() {} }
+    };
+    game.affiliationSystem = new Aff(game);
+    game.affiliationSystem.leaveCastle = () => {};
+    game.affiliationSystem.enterCastle = (b, id) => { b.castleId = id; };
+    game.affiliationSystem.updateLoyaltyForNewLord = () => {};
+    game.affiliationSystem.syncSpousesForClanChange = () => {};
+    game.affiliationSystem.updateUI = () => { uiRefreshes++; };
+    const command = new Command(game);
+    let completions = 0;
+    command.finishCommand = () => { completions++; };
+    command.executeEmploy(doer.id, target.id);
+    assert.strictEqual(target.clan, 1, '所属変更は既存joinClanで確定する');
+    assert.strictEqual(target.status, 'active', '登用対象が現役へ復帰する');
+    assert.strictEqual(doer.achievementTotal, 520, '元の功績報酬の量を変えない');
+    assert.deepStrictEqual(observations, [{ clanId: 1, doerMerit: 520, targetClan: 1 }],
+        '再編は担当者の功績確定後に受入家だけ一回');
+    assert.strictEqual(uiRefreshes, 1, '画面も最終確定後に一度更新');
+    assert.strictEqual(completions, 1, '登用命令を正常に完了');
+});
+
 // A-146: 月次共通イベントの「画面更新」と「派閥再選挙」を分離。
 // 毎月の民忠・交易など、武将所属が変わらない処理で二重選挙を起こさない。
 test('r833 月初の非人事イベントは画面・威信だけ更新し派閥を再選挙しない', async () => {
@@ -39268,6 +39335,146 @@ test('r837 合戦からの独立した滅亡処理は派閥を即時再編する
     assert.strictEqual(clan.isDestroyed,true);
     assert.strictEqual(retainer.clan,0);
     assert.deepStrictEqual(updates,[10], '戦後の滅亡呼出しは即時の1回を保持');
+});
+
+
+// r842: AI通常浪人登用の成功経路は、プレイヤーと同じ最終状態で派閥選出する。
+// 実際のAI分岐と、所属変更の製品コードを通す。功績490→520は候補資格の境界。
+test('r842 AI浪人登用は功績報酬確定後に派閥を一度だけ再編する', () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', UNBORN: 'unborn', DEAD: 'dead' } },
+        LifeStatusRules: { isPresent: b => b.status === 'active' || b.status === 'ronin' },
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' }
+    });
+    loadScript(ctx, 'js/personnel_rules.js');
+    loadScript(ctx, 'js/affiliation_system.js');
+    ctx.PersonnelRules.calcEmploymentSuccess = () => true;
+    const Aff = vm.runInContext('AffiliationSystem', ctx);
+    const castle = { id: 20, ownerClan: 2, samuraiIds: [201, 202] };
+    const doer = { id: 201, name: 'AI登用担当', status: 'active', clan: 2, castleId: 20,
+        achievementTotal: 490, isDaimyo: false, isActionDone: false };
+    const target = { id: 202, name: '浪人', status: 'ronin', clan: 0, castleId: 20,
+        belongKunishuId: 0, strength: 100, intelligence: 70, leadership: 70,
+        charm: 70, diplomacy: 70, achievementTotal: 0, isCastellan: false };
+    const observations = [];
+    let screenRefreshes = 0;
+    const game = {
+        isProcessingAI: true, playerClanId: 1, bushos: [doer, target], castles: [castle],
+        getBusho(id) { return this.bushos.find(b => Number(b.id) === Number(id)); },
+        getCastle(id) { return Number(id) === 20 ? castle : null; },
+        getClanDaimyo() { return { affinity: 50 }; },
+        getClanTotalSoldiers() { return 1000; },
+        factionSystem: {
+            updateRecognition() {},
+            updateFactions(clanId) { observations.push({ clanId, doerMerit: doer.achievementTotal, targetClan: target.clan }); }
+        }
+    };
+    game.affiliationSystem = new Aff(game);
+    game.affiliationSystem.leaveCastle = () => {};
+    game.affiliationSystem.enterCastle = (b, id) => { b.castleId = id; };
+    game.affiliationSystem.updateLoyaltyForNewLord = () => {};
+    game.affiliationSystem.syncSpousesForClanChange = () => {};
+    game.affiliationSystem.updateUI = () => { screenRefreshes++; };
+    const aiSource = read('js/ai.js');
+    const start = aiSource.indexOf("if (action.type === 'employ') {");
+    const end = aiSource.indexOf("if (action.type === 'sabotage')", start);
+    assert.ok(start > 0 && end > start, '製品AIの登用分岐を検査');
+    const executeAIEmployment = new Function('PersonnelRules', 'castle', 'doer', 'targetRonin',
+        'let actionDoneInThisStep=false; for (const action of [{type:"employ",targetRonin}]) {'
+        + aiSource.slice(start, end) + '} return actionDoneInThisStep;');
+    const done = executeAIEmployment.call({ game }, ctx.PersonnelRules, castle, doer, target);
+    assert.strictEqual(done, true);
+    assert.strictEqual(target.clan, 2, 'AI側の通常登用も既存joinClanで確定');
+    assert.strictEqual(doer.achievementTotal, 520, '登用成功功績の量は従来どおり');
+    assert.deepStrictEqual(observations, [{ clanId: 2, doerMerit: 520, targetClan: 2 }],
+        'AI派閥再編は功績報酬確定後に受入家だけ一度');
+    assert.strictEqual(screenRefreshes, 1, '画面の再描画は既存所属Systemに委譲');
+    assert.strictEqual(doer.isActionDone, true);
+});
+
+// r843: 生前の家督譲渡は後継者の大名就任で派閥主資格が失われる。
+// 通常命令には史実イベント等の共通終了再編がないため、命令全体の完了時に旧家を一度だけ再編する。
+test('r843 生前家督譲渡は旧派閥主を新大名として確定後に一度だけ再編する', async () => {
+    const ctx = createContext({
+        GameConstants: { BushoStatus: { ACTIVE: 'active', RONIN: 'ronin', UNBORN: 'unborn', DEAD: 'dead' } },
+        BushoStatusRules: { isActive: b => b.status === 'active', isRonin: b => b.status === 'ronin' },
+        LifeStatusRules: { isUnborn: b => b.status === 'unborn' },
+        WarParams: global.GameConfig.War
+    });
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/life_system.js');
+    loadScript(ctx, 'js/faction_system.js');
+    const Affiliation = vm.runInContext('AffiliationSystem', ctx);
+    const Life = vm.runInContext('LifeSystem', ctx);
+    const Faction = vm.runInContext('FactionSystem', ctx);
+    const clan = { id: 4, leaderId: 10, name: '旧当主家' };
+    const home = { id: 1, ownerClan: 4, legionId: 0, castellanId: 10, samuraiIds: [10, 11, 12, 13] };
+    const make = (id, label, merit) => ({
+        id, name: label, fullName: label, familyName: label, givenName: label,
+        clan: 4, castleId: 1, status: 'active', isDaimyo: false,
+        isFactionLeader: false, isRetired: false, isCommander: false, isGunshi: false,
+        isCastellan: false, factionId: 0, achievementTotal: merit, familyIds: [1],
+        affinity: 45, innovation: 40, personality: 'ambitious',
+        leadership: 70, strength: 70, politics: 65, diplomacy: 65,
+        intelligence: 70, charm: 50, loyalty: 90, recognitionNeed: 0,
+        battleHistory: [], stayHistory: [], clanNameStr: '旧当主家', clanYomiStr: 'きゅうとうしゅけ'
+    });
+    const old = make(10, '先代', 1200);
+    old.isDaimyo = true;
+    old.isCastellan = true;
+    const heir = make(11, '後継派閥主', 1000);
+    heir.isFactionLeader = true;
+    heir.factionId = 401;
+    heir.factionName = '後継派閥主派';
+    const otherA = make(12, '家臣甲', 800);
+    const otherB = make(13, '家臣乙', 850);
+    otherA.factionId = 401;
+    const bushos = [old, heir, otherA, otherB];
+    let displayCount = 0;
+    const game = {
+        year: 1570, month: 8, playerClanId: 4, bushos, legions: [], clans: [clan],
+        getBusho(id) { return bushos.find(b => Number(b.id) === Number(id)) || null; },
+        getClan(id) { return Number(id) === 4 ? clan : null; },
+        getClanBushos(id) { return bushos.filter(b => Number(b.clan) === Number(id)); },
+        getClanDaimyo(id) { return bushos.find(b => b.clan === Number(id) && b.isDaimyo) || null; },
+        getCastle(id) { return Number(id) === 1 ? home : null; },
+        getClanCastles(id) { return Number(id) === 4 ? [home] : []; },
+        getDaimyoHomeCastle() { return home; },
+        changeLeader(id, leaderId) {
+            this.getClanBushos(id).forEach(b => { b.isDaimyo = false; });
+            const next = this.getBusho(leaderId);
+            next.isDaimyo = true;
+            next.loyalty = 100;
+            clan.leaderId = next.id;
+        },
+        ui: {
+            log() {}, updatePanelHeader() {}, renderCommandMenu() {},
+            async showDialogAsync() {
+                displayCount++;
+                assert.strictEqual(heir.isFactionLeader, false, '継承通知までに旧派閥主資格を解消する');
+            }
+        }
+    };
+    game.affiliationSystem = new Affiliation(game);
+    game.affiliationSystem.updateCastleLord = () => {};
+    game.factionSystem = new Faction(game);
+    let calls = 0;
+    const realUpdate = game.factionSystem.updateFactions.bind(game.factionSystem);
+    game.factionSystem.updateFactions = (clanId) => {
+        calls++;
+        assert.strictEqual(clanId, 4, '継承先の所属勢力だけを再編する');
+        assert.strictEqual(heir.isDaimyo, true, '新当主就任後の状態で再編する');
+        return realUpdate(clanId);
+    };
+    const life = new Life(game);
+    life.applyDaimyoNameAndFaceChange = () => {};
+    life.applyDaimyoChangeEffects = () => {};
+    await life.executeSuccessionCommand(heir.id);
+    assert.strictEqual(clan.leaderId, 11, '生前家督譲渡は完了する');
+    assert.strictEqual(heir.isDaimyo, true);
+    assert.strictEqual(heir.isFactionLeader, false, '大名と派閥主を兼任させない');
+    assert.strictEqual(calls, 1, '派閥再編は命令全体の完了時に一度だけ');
+    assert.ok(displayCount > 0, '通常の相続通知は維持する');
 });
 
 Promise.all(pendingTests).then(() => {

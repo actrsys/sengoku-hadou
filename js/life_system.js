@@ -1717,6 +1717,9 @@ class LifeSystem {
         // ★一元化した引き継ぎセットアップ魔法にすべてお任せします！
         // （生前退位のコマンドなので、フラグは true にします）
         this.setupNewDaimyo(oldDaimyo, successor, messages, true);
+        // 生前家督譲渡の通常命令には史実イベント・死亡処理の終了時再編がない。
+        // 新当主就任と先代隠居を確定した後、派閥選出は既存の正本で一度だけ行う。
+        if (this.game.factionSystem) this.game.factionSystem.updateFactions(clan.id);
         // ==========================================
 
         // ★修正：改名する前の「元の名前」を使ってメッセージを作ります！

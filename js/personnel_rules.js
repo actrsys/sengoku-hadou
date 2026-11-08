@@ -361,6 +361,22 @@ class PersonnelRules {
         const prob = this.getEmployProb(recruiter, target, recruiterClanPower, targetClanPower, game);
         return Math.random() < prob;
     }
+
+    /**
+     * 通常浪人登用に成功した後の共通確定処理（プレイヤーとAI共用）。
+     * 所属と旧派閥の破棄はAffiliationSystem、再選出はFactionSystemに委譲する。
+     * 同じ命令の功績・承認欲求を確定するまで、途中の派閥再編だけを保留する。
+     * 行動済み・履歴・UI・成否判定はそれぞれの命令実行元が管理する。
+     */
+    static applyEmploymentSuccess(game, recruiter, target, receivingClanId, receivingCastleId) {
+        game.affiliationSystem.joinClan(target, receivingClanId, receivingCastleId, null, false, {
+            deferFactionUpdate: true, deferUI: true
+        });
+        const maxStat = Math.max(target.strength, target.intelligence, target.leadership, target.charm, target.diplomacy);
+        recruiter.achievementTotal = (recruiter.achievementTotal || 0) + Math.floor(maxStat * 0.3);
+        game.factionSystem.updateRecognition(recruiter, 20);
+        game.factionSystem.updateFactions(receivingClanId);
+    }
 }
 
 window.PersonnelRules = PersonnelRules;
