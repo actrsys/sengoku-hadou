@@ -9981,6 +9981,31 @@ test('ゲームオーバーは短い暗転開始直後から入力を遮断し�
     assert.ok(ui.includes('const loadingAlreadyVisible = options.loadingAlreadyVisible === true'));
 });
 
+// エンディングDOMが欠落しても、タイトル復帰の終了を待って呼出元へ返す。
+test('r847 エンディングDOM欠落時はタイトル復帰の完了まで待つ', async () => {
+    const ctx = createContext({ document: { getElementById: () => null } });
+    loadScript(ctx, 'js/ending_system.js');
+    const Ending = vm.runInContext('EndingSystem', ctx);
+    let finishReturn;
+    const game = { ui: { returnToTitle: () => new Promise(resolve => { finishReturn = resolve; }) } };
+    const ending = new Ending(game);
+    let settled = false;
+    const sequence = ending.playEndingSequence('終焉', '欠落DOM', false).then(() => { settled = true; });
+    await Promise.resolve();
+    assert.strictEqual(settled, false, 'タイトル復帰完了前にエンディングが解決しない');
+    finishReturn(true);
+    await sequence;
+    assert.strictEqual(settled, true);
+});
+
+test('r847 エンディングDOM欠落時の非同期タイトル復帰失敗は呼出元へ伝える', async () => {
+    const ctx = createContext({ document: { getElementById: () => null } });
+    loadScript(ctx, 'js/ending_system.js');
+    const Ending = vm.runInContext('EndingSystem', ctx);
+    const ending = new Ending({ ui: { returnToTitle: async () => { throw new Error('タイトル画面復帰失敗'); } } });
+    await assert.rejects(ending.playEndingSequence('終焉', '欠落DOM', false), /タイトル画面復帰失敗/);
+});
+
 // エンディングの暗転・入力遮断は、初回paint失敗も含めUIManagerのタイトル復帰へ委譲する。
 function createEndingExceptionFixture({ failPaintAt = null, failTitle = false, switchScenario = false } = {}) {
     const elements = new Map();
@@ -10070,6 +10095,132 @@ test('エンディング待機中にシナリオ遷移した場合は旧演出�
     assert.strictEqual(fixture.calls.title.length, 0);
     assert.strictEqual(fixture.getElement('app').inert, false);
     assert.strictEqual(fixture.getElement('ending-screen').classList.contains('hidden'), true);
+});
+
+// エンディングと次シナリオが同じDOMを共有する場合、旧演出が画面を復旧しないこと。
+function bindEndingFlowFixture(fixture) {
+    let generation = 1;
+    const listeners = new Set();
+    const turns = {
+        captureTurnFlowGeneration() { return generation; },
+        isTurnFlowGenerationLatest(value) { return value === generation; },
+        subscribeTurnFlowAbort(value, callback) {
+            assert.strictEqual(value, generation);
+            listeners.add(callback);
+            return () => listeners.delete(callback);
+        },
+        abortForScenarioTransition() {
+            generation++;
+            const callbacks = Array.from(listeners);
+            listeners.clear();
+            callbacks.forEach(callback => callback());
+        }
+    };
+    fixture.game.turnManager = turns;
+    return { turns, listeners };
+}
+
+test('r846 旧エンディングの例外finallyは新シナリオの入力遮断・画面を上書きしない', async () => {
+    const fixture = createEndingExceptionFixture();
+    const { turns, listeners } = bindEndingFlowFixture(fixture);
+    let rejectPaint;
+    fixture.game.ui.waitForNextPaint = () => new Promise((resolve, reject) => { rejectPaint = reject; });
+    const oldEnding = fixture.ending.playEndingSequence('終焉', '旧演出', false);
+    assert.strictEqual(fixture.getElement('app').inert, true);
+    assert.strictEqual(listeners.size, 1);
+    turns.abortForScenarioTransition();
+    assert.strictEqual(fixture.getElement('app').inert, false, 'シナリオ切替では旧ガードを即解除');
+    fixture.game.phase = 'game';
+    fixture.getElement('app').inert = true;
+    fixture.getElement('app').style.pointerEvents = 'none';
+    fixture.getElement('ending-screen').classList.add('show');
+    fixture.getElement('ending-screen').classList.remove('hidden');
+    rejectPaint(new Error('旧描画の失敗'));
+    await assert.rejects(oldEnding, /旧描画の失敗/);
+    assert.strictEqual(fixture.calls.title.length, 0, '失効した旧演出からタイトルへ戻さない');
+    assert.strictEqual(fixture.getElement('app').inert, true);
+    assert.strictEqual(fixture.getElement('app').style.pointerEvents, 'none');
+    assert.strictEqual(fixture.getElement('ending-screen').classList.contains('show'), true);
+    assert.strictEqual(fixture.getElement('ending-screen').classList.contains('hidden'), false);
+    assert.strictEqual(listeners.size, 0, '中断購読を残さない');
+});
+
+test('r846 中断されたエンディングの描画待機が正常完了しても旧演出を再開しない', async () => {
+    const fixture = createEndingExceptionFixture();
+    const { turns } = bindEndingFlowFixture(fixture);
+    let releasePaint;
+    fixture.game.ui.waitForNextPaint = () => new Promise(resolve => { releasePaint = resolve; });
+    const oldEnding = fixture.ending.playEndingSequence('終焉', '旧演出', false);
+    turns.abortForScenarioTransition();
+    fixture.game.phase = 'game';
+    fixture.getElement('ending-title').innerText = '新しい画面';
+    releasePaint();
+    await oldEnding;
+    assert.strictEqual(fixture.getElement('ending-title').innerText, '新しい画面');
+    assert.strictEqual(fixture.calls.title.length, 0);
+});
+
+test('r846 正常なタイトル復帰による世代更新ではエンディング遮断を解放する', async () => {
+    const fixture = createEndingExceptionFixture();
+    const { turns, listeners } = bindEndingFlowFixture(fixture);
+    fixture.game.ui.returnToTitle = async options => {
+        fixture.calls.title.push(options);
+        turns.abortForScenarioTransition();
+        fixture.game.phase = 'title';
+        return true;
+    };
+    await fixture.ending.playEndingSequence('終焉', 'テスト', false);
+    assert.strictEqual(fixture.calls.title.length, 1);
+    assert.strictEqual(fixture.getElement('app').inert, false);
+    assert.strictEqual(fixture.getElement('ending-screen').classList.contains('hidden'), true);
+    assert.strictEqual(listeners.size, 0);
+});
+
+test('r846 同世代の古いエンディングを中断しても新演出の入力遮断を維持する', async () => {
+    const fixture = createEndingExceptionFixture();
+    const paintReleases = [];
+    let paintCount = 0;
+    fixture.game.ui.waitForNextPaint = () => {
+        paintCount++;
+        if (paintCount <= 2) return new Promise(resolve => paintReleases.push(resolve));
+    };
+    const oldEnding = fixture.ending.playEndingSequence('旧終焉', '旧画面', false);
+    const newEnding = fixture.ending.playEndingSequence('新終焉', '新画面', false);
+    assert.strictEqual(fixture.getElement('app').inert, true, '新演出が遮断を再取得する');
+    assert.strictEqual(fixture.getElement('app').style.pointerEvents, 'none');
+    paintReleases[0]();
+    await oldEnding;
+    assert.strictEqual(fixture.getElement('app').inert, true, '古い待機完了は新演出の遮断を解除しない');
+    paintReleases[1]();
+    await newEnding;
+    assert.strictEqual(fixture.calls.title.length, 1);
+    assert.strictEqual(fixture.getElement('app').inert, false);
+});
+
+// r848: 新演出へ所有権を渡した旧演出の失敗は、同世代でも新演出をタイトルへ戻さない。
+test('r848 同世代の旧エンディング例外は後発演出のタイトル遷移を起動しない', async () => {
+    const fixture = createEndingExceptionFixture();
+    const { turns } = bindEndingFlowFixture(fixture);
+    const paints = [];
+    fixture.game.ui.waitForNextPaint = () => paints.length < 2
+        ? new Promise((resolve, reject) => paints.push({resolve, reject})) : Promise.resolve();
+    fixture.game.ui.returnToTitle = async options => {
+        fixture.calls.title.push(options);
+        turns.abortForScenarioTransition();
+        fixture.game.phase = 'title';
+        return true;
+    };
+    const prior = fixture.ending.playEndingSequence('旧終焉', '旧演出', false);
+    const current = fixture.ending.playEndingSequence('新終焉', '新演出', false);
+    assert.strictEqual(paints.length, 2, '両演出が初期描画待機に入る');
+    paints[0].reject(new Error('旧演出の描画失敗'));
+    await assert.rejects(prior, /旧演出の描画失敗/);
+    assert.strictEqual(fixture.calls.title.length, 0, '所有権のない旧演出は新演出をタイトル復帰で中断しない');
+    assert.strictEqual(fixture.game.phase, 'game', '新演出のゲーム世代を維持する');
+    assert.strictEqual(fixture.getElement('app').inert, true, '新演出の入力遮断を維持する');
+    paints[1].resolve();
+    await current;
+    assert.strictEqual(fixture.calls.title.length, 1, '後発の現行演出だけがタイトル復帰する');
 });
 
 test('観戦終了予約メッセージはbodyではなく固定論理画面内へ配置する', () => {

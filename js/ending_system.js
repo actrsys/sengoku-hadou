@@ -57,10 +57,15 @@ class EndingSystem {
         
         // 万が一HTMLが見つからなかった時のための安全装置です
         if (!endingScreen || !titleEl || !msgEl || !staffRollContainer || !staffRollContent) {
-            this.game.ui.returnToTitle();
+            // DOM欠落時も共通のタイトル復帰が完了するまでエンディングを終了扱いにしない。
+            // 復帰失敗は呼び出し元に伝え、未処理のPromiseを残さない。
+            await this.game.ui.returnToTitle();
             return;
         }
 
+        // 続けて別のエンディングが来た場合は先行演出の所有権を失効させる。
+        // 新しい遮断を設定した後で旧遮断を解除してはならない。
+        if (typeof this._cancelEndingPresentation === 'function') this._cancelEndingPresentation();
         // ロード画面より手前で暗転させます。hiddenを外した瞬間から入力遮断します。
         endingScreen.style.zIndex = '99999';
         const app = document.getElementById('app');
@@ -80,14 +85,47 @@ class EndingSystem {
             && (originalGeneration === null
                 || (typeof turnManager?.isTurnFlowGenerationLatest === 'function'
                     && turnManager.isTurnFlowGenerationLatest(originalGeneration)));
+        // 演出の入力遮断はこの実行だけが所有する。新シナリオへ移るときは
+        // TurnManagerの共通中断通知で先に古い遮断を解放する。
+        // 古いawaitのfinallyから新しい画面の遮断を上書きしない。
+        const presentation = { cancelled: false };
+        this._activeEndingPresentation = presentation;
+        const releasePresentation = () => {
+            if (this._activeEndingPresentation !== presentation) return;
+            endingScreen.style.transition = '';
+            endingScreen.classList.remove('show');
+            endingScreen.classList.add('hidden');
+            titleEl.classList.remove('show');
+            msgEl.classList.remove('show');
+            staffRollContainer.style.transition = 'none';
+            staffRollContainer.style.transform = 'translateY(0)';
+            if (app) {
+                app.inert = false;
+                app.style.pointerEvents = '';
+            }
+            this._activeEndingPresentation = null;
+        };
+        const cancelPresentation = () => {
+            presentation.cancelled = true;
+            releasePresentation();
+        };
+        this._cancelEndingPresentation = cancelPresentation;
+        const unsubscribeFlowAbort = originalGeneration !== null
+            && typeof turnManager?.subscribeTurnFlowAbort === 'function'
+            ? turnManager.subscribeTurnFlowAbort(originalGeneration, cancelPresentation)
+            : () => {};
+        const isPresentationCurrent = () => !presentation.cancelled
+            && this._activeEndingPresentation === presentation && isOriginalGameFlow();
         let loadingAlreadyVisible = false;
         let titleReturnStarted = false;
         try {
             // 1. 短い暗転。2秒の待ち時間を廃止し、演出と入力遮断を同時に開始します。
             endingScreen.classList.remove('hidden');
             await this.game.ui.waitForNextPaint();
+            if (!isPresentationCurrent()) return;
             endingScreen.classList.add('show');
             await new Promise(resolve => setTimeout(resolve, 700));
+            if (!isPresentationCurrent()) return;
 
             // 2. タイトルとメッセージをふわっと表示します
             titleEl.innerText = titleText;
@@ -95,11 +133,13 @@ class EndingSystem {
         
             titleEl.classList.add('show');
             await new Promise(resolve => setTimeout(resolve, 1500));
+            if (!isPresentationCurrent()) return;
         
             msgEl.classList.add('show');
         
             // プレイヤーがメッセージを読めるように長めに待ちます（6秒）
             await new Promise(resolve => setTimeout(resolve, 6000));
+            if (!isPresentationCurrent()) return;
 
             // 3. タイトルとメッセージをフェードアウトさせます
             titleEl.classList.remove('show');
@@ -107,6 +147,7 @@ class EndingSystem {
         
             // 文字が完全に消えるのを待ちます
             await new Promise(resolve => setTimeout(resolve, 2000));
+            if (!isPresentationCurrent()) return;
 
             // ★ 4. 天下統一（クリア）の時だけ、スタッフロールを流します！
             if (isClear) {
@@ -139,6 +180,7 @@ class EndingSystem {
                 staffRollContainer.style.transform = `translateY(0)`;
             
                 await new Promise(resolve => setTimeout(resolve, 500)); // スクロール開始前の少しの溜め
+                if (!isPresentationCurrent()) return;
             
                 // 上に向かって移動させます
                 const moveDistance = staffRollContent.offsetHeight + staffRollContainer.offsetHeight;
@@ -146,12 +188,15 @@ class EndingSystem {
 
                 // スクロールが完全に終わるまで待機します
                 await new Promise(resolve => setTimeout(resolve, rollDuration * 1000));
+                if (!isPresentationCurrent()) return;
             
                 // 文字が流れ終わった後、少し余韻を残します
                 await new Promise(resolve => setTimeout(resolve, 2000));
+                if (!isPresentationCurrent()) return;
             } else {
                 // ゲームオーバーはスタッフロールを流さず、短い余韻だけ置きます。
                 await new Promise(resolve => setTimeout(resolve, 500));
+                if (!isPresentationCurrent()) return;
             }
 
             // 5. 暗転からロード画面へ受け渡してタイトルを準備します。
@@ -159,6 +204,7 @@ class EndingSystem {
             this.game.ui.showLoadingScreen('タイトル画面へ戻っています', 5);
             loadingAlreadyVisible = true;
             await this.game.ui.waitForNextPaint();
+            if (!isPresentationCurrent()) return;
 
             // アニメーションの状態や文字をリセットしておきます。
             staffRollContainer.style.transition = 'none';
@@ -169,6 +215,7 @@ class EndingSystem {
             endingScreen.style.transition = 'opacity 0.3s ease-out';
             endingScreen.classList.remove('show');
             await new Promise(resolve => setTimeout(resolve, 300));
+            if (!isPresentationCurrent()) return;
             endingScreen.classList.add('hidden');
 
             // ロード画面が見えている状態でタイトルへの掃除・セーブ確認を完了させます。
@@ -176,8 +223,9 @@ class EndingSystem {
             await this.game.ui.returnToTitle({ loadingAlreadyVisible: true });
         } catch (error) {
             // タイトル復帰前の演出失敗なら、共通の復帰処理で後始末する。
-            // 既にシナリオが切り替わった場合は、その新画面を古い演出から変更しない。
-            if (!titleReturnStarted && isOriginalGameFlow()) {
+            // 世代失効だけでなく、同世代で新しい演出へ表示所有権を渡した場合も、
+            // 古い演出の失敗から新演出を勝手にタイトルへ戻さない。
+            if (!titleReturnStarted && isPresentationCurrent()) {
                 try {
                     await this.game.ui.returnToTitle({ loadingAlreadyVisible });
                 } catch (returnError) {
@@ -186,17 +234,12 @@ class EndingSystem {
             }
             throw error;
         } finally {
-            // 演出・タイトル準備のどのawaitが失敗しても、入力遮断と残留幕を解除する。
-            endingScreen.style.transition = '';
-            endingScreen.classList.remove('show');
-            endingScreen.classList.add('hidden');
-            titleEl.classList.remove('show');
-            msgEl.classList.remove('show');
-            staffRollContainer.style.transition = 'none';
-            staffRollContainer.style.transform = 'translateY(0)';
-            if (app) {
-                app.inert = false;
-                app.style.pointerEvents = '';
+            // 世代遷移時は中断通知が旧遮断を先に片付けている。
+            // 所有権を失った演出のfinallyは新シナリオのDOMに触れない。
+            releasePresentation();
+            unsubscribeFlowAbort();
+            if (this._cancelEndingPresentation === cancelPresentation) {
+                this._cancelEndingPresentation = null;
             }
         }
     }
