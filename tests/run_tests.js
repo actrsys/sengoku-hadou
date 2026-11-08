@@ -9968,6 +9968,44 @@ test('r741 1699年12月末から1700年1月に進む前に時代を終える', a
     assert.strictEqual(startCount, 1);
 });
 
+// r849: 12月末から元服処理前の1月に進めた瞬間も、その年の登場予定者を全滅扱いしない。
+// 年越しは実際のTurnManager.endMonthを通し、時代終了と翌月開始の順序を確かめる。
+test('r849 年越し直後の同年登場予定者がいる場合は終焉せず月初処理へ進む', async () => {
+    const ctx = createContext();
+    ctx.GameConfig.Ending = { ...global.GameConfig.Ending };
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/ending_system.js');
+    loadScript(ctx, 'js/turn_manager.js');
+    let startCount = 0;
+    let eraEndCount = 0;
+    const upcoming = {id:2001, status:'unborn', startYear:1651, isAutoLeader:false};
+    const autoLeader = {id:2002, status:'active', startYear:1600, isAutoLeader:true};
+    const dummy = {id:2003, status:'unborn', startYear:9999, isAutoLeader:false};
+    const game = {year:1650, month:12, playerClanId:1, phase:'game', isWatchMode:true,
+        clans:[{id:1},{id:2}], bushos:[autoLeader, upcoming, dummy], ui:{},
+        writeSystemDiagnostic(){}, updateClanDisplayNames(){},
+        async startMonth() {startCount++; upcoming.status='ronin';}
+    };
+    ctx.game=game;
+    const ending = vm.runInContext('new EndingSystem(game)',ctx);
+    ending.processEraEnd = async()=>{eraEndCount++;};
+    game.endingSystem=ending;
+    const turns=vm.runInContext('new TurnManager(game)',ctx);
+    game.turnManager=turns;
+    await turns.endMonth();
+    assert.strictEqual(game.year,1651, '年越しが正常に進む');
+    assert.strictEqual(game.month,1);
+    assert.strictEqual(eraEndCount,0, '当年1月登場予定があるなら終焉しない');
+    assert.strictEqual(startCount,1, '予定どおり月初の登場処理へ引き継ぐ');
+    assert.strictEqual(upcoming.status,'ronin', '登場予定者は翌月処理側で登場できる');
+    // それ以外の生存者・登場予定者が無くなった場合は従来どおり終焉とする。
+    upcoming.status='dead';
+    await turns.endMonth();
+    assert.strictEqual(game.month,2);
+    assert.strictEqual(eraEndCount,1, '生成頭領と9999年ダミーだけなら終了');
+    assert.strictEqual(startCount,1, '終焉した月に月初処理を開始しない');
+});
+
 test('ゲームオーバーは短い暗転開始直後から入力を遮断しロード画面経由でタイトルへ戻る', () => {
     const ending = read('js/ending_system.js');
     const ui = read('js/ui.js');

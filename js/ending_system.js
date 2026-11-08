@@ -251,7 +251,7 @@ class EndingSystem {
         return !this.game.bushos.some(b =>
             !b.isAutoLeader && (
                 window.LifeStatusRules.isPresent(b) ||
-                (window.LifeStatusRules.isUnborn(b) && b.startYear > this.game.year && b.startYear < 9999)
+                (window.LifeStatusRules.isUnborn(b) && b.startYear >= this.game.year && b.startYear < 9999)
             )
         );
     }
