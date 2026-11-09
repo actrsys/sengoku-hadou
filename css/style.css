@@ -22,6 +22,12 @@ button, input, select, textarea, label, a, .cmd-btn, .title-btn, .zoom-btn, .sel
 
 .select-item {
     touch-action: manipulation;
+    border-bottom: 1px solid rgba(255,215,79,0.3);
+    scroll-snap-align: start;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%);
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
 
 /* 本編2書体の @font-face は初回操作後に css/game_fonts.css から読み込む。
@@ -43,7 +49,7 @@ button, input, select, textarea, label, a, .cmd-btn, .title-btn, .zoom-btn, .sel
 }
 /* タイトルと本編ロード幕の見出しは同じ軽量書体の設定を参照する。
    書体を変更するときは画面個別ではなく以下の共通変数を切り替える。 */
-#title-screen { font-family: var(--font-title-ui-ja); }
+
 #title-screen .game-title,
 .loading-title { font-family: var(--font-title-heading-ja); }
 #title-screen .title-btn,
@@ -56,11 +62,8 @@ html.fonts-ready body,
 html.fonts-fallback body { visibility: visible; }
 :root {
     --bg-color: #eceff1;
-    --panel-bg: #ffffff;
     --text-color: #333;
-    --border-color: #cfd8dc;
     --map-tile-size: 80px;
-    --header-height: 100px;
     /* 標準モーダルの内容枠と決定・戻る・閉じる等の操作列との共通間隔。 */
     --modal-footer-gap: 12px;
     /* 下部会話だけは名前札がメッセージ枠の上へ16〜18px張り出すため、
@@ -168,43 +171,14 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
    共通ユーティリティ・アニメーション
    ========================================================= */
 .hidden { display: none !important; }
-.invisible { visibility: hidden !important; opacity: 0 !important; transition: none !important; animation: none !important; pointer-events: none !important; }
 .instant { transition: none !important; animation: none !important; }
 .disabled-area { pointer-events: none; opacity: 0.5; }
-
-/* =========================================================
-   ★追加：長い名前をギュッと圧縮（長体）するための専用内箱
-   ========================================================= */
-.compressed-text-wrapper {
-    display: inline-flex;
-    align-items: center;
-    white-space: nowrap;
-    transform-origin: left center;
-    line-height: 1;
-}
 
 .fade-in { animation: fadeIn 0.3s ease-in; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(233, 30, 99, 0); } 100% { box-shadow: 0 0 0 0 rgba(233, 30, 99, 0); } }
 @keyframes pulse-shadow { 0% { filter: drop-shadow(0 0 0 rgba(233, 30, 99, 0.7)); } 70% { filter: drop-shadow(0 0 10px rgba(233, 30, 99, 0)); } 100% { filter: drop-shadow(0 0 0 rgba(233, 30, 99, 0)); } }
 @keyframes fw-blink { 0%{opacity:0.3;} 50%{opacity:0.8;} 100%{opacity:0.3;} }
-
-/* =========================================================
-   タイトル画面
-   ========================================================= */
-#title-screen {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: linear-gradient(135deg, #263238 0%, #37474f 100%);
-    display: flex; justify-content: center; align-items: flex-start; z-index: 3000;
-}
-.title-content { text-align: center; color: #fff; padding-top: 15%; width: 100%; }
-.game-title { font-size: 4rem; margin-bottom: 30px; color: #ffffff; text-shadow: 3px 3px 5px rgba(0,0,0,0.8); }
-.title-menu { display: flex; flex-direction: column; gap: 15px; }
-.title-btn { width: 240px; text-align: center; padding: 12px 0; font-size: 1.2rem; background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; transition: all 0.3s; }
-.title-btn:hover { background: rgba(255,255,255,0.3); }
-#title-screen .title-menu-buttons { display: flex; flex-direction: column; align-items: center; gap: 20px; margin-top: 20px; }
-.title-tap-message { font-size: 1.5rem; color: #fff; margin-top: 20px; cursor: pointer; animation: blink 2s infinite; }
 
 /* =========================================================
    全体レイアウト（ヘッダー・フッター）
@@ -213,7 +187,15 @@ img { pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 
 #top-info-bar { flex: none; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); border-bottom: 3px solid #d4af37; padding-top: max(20px, env(safe-area-inset-top)); padding-bottom: 10px; padding-left: 2px; padding-right: 2px; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.6); font-size: 0.8rem; display: flex; justify-content: space-between; align-items: flex-start; }
 #mobile-top-left { display: flex; flex-direction: column; width: 100%; font-size: 0.85rem; position: relative; }
-.sp-info-header { display: flex; align-items: center; background: #0d1a10; color: #fff; padding: 2px 8px; font-weight: bold; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.sp-info-header {
+    display: flex;
+    align-items: center;
+    background: var(--ui-panel-deep);
+    color: #fff;
+    padding: 2px 8px;
+    font-weight: bold;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
 .sp-clan { display: flex; align-items: center; margin-right: 10px; color: #ffeb3b; line-height: 1; }
 .sp-province { display: flex; align-items: center; margin-right: 5px; color: #fff; font-size: inherit; line-height: 1; }
 .sp-castle { flex: 1; font-size: 1rem; display: flex; align-items: center; line-height: 1; }
@@ -324,7 +306,6 @@ body:not(.is-pc) .status-marks-carousel .status-mark.fade-in {
 .sp-val-compact { font-size: 0.85rem; }
 .sp-val-left { display: flex; align-items: center; justify-content: flex-start; font-weight: bold; padding-left: 2px; font-variant-numeric: tabular-nums; height: 100%; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .sp-population-value { grid-column: 2 / span 3; }
-.sp-empty {}
 .sp-info-footer { display: flex; justify-content: space-between; gap: 4px; padding: 4px 5px; font-weight: bold; font-size: 0.85rem; }
 .sp-footer-box { flex: 1; display: flex; justify-content: space-between; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.3); color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 .sp-footer-box span:first-child { color: #ffd54f; }
@@ -339,34 +320,34 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
 
 #mobile-bottom-info { padding: 0; margin: 0; }
 .command-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 4px 0; }
-.cmd-btn { 
-    padding: 0 2px 2px 2px; 
-    box-sizing: border-box; 
-    height: 38px; 
+.cmd-btn {
+    padding: 0 2px 2px 2px;
+    box-sizing: border-box;
+    height: 38px;
     border-style: solid;
     border-width: 3px;
     border-color: #e6e3d8 #d1c18c #a88a2c #d1c18c;
-    background: linear-gradient(135deg, #b0c4b1 0%, #6e8c81 100%); 
-    color: #ffffff; 
+    background: linear-gradient(135deg, #b0c4b1 0%, #6e8c81 100%);
+    color: #ffffff;
     font-family: var(--font-decorative-ja);
     letter-spacing: 0.5px;
-    text-shadow: 
-        1px 1px 0 #0f2b21, -1px -1px 0 #0f2b21, 
+    text-shadow: 1px 1px 0 #0f2b21, -1px -1px 0 #0f2b21, 
         1px -1px 0 #0f2b21, -1px 1px 0 #0f2b21,
         0px 2px 0 #0f2b21, 0px -2px 0 #0f2b21,
         2px 0px 0 #0f2b21, -2px 0px 0 #0f2b21,
         1px 3px 3px rgba(0,0,0,0.8);
-    border-radius: 6px; 
-    cursor: pointer; 
-    font-size: 1.1rem; 
-    font-weight: normal; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    touch-action: manipulation; 
-    white-space: nowrap; 
-    overflow: hidden; 
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: normal;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    white-space: nowrap;
+    overflow: hidden;
     box-shadow: inset 0 0 0 1px rgba(0, 50, 40, 0.4), 0 2px 4px rgba(0,0,0,0.4);
+    transition: transform 0.10s ease, box-shadow 0.12s ease, background 0.14s ease, border-color 0.14s ease;
 }
 .cmd-btn:hover { 
     background: linear-gradient(135deg, #c2d6c3 0%, #82a396 100%); 
@@ -441,7 +422,6 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
     transition: none;
 }
 
-#sidebar-resizer { display: none; }
 #pc-sidebar { display: none !important; }
 
 /* =========================================================
@@ -480,18 +460,20 @@ body:not(.is-pc) #map-container.base-map-image-ready { background-image: none; }
 }
 /* ★Round5：スマホでは巨大マップを常時GPUレイヤーとして予約しない。 */
 body:not(.is-pc) #map-scroll-container { will-change: auto; }
+/* スマホの巨大メインマップは常時GPUレイヤー化しません。
+   ui_map.js側でも translateZ(0) をPCだけに限定します。 */
+
 body:not(.is-pc) #map-container {
     will-change: auto;
     backface-visibility: visible;
-    /* スマホはJS側の軽量表示画像だけを使う。CSS背景で原寸地図を二重にdecodeしない。 */
     background-image: none;
     background-color: #d9e0d7;
+    transform-style: flat;
 }
 /* ★Round14：巨大なmap-container全体ではなく、約1200x800の静的な地図画像だけを
    独立レイヤーとして保持します。これによりスクロール先のcheckerboardingを抑えつつ、
    城・SVG・複数Canvasまで一枚の巨大GPU面にまとめることを避けます。 */
 body:not(.is-pc) #map-base-image { transform: translateZ(0); backface-visibility: hidden; }
-#pc-map-overlay { display: none !important; }
 #zoom-controls { display: none !important; }
 
 /* =========================================================
@@ -515,24 +497,27 @@ body:not(.is-pc) #map-base-image { transform: translateZ(0); backface-visibility
     align-items: flex-start; /* ★根本原因：要素が縦に引き伸ばされるのを防ぐ指定です */
 }
 
-.floating-time, .floating-market { 
-    background: rgba(0, 0, 0, 0.75); color: #fff; 
-    padding: 4px 12px; border-radius: 12px; 
-    font-size: 0.9rem; font-weight: bold; 
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); 
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.8); 
-    white-space: nowrap; /* ★根本原因：文字が画面幅で自動改行されるのを防ぐ指定です */
-    line-height: 1.2; /* 行間による間延びをリセットします */
-}
-
-/* ★追加：スマホ版・PC版共通で、数字が変わっても箱の大きさが揺れないようにする設定 */
-/* ３つの箱の横幅をすべて同じサイズに統一して、カッチリ固定します */
 .floating-time, .floating-market {
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.2);
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+    white-space: nowrap;
+    line-height: 1.2;
     width: 110px;
     box-sizing: border-box;
     text-align: center;
     font-variant-numeric: tabular-nums;
 }
+
+/* ★追加：スマホ版・PC版共通で、数字が変わっても箱の大きさが揺れないようにする設定 */
+/* ３つの箱の横幅をすべて同じサイズに統一して、カッチリ固定します */
+
 
 #map-guide { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: 20px; pointer-events: none; z-index: 600; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
 
@@ -554,7 +539,6 @@ body:not(.is-pc) #map-base-image { transform: translateZ(0); backface-visibility
 .castle-card.icon-tier-4::before { background-image: url('../data/images/map/shiro_icon004.webp'); }
 .castle-card::after { content: ""; position: absolute; bottom: var(--castle-shadow-bottom, 11.5px); left: 50%; transform: translateX(-50%); width: 90%; height: 15%; background: rgba(0, 0, 0, 1.0); border-radius: 50%; z-index: 1; pointer-events: none; }
 body:not(.is-touch-input) .castle-card:hover { transform: translate(-50%, calc(-60% - 2px)) scale(var(--castle-scale, 0.41)); filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.5)); z-index: 100 !important; }
-.castle-card.active-turn { filter: drop-shadow(0 0 8px #ff9800); z-index: 15; }
 .castle-card.selectable-target { filter: drop-shadow(0 0 8px #e91e63); animation: pulse-shadow 1s infinite; z-index: 25; cursor: crosshair; }
 .castle-card.dimmed { opacity: 0.3; filter: grayscale(80%); }
 .castle-card.current-turn { z-index: 80; }
@@ -723,9 +707,6 @@ body.hide-daimyo-labels .daimyo-name-label { display: none !important; }
 }
 .result-body { flex: 1; width: 100%; overflow-y: auto; min-height: 0; margin-bottom: 0 !important; padding-bottom: 10px; box-sizing: border-box; overscroll-behavior: none; }
 .select-item:last-child { margin-bottom: 0; }
-.select-item.succession-select-item { display: flex; align-items: center; }
-.succession-candidate-name { flex: 1; font-weight: bold; }
-.succession-candidate-stats { display: flex; gap: 5px; align-items: center; }
 
 /* 縦の区切り線（子要素全てに適用） */
 .list-header > *, .select-item > * { 
@@ -745,7 +726,7 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 
 /* リストヘッダー・アイテム (ゼブラ柄) */
 .list-header { background: #0d1a10; color: #ffd54f; font-weight: bold; position: sticky; top: 0; z-index: 10; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
-.select-item { border-bottom: 1px solid rgba(255,215,79,0.3); scroll-snap-align: start; cursor: pointer; color: #fff; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+
 .select-item.row-striped { background: linear-gradient(to bottom, #2d5a38 0%, #254a2e 100%); }
 .select-item:hover { background: linear-gradient(to bottom, #3a6b46 0%, #2a5a36 100%) !important; }
 .select-item.disabled { color: #9e9e9e !important; pointer-events: none; background: linear-gradient(to bottom, #455a64 0%, #263238 100%) !important; text-shadow: 1px 1px 0 #000 !important; }
@@ -790,12 +771,9 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .select-item .col-rice,
 .select-item .col-soldiers,
 .select-item .col-defense,
-.select-item .col-morale,
-.select-item .col-training,
 .select-item .col-horses,
 .select-item .col-guns,
 .select-item .col-population,
-.select-item .col-loyalty,
 .select-item .col-kokudaka,
 .select-item .col-commerce,
 .select-item .col-gold-income,
@@ -868,14 +846,12 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .text-blue { color: #82b1ff !important; }
 .text-green { color: #69f0ae !important; }
 .text-orange { color: #ffd180 !important; }
-.text-pink { color: #ff96ba !important; }
 
 /* 個別リストのグリッド調整（JavaScript側で設定するように変更しました） */
 
 /* =========================================================
    ボタン類
    ========================================================= */
-.toggle-btn { background: none; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; font-size: 0.8rem; cursor: pointer; color: #555; }
 
 /* 基本のボタン（決定系・キャンセル系） */
 .btn-primary, .btn-secondary, .btn-danger { 
@@ -1075,9 +1051,11 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 .select-item.disabled .grade-sub { color: #b0bec5 !important; }
 
 .bar-bg { width: 90%; height: 12px; border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; border: 1px solid #a69363; box-shadow: 0 0 5px rgba(0,0,0,0.8), inset 0 1px 3px rgba(0,0,0,0.6); box-sizing: border-box; }
-.bar-fill { height: 100%; transition: width 0.3s ease; }
-.bar-bg-power { background-color: #3e2723; } .bar-fill-power { background: linear-gradient(to bottom, #26a69a, #00796b); }
-.bar-bg-friend { background-color: #b71c1c; } .bar-fill-friend { background: linear-gradient(to bottom, #42a5f5, #1565c0); }
+.bar-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+    width: var(--bar-value, 0%);
+}
 
 .status-bar-container { display: inline-block; vertical-align: middle; width: 60px; height: 14px; background-color: #d17842; border: 1px solid #a69363; position: relative; box-shadow: 0 0 5px rgba(0,0,0,0.8), inset 0 1px 3px rgba(0,0,0,0.6); margin: 0 4px; box-sizing: border-box; }
 .status-bar-fill { height: 100%; width: var(--status-bar-width, 0%); }
@@ -1290,11 +1268,11 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 #saveload-list {
     display: flex;
     flex-direction: column;
-    flex: 1; 
-    min-height: 0; 
-    height: 100%; 
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
     max-height: none !important;
-    overflow-x: hidden !important; /* 横スクロールを絶対に禁止します */
+    overflow-x: hidden !important;
 }
 
 /* カスタムスクロールバーの横スライダーも一切出さないようにする魔法 */
@@ -1307,26 +1285,46 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
 /* ★スマホ版の文字サイズや幅の微調整 */
 body:not(.is-pc) .saveload-slot-number { width: 30px; font-size: 1.2rem; }
 body:not(.is-pc) .saveload-slot-image { width: 80px; }
-body:not(.is-pc) .saveload-slot-content { padding: 4px 8px; }
+body:not(.is-pc) .saveload-slot-content {
+    padding: 4px 8px;
+    justify-content: center;
+    gap: 2px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
 body:not(.is-pc) .saveload-slot-clan { font-size: 1.1rem; }
 body:not(.is-pc) .saveload-slot-date { font-size: 0.85rem; }
-body:not(.is-pc) .saveload-slot-time { font-size: 0.7rem; }
+body:not(.is-pc) .saveload-slot-time {
+    font-size: 0.7rem;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    gap: 6px;
+    min-height: 1.25em;
+    width: 100%;
+    white-space: nowrap;
+    overflow: visible;
+    padding-bottom: 1px;
+    box-sizing: border-box;
+}
 body:not(.is-pc) .saveload-slot-scenario { font-size: 0.75rem; }
 body:not(.is-pc) .saveload-slot-passed { font-size: 0.7rem; }
 body:not(.is-pc) .saveload-slot-empty-text { font-size: 0.85rem; }
 
-body:not(.is-pc) .saveload-row-top { gap: 8px; }
+body:not(.is-pc) .saveload-row-top {
+    gap: 8px;
+    flex: 0 0 auto;
+    min-height: 1.35em;
+    line-height: 1.2;
+}
 body:not(.is-pc) .saveload-row-bottom {
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
-    margin-top: 4px;
+    gap: 2px;
+    margin-top: 2px;
+    flex: 0 0 auto;
+    line-height: 1.2;
 }
-body:not(.is-pc) .saveload-slot-time {
-    flex-direction: row-reverse;
-    justify-content: flex-end;
-    gap: 6px;
-}
+
 
 /* =========================================================
    各種モーダル・オーバーレイ・ガード
@@ -1500,8 +1498,14 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(212, 175, 55, 0.3);
     border-radius: 6px;
-    padding: 12px 5px 8px 5px; 
-    margin-bottom: 15px;
+    padding: 12px 5px 8px 5px;
+    margin-bottom: 10px;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    padding-right: 5px;
+    padding-bottom: 2px;
 }
 
 /* 3. 「輸送先」などの説明エリア */
@@ -1779,7 +1783,7 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 
 #quantity-modal h3, #trade-type-info, #charity-type-selector, #quantity-modal .modal-footer { flex-shrink: 0; }
 #charity-type-selector { margin-bottom: 10px; }
-#quantity-container { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; padding-right: 5px; padding-bottom: 2px; margin-bottom: 10px; }
+
 /* 部隊編成画面のモーダルとフレックスボックス設定 */
 /* =========================================================
    部隊編成画面 (#unit-divide-modal) 専用スタイル
@@ -1867,8 +1871,6 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 .cutin-overlay.fade-in .cutin-text { transform: scale(1); }
 
 /* 大名選択ダイアログ共通 */
-body.is-pc.daimyo-select-mode #pc-sidebar,   /* ★力（詳細度）を上げて確実にPCサイドバーを消します */
-body.daimyo-select-mode #pc-sidebar,
 body.daimyo-select-mode #bottom-command-bar,
 body.daimyo-select-mode #mobile-bottom-info,
 body.daimyo-select-mode #top-info-bar { display: none !important; } /* ★外側の箱（トップインフォバー）ごと完全に隠します */
@@ -2017,8 +2019,7 @@ body.is-pc .daimyo-detail-face {
     box-sizing: border-box;
 }
 
-.daimyo-detail-2col > div,
-.daimyo-detail-3col > div {
+.daimyo-detail-2col > div {
     flex: 1;
     min-width: 0; /* 箱の中身に合わせて縮小可能にします */
 }
@@ -2091,7 +2092,7 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     width: 100%;
     height: 100%;
 }
-.bar-fill { width: var(--bar-value, 0%); }
+
 .delegate-setting-panel {
     padding: 20px;
     text-align: center;
@@ -2184,11 +2185,6 @@ body:not(.is-pc) .daimyo-detail-container > div:last-child {
     display: flex;
     align-items: flex-end;
     gap: 8px;
-}
-.daimyo-confirm-title-block {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
 }
 .daimyo-confirm-yomi {
     font-size: 0.715rem;
@@ -2811,19 +2807,6 @@ body:not(.is-pc) .busho-detail-biography-text {
     box-shadow: 0 0 6px rgba(255, 255, 240, 0.8);
 }
 
-.bar-fill-busho-over::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-radius: inherit;
-    /* 光だけを担当する分身を作ります */
-    box-shadow: 0 0 4px rgba(255, 255, 240, 0.6);
-    /* -1を指定することで、元のゲージの裏側に光を回り込ませます */
-    z-index: -1;
-}
 
 /* ★追加：経験値ゲージの中身（白いバー） */
 .exp-bar-fill {
@@ -2875,11 +2858,12 @@ body:not(.is-pc) .busho-detail-biography-text {
 
 /* ターン数の数字だけ特別扱いする設定 */
 .turn-number {
-    font-size: 1.6rem;
-    color: #fdea60 !important;
+    font-size: 1.8rem;
+    color: #ffeb75 !important;
     font-weight: bold;
     margin: 0 5px;
     line-height: 1;
+    text-shadow: 0 0 8px rgba(255, 235, 117, 0.38);
 }
 .war-highlight-value { color: #fdea60; }
 .war-title-segment { display: inline-block; }
@@ -2907,7 +2891,14 @@ body:not(.is-pc) .busho-detail-biography-text {
 .empty-icon { width: 35px; height: 35px; border: 2px solid #999; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; background: #eee; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #888; text-shadow: none; }
 .responsive-army-stats { display: flex !important; flex-direction: column !important; gap: 4px !important; width: 100% !important; box-sizing: border-box !important; font-size: 0.95rem; color: #fff; }
 
-.stat-busho { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; color: #fff; font-weight: bold; }
+.stat-busho {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    color: #fff;
+    font-weight: bold;
+    letter-spacing: 0.02em;
+}
 .reinf-content-wrap { display: flex; width: 100%; }
 .stat-row-group .stat-row { flex: 1; border-bottom: none !important; padding: 2px 6px !important; min-width: 0; }
 .war-reinf-card .stat-row { display: flex !important; justify-content: space-between !important; width: 100% !important; box-sizing: border-box !important; }
@@ -2956,6 +2947,8 @@ body:not(.is-pc) .busho-detail-biography-text {
     animation: active-army-glow 1s ease-in-out infinite;
     z-index: 10;
     position: relative;
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 2px rgba(255, 240, 160, 0.65), 0 0 20px rgba(255, 228, 122, 0.34), inset 0 1px 0 rgba(255,255,255,0.08) !important;
 }
 
 /* =========================================================
@@ -3167,10 +3160,6 @@ body:not(.is-pc) .busho-detail-biography-text {
 .fw-unit.defender.self-ally .fw-unit-icon::before { background-color: #4fc3f7 !important; }
 .fw-unit.defender.self-ally.active .fw-unit-icon { filter: drop-shadow(1px 0 0 #0288d1) drop-shadow(-1px 0 0 #0288d1) drop-shadow(0 1px 0 #0288d1) drop-shadow(0 -1px 0 #0288d1) drop-shadow(0 0 6px #ffff00) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)) !important; }
 
-/* 友軍カラー（野戦・ログ共通） */
-.log-color-atk { color: #f48fb1; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
-.log-color-def { color: #4fc3f7; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
-
 /* =========================================================
    スマホ専用のオーバーライド (body:not(.is-pc))
    ========================================================= */
@@ -3311,8 +3300,10 @@ body:not(.is-pc) .war-side-wrapper > .war-reinf-col:first-child { flex-direction
 body:not(.is-pc) .responsive-army-content .stat-busho > * { font-size: 0.75rem !important; }
 body:not(.is-pc) .war-visual { padding: 3px 1px !important; margin-bottom: 0 !important; flex-shrink: 1 !important; min-height: 0 !important; overflow-y: auto !important; }
 body:not(.is-pc) #war-title-name { font-size: 1.05rem !important; margin: 1px 0 !important; }
-body:not(.is-pc) .war-header-info, body:not(.is-pc) #war-date-info, body:not(.is-pc) #war-turn-info { font-size: 0.8rem !important; margin-bottom: 1px !important; }
-body:not(.is-pc) .turn-number { font-size: 1.1rem !important; }
+body:not(.is-pc) #war-date-info, body:not(.is-pc) #war-turn-info { font-size: 0.8rem !important; margin-bottom: 1px !important; }
+body:not(.is-pc) .turn-number {
+    font-size: 1.08rem !important;
+}
 
 /* ① 【スマホ版】メイン軍・援軍 共通の魔法 */
 body:not(.is-pc) .responsive-army-title,
@@ -3377,7 +3368,7 @@ body:not(.is-pc) .war-controls-buttons button { font-size: clamp(0.75rem, 4vw, 1
    ========================================================= */
 body.is-pc {
     #app { flex-direction: row; }
-    #top-info-bar, #bottom-command-bar, #pc-map-overlay { display: none !important; }
+    #top-info-bar, #bottom-command-bar { display: none !important; }
     #map-reset-zoom { bottom: 20px; right: 20px; }
     
     /* PC版：マップの周りの余白をタイトル画面と同じ色に塗りつぶす魔法 */
@@ -3408,17 +3399,7 @@ body.is-pc {
     /* ダンボール箱に閉じ込める魔法 */
     #title-screen, .modal, .cutin-overlay, #ai-guard { position: absolute !important; }
 
-    /* PCサイドバー（新しいUIに移行したため完全に非表示にします） */
-    #pc-sidebar { display: none !important; }
-    #sidebar-resizer { display: none !important; }
-
-    #pc-status-panel { flex: none; padding: 0; background: #fff; border-bottom: 2px solid #ccc; }
-    #pc-status-panel .sp-params-grid { row-gap: 8px; padding: 10px 0; }
-    #pc-status-panel .sp-info-body { padding: 10px; }
-    #pc-status-panel .sp-info-header { padding: 8px 12px; font-size: 1.1rem; }
-    #pc-status-panel .sp-info-footer { padding: 8px 0; font-size: 0.95rem; }
-
-    #pc-command-area { padding: 10px; flex: 1; overflow-y: auto; }
+    /* 旧サイドバーは共通の #pc-sidebar 非表示ルールで管理する。 */
     .command-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .cmd-btn { padding: 8px 8px; font-size: 1.2rem; height: auto; }
 
@@ -3745,11 +3726,7 @@ body.is-pc {
     letter-spacing: 0.02em;
 }
 .war-title-segment + .war-title-segment { margin-left: 0.25em; }
-.turn-number {
-    font-size: 1.8rem;
-    color: #ffeb75 !important;
-    text-shadow: 0 0 8px rgba(255, 235, 117, 0.38);
-}
+
 .war-wall-hexagon-wrap {
     position: relative;
     clip-path: polygon(15px 0, calc(100% - 15px) 0, 100% 15px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0 calc(100% - 15px), 0 15px);
@@ -3896,9 +3873,7 @@ body.is-pc {
 .reinf-busho-label {
     color: #fff !important;
 }
-.stat-busho {
-    letter-spacing: 0.02em;
-}
+
 .stat-row { display: flex; justify-content: space-between; align-items: center !important; padding: 2px 6px !important; border-bottom: none !important; font-weight: bold; font-size: 0.8rem !important; box-sizing: border-box !important; min-width: 0;
     background: linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.44) 100%) !important;
     border: 1px solid rgba(255,255,255,0.10);
@@ -3956,10 +3931,7 @@ body.is-pc {
 #war-atk-ally-reinf-card::after,
 #war-def-ally-reinf-card::after { content: '友軍援軍'; }
 
-.active-command-turn {
-    transform: translateY(-1px);
-    box-shadow: 0 0 0 2px rgba(255, 240, 160, 0.65), 0 0 20px rgba(255, 228, 122, 0.34), inset 0 1px 0 rgba(255,255,255,0.08) !important;
-}
+
 
 .war-controls-shell { position: relative; flex-shrink: 0;
     margin: 0 10px 10px;
@@ -4077,9 +4049,7 @@ body:not(.is-pc) .war-title {
     font-size: 0.98rem !important;
     line-height: 1.2;
 }
-body:not(.is-pc) .turn-number {
-    font-size: 1.2rem !important;
-}
+
 body:not(.is-pc) .war-wall-hexagon-inner {
     min-width: 58px;
     padding: 8px 18px;
@@ -4119,36 +4089,6 @@ body.is-pc .war-controls-shell {
     margin: 0 12px 12px;
 }
 
-/* =========================================================
-   ★ 専用ロード画面の魔法
-   ========================================================= */
-#global-loading-screen {
-    position: absolute; /* 親要素（ゲーム画面）を基準にします */
-    top: 0; 
-    left: 0; 
-    width: 100%; 
-    height: 100%;
-    background-color: #263238; /* タイトル画面のような暗い色 */
-    z-index: 9999; /* どんな画面よりも手前に出します */
-    display: flex;
-    justify-content: center; /* ★中央に寄せます（左右） */
-    align-items: center;     /* ★中央に寄せます（上下） */
-    padding: 0;              /* 余計な隙間をなくします */
-    box-sizing: border-box;
-}
-
-#global-loading-screen.hidden {
-    display: none; /* 隠す時は完全に無いものとします */
-}
-
-.loading-text {
-    color: #ffffff;
-    font-size: 1.5rem;
-    letter-spacing: 4px; /* 文字と文字の間を少し開けます */
-    animation: blink-loading 1.5s infinite; /* チカチカ動くアニメーションの名前です */
-}
-
-/* ロード中の文字がフワッ、と点滅する動きの指定です */
 /* 保存処理中の操作ガード。見た目はCSS側で管理し、SaveManagerは表示状態だけ切り替える。 */
 #save-guard {
     position: fixed;
@@ -4264,7 +4204,7 @@ body.is-pc.daimyo-select-mode #pc-new-ui-container { display: none !important; }
 }
 
 /* ★ 武将一覧・拠点一覧など、全てのタブグループで横並びになるようにします */
-#selector-tabs, #kyoten-tabs, #kyoten-scope-tabs {
+#selector-tabs {
     display: flex;
     gap: 4px;
     align-items: flex-end;
@@ -4473,7 +4413,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
 
 .interview-session-kicker {
     color: rgba(232,207,130,.78);
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: .18em;
 }
 
@@ -4487,7 +4427,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
 .interview-session-hint {
     min-height: 18px;
     color: rgba(255,255,255,.72);
-    font-size: 12px;
+    font-size: 14px;
 }
 
 .interview-session-main {
@@ -4532,12 +4472,12 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
 .interview-session-summary-caption {
     margin-bottom: 3px;
     color: rgba(232,207,130,.72);
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: .08em;
 }
 .interview-session-name {
     max-width: 100%;
-    font-size: 20px;
+    font-size: 23px;
     font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
@@ -4553,7 +4493,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
 
 .interview-session-meta-row {
     min-width: 0;
-    font-size: 12px;
+    font-size: 14px;
     text-align: left;
     line-height: 1.35;
     color: #ccc;
@@ -4581,7 +4521,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
 }
 
 .interview-session-stat-label {
-    font-size: 11px;
+    font-size: 13px;
     color: #ffd54f;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
@@ -4590,7 +4530,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    font-size: 17px;
+    font-size: 18px;
     font-weight: 700;
 }
 .interview-session-stat-value .grade-container { font-size: 1em; }
@@ -4635,7 +4575,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
 
 .interview-session-search {
     font: inherit;
-    font-size: 12px;
+    font-size: 14px;
     padding: 4px 9px;
     outline: none;
     -webkit-appearance: none;
@@ -4677,7 +4617,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
     background: transparent;
     color: #fff;
     font: inherit;
-    font-size: 12px;
+    font-size: 14px;
     padding: 4px 22px 4px 8px;
     outline: none;
     -webkit-appearance: none;
@@ -4691,7 +4631,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
     height: 34px;
     min-height: 34px !important;
     padding: 3px 6px !important;
-    font-size: 11px !important;
+    font-size: 13px !important;
 }
 
 .interview-session-sort-direction:disabled {
@@ -4700,7 +4640,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
 }
 .interview-session-list-count {
     text-align: right;
-    font-size: 10px;
+    font-size: 12px;
     color: rgba(255,255,255,.7);
     white-space: nowrap;
 }
@@ -4760,14 +4700,14 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
 }
 .interview-session-person-name {
     min-width: 0;
-    font-size: 14px;
+    font-size: 15px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .interview-session-person-rank {
     min-width: 0;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.2;
     color: #aaa;
     white-space: nowrap;
@@ -4791,7 +4731,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
 #interview-modal.interview-conversation-mode {
     display: grid !important;
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) 42px 60px auto;
+    grid-template-rows: minmax(0, 1fr) 96px 60px auto;
     justify-items: center;
     align-items: stretch;
     padding: 12px 0 max(20px, env(safe-area-inset-bottom)) !important;
@@ -4849,18 +4789,22 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
     display: none;
 }
 
-/* 選択肢は通常会話と同じく、下端メッセージの直上へ置く。
-   非表示時も高さを予約して、選択肢の有無で会話枠を上下させない。 */
+/* 面談の専用選択肢は2列2段。下端メッセージの直上へ置き、
+   非表示時にも高さを予約して会話枠を動かさない。 */
 .interview-session-inline-actions {
     flex: 0 0 42px;
-    min-height: 42px;
-    width: min(800px, calc(100% - 20px));
-    display: flex;
+    min-height: 96px;
+    width: min(540px, calc(100% - 28px));
+    display: grid;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    overflow: hidden;
-    margin: 8px 0;
+    gap: 8px 10px;
+    overflow: visible;
+    margin: 0;
+    height: 96px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, 42px);
+    align-content: center;
 }
 #interview-modal.interview-conversation-mode .interview-session-inline-actions {
     grid-row: 2;
@@ -4890,6 +4834,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
     grid-row: 4;
     align-self: end;
     margin: 12px auto 0;
+    margin-top: 18px;
 }
 #interview-modal .interview-session-dialog .dialog-body-container {
     width: 100%;
@@ -4928,7 +4873,7 @@ body:not(.is-pc) .event-dialog-modal.event-choices-active .modal-footer {
     gap: 12px;
 }
 .interview-session-pager button { min-width: 88px; min-height: 30px; padding: 4px 12px; }
-.interview-session-page-label { min-width: 58px; font-size: 12px; }
+.interview-session-page-label { min-width: 58px; font-size: 13px; }
 
 /* 決定・戻る・終了などは共通 modal-footer と同じく内容枠の外側へ置く。
    内容枠との隙間は全モーダル共通の --modal-footer-gap / .modal-footer に委譲する。 */
@@ -4970,9 +4915,9 @@ body:not(.is-pc) .interview-session-header {
     flex-basis: 62px;
     min-height: 62px;
 }
-body:not(.is-pc) .interview-session-kicker { font-size: 7px; }
-body:not(.is-pc) #interview-modal .interview-session-header h3 { font-size: 18px; margin: 0 0 2px; padding-bottom: 2px; }
-body:not(.is-pc) .interview-session-hint { min-height: 13px; font-size: 8px; }
+body:not(.is-pc) .interview-session-kicker { font-size: 9px; }
+body:not(.is-pc) #interview-modal .interview-session-header h3 { font-size: 20px; margin: 0 0 2px; padding-bottom: 2px; }
+body:not(.is-pc) .interview-session-hint { min-height: 13px; font-size: 10px; }
 
 body:not(.is-pc) .interview-session-main {
     --interview-mobile-card-row-height: 52px;
@@ -4999,10 +4944,10 @@ body:not(.is-pc) .interview-session-summary-head {
     grid-row: 1;
     padding-bottom: 3px;
 }
-body:not(.is-pc) .interview-session-summary-caption { font-size: 7px; margin-bottom: 1px; }
-body:not(.is-pc) .interview-session-name { font-size: 14px; }
+body:not(.is-pc) .interview-session-summary-caption { font-size: 9px; margin-bottom: 1px; }
+body:not(.is-pc) .interview-session-name { font-size: 16px; }
 body:not(.is-pc) .interview-session-meta { grid-column: 1; grid-row: 2; gap: 1px; }
-body:not(.is-pc) .interview-session-meta-row { font-size: 8px; }
+body:not(.is-pc) .interview-session-meta-row { font-size: 10px; }
 body:not(.is-pc) .interview-session-stats {
     grid-column: 2;
     grid-row: 1 / 3;
@@ -5011,8 +4956,8 @@ body:not(.is-pc) .interview-session-stats {
     align-content: center;
 }
 body:not(.is-pc) .interview-session-stat { min-height: 29px; padding: 2px 4px; }
-body:not(.is-pc) .interview-session-stat-label { font-size: 7px; }
-body:not(.is-pc) .interview-session-stat-value { min-width: 18px; font-size: 10px; }
+body:not(.is-pc) .interview-session-stat-label { font-size: 9px; }
+body:not(.is-pc) .interview-session-stat-value { min-width: 18px; font-size: 12px; }
 body:not(.is-pc) .interview-session-content.speaker-hidden .interview-session-main { grid-template-rows: minmax(0, 1fr); }
 
 body:not(.is-pc) .interview-session-list-view { gap: 4px; }
@@ -5028,11 +4973,11 @@ body:not(.is-pc) .interview-session-sort-wrap {
 }
 body:not(.is-pc) .interview-session-search {
     padding: 2px 5px;
-    font-size: 10px;
+    font-size: 11px;
 }
 body:not(.is-pc) .interview-session-sort-select {
     padding: 2px 18px 2px 5px;
-    font-size: 10px;
+    font-size: 11px;
 }
 body:not(.is-pc) .interview-session-sort-wrap::after {
     right: 5px;
@@ -5044,13 +4989,13 @@ body:not(.is-pc) .interview-session-sort-direction {
     height: 29px;
     min-height: 29px !important;
     padding: 2px !important;
-    font-size: 8px !important;
+    font-size: 10px !important;
     white-space: nowrap !important;
     word-break: keep-all;
     writing-mode: horizontal-tb !important;
     text-orientation: mixed;
 }
-body:not(.is-pc) .interview-session-list-count { font-size: 7px; }
+body:not(.is-pc) .interview-session-list-count { font-size: 9px; }
 
 body:not(.is-pc) .interview-session-person-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5069,8 +5014,8 @@ body:not(.is-pc) .interview-session-person {
     padding: 2px 4px;
 }
 body:not(.is-pc) .interview-session-person-face { width: 38px; height: 46px; }
-body:not(.is-pc) .interview-session-person-name { font-size: 9px; }
-body:not(.is-pc) .interview-session-person-rank { font-size: 7px; gap: 1px; }
+body:not(.is-pc) .interview-session-person-name { font-size: 10px; }
+body:not(.is-pc) .interview-session-person-rank { font-size: 8px; gap: 1px; }
 
 body:not(.is-pc) #interview-modal .interview-session-content.interview-conversation-active {
     width: calc(100% - 12px) !important;
@@ -5081,7 +5026,7 @@ body:not(.is-pc) #interview-modal .interview-session-content.interview-conversat
     gap: 5px;
 }
 body:not(.is-pc) #interview-modal.interview-conversation-mode {
-    grid-template-rows: minmax(0, 1fr) 34px 60px auto;
+    grid-template-rows: minmax(0, 1fr) 82px 60px auto;
     padding: 6px 0 max(20px, env(safe-area-inset-bottom)) !important;
 }
 body:not(.is-pc) .interview-session-content.interview-conversation-active .interview-session-header {
@@ -5125,10 +5070,12 @@ body:not(.is-pc) .interview-session-content.interview-conversation-active .inter
 }
 body:not(.is-pc) .interview-session-inline-actions {
     flex-basis: 34px;
-    min-height: 34px;
-    width: calc(100% - 20px);
-    gap: 4px;
+    min-height: 82px;
+    width: calc(100% - 28px);
+    gap: 6px 7px;
     margin: 4px 0;
+    height: 82px;
+    grid-template-rows: repeat(2, 36px);
 }
 body:not(.is-pc) #interview-modal.interview-conversation-mode .interview-session-inline-actions {
     margin: 0;
@@ -5163,7 +5110,7 @@ body:not(.is-pc) .interview-session-pager {
     gap: 7px;
 }
 body:not(.is-pc) .interview-session-pager button { min-width: 74px; min-height: 28px; padding: 2px 8px; font-size: 11px; }
-body:not(.is-pc) .interview-session-page-label { min-width: 42px; font-size: 9px; }
+body:not(.is-pc) .interview-session-page-label { min-width: 42px; font-size: 10px; }
 
 body:not(.is-pc) .interview-session-footer {
     flex: 0 0 60px;
@@ -5203,8 +5150,11 @@ body:not(.is-pc) .interview-session-footer > button {
 }
 
 .trade-result-value {
-    color: #ffffff; /* 白 */
+    color: #ffffff;
     text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    width: 3.5em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
 }
 
 .trade-arrow-group {
@@ -5229,14 +5179,7 @@ body:not(.is-pc) .interview-session-footer > button {
     justify-content: center;
     margin-bottom: 15px;
 }
-/* =========================================================
-   取引の数値変化のズレ防止
-   ========================================================= */
-.trade-result-value {
-    width: 3.5em; /* 5桁の数字が入るだけの幅を確保して固定します */
-    text-align: right; /* 右端で揃えて桁の増減による左側のズレを防ぎます */
-    font-variant-numeric: tabular-nums; /* 数字の横幅をすべて同じにする魔法です */
-}
+
 /* =========================================================
    設定画面 (#settings-modal) 専用スタイル
    ========================================================= */
@@ -5508,9 +5451,6 @@ html.mobile-low-memory body:not(.is-pc) .low-memory-page-btn:disabled {
 html.mobile-low-memory body:not(.is-pc) .castle-card {
     filter: none;
 }
-html.mobile-low-memory body:not(.is-pc) .castle-card.active-turn {
-    filter: drop-shadow(0 0 8px #ff9800);
-}
 html.mobile-low-memory body:not(.is-pc) .castle-card.selectable-target {
     filter: drop-shadow(0 0 8px #e91e63);
 }
@@ -5632,11 +5572,6 @@ html.mobile-low-memory body:not(.is-pc) .daimyo-name-label {
     height: calc(100% + var(--screen-edge-bleed, 1px) + var(--screen-edge-bleed, 1px)) !important;
 }
 
-/* スマホの巨大メインマップは常時GPUレイヤー化しません。
-   ui_map.js側でも translateZ(0) をPCだけに限定します。 */
-body:not(.is-pc) #map-container {
-    transform-style: flat;
-}
 
 /* =========================================================
    ★Round 28：タイトル / ローディング / シナリオ選択の意匠統一
@@ -5645,13 +5580,10 @@ body:not(.is-pc) #map-container {
 :root {
     --title-ink-0: #090b0c;
     --title-ink-1: #111617;
-    --title-ink-2: #1a2221;
     --title-gold: #b89a54;
     --title-gold-bright: #ddc47e;
-    --title-gold-dim: rgba(184, 154, 84, 0.34);
     --title-paper: #ede6d3;
     --title-muted: #aaa692;
-    --title-red: #6f1f1a;
 }
 
 #title-screen,
@@ -5664,7 +5596,16 @@ body:not(.is-pc) #map-container {
     color: var(--title-paper);
 }
 
+
+
 #title-screen {
+    font-family: var(--font-title-ui-ja);
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    z-index: 3000;
     justify-content: center;
     align-items: center;
     overflow: hidden;
@@ -5832,6 +5773,7 @@ html.mobile-low-memory .legacy-safe-mode-indicator { display: block; }
     display: flex;
     flex-direction: column;
     align-items: stretch;
+    gap: 15px;
 }
 
 #title-screen .title-menu-buttons {
@@ -5862,6 +5804,7 @@ html.mobile-low-memory .legacy-safe-mode-indicator { display: block; }
     letter-spacing: 0.13em;
     text-align: left;
     text-shadow: 0 2px 2px #000;
+    cursor: pointer;
     transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, padding-left 0.16s ease;
 }
 
@@ -5971,6 +5914,7 @@ html.mobile-low-memory .legacy-safe-mode-indicator { display: block; }
     text-align: center;
     border-top: 1px solid rgba(184,154,84,0.22);
     border-bottom: 1px solid rgba(184,154,84,0.22);
+    cursor: pointer;
     animation: titleTapPulse 2.4s ease-in-out infinite;
 }
 
@@ -5985,6 +5929,9 @@ html.mobile-low-memory .legacy-safe-mode-indicator { display: block; }
 /* ローディング：タイトル画面と同じ素材感で、表示物だけを絞ります。 */
 #global-loading-screen {
     position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     z-index: 9999;
     display: flex;
     justify-content: center;
@@ -6418,9 +6365,7 @@ body.is-pc #pc-new-status-panel,
     border-color: var(--ui-gold);
 }
 
-.sp-info-header {
-    background: var(--ui-panel-deep);
-}
+
 
 .modal .modal-content h3,
 .sp-clan,
@@ -6430,9 +6375,7 @@ body.is-pc #pc-new-status-panel,
     color: #ffe070;
 }
 
-.cmd-btn {
-    transition: transform 0.10s ease, box-shadow 0.12s ease, background 0.14s ease, border-color 0.14s ease;
-}
+
 
 .cmd-btn:hover,
 .cmd-btn:focus-visible {
@@ -6540,51 +6483,25 @@ body.is-pc .pc-cmd-col .cmd-btn.category.active::after {
     box-sizing: border-box;
 }
 
-#saveload-list {
-    flex: 1 1 auto !important;
-    height: 100% !important;
-    max-height: none !important;
-    min-height: 0 !important;
-}
+
 
 body:not(.is-pc) .saveload-slot-btn {
     height: 94px;
     min-height: 94px;
 }
 
-body:not(.is-pc) .saveload-slot-content {
-    justify-content: center;
-    gap: 2px;
-    padding-top: 5px;
-    padding-bottom: 5px;
-}
 
-body:not(.is-pc) .saveload-row-top {
-    flex: 0 0 auto;
-    min-height: 1.35em;
-    line-height: 1.2;
-}
 
-body:not(.is-pc) .saveload-row-bottom {
-    flex: 0 0 auto;
-    gap: 2px;
-    margin-top: 2px;
-    line-height: 1.2;
-}
+
+
+
 
 body:not(.is-pc) .saveload-slot-date,
 body:not(.is-pc) .saveload-slot-time {
     line-height: 1.25;
 }
 
-body:not(.is-pc) .saveload-slot-time {
-    min-height: 1.25em;
-    width: 100%;
-    white-space: nowrap;
-    overflow: visible;
-    padding-bottom: 1px;
-    box-sizing: border-box;
-}
+
 
 .saveload-latest-mark { color: #ff8a80; font-weight: bold; text-shadow: 1px 1px 0 #000; }
 
@@ -6593,21 +6510,6 @@ body:not(.is-pc) .saveload-latest-mark {
     white-space: nowrap;
     flex-shrink: 0;
 }
-
-
-.prisoner-result {
-    text-align: center;
-    padding: 10px;
-}
-.prisoner-result-title { margin-top: 0; }
-.prisoner-result-desc { font-size: 1.1rem; }
-.prisoner-result-actions {
-    margin-top: 20px;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-}
-
 
 #watch-return-reserved-notice {
     /* 物理viewportではなく固定論理画面内に置き、縦横比調整用の黒帯へ出さない。 */
@@ -6674,7 +6576,7 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
 
 .legion-council-kicker {
     color: #d9c27a;
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.32em;
     margin-bottom: 1px;
     opacity: 0.9;
@@ -6682,7 +6584,7 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
 
 .legion-council-date {
     color: rgba(255,255,255,0.78);
-    font-size: 11px;
+    font-size: 13px;
     margin-top: 4px;
     letter-spacing: 0.12em;
 }
@@ -6690,7 +6592,7 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
 .legion-council-guidance {
     margin-top: 3px;
     color: rgba(255,255,255,.67);
-    font-size: 10px;
+    font-size: 12px;
 }
 
 .legion-council-stage {
@@ -6746,7 +6648,7 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
 .legion-council-seat-heading {
     grid-column: 2;
     color: #e8cf82;
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: .08em;
     text-align: left;
     white-space: nowrap;
@@ -6767,7 +6669,7 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
 .legion-council-name {
     grid-column: 2;
     min-width: 0;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 700;
     text-align: left;
     white-space: nowrap;
@@ -6783,7 +6685,7 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
     align-content: flex-start;
     gap: 3px;
     text-align: left;
-    font-size: 9px;
+    font-size: 11px;
     line-height: 1.2;
 }
 
@@ -6802,7 +6704,7 @@ body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
     grid-column: 2;
     align-self: end;
     color: rgba(232,207,130,.78);
-    font-size: 9px;
+    font-size: 10px;
     text-align: right;
     white-space: nowrap;
 }
@@ -6937,13 +6839,13 @@ body.is-pc .legion-council-actions {
 .legion-council-order-label strong {
     display: block;
     color: #fff6d6;
-    font-size: 15px;
+    font-size: 17px;
 }
 
 .legion-council-order-label small {
     display: block;
     color: rgba(255,255,255,.65);
-    font-size: 11px;
+    font-size: 13px;
     margin-top: 3px;
     line-height: 1.45;
 }
@@ -6994,10 +6896,6 @@ body:not(.is-pc) #legion-council-modal .legion-council-content {
     gap: 0;
 }
 
-body:not(.is-pc) #legion-council-order-modal .legion-council-order-content {
-    overflow: hidden !important;
-}
-
 /* 命令画面は標準モーダルと同じく、内容枠の下に確定/戻るフッターを置く。 */
 body:not(.is-pc) #legion-council-order-modal .legion-council-order-content {
     width: calc(100% - 16px) !important;
@@ -7005,6 +6903,11 @@ body:not(.is-pc) #legion-council-order-modal .legion-council-order-content {
     height: auto !important;
     max-height: calc(100% - 88px) !important;
     border-radius: 8px !important;
+
+    overflow: hidden !important;
+    padding: max(8px, env(safe-area-inset-top)) 10px max(8px, env(safe-area-inset-bottom));
+    justify-content: flex-start;
+    gap: 6px;
 }
 
 body:not(.is-pc) #legion-council-modal .legion-council-header {
@@ -7013,23 +6916,23 @@ body:not(.is-pc) #legion-council-modal .legion-council-header {
 
 body:not(.is-pc) #legion-council-modal .legion-council-header h3,
 body:not(.is-pc) #legion-council-order-modal .legion-council-order-header h3 {
-    font-size: 19px;
+    font-size: 20px;
     padding-bottom: 2px;
 }
 
 body:not(.is-pc) .legion-council-kicker {
-    font-size: 8px;
+    font-size: 9px;
     margin-bottom: 0;
 }
 
 body:not(.is-pc) .legion-council-date {
-    font-size: 9px;
+    font-size: 10px;
     margin-top: 2px;
 }
 
 body:not(.is-pc) .legion-council-guidance {
     margin-top: 3px;
-    font-size: 8px;
+    font-size: 9px;
 }
 
 body:not(.is-pc) .legion-council-stage {
@@ -7079,12 +6982,12 @@ body:not(.is-pc) .legion-council-policy-summary {
 }
 
 body:not(.is-pc) .legion-council-seat-heading {
-    font-size: 8px;
+    font-size: 9px;
     margin: 0;
 }
 
 body:not(.is-pc) .legion-council-name {
-    font-size: 11px;
+    font-size: 12px;
     margin: 0;
 }
 
@@ -7093,7 +6996,7 @@ body:not(.is-pc) .legion-council-policy-summary {
     align-content: center;
     margin: 0;
     gap: 2px;
-    font-size: 7px;
+    font-size: 8px;
 }
 
 body:not(.is-pc) .legion-council-policy-chip {
@@ -7131,12 +7034,6 @@ body:not(.is-pc) #legion-council-finish-btn {
     min-height: 30px;
 }
 
-body:not(.is-pc) #legion-council-order-modal .legion-council-order-content {
-    padding: max(8px, env(safe-area-inset-top)) 10px max(8px, env(safe-area-inset-bottom));
-    justify-content: flex-start;
-    gap: 6px;
-}
-
 body:not(.is-pc) .legion-council-order-header {
     margin-bottom: 4px;
 }
@@ -7153,8 +7050,8 @@ body:not(.is-pc) .legion-council-order-row {
     padding: 10px 2px;
 }
 
-body:not(.is-pc) .legion-council-order-label strong { font-size: 14px; }
-body:not(.is-pc) .legion-council-order-label small { font-size: 10px; margin-top: 2px; }
+body:not(.is-pc) .legion-council-order-label strong { font-size: 15px; }
+body:not(.is-pc) .legion-council-order-label small { font-size: 11px; margin-top: 2px; }
 
 body:not(.is-pc) .legion-council-toggle { width: 100%; }
 body:not(.is-pc) .legion-council-toggle button {
@@ -7215,7 +7112,8 @@ body:not(.is-pc).mobile-ai-light-mode .daimyo-name-label {
 }
 
 /* =========================================================
-   r119: 面談・評定 UI密度と操作階層の統一
+   面談の専用選択肢・操作階層と端末別配置
+   現行文字サイズと共通グリッドは各画面の基本定義へ統合済み。
    ========================================================= */
 body.is-pc #interview-modal .interview-session-content,
 body.is-pc #interview-modal .interview-session-content.interview-conversation-active {
@@ -7260,19 +7158,7 @@ body.is-pc #interview-modal .interview-session-content.interview-conversation-ac
 }
 .interview-choice-btn:disabled { opacity: .45; cursor: default; }
 
-.interview-session-inline-actions {
-    width: min(540px, calc(100% - 28px));
-    min-height: 96px;
-    height: 96px;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: repeat(2, 42px);
-    gap: 8px 10px;
-    align-content: center;
-    justify-content: center;
-    overflow: visible;
-    margin: 0;
-}
+
 .interview-session-inline-actions > .interview-choice-btn:only-child {
     grid-column: 1 / -1;
     width: calc((100% - 10px) / 2);
@@ -7284,65 +7170,7 @@ body.is-pc #interview-modal .interview-session-content.interview-conversation-ac
     width: 100%;
     justify-self: stretch;
 }
-#interview-modal.interview-conversation-mode {
-    grid-template-rows: minmax(0, 1fr) 96px 60px auto;
-}
-#interview-modal.interview-conversation-mode .interview-session-dialog {
-    margin-top: 18px;
-}
 
-/* 武将詳細の可読性を基準に、面談の極小文字を一段引き上げる。 */
-.interview-session-kicker { font-size: 12px; }
-.interview-session-hint { font-size: 14px; }
-.interview-session-summary-caption { font-size: 12px; }
-.interview-session-name { font-size: 23px; }
-.interview-session-meta-row { font-size: 14px; }
-.interview-session-stat-label { font-size: 13px; }
-.interview-session-stat-value { font-size: 18px; }
-.interview-session-search,
-.interview-session-sort-select { font-size: 14px; }
-.interview-session-sort-direction { font-size: 13px !important; }
-.interview-session-list-count { font-size: 12px; }
-.interview-session-person-name { font-size: 15px; }
-.interview-session-person-rank { font-size: 12px; }
-.interview-session-page-label { font-size: 13px; }
-
-/* 評定終了は「閉じる/終了」系なので銀のキャンセル色へ統一。 */
-#legion-council-finish-btn { min-width: 180px; }
-
-/* 評定も武将詳細に近い可読性へ寄せる。 */
-.legion-council-kicker { font-size: 12px; }
-.legion-council-date { font-size: 13px; }
-.legion-council-guidance { font-size: 12px; }
-.legion-council-seat-heading { font-size: 12px; }
-.legion-council-name { font-size: 16px; }
-.legion-council-policy-summary { font-size: 11px; }
-.legion-council-seat-hint { font-size: 10px; }
-.legion-council-order-label strong { font-size: 17px; }
-.legion-council-order-label small { font-size: 13px; }
-
-body:not(.is-pc) .interview-session-kicker { font-size: 9px; }
-body:not(.is-pc) #interview-modal .interview-session-header h3 { font-size: 20px; }
-body:not(.is-pc) .interview-session-hint { font-size: 10px; }
-body:not(.is-pc) .interview-session-summary-caption { font-size: 9px; }
-body:not(.is-pc) .interview-session-name { font-size: 16px; }
-body:not(.is-pc) .interview-session-meta-row { font-size: 10px; }
-body:not(.is-pc) .interview-session-stat-label { font-size: 9px; }
-body:not(.is-pc) .interview-session-stat-value { font-size: 12px; }
-body:not(.is-pc) .interview-session-search,
-body:not(.is-pc) .interview-session-sort-select { font-size: 11px; }
-body:not(.is-pc) .interview-session-sort-direction { font-size: 10px !important; }
-body:not(.is-pc) .interview-session-list-count { font-size: 9px; }
-body:not(.is-pc) .interview-session-person-name { font-size: 10px; }
-body:not(.is-pc) .interview-session-person-rank { font-size: 8px; }
-body:not(.is-pc) .interview-session-page-label { font-size: 10px; }
-body:not(.is-pc) .interview-session-inline-actions {
-    width: calc(100% - 28px);
-    min-height: 82px;
-    height: 82px;
-    grid-template-rows: repeat(2, 36px);
-    gap: 6px 7px;
-}
 body:not(.is-pc) .interview-choice-btn {
     height: 36px;
     min-height: 36px;
@@ -7356,23 +7184,10 @@ body:not(.is-pc) .interview-session-inline-actions > .interview-choice-btn:only-
 body:not(.is-pc) .interview-session-inline-actions > .interview-choice-btn:nth-child(3):last-child {
     width: 100%;
 }
-body:not(.is-pc) #interview-modal.interview-conversation-mode {
-    grid-template-rows: minmax(0, 1fr) 82px 60px auto;
-}
+
 body:not(.is-pc) #interview-modal.interview-conversation-mode .interview-session-dialog {
     margin-top: 16px;
 }
-
-body:not(.is-pc) #legion-council-modal .legion-council-header h3,
-body:not(.is-pc) #legion-council-order-modal .legion-council-order-header h3 { font-size: 20px; }
-body:not(.is-pc) .legion-council-kicker { font-size: 9px; }
-body:not(.is-pc) .legion-council-date { font-size: 10px; }
-body:not(.is-pc) .legion-council-guidance { font-size: 9px; }
-body:not(.is-pc) .legion-council-seat-heading { font-size: 9px; }
-body:not(.is-pc) .legion-council-name { font-size: 12px; }
-body:not(.is-pc) .legion-council-policy-summary { font-size: 8px; }
-body:not(.is-pc) .legion-council-order-label strong { font-size: 15px; }
-body:not(.is-pc) .legion-council-order-label small { font-size: 11px; }
 
 /* =========================================================
    指南書 (#guide-modal)
@@ -7651,8 +7466,6 @@ body:not(.is-pc) .guide-section ul {
     line-height: 1.35;
 }
 
-
-
 /* =========================================================
    攻城戦UI：下部操作領域とターン表示
    - 端末共通の操作領域・戦闘メッセージの基礎寸法を管理する。
@@ -7766,8 +7579,6 @@ body:not(.is-pc) .main-army-box::after {
     display: none;
 }
 
-
-
 /* =========================================================
    攻城戦UI：スマホ表示密度
    - 本隊/援軍の補助ラベルを省き、限られた縦幅へ情報を収める。
@@ -7798,9 +7609,7 @@ body:not(.is-pc) .war-title,
 body:not(.is-pc) #war-title-name {
     font-size: 0.88rem !important;
 }
-body:not(.is-pc) .turn-number {
-    font-size: 1.08rem !important;
-}
+
 body:not(.is-pc) #war-def-wall-info {
     font-size: 1.30rem !important;
 }
@@ -7845,8 +7654,6 @@ body:not(.is-pc) .war-action-message-prompt { left: auto; right: 15px; transform
 body:not(.is-pc) #war-ai-guard {
     font-size: 1.35rem !important;
 }
-
-
 
 /* =========================================================
    攻城戦UI：スマホ下部操作領域
@@ -7894,8 +7701,6 @@ body:not(.is-pc) .war-action-message-text { line-height: 1.4;
     font-size: 54% !important;
     max-height: 68px !important;
 }
-
-
 
 /* =========================================================
    攻城戦UI：スマホ入力対象の明示
@@ -8047,8 +7852,6 @@ body.is-pc #war-modal .war-reinf-card .responsive-army-stats {
     min-width: 0 !important;
     width: 100% !important;
 }
-
-
 
 /* =========================================================
    攻城戦UI：PC情報密度と命令説明

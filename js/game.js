@@ -30,12 +30,21 @@ class GameManager {
         this.playerClanId = 1;
         // 起動中のUI初期化が前回の実機診断を上書きしないよう、UI生成前からタイトル状態を正本化する。
         this.phase = 'title';
+        this.tabSession = window.TabSessionCoordinator ? new window.TabSessionCoordinator(window) : null;
         // タイトル／システムのロード可否はSaveManagerが検査した結果だけを反映する。未検査時は選択不可。
         this.hasSaveData = false;
         this.historySystem = new HistorySystem(this);
         this.ui = new UIManager(this); 
         this.saveManager = new SaveManager(this);
         this.turnManager = new TurnManager(this);
+        if (this.tabSession) {
+            this.tabSession.onLost = () => {
+                // 別タブが操作権を取得した場合も、ターン・戦闘・ロードの既存中断処理を使う。
+                Promise.resolve(this.ui.returnToTitle()).catch(error => {
+                    console.warn('別タブへの操作権移行時にタイトルへ復帰できませんでした:', error);
+                });
+            };
+        }
         this.selectionMode = null; 
         this.validTargets = []; 
         this.isProcessingAI = false; 
@@ -280,6 +289,7 @@ class GameManager {
     }
     
     async startNewGame(options = {}) {
+        if (this.tabSession && !this.tabSession.claim()) return;
         const startInWatchMode = !!(options && options.watchMode);
         const turnManager = this.turnManager;
         if (turnManager && typeof turnManager.abortForScenarioTransition === 'function') {
@@ -291,7 +301,8 @@ class GameManager {
         const isStartFlowLatest = () => startFlowGeneration !== null
             && turnManager
             && typeof turnManager.isTurnFlowGenerationLatest === 'function'
-            && turnManager.isTurnFlowGenerationLatest(startFlowGeneration);
+            && turnManager.isTurnFlowGenerationLatest(startFlowGeneration)
+            && (!this.tabSession || this.tabSession.isOwner());
         if (this.warManager && typeof this.warManager.abortForScenarioTransition === 'function') {
             this.warManager.abortForScenarioTransition();
         }
@@ -370,6 +381,7 @@ class GameManager {
     }
     
     async loadScenario(folder, options = {}) {
+        if (this.tabSession && !this.tabSession.claim()) return;
         const startInWatchMode = !!(options && options.startInWatchMode);
         // シナリオ選択後を新しい遷移境界とする。二重決定やタイトル復帰が入った場合、
         // 先に始まったloadScenarioのawait後処理を新しい状態へ戻さない。
@@ -379,7 +391,8 @@ class GameManager {
             || typeof turnManager.isTurnFlowGenerationLatest !== 'function') return;
         turnManager.abortForScenarioTransition();
         const scenarioLoadGeneration = turnManager.captureTurnFlowGeneration();
-        const isScenarioLoadLatest = () => turnManager.isTurnFlowGenerationLatest(scenarioLoadGeneration);
+        const isScenarioLoadLatest = () => turnManager.isTurnFlowGenerationLatest(scenarioLoadGeneration)
+            && (!this.tabSession || this.tabSession.isOwner());
         if (this.warManager && typeof this.warManager.abortForScenarioTransition === 'function') {
             this.warManager.abortForScenarioTransition();
         }
@@ -1353,7 +1366,10 @@ class GameManager {
     saveGameToLocal(slotNo = 1) { return this.saveManager.saveGameToLocal(slotNo); }
     loadGameFromLocal(slotNo = 1, prefix = "sengoku_save_slot") { return this.saveManager.loadGameFromLocal(slotNo, prefix); }
     executeAutoSave() { return this.saveManager.executeAutoSave(); }
-    continueGame() { return this.saveManager.continueGame(); }
+    continueGame() {
+        if (this.tabSession && !this.tabSession.claim()) return;
+        return this.saveManager.continueGame();
+    }
 
     // ==========================================
     // 観戦モードの切り替え

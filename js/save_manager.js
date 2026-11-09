@@ -501,7 +501,8 @@ class SaveManager {
     _captureSaveRequestCurrent() {
         const flow = this._captureLoadRequestFlow();
         const scenarioFolder = this.game.scenarioFolder;
-        return () => (!flow || flow.isLatest()) && this.game.scenarioFolder === scenarioFolder;
+        return () => (!flow || flow.isLatest()) && this.game.scenarioFolder === scenarioFolder
+            && (!this.game.tabSession || this.game.tabSession.isOwner());
     }
 
     // ロードできなかった旨の案内は、ロード幕を取り除いてから出す。
@@ -674,6 +675,7 @@ class SaveManager {
         // 復元処理は最初のawaitより前に遷移世代を所有する。
         // シナリオ定義の読込待ち中にタイトル復帰や別ロードが始まっても、
         // 古い復元が後からabortForScenarioTransition()して新しい遷移を奪い返さないようにする。
+        if (this.game.tabSession && !this.game.tabSession.claim()) return false;
         const turnManager = this.game.turnManager;
         if (!turnManager || typeof turnManager.abortForScenarioTransition !== 'function'
             || typeof turnManager.captureTurnFlowGeneration !== 'function'
@@ -944,8 +946,9 @@ class SaveManager {
         const isRequestCurrent = this._captureSaveRequestCurrent();
         this.showSaveGuard(); // ★追加：保存中のバリアを張ります
         try {
-            const data = await this._createSaveDataObj(); // ★待つように変更
-            if (!data) return; // 保存準備中に別シナリオへ遷移した場合は書き込まない。
+            const data = await this._createSaveDataObj(); // サムネイル生成を含むためawaitする
+            // 待機中にタイトル復帰・別タブへの操作権移行があれば、旧状態のファイルを出力しない。
+            if (!data || !isRequestCurrent()) return;
             this._validateSaveDataStructure(data);
             const encryptedData = this._encryptData(data); // ★暗号化します
             const blob = new Blob([encryptedData], {type: 'application/octet-stream'}); // ★バイナリデータとして保存します

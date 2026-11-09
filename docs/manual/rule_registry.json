@@ -156,6 +156,13 @@
       "owner": "マニュアル管理",
       "anchor": "マニュアルの保守",
       "status": "current"
+    },
+    {
+      "id": "TAB-SESSION",
+      "area": "複数タブ・セーブ寿命",
+      "owner": "TabSessionCoordinator / SaveManager",
+      "anchor": "複数タブの操作権",
+      "status": "current"
     }
   ]
 }

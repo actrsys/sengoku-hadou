@@ -39832,6 +39832,299 @@ test('月末処理で例外が発生しても実行権を解放し次の呼び�
     assert.strictEqual(game.month, 2);
 });
 
+// r852: storage通知がバックグラウンドで遅延しても、同じオリジンの別タブが
+// 操作権を得た後に旧タブがシナリオ選択・ロード画面を更新してはならない。
+test('r852 別タブへ操作権移行中の新規開始・シナリオ読込は旧画面を公開しない', async () => {
+    const ctx = createContext({
+        addEventListener() {}, EventManager: class {}, SCENARIOS: []
+    });
+    loadScript(ctx, 'js/tab_session.js');
+    loadScript(ctx, 'js/game.js');
+    const Game = vm.runInContext('GameManager', ctx);
+    const Tab = ctx.TabSessionCoordinator;
+    const shared = new Map();
+    function host(id) {
+        return {
+            crypto: {randomUUID: () => id},
+            localStorage: {
+                getItem: key => shared.get(key) || null,
+                setItem: (key, value) => shared.set(key, value)
+            },
+            // storage通知の配信が遅れるブラウザの実在経路を再現する。
+            addEventListener() {}
+        };
+    }
+    let generation = 0;
+    let shown = 0, surface = 0, loaded = 0;
+    let releasePaint = null;
+    const game = {
+        tabSession: new Tab(host('old-tab')),
+        releaseScenarioMapResources() {},
+        ui: {
+            forceResetModals() {}, clearWarLog() {}, resetMapViewState() {},
+            showScenarioSelection() { shown++; }, showLoadingScreen() {},
+            showGameSurface() { surface++; }, updateLoadingProgress() {},
+            hideLoadingScreen: async () => {}, showDialog() {},
+            waitForNextPaint() {
+                return releasePaint ? new Promise(resolve => { releasePaint = resolve; }) : Promise.resolve();
+            }
+        },
+        turnManager: {
+            abortForScenarioTransition() { generation++; },
+            captureTurnFlowGeneration() { return generation; },
+            isTurnFlowGenerationLatest(value) { return value === generation; }
+        },
+        historySystem: {clear() {}},
+        aiOperationManager: {resetAllState() {}},
+        aiStaffing: {resetCaches() {}}
+    };
+    const nextTab = new Tab(host('new-tab'));
+    let finishDefinitions;
+    ctx.DataManager = { loadScenarioDefinitions: () => new Promise(resolve => { finishDefinitions = resolve; }) };
+    const oldStart = Game.prototype.startNewGame.call(game);
+    assert.strictEqual(typeof finishDefinitions, 'function');
+    assert.strictEqual(nextTab.claim(), true);
+    finishDefinitions();
+    await oldStart;
+    assert.strictEqual(shown, 0, '別タブの開始後は旧タブのシナリオ選択を表示しない');
+
+    // 旧タブで再度操作すると操作権を取り直せるが、ロード待機中にさらに失効しうる。
+    releasePaint = true;
+    ctx.DataManager.loadAll = async () => { loaded++; throw new Error('読込後の継続禁止'); };
+    const oldLoad = Game.prototype.loadScenario.call(game, '1560_okehazama');
+    assert.strictEqual(typeof releasePaint, 'function');
+    assert.strictEqual(nextTab.claim(), true);
+    releasePaint();
+    await oldLoad;
+    assert.strictEqual(surface, 0, '失効後に旧タブのゲーム面へ切り替えない');
+    assert.strictEqual(loaded, 0, '失効後に旧タブのBIN読込を進めない');
+
+    // 操作権が有効なら通常のシナリオ選択は表示できる。
+    releasePaint = null;
+    ctx.DataManager.loadScenarioDefinitions = async () => {};
+    await Game.prototype.startNewGame.call(game);
+    assert.strictEqual(shown, 1, '所有タブの正常な新規開始は維持する');
+});
+
+// r850: 同一オリジンの別タブが本編へ入った場合、旧タブは正規のタイトル復帰に引き渡す。
+// ストレージのstorage通知は書き込んだ側には届かないというブラウザ規則も再現する。
+test('r850 別タブの操作権取得で旧タブが失効し、旧セーブ要求は書込不可になる', () => {
+    const values = new Map();
+    const clients = [];
+    function makeHost(id) {
+        const listeners = new Map();
+        const storage = {
+            getItem: key => values.has(key) ? values.get(key) : null,
+            setItem(key, value) {
+                values.set(key, String(value));
+                for (const c of clients) {
+                    if (c.storage === storage) continue;
+                    for (const fn of c.listeners.get('storage') || []) {
+                        fn({ key, newValue: value, storageArea: c.storage });
+                    }
+                }
+            }
+        };
+        const host = {
+            localStorage: storage,
+            crypto: { randomUUID: () => id },
+            addEventListener(type, fn) {
+                if (!listeners.has(type)) listeners.set(type, []);
+                listeners.get(type).push(fn);
+            }
+        };
+        clients.push({ storage, listeners });
+        return host;
+    }
+    const ctx = createContext();
+    loadScript(ctx, 'js/tab_session.js');
+    loadScript(ctx, 'js/save_manager.js');
+    const a = new ctx.TabSessionCoordinator(makeHost('tab-a'));
+    const b = new ctx.TabSessionCoordinator(makeHost('tab-b'));
+    let lostA = 0, lostB = 0;
+    a.onLost = () => { lostA++; };
+    b.onLost = () => { lostB++; };
+    assert.strictEqual(a.claim(), true);
+    assert.strictEqual(a.isOwner(), true);
+    const game = {
+        scenarioFolder: '1560', tabSession: a,
+        turnManager: {
+            captureTurnFlowGeneration: () => 7,
+            isTurnFlowGenerationLatest: generation => generation === 7
+        }
+    };
+    const savedRequest = new ctx.SaveManager(game)._captureSaveRequestCurrent();
+    assert.strictEqual(savedRequest(), true, '所有タブは従来の保存要求を継続できる');
+    assert.strictEqual(b.claim(), true);
+    assert.strictEqual(lostA, 1, '旧タブだけがタイトル復帰通知を受ける');
+    assert.strictEqual(savedRequest(), false, '旧タブの保存待機要求は操作権失効で無効');
+    assert.strictEqual(b.isOwner(), true);
+    a.checkOwnership();
+    assert.strictEqual(lostA, 1, '同じ失効で二重のタイトル復帰を行わない');
+    assert.strictEqual(a.claim(), true, '旧タブで再び開始を選んだら操作権を取り直せる');
+    assert.strictEqual(lostB, 1, '再取得時は今までの所有タブだけを失効させる');
+    assert.strictEqual(a.isOwner(), true);
+    assert.strictEqual(b.isOwner(), false);
+    const broken = new ctx.TabSessionCoordinator({
+        get localStorage() { throw new Error('disabled'); },
+        addEventListener() {}
+    });
+    assert.strictEqual(broken.claim(), true, 'ストレージ拒否環境ではゲームの起動自体を妨げない');
+});
+
+test('r850 タブ操作権はシナリオ開始・セーブ復元・セーブ正本へ接続する', () => {
+    const html = read('index.html');
+    const game = read('js/game.js');
+    const saver = read('js/save_manager.js');
+    assert.ok(html.indexOf('js/app_bootstrap.js') < html.indexOf('js/tab_session.js'));
+    assert.ok(html.indexOf('js/tab_session.js') < html.indexOf('js/game.js'));
+    assert.ok(game.includes('this.tabSession.onLost = () => {'));
+    assert.ok(game.includes('this.ui.returnToTitle()'), '旧タブは共通のタイトル復帰へ委譲');
+    assert.ok(game.includes('async loadScenario(folder, options = {}) {\n        if (this.tabSession && !this.tabSession.claim()) return;'));
+    assert.ok(game.includes('async startNewGame(options = {}) {\n        if (this.tabSession && !this.tabSession.claim()) return;'));
+    assert.ok(saver.includes('this.game.tabSession && !this.game.tabSession.claim()'), '保存復元からも操作権を取得');
+    assert.ok(saver.includes('this.game.tabSession.isOwner()'), '遅延セーブ前の寿命判定を共用');
+});
+
+
+// r851: ファイル保存の画像生成はawaitを含む。別タブが操作権を取得した後に
+// 旧タブが古いゲームの.savをダウンロードしてはならない。
+test('r851 ファイル保存生成中に別タブへ操作権が移ったら出力しない', async () => {
+    let owner = true;
+    let finishSnapshot;
+    const downloads = [];
+    let encrypted = 0;
+    const ctx = createContext({
+        document: {
+            createElement(tag) {
+                assert.strictEqual(tag, 'a');
+                return {click() { downloads.push(this.download); }};
+            }
+        },
+        Blob: class Blob { constructor(parts) { this.parts = parts; } },
+        URL: {createObjectURL: () => 'blob:fixture', revokeObjectURL() {}}
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    const manager = new ctx.SaveManager({
+        scenarioFolder: '1560_okehazama',
+        tabSession: {isOwner: () => owner},
+        turnManager: {
+            captureTurnFlowGeneration: () => 12,
+            isTurnFlowGenerationLatest: generation => generation === 12
+        }
+    });
+    const guards = [];
+    manager.showSaveGuard = () => guards.push('show');
+    manager.hideSaveGuard = () => guards.push('hide');
+    manager._createSaveDataObj = () => new Promise(resolve => { finishSnapshot = resolve; });
+    manager._validateSaveDataStructure = () => true;
+    manager._encryptData = () => { encrypted++; return new Uint8Array([1]); };
+    const oldSave = manager.saveGameToFile();
+    owner = false; // 他タブが本編へ入り、旧タブの保存要求が失効
+    finishSnapshot({year: 1560, month: 1});
+    await oldSave;
+    assert.strictEqual(encrypted, 0, '失効した要求は暗号化処理へ進めない');
+    assert.deepStrictEqual(downloads, [], '失効後の古いファイル保存がダウンロードされない');
+    assert.deepStrictEqual(guards, ['show', 'hide'], '失効しても保存ガードは解放する');
+
+    owner = true;
+    manager._createSaveDataObj = async () => ({year: 1560, month: 2});
+    await manager.saveGameToFile();
+    assert.deepStrictEqual(downloads, ['sengoku_save_1560_2.sav'], '現行所有タブの通常ファイル保存は維持');
+    assert.deepStrictEqual(guards, ['show', 'hide', 'show', 'hide']);
+});
+
+
+// CSS正本化後に旧テーマ・未生成の装飾クラスを復活させない。
+// マップ/野戦の動的クラスは実装で生成されるため対象外。
+test('CSS現行UIに旧テーマの上書きと到達不能な装飾クラスを残さない', () => {
+    const css = read('css/style.css');
+    const animation = read('css/animation.css');
+    assert.ok(!(css.match(/#title-screen\s*\{[^}]*\}/g) || []).some(block => block.includes('linear-gradient(135deg, #263238')), '旧タイトルの背景は残さない');
+    assert.ok(!css.includes('#pc-map-overlay'), '廃止済みPC地図オーバーレイを参照しない');
+    assert.ok(!css.includes('.prisoner-result {'), '旧捕虜結果画面用の未参照ルールを残さない');
+    assert.ok(!css.includes('.bar-fill-busho-over::before'), '未生成の旧ゲージ装飾を残さない');
+    assert.ok(!animation.includes('.anim-attack {'), '旧攻撃アニメーションを残さない');
+    assert.ok(!animation.includes('.is-evening') && !animation.includes('.is-night'), '生成されない旧時間帯クラスを残さない');
+    assert.ok(css.includes('.castle-card.icon-tier-1') && css.includes('.hex-forest {'), '動的描画に必要なCSSは維持する');
+});
+
+// 面談・国主評定の視認性調整は、それぞれのCSS正本へ統合する。
+// 後勝ちの重複セレクタを復活させない（PC・スマホの状態分離は維持する）。
+test('面談・国主評定CSSは文字サイズ・操作枠を後勝ちの重複定義にしない', () => {
+    const css = read('css/style.css');
+    const selectors = [
+        '.interview-session-kicker',
+        '.interview-session-name',
+        '.interview-session-stat-value',
+        '.interview-session-inline-actions',
+        '#interview-modal.interview-conversation-mode',
+        'body:not(.is-pc) .interview-session-inline-actions',
+        '.legion-council-kicker',
+        '.legion-council-name',
+        '.legion-council-policy-summary',
+        'body:not(.is-pc) .legion-council-name',
+        'body:not(.is-pc) #legion-council-order-modal .legion-council-order-content'
+    ];
+    for (const selector of selectors) {
+        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const count = [...css.matchAll(new RegExp('(?:^|\\n)\\s*' + escaped + '\\s*\\{', 'g'))].length;
+        assert.strictEqual(count, 1, `${selector} はCSS正本を1ブロックだけにする (${count})`);
+    }
+});
+
+
+// CSS正本を旧ルールの後勝ちで隠さない。用途別の変数群 :root は意図して分ける。
+// 同一条件の各ルールは1か所に集約し、PC/スマホの意味ある条件差は保つ。
+test('r855 CSS主要画面は同条件の旧ルール重複を持たない', () => {
+    const css = read('css/style.css');
+    const selectors = [
+        '.select-item', '#title-screen', '.sp-info-header', '.cmd-btn',
+        'body:not(.is-pc) #map-container', '.floating-time, .floating-market',
+        '.bar-fill', '#saveload-list',
+        'body:not(.is-pc) .saveload-slot-content',
+        'body:not(.is-pc) .saveload-slot-time',
+        'body:not(.is-pc) .saveload-row-top',
+        'body:not(.is-pc) .saveload-row-bottom',
+        '#quantity-container', '.turn-number', '.stat-busho',
+        '.active-command-turn', 'body:not(.is-pc) .turn-number',
+        '.trade-result-value'
+    ];
+    for (const selector of selectors) {
+        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const count = [...css.matchAll(new RegExp('(?:^|\\n)' + escaped + '[ \\t]*\\{', 'g'))]
+            .filter(match => !css.slice(0, match.index).trimEnd().endsWith(',')).length;
+        assert.strictEqual(count, 1, `CSSは${selector}を1か所だけに定義する (${count})`);
+    }
+    assert.ok(!css.includes('.sp-empty {}'), '宣言のない旧空ルールを残さない');
+});
+
+
+// 削除済みの旧外観を再導入しない。地形/軍団色はJSでクラス名を組み立てるため除外する。
+test('r856 CSS旧切替ボタン・未生成一覧列・未参照変数を残さない', () => {
+    const css = read('css/style.css');
+    assert.ok(!/\.toggle-btn\s*\{/.test(css), '旧 .toggle-btn の単独スタイルを復活させない');
+    for (const selector of ['.col-morale', '.col-training', '.col-loyalty']) {
+        assert.ok(!css.includes(selector), `現行の一覧に存在しない ${selector} を残さない`);
+    }
+    for (const prop of ['--panel-bg', '--border-color', '--header-height', '--title-ink-2', '--title-gold-dim', '--title-red']) {
+        assert.ok(!css.includes(prop), `参照のない ${prop} を残さない`);
+    }
+    assert.ok(css.includes('.ui-toggle-btn {'), '使用中の切替ボタンCSSは維持する');
+    assert.ok(css.includes('.hex-forest {') && css.includes('.legion-color-8 {'), '動的生成する地形・軍団色CSSは維持する');
+});
+
+// 旧PCサイドバーは現行UIで常時不可視。装飾を後勝ちで再導入しない。
+test('r857 非表示の旧PCサイドバー内部装飾を再導入しない', () => {
+    const css = read('css/style.css');
+    assert.match(css, /#pc-sidebar\s*\{\s*display:\s*none\s*!important\s*;\s*\}/, '旧サイドバーの共通非表示は必要');
+    assert.ok(!css.includes('#sidebar-resizer'), '静的DOMに存在しない旧リサイズハンドル用CSSは復活させない');
+    for (const obsolete of ['#pc-status-panel', '#pc-command-area', 'body.daimyo-select-mode #pc-sidebar']) {
+        assert.ok(!css.includes(obsolete), `${obsolete} の表示されない装飾・重複非表示を復活させない`);
+    }
+    assert.ok(css.includes('#pc-new-ui-container'), '現行PC画面のCSSは維持する');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
@@ -39840,6 +40133,4 @@ Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(1);
 });
-
-
 
