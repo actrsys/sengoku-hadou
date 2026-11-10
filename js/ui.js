@@ -2784,6 +2784,12 @@ class UIManager {
         // 最後まで完了したかを返す。失効した復帰からの後続画面生成を防ぐ。
         const dismissed = await this.hideLoadingScreen();
         const completed = isTitleFlowLatest() && dismissed !== false;
+        // タイトルへ戻った後まで操作権を保持すると、既にタイトルにいるタブでも
+        // 別タブ開始時のstorage通知で再びタイトル復帰が走り、ロード幕がちらつく。
+        // 実行権の放棄は正常完了時だけTabSessionCoordinatorへ委譲する。
+        if (completed && this.game?.tabSession && typeof this.game.tabSession.release === 'function') {
+            this.game.tabSession.release();
+        }
         // 画面が正常にタイトルへ戻った場合だけ、前ゲームの実機停止診断を解除する。
         // 後発ロードや新規開始に遷移を奪われた場合は診断を消さない。
         if (completed && typeof this.game?.clearSystemDiagnosticAfterCleanTitleReturn === 'function') {

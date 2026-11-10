@@ -10261,6 +10261,34 @@ test('r848 同世代の旧エンディング例外は後発演出のタイトル
     assert.strictEqual(fixture.calls.title.length, 1, '後発の現行演出だけがタイトル復帰する');
 });
 
+// r865: エンディング演出中のpaint/タイマー待機では世代が変わらなくても
+// 別タブが操作権を取得できる。storage通知の配信前に演出を続行してはならない。
+test('r865 エンディング待機中の操作権喪失で旧演出と旧タイトル復帰を停止する', async () => {
+    for (const lost of [true, false]) {
+        const fixture = createEndingExceptionFixture();
+        const { turns } = bindEndingFlowFixture(fixture);
+        let owner = true, resumePaint;
+        fixture.game.tabSession = { isOwner: () => owner };
+        fixture.game.ui.waitForNextPaint = () => new Promise(resolve => { resumePaint = resolve; });
+        const oldEnding = fixture.ending.playEndingSequence('終焉', '旧ゲーム', false);
+        assert.strictEqual(fixture.getElement('app').inert, true, '暗転は入力を遮断する');
+        assert.strictEqual(turns.captureTurnFlowGeneration(), 1);
+        if (lost) owner = false; // 後発タブが取得。世代更新とstorageイベントは未着。
+        // 以降のpaintは待たないため、正常系では最後まで演出できる。
+        let paintCount = 0;
+        fixture.game.ui.waitForNextPaint = () => { paintCount++; return Promise.resolve(); };
+        resumePaint();
+        await oldEnding;
+        assert.strictEqual(fixture.calls.title.length, lost ? 0 : 1,
+            '失効タブだけはタイトル復帰を開始せず、所有タブは従来どおり完了');
+        assert.strictEqual(fixture.getElement('ending-title').classList.contains('show'), false);
+        assert.strictEqual(fixture.getElement('ending-screen').classList.contains('hidden'), true);
+        assert.strictEqual(fixture.getElement('app').inert, false);
+        assert.strictEqual(fixture.getElement('app').style.pointerEvents, '');
+        assert.strictEqual(paintCount, lost ? 0 : 1, '失効後の描画待機を開始しない');
+    }
+});
+
 test('観戦終了予約メッセージはbodyではなく固定論理画面内へ配置する', () => {
     const ui = read('js/ui.js');
     const css = read('css/style.css');
@@ -40232,6 +40260,66 @@ test('r850 別タブの操作権取得で旧タブが失効し、旧セーブ要
         addEventListener() {}
     });
     assert.strictEqual(broken.claim(), true, 'ストレージ拒否環境ではゲームの起動自体を妨げない');
+});
+
+// r866: 操作権を取得したままタイトルへ戻ると、別タブの開始で
+// 既にタイトル表示中の旧タブが再びロード幕を表示してしまう。
+test('r866 タイトル復帰の正常完了でタブ操作権を解放し、旧タイトルの再復帰を防ぐ', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/tab_session.js');
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const shared = new Map();
+    const host = id => ({
+        crypto: { randomUUID: () => id },
+        localStorage: {
+            getItem: key => shared.get(key) || null,
+            setItem: (key, value) => shared.set(key, value)
+        },
+        addEventListener() {}
+    });
+    const oldTab = new ctx.TabSessionCoordinator(host('old'));
+    const newTab = new ctx.TabSessionCoordinator(host('new'));
+    let generation = 0, loadingScreens = 0, oldLost = 0, newLost = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false, tabSession: oldTab,
+        turnManager: {
+            abortForScenarioTransition() { generation++; },
+            captureTurnFlowGeneration() { return generation; },
+            isTurnFlowGenerationLatest(value) { return value === generation; }
+        },
+        releaseScenarioMapResources() {}
+    };
+    const ui = {
+        game,
+        showLoadingScreen() { loadingScreens++; }, updateLoadingProgress() {},
+        async waitForNextPaint() {}, forceResetModals() {}, resetMapViewState() {},
+        showTitleSurface() {}, async checkSaveDataForTitle() {},
+        async hideLoadingScreen() { return true; }
+    };
+    const returnToTitle = () => UI.prototype.returnToTitle.call(ui);
+    oldTab.onLost = () => { oldLost++; void returnToTitle(); };
+    newTab.onLost = () => { newLost++; };
+    assert.strictEqual(oldTab.claim(), true);
+    assert.strictEqual(await returnToTitle(), true);
+    assert.strictEqual(oldTab.isOwner(), false, 'タイトル復帰で操作権を手放す');
+    assert.strictEqual(game.phase, 'title');
+    assert.strictEqual(newTab.claim(), true);
+    oldTab.checkOwnership();
+    await Promise.resolve();
+    assert.strictEqual(oldLost, 0, 'タイトルにいる旧タブは再び復帰しない');
+    assert.strictEqual(loadingScreens, 1, 'タイトルのロード幕を余分に表示しない');
+    assert.strictEqual(oldTab.claim(), true, '旧タブで再開始すれば取得し直せる');
+    newTab.checkOwnership();
+    assert.strictEqual(newLost, 1, 'ゲーム中の新タブは従来どおり操作権失効を受ける');
+
+    // 失効したタイトル復帰やロード幕失敗では、正常なセッション終了と誤認しない。
+    ui.hideLoadingScreen = async () => false;
+    assert.strictEqual(await returnToTitle(), false);
+    assert.strictEqual(oldTab.isOwner(), true, '未完了のタイトル復帰では操作権を維持する');
+    ui.hideLoadingScreen = async () => { generation++; return true; };
+    assert.strictEqual(await returnToTitle(), false);
+    assert.strictEqual(oldTab.isOwner(), true, '後発遷移に失効した復帰は解放しない');
 });
 
 test('r850 タブ操作権はシナリオ開始・セーブ復元・セーブ正本へ接続する', () => {

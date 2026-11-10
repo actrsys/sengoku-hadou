@@ -48,6 +48,13 @@ class TabSessionCoordinator {
         return this.claimed;
     }
 
+    // タイトルへの正常復帰後は、このタブを操作中と扱わない。
+    // 他タブの取得値を消す恐れがあるため共有ストレージのキーは削除せず、
+    // 次の新規開始・ロード時には従来どおりclaim()で取得し直す。
+    release() {
+        this.claimed = false;
+    }
+
     isOwner() {
         if (!this.claimed) return false;
         if (!this.storage) return true;

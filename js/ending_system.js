@@ -84,7 +84,10 @@ class EndingSystem {
         const isOriginalGameFlow = () => this.game.phase === 'game'
             && (originalGeneration === null
                 || (typeof turnManager?.isTurnFlowGenerationLatest === 'function'
-                    && turnManager.isTurnFlowGenerationLatest(originalGeneration)));
+                    && turnManager.isTurnFlowGenerationLatest(originalGeneration)))
+            // タブ間のstorage通知が遅延しても旧タブは演出・タイトル遷移を続けない。
+            // TurnManagerの世代は別タブの操作権移行では変化しないため、所有権も確認する。
+            && (!this.game.tabSession || this.game.tabSession.isOwner());
         // 演出の入力遮断はこの実行だけが所有する。新シナリオへ移るときは
         // TurnManagerの共通中断通知で先に古い遮断を解放する。
         // 古いawaitのfinallyから新しい画面の遮断を上書きしない。
