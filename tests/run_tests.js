@@ -18188,7 +18188,7 @@ test('r451 四半期軍団人事の分割待ち中にタイトル復帰したら
     const clans=[1,2,3,4,5].map(id=>({id,isDestroyed:false}));
     const sys=new Staffing();
     sys.game={clans,getBusho:()=>null,writeSystemDiagnostic:msg=>visited.push(msg),
-        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation}};
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:n=>n===generation}};
     sys.checkLegionDisband=()=>false;
     sys.createNewLegionIfNeeded=()=>false;
     const pending=sys.processQuarterlyStaffing(1,99);
@@ -18232,7 +18232,7 @@ test('r452 1月の改名案内中にタイトルへ戻ると後続の改名処�
     const bushos=[1,2].map(id=>({id,clan:1,isDaimyo:false,name:'元の名前',nameChange:'1560:新名:しんめい',
         applyNameChangeData(){changed.push(id);this.name='新しい名前';}}));
     const game={year:1560,playerClanId:1,bushos,turnManager:{captureTurnFlowGeneration:()=>generation,
-        isTurnFlowGenerationLatest:n=>n===generation},getClan:()=>({name:'某家'}),ui:{log(){},showDialogAsync:()=>++dialogCount===1?new Promise(resolve=>resume=resolve):Promise.resolve()}};
+        isTurnFlowGenerationCurrent:n=>n===generation},getClan:()=>({name:'某家'}),ui:{log(){},showDialogAsync:()=>++dialogCount===1?new Promise(resolve=>resume=resolve):Promise.resolve()}};
     const sys=new LifeSystem(game);
     // 50ms待ちをテスト用に解放できるようにし、現実の遅延を増やさない。
     const pending=sys.checkNameChange();
@@ -18251,7 +18251,7 @@ test('r452 死亡イベント待機中のシナリオ切替後は旧武将を処
     let generation=1,resume,eventCount=0;const executed=[];
     const bushos=[1,2].map(id=>({id,clan:1,status:'active',endYear:1490,deathFlag:false}));
     const game={year:1560,month:5,gameStartYear:1550,gameStartMonth:1,bushos,princesses:[],playerClanId:9,
-        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation},
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:n=>n===generation},
         eventManager:{processEvents:()=>++eventCount===1?new Promise(resolve=>resume=resolve):Promise.resolve()},ui:{log(){},showDialogAsync:async()=>{}}};
     const sys=new LifeSystem(game);
     sys.executeDeath=async b=>{executed.push(b.id);};
@@ -18270,7 +18270,7 @@ test('r452 姫誕生案内から旧シナリオの次勢力へ処理が流れな
     let generation=1,resume;const created=[];
     const game={year:1560,playerClanId:1,clans:[1,2].map(id=>({id,leaderId:id})),
         bushos:[],princesses:[],turnManager:{captureTurnFlowGeneration:()=>generation,
-            isTurnFlowGenerationLatest:n=>n===generation},
+            isTurnFlowGenerationCurrent:n=>n===generation},
         getBusho:id=>({id,name:'当主'}),ui:{log(){},showDialogAsync:()=>new Promise(resolve=>resume=resolve)}};
     const sys=new LifeSystem(game);
     sys._buildPrincessAppearanceContext=()=>({unmarriedCountByClan:new Map(),fatherCandidatesByClan:new Map()});
@@ -25147,7 +25147,7 @@ function createR558ExtinctionHarness(playerClanId = 2) {
         endingSystem: { processGameOver: async () => { gameOver++; } },
         affiliationSystem: { becomeRonin: b => { converted.push(b); b.clan = 0; } },
         turnManager: { captureTurnFlowGeneration: () => generation,
-            isTurnFlowGenerationLatest: g => g === generation }
+            isTurnFlowGenerationCurrent: g => g === generation }
     };
     const life = new Life(game);
     return {game, life, originalClan, converted, finishDialog: () => releaseDialog(),
@@ -25206,7 +25206,7 @@ test('r558 滅亡通知後のゲームオーバー遅延中にターン世代が
     const Life = vm.runInContext('LifeSystem', ctx);
     const clan = {id:2, name:'旧家', leaderId:99};
     const game = {year:1560, month:6, playerClanId:2, princesses:[],
-        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation},
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:n=>n===generation},
         getClan:id=>id===2?clan:null, getClanCastles:()=>[], getClanBushos:()=>[],
         ui:{log(){},renderMap(){},showDialogAsync:()=>new Promise(resolve=>releaseDialog=resolve)},
         endingSystem:{processGameOver:async()=>{ended++;}}
@@ -40393,6 +40393,69 @@ test('r858 旧PCサイドバーとリサイズ初期化を復活させず現行�
     }
     assert.ok(css.includes('body.is-pc #pc-new-ui-container'), 'PC操作画面のCSSは維持する');
     assert.ok(css.includes('#bottom-command-bar'), 'スマホ操作バーのCSSは維持する');
+});
+
+// 他タブのclaimが済んでstorage通知が遅れた場合でも、月初の専門処理は
+// 世代番号だけでなくTurnManagerの「現在の操作権」を使って途中で停止する。
+test('r863 四半期AI人事は操作権失効後に後続勢力を処理せず、正常時は全勢力を処理する', async () => {
+    let releaseYield;
+    const ctx = createContext({setTimeout: callback => { releaseYield = callback; return 1; }});
+    loadScript(ctx, 'js/turn_manager.js');
+    loadScript(ctx, 'js/ai_staffing.js');
+    const TurnManager = vm.runInContext('TurnManager', ctx);
+    const Staffing = vm.runInContext('AIStaffing', ctx);
+    for (const loseOwnership of [true, false]) {
+        let owner = true;
+        const visited = [];
+        const game = {
+            phase: 'game', isRestoringSave: false, year: 1560, month: 1,
+            tabSession: {isOwner: () => owner},
+            clans: [1, 2, 3, 4, 5].map(id => ({id, isDestroyed: false})),
+            getBusho: () => null,
+            writeSystemDiagnostic(message) { if (message.includes('month_start:staffing:clan_')) visited.push(message); }
+        };
+        game.turnManager = new TurnManager(game);
+        const sys = new Staffing();
+        sys.game = game;
+        sys.checkLegionDisband = () => false;
+        sys.createNewLegionIfNeeded = () => false;
+        const pending = sys.processQuarterlyStaffing(1, 99);
+        assert.strictEqual(visited.length, 4, '4勢力目の処理後に描画待ちへ入る');
+        if (loseOwnership) owner = false; // 別タブ取得。旧タブへの通知はまだ未配信。
+        releaseYield();
+        await pending;
+        assert.strictEqual(visited.length, loseOwnership ? 4 : 5,
+            '失効した旧タブは5勢力目に入らず、正常タブは最後まで処理する');
+    }
+});
+
+test('r863 1月の武将能力分割再計算は操作権失効後に後続武将を変更しない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/turn_manager.js');
+    loadScript(ctx, 'js/life_system.js');
+    const TurnManager = vm.runInContext('TurnManager', ctx);
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    for (const loseOwnership of [true, false]) {
+        let owner = true, resume;
+        const bushos = Array.from({length: 129}, (_, id) => ({id}));
+        const game = {
+            phase: 'game', isRestoringSave: false, year: 1560, month: 1,
+            tabSession: {isOwner: () => owner}, bushos, princesses: []
+        };
+        game.turnManager = new TurnManager(game);
+        const life = new LifeSystem(game);
+        life._syncPreBirthStatus = () => {};
+        life.recalculateBushoAgeStats = busho => { busho.recalculated = true; };
+        life._yieldToBrowserForLife = () => new Promise(resolve => { resume = resolve; });
+        const pending = life.updateAllBushosAgeCooperatively();
+        assert.strictEqual(bushos.filter(b => b.recalculated).length, 128,
+            'スマホの128人単位の処理から描画待ちへ入る');
+        if (loseOwnership) owner = false;
+        resume();
+        await pending;
+        assert.strictEqual(bushos.filter(b => b.recalculated).length, loseOwnership ? 128 : 129,
+            '失効した旧タブでは残りの能力値を再計算しない');
+    }
 });
 
 Promise.all(pendingTests).then(() => {

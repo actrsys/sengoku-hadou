@@ -1143,15 +1143,16 @@ class AIStaffing {
     /** 四半期の全国AI人事。TurnManagerは実行時期だけを決める。 */
     async processQuarterlyStaffing(month, playerClanId) {
         if (![1, 4, 7, 10].includes(month)) return;
-        // 4勢力ごとの描画待ち中に別シナリオへ移った場合の旧人事継続を防ぐ。
+        // 4勢力ごとの描画待ち中に別タブへ操作権が移った場合も、
+        // 通知を待たずにTurnManagerの共通ターン寿命判定で旧人事を停止する。
         const turnManager = this.game && this.game.turnManager;
         const generation = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
             ? turnManager.captureTurnFlowGeneration() : null;
         const expectedYear = this.game.year;
         const expectedMonth = this.game.month;
         const isCurrentFlow = () => (generation === null || !turnManager
-            || typeof turnManager.isTurnFlowGenerationLatest !== 'function'
-            || turnManager.isTurnFlowGenerationLatest(generation))
+            || typeof turnManager.isTurnFlowGenerationCurrent !== 'function'
+            || turnManager.isTurnFlowGenerationCurrent(generation))
             && this.game.year === expectedYear
             && this.game.month === expectedMonth;
         // 呼出し元から渡された実施月と実際のゲーム月がずれた古い処理を開始しない。

@@ -222,9 +222,11 @@ class LifeSystem {
         if (!context || !this.game
             || this.game.year !== context.year || this.game.month !== context.month) return false;
         const tm = this.game.turnManager;
+        // 年次分割計算・月初元服・月末死亡の非同期待機中も、
+        // 他タブへの操作権移行をTurnManagerの共通有効性判定へ委譲する。
         return context.generation === null || context.generation === undefined || !tm
-            || typeof tm.isTurnFlowGenerationLatest !== 'function'
-            || tm.isTurnFlowGenerationLatest(context.generation);
+            || typeof tm.isTurnFlowGenerationCurrent !== 'function'
+            || tm.isTurnFlowGenerationCurrent(context.generation);
     }
 
     // 毎月の初め（1月）に「新しく登場する武将がいないか」をチェックします

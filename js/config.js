@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r862'
+        Version: 'r863'
     },
 
     Ending: {
