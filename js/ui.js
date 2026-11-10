@@ -14,8 +14,6 @@ class UIManager {
         this._battleSuspendState = null;
 
         this.mapEl = document.getElementById('map-container'); 
-        this.panelEl = document.getElementById('pc-sidebar'); 
-        this.statusContainer = document.getElementById('pc-status-panel'); 
         this.mobileTopLeft = document.getElementById('mobile-top-left');
         this.mobileBottomInfo = document.getElementById('mobile-bottom-info');
         
@@ -116,7 +114,6 @@ class UIManager {
 
         this.initMapDrag();
         this.initContextMenu();
-        this.initSidebarResize(); 
         // ★スマホ安全対策：ブラウザ標準のダブルタップ拡大を確実に止めます。
         // 近い位置を短時間で2回触った時だけ止めるので、別々のボタンを素早く押す操作は妨げません。
         let lastTouchEnd = 0;
@@ -501,7 +498,6 @@ class UIManager {
     _syncControlPanelForLayoutMode() {
         if (!this.game || this.game.phase !== 'game' || !this.currentCastle) return;
         const isPc = document.body.classList.contains('is-pc');
-        if (this.panelEl) this.panelEl.classList.toggle('hidden', isPc);
         if (this.pcNewUiContainer) this.pcNewUiContainer.classList.toggle('hidden', !isPc);
 
         if (this.game.selectionMode) {
@@ -905,35 +901,6 @@ class UIManager {
         }
     }
     
-    initSidebarResize() {
-        const sidebar = document.getElementById('pc-sidebar');
-        const resizer = document.getElementById('sidebar-resizer');
-        if (!sidebar || !resizer) return; 
-
-        let isResizing = false;
-
-        resizer.addEventListener('mousedown', (e) => {
-            isResizing = true;
-            document.body.style.cursor = 'col-resize'; 
-            e.preventDefault(); 
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
-            const newWidth = document.body.clientWidth - e.clientX;
-            if (newWidth >= 280 && newWidth <= 800) {
-                sidebar.style.width = `${newWidth}px`;
-            }
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (isResizing) {
-                isResizing = false;
-                document.body.style.cursor = ''; 
-            }
-        });
-    }
-
     // シナリオ／セーブ切替時だけ、再生成可能な短命・静的描画キャッシュを解放します。
     // 表示中モーダルDOMは各終了処理へ任せ、ここでは次シナリオへ持ち越す意味のない参照だけを切ります。
     releaseScenarioTransientCaches() {
@@ -2448,8 +2415,6 @@ class UIManager {
         }
         
         // 前に遊んでいた時の画面の枠をしっかり隠します！
-        if(this.panelEl) this.panelEl.classList.add('hidden'); // PC版のサイドバーを隠します
-        if(this.statusContainer) this.statusContainer.innerHTML = ''; // PC版の上の情報も消します
         if(this.pcNewUiContainer) this.pcNewUiContainer.classList.add('hidden');
         if(this.pcNewStatusPanel) this.pcNewStatusPanel.innerHTML = '';
         if(this.pcNewCommandArea) this.pcNewCommandArea.innerHTML = '';
@@ -2840,9 +2805,6 @@ class UIManager {
     
     updatePanelHeader() { 
         if (!this.currentCastle) return; 
-        if(this.statusContainer) {
-            this.statusContainer.innerHTML = ''; 
-        }
         this.updateInfoPanel(this.currentCastle);
     }
 
@@ -3072,7 +3034,6 @@ class UIManager {
         // 非表示側へ同じ情報DOMを複製しない。端末モード切替時だけ古い側を掃除する。
         if (!isPc && this.pcNewStatusPanel && this.pcNewStatusPanel.innerHTML) this.pcNewStatusPanel.innerHTML = '';
         if (isPc && this.mobileTopLeft && this.mobileTopLeft.innerHTML) this.mobileTopLeft.innerHTML = '';
-        if (this.statusContainer && this.statusContainer.innerHTML) this.statusContainer.innerHTML = '';
 
         if (this.mobileFloatingInfo) {
             const nextTimeHtml = `<div class="floating-time">${this.game.year}年 ${this.game.month}月</div>`;
@@ -3163,13 +3124,11 @@ class UIManager {
             }
         }
         
-        // パソコンの画面のときは、古いサイドバーを隠して新しい箱を出します
+        // PCの操作パネルのみ端末モードに合わせて切り替える。
         if (document.body.classList.contains('is-pc')) {
-            if(this.panelEl) this.panelEl.classList.add('hidden');
             if(this.pcNewUiContainer) this.pcNewUiContainer.classList.remove('hidden');
         } else {
-            // スマホの画面のときは、今まで通りの箱を出します
-            if(this.panelEl) this.panelEl.classList.remove('hidden');
+            // スマホ側は下部の共通操作バーを使用する。
             if(this.pcNewUiContainer) this.pcNewUiContainer.classList.add('hidden');
         }
         this.updatePanelHeader();

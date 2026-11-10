@@ -422,8 +422,6 @@ body:not(.is-pc):has(.modal:not(.hidden)) #bottom-command-bar {
     transition: none;
 }
 
-#pc-sidebar { display: none !important; }
-
 /* =========================================================
    メインマップ・城関連
    ========================================================= */
@@ -3399,7 +3397,6 @@ body.is-pc {
     /* ダンボール箱に閉じ込める魔法 */
     #title-screen, .modal, .cutin-overlay, #ai-guard { position: absolute !important; }
 
-    /* 旧サイドバーは共通の #pc-sidebar 非表示ルールで管理する。 */
     .command-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .cmd-btn { padding: 8px 8px; font-size: 1.2rem; height: auto; }
 

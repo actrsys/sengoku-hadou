@@ -23119,8 +23119,8 @@ test('r528 スマホ拠点状態マークはモーダルから戻ると同じDOM
         '画面本体が差分描画を省略した場合も同期を行う');
 });
 
-test('r529 回転中のモーダルを閉じると操作パネルを新レイアウトへ復帰する', () => {
-    const testMode = (fromPc, toPc) => {
+test('r529 回転中のモーダルを閉じると現行PC操作パネルを新レイアウトへ復帰する', () => {
+    const testMode = toPc => {
         const bodyClasses = new FakeClassList();
         if (toPc) bodyClasses.add('is-pc');
         const ctx = createContext({
@@ -23128,17 +23128,12 @@ test('r529 回転中のモーダルを閉じると操作パネルを新レイア
         });
         loadScript(ctx, 'js/ui.js');
         const ui = Object.create(vm.runInContext('UIManager.prototype', ctx));
-        const mobileClasses = new FakeClassList();
         const pcClasses = new FakeClassList();
-        for (const classes of [mobileClasses, pcClasses]) {
-            classes.toggle = (name, force) => {
-                if (force) classes.add(name);
-                else classes.remove(name);
-            };
-        }
-        if (fromPc) mobileClasses.add('hidden');
-        else pcClasses.add('hidden');
-        ui.panelEl = { classList: mobileClasses };
+        pcClasses.toggle = (name, force) => {
+            if (force) pcClasses.add(name);
+            else pcClasses.remove(name);
+        };
+        if (!toPc) pcClasses.add('hidden');
         ui.pcNewUiContainer = { classList: pcClasses };
         const castle = { id: 42, ownerClan: 7 };
         ui.currentCastle = castle;
@@ -23157,14 +23152,12 @@ test('r529 回転中のモーダルを閉じると操作パネルを新レイア
         ui.handleLayoutModeChange();
         assert.strictEqual(commandRenders, 0, 'モーダル中に背面コマンドを構築しない');
         ui.resumeBackgroundUpdates();
-        assert.strictEqual(mobileClasses.contains('hidden'), toPc, 'スマホパネルの可視性を新modeに一致');
-        assert.strictEqual(pcClasses.contains('hidden'), !toPc, 'PCパネルの可視性を新modeに一致');
+        assert.strictEqual(pcClasses.contains('hidden'), !toPc, '現行PCパネルの可視性を新modeに一致');
         assert.strictEqual(commandRenders, 1, '復帰時だけコマンドの表示を同期');
     };
-    testMode(true, false);
-    testMode(false, true);
+    testMode(false);
+    testMode(true);
 });
-
 
 test('r530 スマホ共通長押しはフォームとスクロールバーのネイティブ操作を妨げない', () => {
     const listeners = new Map();
@@ -40114,15 +40107,23 @@ test('r856 CSS旧切替ボタン・未生成一覧列・未参照変数を残さ
     assert.ok(css.includes('.hex-forest {') && css.includes('.legion-color-8 {'), '動的生成する地形・軍団色CSSは維持する');
 });
 
-// 旧PCサイドバーは現行UIで常時不可視。装飾を後勝ちで再導入しない。
-test('r857 非表示の旧PCサイドバー内部装飾を再導入しない', () => {
+// r857の不可視CSS整理に続き、参照も出力もない旧PCサイドバー全体を廃止。
+test('r858 旧PCサイドバーとリサイズ初期化を復活させず現行操作UIを保持する', () => {
+    const html = read('index.html');
     const css = read('css/style.css');
-    assert.match(css, /#pc-sidebar\s*\{\s*display:\s*none\s*!important\s*;\s*\}/, '旧サイドバーの共通非表示は必要');
-    assert.ok(!css.includes('#sidebar-resizer'), '静的DOMに存在しない旧リサイズハンドル用CSSは復活させない');
-    for (const obsolete of ['#pc-status-panel', '#pc-command-area', 'body.daimyo-select-mode #pc-sidebar']) {
-        assert.ok(!css.includes(obsolete), `${obsolete} の表示されない装飾・重複非表示を復活させない`);
+    const ui = read('js/ui.js');
+    for (const text of [html, css, ui]) {
+        for (const legacy of ['pc-sidebar', 'pc-status-panel', 'pc-command-area', 'sidebar-resizer']) {
+            assert.ok(!text.includes(legacy), `旧UIの ${legacy} を復活させない`);
+        }
     }
-    assert.ok(css.includes('#pc-new-ui-container'), '現行PC画面のCSSは維持する');
+    assert.ok(!ui.includes('initSidebarResize'), '存在しないハンドルを初期化しない');
+    assert.ok(!ui.includes('this.panelEl') && !ui.includes('this.statusContainer'), '旧DOM参照を保持しない');
+    for (const current of ['pc-new-ui-container', 'pc-new-status-panel', 'pc-new-command-area', 'mobile-top-left', 'command-area']) {
+        assert.ok(html.includes(`id="${current}"`), `現行の ${current} は維持する`);
+    }
+    assert.ok(css.includes('body.is-pc #pc-new-ui-container'), 'PC操作画面のCSSは維持する');
+    assert.ok(css.includes('#bottom-command-bar'), 'スマホ操作バーのCSSは維持する');
 });
 
 Promise.all(pendingTests).then(() => {
