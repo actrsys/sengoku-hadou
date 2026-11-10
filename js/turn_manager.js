@@ -52,7 +52,10 @@ class TurnManager {
         return Number(this._turnFlowGeneration || 0) === Number(generation)
             && !!game
             && game.phase === 'game'
-            && !game.isRestoringSave;
+            && !game.isRestoringSave
+            // 別タブ取得のstorage通知が遅れても、旧タブが月次・AI処理を進めない。
+            // 保存・ロードと同じTabSessionCoordinatorの読取判定を共用する。
+            && (!game.tabSession || game.tabSession.isOwner());
     }
 
     // Event/AI/Diplomacyなど専門部署がawait前後で同じシナリオ寿命か確認するための公開読取窓口。

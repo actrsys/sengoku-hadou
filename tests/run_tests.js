@@ -39827,6 +39827,55 @@ test('月末処理で例外が発生しても実行権を解放し次の呼び�
     assert.strictEqual(game.month, 2);
 });
 
+// r862: 月末待機中に別タブが操作権を取得し、storage通知がまだ届かなくても
+// 旧タブが月末イベントや年月更新を継続しない。既存のターン寿命判定を共用する。
+test('r862 別タブへ操作権が移った月末処理は通知遅延中も翌月へ進めない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/turn_manager.js');
+    const TurnManager = vm.runInContext('TurnManager', ctx);
+    let releaseBefore;
+    const beforeGate = new Promise(resolve => { releaseBefore = resolve; });
+    let owner = true;
+    const stages = [];
+    let endingCalls = 0;
+    const game = {
+        phase: 'game', year: 1560, month: 1,
+        tabSession: {isOwner() { return owner; }},
+        ui: {waitForDialogs: async () => {}},
+        writeSystemDiagnostic() {},
+        eventManager: {async processEvents(stage) {
+            stages.push(stage);
+            if (stage === 'endMonth_before') await beforeGate;
+        }},
+        updateClanDisplayNames() {},
+        endingSystem: {async checkEnding() { endingCalls++; return true; }}
+    };
+    const tm = new TurnManager(game);
+    const pending = tm.endMonth();
+    assert.strictEqual(stages.join(','), 'endMonth_before');
+    // 他タブのclaimによってlocalStorageは更新済みだが、旧タブのstorage通知は保留中。
+    owner = false;
+    releaseBefore();
+    await pending;
+    assert.strictEqual(game.month, 1, '操作権失効後に月を進めない');
+    assert.deepStrictEqual(stages, ['endMonth_before'], '後続の月末イベントを開始しない');
+    assert.strictEqual(endingCalls, 0, '新しい月のエンディング処理に進まない');
+    await tm.endMonth();
+    assert.deepStrictEqual(stages, ['endMonth_before'], '旧タブの再実行も停止する');
+    // 元のタブが正当に権利を持ったままの正常処理は従来どおり続く。
+    const currentGame = {
+        phase: 'game', year: 1560, month: 1,
+        tabSession: {isOwner: () => true},
+        ui: {waitForDialogs: async () => {}},
+        writeSystemDiagnostic() {},
+        eventManager: {async processEvents() {}},
+        updateClanDisplayNames() {},
+        endingSystem: {async checkEnding() { return true; }}
+    };
+    await new TurnManager(currentGame).endMonth();
+    assert.strictEqual(currentGame.month, 2, '操作権を持つタブの正常な月送りは維持する');
+});
+
 // r852: storage通知がバックグラウンドで遅延しても、同じオリジンの別タブが
 // 操作権を得た後に旧タブがシナリオ選択・ロード画面を更新してはならない。
 test('r852 別タブへ操作権移行中の新規開始・シナリオ読込は旧画面を公開しない', async () => {
