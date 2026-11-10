@@ -410,8 +410,8 @@ class KunishuSystem {
         return () => this.game.year === expectedYear
             && this.game.month === expectedMonth
             && (generation === null || !manager
-                || typeof manager.isTurnFlowGenerationLatest !== 'function'
-                || manager.isTurnFlowGenerationLatest(generation));
+                || typeof manager.isTurnFlowGenerationCurrent !== 'function'
+                || manager.isTurnFlowGenerationCurrent(generation));
     }
 
     // 月末処理

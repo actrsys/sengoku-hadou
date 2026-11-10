@@ -17973,7 +17973,7 @@ test('r450 独立の非同期待機中にシナリオが切り替われば後続
     let generation=1, resolveFirst;
     const started=[];
     const game = {
-        castles,turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:g=>g===generation},
+        castles,turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:g=>g===generation},
         getBusho:id=>members.get(id),getClanDaimyo:()=>({factionId:0}),getClanCastles:()=>castles
     };
     const system=new (vm.runInContext('IndependenceSystem',ctx))(game);
@@ -18000,7 +18000,7 @@ test('r450 独立会話の待機中にタイトルへ戻ると旧勢力の地図
         belongKunishuId:0,achievementTotal:0,fullName:'試験武将',name:'試験武将',lastApproachedClanId:0};
     const oldDaimyo={id:12,clan:1,name:'旧大名',nemesisList:[],nemesisIds:[]};
     const game={ castles:[castle],clans:[oldClan,newClan],playerClanId:99,
-        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:g=>g===generation},
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:g=>g===generation},
         getClanBushos:()=>[rebel],getClan:id=>id===1?oldClan:newClan,getClanDaimyo:()=>oldDaimyo,
         getBusho:id=>id===11?rebel:oldDaimyo, getCastle:id=>id===castle.id?castle:null, updateCastleLord(){},
         affiliationSystem:{transferClanRaw(b,id){b.clan=id;}},
@@ -18046,7 +18046,7 @@ test('r451 諸勢力の頭領交代ダイアログ待機中に遷移すると旧
         horses:0,maxHorses:0,guns:0,maxGuns:0,training:50,defaultTraining:50,morale:50,defaultMorale:50},
         {id:2,soldiers:100,maxSoldiers:100,defense:100,maxDefense:100,
         horses:0,maxHorses:0,guns:0,maxGuns:0,training:50,defaultTraining:50,morale:50,defaultMorale:50}];
-    const game={turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation}};
+    const game={turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:n=>n===generation}};
     const sys=new KunishuSystem(game);
     sys.getAliveKunishus=()=>kunishus;
     sys.checkDestroyed=k=>{checked.push(k.id);return k.id===1 ? new Promise(resolve=>{resume=resolve;}) : Promise.resolve();};
@@ -18070,7 +18070,7 @@ test('r451 諸勢力の献上待機中にシナリオ切替した場合は次の
     const kunishus=[1,2].map(id=>({id,ideology:'商人',castleId:1,daimyoRelations:{1:{sentiment:90}},
         soldiers:100,maxSoldiers:100,defense:100,maxDefense:100,
         horses:0,maxHorses:0,guns:0,maxGuns:0,training:50,defaultTraining:50,morale:50,defaultMorale:50}));
-    const game={turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation},
+    const game={turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:n=>n===generation},
         getClanDaimyo:()=>({castleId:1}),getCastle:()=>castle,getBusho:()=>null};
     const sys=new KunishuSystem(game);
     sys.getAliveKunishus=()=>kunishus;
@@ -18096,7 +18096,7 @@ test('r451 下野ダイアログ中のシナリオ切替後は旧月初の派閥
     let generation=1, resume, fled=[], rebuilt=0;
     const bushos=[1,2].map(id=>({id,clan:1,loyalty:0,isDaimyo:false,isCastellan:false}));
     const game={bushos,getClanDaimyo:()=>null,
-        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:n=>n===generation}};
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:n=>n===generation}};
     const sys=new FactionSystem(game);
     sys.executeRonin=b=>{fled.push(b.id);return b.id===1 ? new Promise(resolve=>resume=resolve):Promise.resolve();};
     sys.updateFactions=()=>rebuilt++;
@@ -18118,7 +18118,7 @@ test('r552 下野会話中に同一世代で翌月になると旧月の下野候
     let resume, fled=[], rebuilt=0;
     const bushos=[1,2].map(id=>({id,clan:1,loyalty:0,isDaimyo:false,isCastellan:false}));
     const game={year:1570,month:6,bushos,getClanDaimyo:()=>null,
-        turnManager:{captureTurnFlowGeneration:()=>3,isTurnFlowGenerationLatest:n=>n===3}};
+        turnManager:{captureTurnFlowGeneration:()=>3,isTurnFlowGenerationCurrent:n=>n===3}};
     const sys=new FactionSystem(game);
     sys.executeRonin=b=>{fled.push(b.id);return b.id===1 ? new Promise(resolve=>resume=resolve):Promise.resolve();};
     sys.updateFactions=()=>rebuilt++;
@@ -18141,7 +18141,7 @@ test('r552 諸勢力の月末献上待機中に同一世代で翌月になると
         soldiers:100,maxSoldiers:100,defense:100,maxDefense:100,
         horses:0,maxHorses:0,guns:0,maxGuns:0,training:50,defaultTraining:50,morale:50,defaultMorale:50}));
     const game={year:1570,month:6,
-        turnManager:{captureTurnFlowGeneration:()=>3,isTurnFlowGenerationLatest:n=>n===3},
+        turnManager:{captureTurnFlowGeneration:()=>3,isTurnFlowGenerationCurrent:n=>n===3},
         getClanDaimyo:()=>({castleId:1}),getCastle:()=>castle,getBusho:()=>null};
     const sys=new KunishuSystem(game);
     sys.getAliveKunishus=()=>kunishus;
@@ -18165,7 +18165,7 @@ test('r552 独立事件待機中に同一世代で翌月になると旧月の次
     const castles=[{id:1,ownerClan:1,castellanId:10},{id:2,ownerClan:1,castellanId:11}];
     const bushos=new Map([10,11].map(id=>[id,{id,clan:1,loyalty:0,duty:50,ambition:50,factionId:0,isDaimyo:false}]));
     const game={year:1570,month:6,castles,
-        turnManager:{captureTurnFlowGeneration:()=>3,isTurnFlowGenerationLatest:n=>n===3},
+        turnManager:{captureTurnFlowGeneration:()=>3,isTurnFlowGenerationCurrent:n=>n===3},
         getBusho:id=>bushos.get(id),getClanDaimyo:()=>({id:20,factionId:0}),getClanCastles:()=>castles};
     const sys=new IndependenceSystem(game);
     sys.calculateAndExecute=(castle)=>{attempted.push(castle.id);return castle.id===1 ? new Promise(resolve=>resume=resolve) : Promise.resolve();};
@@ -24813,7 +24813,7 @@ test('r553 鎮圧戦待機中の月替わり・戦争中断では旧コマンド
         let header=0, menu=0;
         const castle={id:10,ownerClan:1,isDelegated:false};
         const game={year:1570,month:6,playerClanId:1,
-            turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:g=>g===generation},
+            turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:g=>g===generation},
             getBusho:id=>({id}),
             ui:{updatePanelHeader(){header++;},renderCommandMenu(){menu++;}},
             warManager:{getCurrentWarGeneration:()=>warGeneration,
@@ -24840,7 +24840,7 @@ test('r553 寝返り面会の旧確認callbackと会話待ち再開は新ゲー�
     for (const mode of ['obsolete_first_choice','obsolete_after_dialog']) {
         let generation=1, savedChoice, releaseDialog, count=0;
         const game={year:1570,month:6,playerClanId:2,
-            turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:g=>g===generation},
+            turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:g=>g===generation},
             getClan:id=>({id,name:'試験家'}),getClanDaimyo:()=>({castleId:9,fullName:'試験大名'}),
             getCastle:id=>({id}),getNavigatorInfo:()=>({name:'小姓',faceIcon:'unknown_face.webp'}),
             ui:{showDialog(msg,confirm,yes,no){savedChoice={yes,no};},
@@ -24881,7 +24881,7 @@ test('r553 独立後の古い操作勢力選択ではプレイヤー勢力を書
         isCastellan:true,achievementTotal:100,loyalty:30};
     const lord={id:12,clan:1,name:'旧当主',fullName:'旧当主',nemesisList:[],nemesisIds:[]};
     const game={year:1570,month:6,castles:[castle],clans:[{id:1,name:'旧家',color:'#dddddd'}],playerClanId:1,
-        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationLatest:g=>g===generation},
+        turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:g=>g===generation},
         getClan:id=>game.clans.find(c=>c.id===id),getClanDaimyo:()=>lord,
         getClanBushos:()=>[rebel,lord],getBusho:id=>id===11?rebel:lord,
         getCastle:id=>castle,updateCastleLord(){},
@@ -24921,7 +24921,7 @@ test('r553 寝返り面会が有効なときは通常の採用確認を維持す
     const IndependenceSystem=vm.runInContext('IndependenceSystem',ctx);
     let choice, count=0;
     const game={year:1570,month:6,playerClanId:2,
-        turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationLatest:g=>g===1},
+        turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationCurrent:g=>g===1},
         getClan:()=>({name:'試験家'}),getClanDaimyo:()=>({castleId:9,fullName:'試験大名'}),
         getCastle:()=>({id:9}),getNavigatorInfo:()=>({name:'小姓'}),
         ui:{showDialog(msg,confirm,yes,no){choice={yes,no};},showDialogAsync:async()=>{count++;}}};
@@ -40455,6 +40455,63 @@ test('r863 1月の武将能力分割再計算は操作権失効後に後続武�
         await pending;
         assert.strictEqual(bushos.filter(b => b.recalculated).length, loseOwnership ? 128 : 129,
             '失効した旧タブでは残りの能力値を再計算しない');
+    }
+});
+
+// r864: 専門月次処理もTurnManagerの操作権付き寿命判定を正本とする。
+test('r864 月初下野会話の待機後は操作権失効なら候補を進めず、正常時は再編する', async () => {
+    const ctx=createContext({WarParams:{Faction:{RoninLoyaltyThreshold:50,RoninChanceBase:2,RoninChanceMultiplier:1}},BushoStatusRules:{isActive:()=>true}});
+    loadScript(ctx,'js/turn_manager.js');loadScript(ctx,'js/faction_system.js');
+    const T=vm.runInContext('TurnManager',ctx),F=vm.runInContext('FactionSystem',ctx);
+    for(const lost of [true,false]){
+        let owner=true,resume;const seen=[];
+        const bushos=[1,2].map(id=>({id,clan:1,loyalty:0,isDaimyo:false,isCastellan:false}));
+        const game={phase:'game',year:1570,month:6,bushos,tabSession:{isOwner:()=>owner},getClanDaimyo:()=>null};
+        game.turnManager=new T(game);
+        const system=new F(game);
+        system.executeRonin=b=>{seen.push(b.id);return b.id===1?new Promise(resolve=>{resume=resolve;}):Promise.resolve();};
+        system.updateFactions=()=>seen.push('rebuild');
+        const pending=system.processStartMonth();assert.deepStrictEqual(seen,[1]);
+        if(lost)owner=false;resume();await pending;
+        assert.deepStrictEqual(seen,lost?[1]:[1,2,'rebuild']);
+    }
+});
+
+test('r864 月末独立判定の待機後は操作権失効なら次城を処理せず、正常時は進む', async () => {
+    const ctx=createContext({WarParams:{Independence:{ThresholdBase:50,ThresholdDutyDiv:10,ThresholdAmbitionDiv:10}}});
+    loadScript(ctx,'js/turn_manager.js');loadScript(ctx,'js/independence_system.js');
+    const T=vm.runInContext('TurnManager',ctx),I=vm.runInContext('IndependenceSystem',ctx);
+    for(const lost of [true,false]){
+        let owner=true,resume;const seen=[];
+        const castles=[1,2].map(id=>({id,ownerClan:1,castellanId:id+10}));
+        const officers=new Map([11,12].map(id=>[id,{id,loyalty:1,duty:50,ambition:50,factionId:0,belongKunishuId:0,isDaimyo:false}]));
+        const game={phase:'game',year:1570,month:6,castles,tabSession:{isOwner:()=>owner},getBusho:id=>officers.get(id),getClanDaimyo:()=>({factionId:0}),getClanCastles:()=>castles};
+        game.turnManager=new T(game);
+        const system=new I(game);
+        system.calculateAndExecute=castle=>{seen.push(castle.id);return castle.id===1?new Promise(resolve=>{resume=resolve;}):Promise.resolve();};
+        const pending=system.checkIndependence();assert.deepStrictEqual(seen,[1]);
+        if(lost)owner=false;resume();await pending;
+        assert.deepStrictEqual(seen,lost?[1]:[1,2]);
+    }
+});
+
+test('r864 諸勢力月末待機後は操作権失効なら次勢力を処理せず、正常時は進む', async () => {
+    const ctx=createContext({MainParams:{Kunishu:{IkkoNetwork:{LocalBacklashHonganjiRelationDrop:0}}}});
+    loadScript(ctx,'js/turn_manager.js');loadScript(ctx,'js/kunishu_system.js');
+    const T=vm.runInContext('TurnManager',ctx),K=vm.runInContext('KunishuSystem',ctx);
+    for(const lost of [true,false]){
+        let owner=true,resume;const seen=[];
+        const kunishus=[1,2].map(id=>({id,castleId:id,ideology:'武士',isDestroyed:false,
+            soldiers:100,maxSoldiers:100,defense:100,maxDefense:100,horses:0,maxHorses:0,guns:0,maxGuns:0,training:50,defaultTraining:50,morale:50,defaultMorale:50}));
+        const game={phase:'game',year:1570,month:6,tabSession:{isOwner:()=>owner},getBusho:()=>null,getCastle:()=>null};
+        game.turnManager=new T(game);
+        const system=new K(game);
+        system.getAliveKunishus=()=>kunishus;
+        system.checkDestroyed=kunishu=>{seen.push(kunishu.id);return kunishu.id===1?new Promise(resolve=>{resume=resolve;}):Promise.resolve();};
+        system.applyIkkoNetworkRelationLink=()=>{};
+        const pending=system.processEndMonth();assert.deepStrictEqual(seen,[1]);
+        if(lost)owner=false;resume();await pending;
+        assert.deepStrictEqual(seen,lost?[1]:[1,2]);
     }
 });
 
