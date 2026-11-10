@@ -485,7 +485,12 @@ class SaveManager {
         return true;
     }
 
-    _captureLoadRequestFlow() {
+    _captureLoadRequestFlow(options = {}) {
+        const requireTabOwnership = options.claimTabOwnership === true;
+        const tabSession = this.game && this.game.tabSession;
+        // 「続きから」・直接ロード・ファイル読込は、媒体のawait前に操作権を取得する。
+        // 復元入口まで取得を遅らせると、待機中に別タブが開始しても旧ロードが再取得してしまう。
+        if (requireTabOwnership && tabSession && !tabSession.claim()) return null;
         const turnManager = this.game && this.game.turnManager;
         if (!turnManager || typeof turnManager.captureTurnFlowGeneration !== 'function'
             || typeof turnManager.isTurnFlowGenerationLatest !== 'function') return null;
@@ -493,6 +498,7 @@ class SaveManager {
         return {
             generation,
             isLatest: () => turnManager.isTurnFlowGenerationLatest(generation)
+                && (!requireTabOwnership || !tabSession || tabSession.isOwner())
         };
     }
 
@@ -980,7 +986,7 @@ class SaveManager {
             if (this.game.ui) this.game.ui.showDialog('セーブファイルが大きすぎるため、読み込みを中止しました。', false);
             return;
         }
-        const requestFlow = this._captureLoadRequestFlow();
+        const requestFlow = this._captureLoadRequestFlow({ claimTabOwnership: true });
         if (!requestFlow) return;
         if (this.game.ui) this.game.ui.showLoadingScreen('セーブデータを確認しています', 0);
         
@@ -1088,7 +1094,7 @@ class SaveManager {
     async loadGameFromLocal(slotNo = 1, prefix = "sengoku_save_slot") { 
         // DB読込自体はまだゲーム状態を置換しないが、待ち時間に別遷移が始まった場合は
         // 古いロード要求が後から復元を開始しないよう、要求開始時のTurnManager世代を保持する。
-        const requestFlow = this._captureLoadRequestFlow();
+        const requestFlow = this._captureLoadRequestFlow({ claimTabOwnership: true });
         if (!requestFlow) return;
         // ★追加：ロードが始まった瞬間にロード画面で蓋をします！
         if (this.game.ui) this.game.ui.showLoadingScreen();
@@ -1305,7 +1311,7 @@ class SaveManager {
     async continueGame() {
         // 「続きから」のスロット探索中にも別の開始／タイトル遷移が起こり得るため、
         // 探索開始時の世代だけを保持し、古い検索結果からロードを開始しない。
-        const requestFlow = this._captureLoadRequestFlow();
+        const requestFlow = this._captureLoadRequestFlow({ claimTabOwnership: true });
         if (!requestFlow) return;
         // ★追加：探している間に操作されないようにロード画面で蓋をします！
         if (this.game.ui) this.game.ui.showLoadingScreen();

@@ -1366,10 +1366,7 @@ class GameManager {
     saveGameToLocal(slotNo = 1) { return this.saveManager.saveGameToLocal(slotNo); }
     loadGameFromLocal(slotNo = 1, prefix = "sengoku_save_slot") { return this.saveManager.loadGameFromLocal(slotNo, prefix); }
     executeAutoSave() { return this.saveManager.executeAutoSave(); }
-    continueGame() {
-        if (this.tabSession && !this.tabSession.claim()) return;
-        return this.saveManager.continueGame();
-    }
+    continueGame() { return this.saveManager.continueGame(); }
 
     // ==========================================
     // 観戦モードの切り替え

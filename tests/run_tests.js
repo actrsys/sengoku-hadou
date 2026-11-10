@@ -16828,7 +16828,7 @@ test('r430ではセーブ復元完了まで入力抑止を維持し旧復元を�
     assert.ok(titleSaveBlock.includes('hasData = await this.game.saveManager.refreshLoadAvailability({ isCurrent });'));
     assert.ok((titleSaveBlock.match(/if \(!isCurrent\(\)\) return false;/g) || []).length >= 2, 'ロード可否確認の前後でタイトル遷移世代を確認する');
 
-    const loadRequestAt = save.indexOf('_captureLoadRequestFlow()');
+    const loadRequestAt = save.indexOf('_captureLoadRequestFlow(options = {})');
     const loadRequestEnd = save.indexOf('\n    async _recoverFromFailedRestore()', loadRequestAt);
     const loadRequestBlock = save.slice(loadRequestAt, loadRequestEnd > loadRequestAt ? loadRequestEnd : loadRequestAt + 900);
     assert.ok(loadRequestBlock.includes('captureTurnFlowGeneration()'));
@@ -16840,12 +16840,12 @@ test('r430ではセーブ復元完了まで入力抑止を維持し旧復元を�
     const localBlock = save.slice(localAt, localEnd);
     const dbAwaitAt = localBlock.indexOf('rawData = await this._readSlotAfterPendingSave(prefix + slotNo);');
     const dbRecheckAt = localBlock.indexOf('if (!requestFlow.isLatest()) return;', dbAwaitAt);
-    assert.ok(localBlock.includes('const requestFlow = this._captureLoadRequestFlow();'));
+    assert.ok(localBlock.includes('const requestFlow = this._captureLoadRequestFlow({ claimTabOwnership: true });'));
     assert.ok(dbAwaitAt >= 0 && dbRecheckAt > dbAwaitAt, 'IndexedDB待ち後に旧ロード要求を止める');
 
     const continueAt = save.indexOf('async continueGame()');
     const continueBlock = save.slice(continueAt, continueAt + 1800);
-    assert.ok(continueBlock.includes('const requestFlow = this._captureLoadRequestFlow();'));
+    assert.ok(continueBlock.includes('const requestFlow = this._captureLoadRequestFlow({ claimTabOwnership: true });'));
     assert.ok(continueBlock.includes('if (!requestFlow.isLatest()) return;'));
 
     const recoveryAt = save.indexOf('async _recoverFromFailedRestore()');
@@ -39899,6 +39899,94 @@ test('r852 別タブへ操作権移行中の新規開始・シナリオ読込は
     ctx.DataManager.loadScenarioDefinitions = async () => {};
     await Game.prototype.startNewGame.call(game);
     assert.strictEqual(shown, 1, '所有タブの正常な新規開始は維持する');
+});
+
+// r861: 読込媒体をawaitしている間に別タブが開始したら、旧タブが復元入口のclaimで
+// 操作権を取り戻さない。続きから・直接ロード・ファイル読込は同じ寿命窓口を使う。
+test('r861 セーブ読込待ち中に操作権を失った旧タブは再取得も復元もしない', async () => {
+    let reader;
+    class FakeReader {
+        constructor() { reader = this; }
+        readAsArrayBuffer() {}
+    }
+    const ctx = createContext({FileReader: FakeReader});
+    loadScript(ctx, 'js/tab_session.js');
+    loadScript(ctx, 'js/save_manager.js');
+    const shared = new Map();
+    const host = id => ({
+        crypto: {randomUUID: () => id},
+        localStorage: {
+            getItem: key => shared.get(key) || null,
+            setItem: (key, value) => shared.set(key, value)
+        },
+        // バックグラウンドではstorage通知が遅れる場合を再現。
+        addEventListener() {}
+    });
+    const oldTab = new ctx.TabSessionCoordinator(host('old'));
+    const newTab = new ctx.TabSessionCoordinator(host('new'));
+    let generation = 1;
+    const game = {
+        tabSession: oldTab,
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationLatest: n => n === generation
+        },
+        ui: {showLoadingScreen() {}, hideLoadingScreen: async () => {}, showDialog() {}}
+    };
+    const saver = new ctx.SaveManager(game);
+    let validations = 0, restores = 0;
+    saver._validateSaveDataStructure = () => { validations++; };
+    saver._restoreSaveDataObj = async () => {
+        // 製品の復元入口はここでclaimする。ここへ旧要求が到達してはならない。
+        restores++;
+        oldTab.claim();
+        return true;
+    };
+    saver._decryptData = () => ({year: 1560});
+
+    // タブAが現役中に直接ロードし、DB待機中にBが操作権を取得。
+    assert.strictEqual(oldTab.claim(), true);
+    let finishRead;
+    saver._readSlotAfterPendingSave = () => new Promise(resolve => { finishRead = resolve; });
+    const local = saver.loadGameFromLocal(1);
+    assert.strictEqual(oldTab.isOwner(), true);
+    assert.strictEqual(newTab.claim(), true);
+    finishRead({year: 1560});
+    await local;
+    assert.strictEqual(newTab.isOwner(), true, '古い直接ロードは後発タブの操作権を奪わない');
+    assert.strictEqual(validations, 0);
+    assert.strictEqual(restores, 0);
+
+    // タイトルの「続きから」も、検索開始時点で取得して検索のawait後に再確認する。
+    let finishSlots;
+    saver.readSaveSlots = () => new Promise(resolve => { finishSlots = resolve; });
+    saver.loadGameFromLocal = async () => { throw new Error('失効後のロード禁止'); };
+    const continuing = saver.continueGame();
+    assert.strictEqual(oldTab.isOwner(), true, '続きからの検索開始時に操作権を取得');
+    assert.strictEqual(newTab.claim(), true);
+    finishSlots([{hasData: true, saveTimestamp: 12345, originalSlotNo: 1}]);
+    await continuing;
+    assert.strictEqual(newTab.isOwner(), true);
+    assert.strictEqual(restores, 0);
+
+    // FileReaderの非同期読込中も同じ扱い。ファイル未読時に旧復元へ進めない。
+    const file = {size: 12};
+    const input = {files: [file], value: 'save.sav'};
+    saver.loadGameFromFile({target: input});
+    assert.strictEqual(oldTab.isOwner(), true, 'ファイル読込開始時に操作権を取得');
+    assert.strictEqual(newTab.claim(), true);
+    await reader.onload({target: {result: new Uint8Array([1, 2, 3]).buffer}});
+    assert.strictEqual(newTab.isOwner(), true);
+    assert.strictEqual(validations, 0);
+    assert.strictEqual(restores, 0);
+
+    // 通常の直接ロードは有効なまま。世代と操作権を守れば従来の復元へ渡す。
+    saver._readSlotAfterPendingSave = async () => ({year: 1560});
+    saver.loadGameFromLocal = ctx.SaveManager.prototype.loadGameFromLocal.bind(saver);
+    await saver.loadGameFromLocal(2);
+    assert.strictEqual(validations, 1);
+    assert.strictEqual(restores, 1);
+    assert.strictEqual(oldTab.isOwner(), true);
 });
 
 // r860: 復元定義のawait中に別タブが操作権を得ても、storage通知は遅延し得る。
