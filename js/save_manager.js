@@ -684,7 +684,10 @@ class SaveManager {
         }
         turnManager.abortForScenarioTransition();
         const restoreFlowGeneration = turnManager.captureTurnFlowGeneration();
-        const isRestoreFlowLatest = () => turnManager.isTurnFlowGenerationLatest(restoreFlowGeneration);
+        // 別タブへ操作権が移ってもstorage通知はバックグラウンドで遅れることがある。
+        // 新規開始・シナリオ読込と同じく、各await境界では世代と操作権を一緒に確認する。
+        const isRestoreFlowLatest = () => turnManager.isTurnFlowGenerationLatest(restoreFlowGeneration)
+            && (!this.game.tabSession || this.game.tabSession.isOwner());
         this.game.isRestoringSave = true;
 
         try {

@@ -16793,7 +16793,9 @@ test('r430ではセーブ復元完了まで入力抑止を維持し旧復元を�
     const end = save.indexOf('\n    // ==========================================\n    // セーブ実行部分', at);
     const block = save.slice(at, end);
     assert.ok(block.includes('const restoreFlowGeneration = turnManager.captureTurnFlowGeneration();'));
-    assert.ok(block.includes('const isRestoreFlowLatest = () => turnManager.isTurnFlowGenerationLatest(restoreFlowGeneration);'));
+    assert.ok(block.includes('const isRestoreFlowLatest = () => turnManager.isTurnFlowGenerationLatest(restoreFlowGeneration)')
+        && block.includes('&& (!this.game.tabSession || this.game.tabSession.isOwner());'),
+        '復元中の寿命はターン世代だけでなく現在の操作権も照合する');
     const restoreCaptureAt = block.indexOf('const restoreFlowGeneration = turnManager.captureTurnFlowGeneration();');
     const restoreDefsAwaitAt = block.indexOf('await DataManager.loadScenarioDefinitions();');
     const restoreDefsRecheckAt = block.indexOf('if (!isRestoreFlowLatest()) return false;', restoreDefsAwaitAt);
@@ -39897,6 +39899,49 @@ test('r852 別タブへ操作権移行中の新規開始・シナリオ読込は
     ctx.DataManager.loadScenarioDefinitions = async () => {};
     await Game.prototype.startNewGame.call(game);
     assert.strictEqual(shown, 1, '所有タブの正常な新規開始は維持する');
+});
+
+// r860: 復元定義のawait中に別タブが操作権を得ても、storage通知は遅延し得る。
+// ターン世代だけでは旧復元を止められないため、実コードの復元入口から確認する。
+test('r860 別タブへ操作権を失ったセーブ復元は非同期読込後に旧状態へ触れない', async () => {
+    let owner = true, releaseDefinitions = null, validations = 0, claims = 0;
+    const ctx = createContext({
+        DataManager: {
+            loadScenarioDefinitions: () => new Promise(resolve => { releaseDefinitions = resolve; })
+        }
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    const game = {
+        tabSession: {
+            claim: () => { claims++; return owner; },
+            isOwner: () => owner
+        },
+        turnManager: {
+            abortForScenarioTransition() {},
+            captureTurnFlowGeneration: () => 17,
+            isTurnFlowGenerationLatest: generation => generation === 17
+        }
+    };
+    const manager = new ctx.SaveManager(game);
+    manager._validateSaveDataStructure = () => {
+        validations++;
+        throw new Error('検証用：操作権のある通常復元は構造検証まで進む');
+    };
+    const staleRestore = manager._restoreSaveDataObj({});
+    assert.strictEqual(typeof releaseDefinitions, 'function', 'シナリオ定義の読込を待機する');
+    assert.strictEqual(claims, 1);
+    owner = false; // 別タブが操作権を取得。旧タブへのstorage通知はまだ届いていない。
+    releaseDefinitions();
+    assert.strictEqual(await staleRestore, false, '旧タブの復元を中止する');
+    assert.strictEqual(validations, 0, '操作権失効後は保存データの展開を開始しない');
+    assert.strictEqual(game.year, undefined, '旧タブがゲーム状態を上書きしない');
+
+    owner = true;
+    const currentRestore = manager._restoreSaveDataObj({});
+    assert.strictEqual(claims, 2);
+    releaseDefinitions();
+    await assert.rejects(currentRestore, /操作権のある通常復元は構造検証まで進む/);
+    assert.strictEqual(validations, 1, '現行所有タブの正常な復元入口を塞がない');
 });
 
 // r859: 所有者確認後の IndexedDB.open() は非同期。別タブが接続待機中に
