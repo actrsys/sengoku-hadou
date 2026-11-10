@@ -39899,6 +39899,93 @@ test('r852 別タブへ操作権移行中の新規開始・シナリオ読込は
     assert.strictEqual(shown, 1, '所有タブの正常な新規開始は維持する');
 });
 
+// r859: 所有者確認後の IndexedDB.open() は非同期。別タブが接続待機中に
+// 操作権を奪った場合、旧タブはトランザクションを開始してはならない。
+test('r859 IndexedDB接続待ちで操作権を失った手動・自動保存は書き込まない', async () => {
+    let owner = true;
+    let finishOpen = null;
+    let writes = 0, closes = 0;
+    const saved = new Map();
+    const ctx = createContext({
+        localStorage: {getItem: () => '1', setItem() {}}
+    });
+    loadScript(ctx, 'js/save_manager.js');
+    const db = {
+        close() { closes++; },
+        transaction() {
+            const tx = {error: null, objectStore() {
+                return {put(data, key) {
+                    writes++;
+                    saved.set(key, data);
+                    queueMicrotask(() => tx.oncomplete());
+                }};
+            }};
+            return tx;
+        }
+    };
+    ctx.__openDb = () => new Promise(resolve => { finishOpen = () => resolve(db); });
+    ctx.__readDb = async key => saved.get(key) || null;
+    vm.runInContext('initDB = __openDb; loadFromDB = __readDb;', ctx);
+    const game = {
+        scenarioFolder: '1560_okehazama',
+        tabSession: {isOwner: () => owner},
+        turnManager: {
+            captureTurnFlowGeneration: () => 8,
+            isTurnFlowGenerationLatest: generation => generation === 8
+        }
+    };
+    const manager = new ctx.SaveManager(game);
+    const guards = [];
+    manager.showSaveGuard = () => guards.push('show');
+    manager.hideSaveGuard = () => guards.push('hide');
+    manager._createSaveDataObj = async () => ({saveTimestamp: 900, year: 1560});
+    manager._validateSaveDataStructure = () => true;
+    manager._encryptData = data => data;
+    manager.decodeStoredData = data => data;
+    manager.isLoadableSaveData = () => true;
+
+    const waitForOpen = async () => {
+        for (let i = 0; i < 30 && !finishOpen; i++) {
+            await new Promise(resolve => setImmediate(resolve));
+        }
+        assert.strictEqual(typeof finishOpen, 'function', '保存処理がDB接続待ちに入る');
+        const complete = finishOpen;
+        finishOpen = null;
+        return complete;
+    };
+
+    // 手動保存: ロード済み既存データ照合の後、DB接続中に別タブへ操作権移行。
+    const oldManual = manager.saveGameToLocal(1);
+    const releaseManual = await waitForOpen();
+    owner = false;
+    releaseManual();
+    await oldManual;
+    assert.strictEqual(writes, 0, '失効した旧タブは手動セーブを開始しない');
+    assert.strictEqual(saved.size, 0);
+    assert.strictEqual(closes, 1, '未使用DB接続も閉じる');
+
+    // 自動保存にも同じ入口の寿命判定を適用する。
+    owner = true;
+    const oldAuto = manager.executeAutoSave();
+    const releaseAuto = await waitForOpen();
+    owner = false;
+    releaseAuto();
+    await oldAuto;
+    assert.strictEqual(writes, 0, '失効した旧タブは自動セーブを開始しない');
+    assert.strictEqual(closes, 2);
+
+    // 操作権を維持した通常保存は、従来どおり書込・読戻しまで進む。
+    owner = true;
+    const current = manager.saveGameToLocal(1);
+    const releaseCurrent = await waitForOpen();
+    releaseCurrent();
+    await current;
+    assert.strictEqual(writes, 1);
+    assert.strictEqual(saved.get('sengoku_save_slot1').saveTimestamp, 900);
+    assert.strictEqual(game.hasSaveData, true);
+    assert.deepStrictEqual(guards, ['show', 'hide', 'show', 'hide', 'show', 'hide']);
+});
+
 // r850: 同一オリジンの別タブが本編へ入った場合、旧タブは正規のタイトル復帰に引き渡す。
 // ストレージのstorage通知は書き込んだ側には届かないというブラウザ規則も再現する。
 test('r850 別タブの操作権取得で旧タブが失効し、旧セーブ要求は書込不可になる', () => {

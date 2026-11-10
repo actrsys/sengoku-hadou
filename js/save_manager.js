@@ -1055,7 +1055,10 @@ class SaveManager {
                 this._validateSaveDataStructure(data);
                 const encryptedData = this._encryptData(data);
                 if (!isRequestCurrent()) return;
-                await saveToDB(storageKey, encryptedData);
+                // IndexedDBのopen自体も非同期。接続待ちの間に別タブへ操作権が移った場合、
+                // トランザクションを開始せず旧要求を破棄する。
+                if (await saveToDB(storageKey, encryptedData, isRequestCurrent) === false
+                    || !isRequestCurrent()) return;
                 // 読み戻しも同じキュー内に保持し、後続保存との照合を取り違えない。
                 const writtenData = this.decodeStoredData(await loadFromDB(storageKey));
                 if (!this.isLoadableSaveData(writtenData) || Number(writtenData.saveTimestamp) !== Number(data.saveTimestamp)) {
@@ -1162,8 +1165,8 @@ class SaveManager {
                 if (!data || !request.isCurrent()) return;
                 this._validateSaveDataStructure(data);
                 if (!request.isCurrent()) return;
-                await saveToDB(storageKey, data);
-                if (!request.isCurrent()) return;
+                if (await saveToDB(storageKey, data, request.isCurrent) === false
+                    || !request.isCurrent()) return;
                 this.game.hasSaveData = true;
                 localStorage.setItem('autoSaveIndex', autoSaveIndex === 5 ? 1 : autoSaveIndex + 1);
             });
@@ -1365,8 +1368,22 @@ function initDB() {
     });
 }
 
-async function saveToDB(key, data) {
+async function saveToDB(key, data, canStartWrite = null) {
     const db = await initDB();
+    // 操作権はopenの待機中にも移る。書込トランザクション生成の直前に
+    // 保存要求の寿命を再確認し、失効後の旧タブからの上書きを防ぐ。
+    // すでに開始したトランザクションの中断まで保証するものではない。
+    if (typeof canStartWrite === 'function') {
+        try {
+            if (!canStartWrite()) {
+                db.close();
+                return false;
+            }
+        } catch (error) {
+            try { db.close(); } catch (_) {}
+            throw error;
+        }
+    }
     return new Promise((resolve, reject) => {
         let finished = false;
         const closeAndFinish = (ok, value) => {
