@@ -40628,6 +40628,30 @@ test('r864 諸勢力月末待機後は操作権失効なら次勢力を処理せ
     }
 });
 
+
+// r868: r853のCSS整理で、JSが種類名から動的生成するゲージの色が誤削除された。
+// 現行の一覧（外交・大名・諸勢力）ではpower / friendの塗りと下地を両方保持する。
+test('外交・大名一覧の威信/友好度ゲージの動的クラスに塗り色と下地色がある', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ui_info.js');
+    const createBar = vm.runInContext('UIInfoManager.prototype._createBarHtml', ctx);
+    const css = read('css/style.css');
+    for (const type of ['power', 'friend']) {
+        const html = createBar.call({}, 65, type);
+        assert.ok(html.includes(`bar-bg-${type}`) && html.includes(`bar-fill-${type}`),
+            `${type}の動的ゲージclassが画面へ生成される`);
+        assert.ok(html.includes('--bar-value:65%'), `${type}の表示割合をCSS変数で受け渡す`);
+        const bg = css.match(new RegExp('\\.bar-bg-' + type + '\\s*\\{([^}]*)\\}'));
+        const fill = css.match(new RegExp('\\.bar-fill-' + type + '\\s*\\{([^}]*)\\}'));
+        assert.ok(bg && /background-color\s*:\s*#[0-9a-f]{3,8}/i.test(bg[1]),
+            `${type}のゲージ下地の色をCSS正本に保持する`);
+        assert.ok(fill && /background\s*:\s*linear-gradient\s*\(/.test(fill[1]),
+            `${type}のゲージ塗り色をCSS正本に保持する`);
+    }
+    assert.ok(/\.bar-fill\s*\{[^}]*width\s*:\s*var\(--bar-value/.test(css),
+        '共通のゲージ表示幅はJSのCSS変数を参照する');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);

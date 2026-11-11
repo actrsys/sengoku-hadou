@@ -2097,6 +2097,50 @@ async function validateTerminalDialogCoveredPaint(cdp) {
     console.log('✓ r720 終端会話のcoverをPC・スマホ・低メモリスマホで2描画境界まで保持 (実ブラウザ)');
 }
 
+
+// r868: 動的生成ゲージの幅だけでなく、CSS整理で色が透明になる回帰も検出する。
+async function validateListGaugeColors(cdp) {
+    const html = fixtureHtml('list_gauges.html');
+    for (const [width, height, isPc] of [[1280, 720, true], [360, 640, false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', {
+            width, height, deviceScaleFactor: 1, mobile: !isPc
+        });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc', ${isPc});
+                return [...document.querySelectorAll('[data-gauge]')].map(row => {
+                    const bg = row.querySelector('.bar-bg');
+                    const fill = row.querySelector('.bar-fill');
+                    const bgStyle = getComputedStyle(bg);
+                    const fillStyle = getComputedStyle(fill);
+                    const bgRect = bg.getBoundingClientRect();
+                    const fillRect = fill.getBoundingClientRect();
+                    return {type:row.dataset.gauge, percent:Number(row.dataset.percent),
+                        background:bgStyle.backgroundColor,
+                        fillBackground:fillStyle.backgroundImage,
+                        bgWidth:bgRect.width,fillWidth:fillRect.width,
+                        bgHeight:bgRect.height,fillHeight:fillRect.height};
+                });
+            })()`, returnByValue: true, awaitPromise: true
+        });
+        if (result.exceptionDetails) throw Error(result.exceptionDetails.text);
+        const rows = result.result?.value;
+        assert.ok(Array.isArray(rows) && rows.length === 4, '一覧ゲージのブラウザ描画を取得する');
+        for (const row of rows) {
+            assert.ok(row.background && row.background !== 'rgba(0, 0, 0, 0)',
+                `${isPc?'PC':'スマホ'} ${row.type}のゲージ背景が透明ではない`);
+            assert.ok(row.fillBackground && row.fillBackground.includes('linear-gradient('),
+                `${isPc?'PC':'スマホ'} ${row.type}のゲージ塗りが透明ではない`);
+            assert.ok(row.bgWidth > 80 && row.bgHeight >= 10 && row.fillHeight >= 9,
+                `${isPc?'PC':'スマホ'} ${row.type}ゲージの寸法を維持する`);
+            approx(row.fillWidth / (row.bgWidth - 2), row.percent / 100, 0.04,
+                `${isPc?'PC':'スマホ'} ${row.type}ゲージの幅率`);
+        }
+    }
+    console.log('✓ 外交・大名一覧 威信/友好度ゲージの色と幅 PC/スマホ visual regression');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -2152,6 +2196,7 @@ async function main() {
         }
         console.log('✓ PC武将能力ゲージ visual/layout regression');
         console.log('  80/100/110/120 の幅・高さ・限界突破・右列非侵入を実ブラウザで確認しました');
+        await validateListGaugeColors(cdp);
         await validateLegionCouncil(cdp);
         await validateFloatingStatusLayout(cdp);
         await validateCommandAndInterviewStates(cdp);

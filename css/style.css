@@ -1054,6 +1054,12 @@ body:not(.is-pc) .select-item > *:has(+ .pc-only:last-child) { border-right: non
     transition: width 0.3s ease;
     width: var(--bar-value, 0%);
 }
+/* 一覧のゲージ種別はUIInfoManager._createBarHtml()が動的にclass名を生成する。
+   静的検索に現れなくても外交・大名・諸勢力の一覧で使用中なので削除しない。 */
+.bar-bg-power { background-color: #3e2723; }
+.bar-fill-power { background: linear-gradient(to bottom, #26a69a, #00796b); }
+.bar-bg-friend { background-color: #b71c1c; }
+.bar-fill-friend { background: linear-gradient(to bottom, #42a5f5, #1565c0); }
 
 .status-bar-container { display: inline-block; vertical-align: middle; width: 60px; height: 14px; background-color: #d17842; border: 1px solid #a69363; position: relative; box-shadow: 0 0 5px rgba(0,0,0,0.8), inset 0 1px 3px rgba(0,0,0,0.6); margin: 0 4px; box-sizing: border-box; }
 .status-bar-fill { height: 100%; width: var(--status-bar-width, 0%); }
