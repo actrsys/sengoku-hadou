@@ -22,12 +22,20 @@ global.GameConfig = configRuntime.window.GameConfig;
 
 let passed = 0;
 let failed = 0;
+let skipped = 0;
 const pendingTests = [];
 
 function _recordTestFailure(name, error) {
     failed++;
     console.error(`✗ ${name}`);
     console.error(error && error.stack ? error.stack : error);
+}
+
+// 配布方針により意図的に未収録の実体だけを明示的にskipする。
+// ソースの構造的な確認は通常のtest()に残し、失敗と混同しない。
+function skip(name, reason) {
+    skipped++;
+    console.log(`- ${name} (SKIP: ${reason})`);
 }
 
 function test(name, fn) {
@@ -334,18 +342,19 @@ test('野戦の川の開始地域は非推移的な乱数ソートを使わな�
 // 設定・定数
 // ---------------------------------------------------------------------------
 
+const TITLE_FONT_PAIRS = [
+    ['title-abashiri-mincho.woff2', 'abashiri-mincho.woff2'],
+    ['title-fude-goshirae.woff2', 'fude-goshirae.woff2']
+];
+
 test('r540 タイトルは同じ2書体のsubsetを先に読み、ゲーム本体の完全書体はロード幕で後から待つ', () => {
     const boot = read('js/app_bootstrap.js');
     const css = read('css/style.css');
     const ui = read('js/ui.js');
     const html = read('index.html');
-    for (const [file, full] of [
-        ['title-abashiri-mincho.woff2', 'abashiri-mincho.woff2'],
-        ['title-fude-goshirae.woff2', 'fude-goshirae.woff2']
-    ]) {
-        const small = fs.statSync(path.join(ROOT, 'data/fonts', file)).size;
-        const large = fs.statSync(path.join(ROOT, 'data/fonts', full)).size;
-        assert.ok(small > 1000 && small < large / 10, file + ' は同一フォントの軽量字形');
+    assert.ok(fs.statSync(path.join(ROOT, 'data/fonts')).isDirectory(),
+        '配布版もフォントを配置する空フォルダは残す');
+    for (const [file] of TITLE_FONT_PAIRS) {
         assert.ok(boot.includes(file), 'トップのpreload対象は小型字形のみ');
         assert.ok(css.includes(file), 'CSSも同じ小型字形を使用');
     }
@@ -360,6 +369,22 @@ test('r540 タイトルは同じ2書体のsubsetを先に読み、ゲーム本�
     assert.ok(html.includes('class="fonts-loading"'), '最初の画面も字形が揃ってから表示する');
     assert.ok(!boot.includes('FONT_TIMEOUT_MS = 6000'), '大容量フォントをトップの白画面待機対象にしない');
 });
+
+// フォント本体は配布ZIPから除外し、ユーザー側で data/fonts に配置する。
+// 4点すべて未収録なら実体検査だけをskip。部分欠落は不完全な配置なので失敗させる。
+const fontSizeTestName = 'r540 タイトル軽量フォントの実体は完全版より十分小さい';
+const fontPaths = TITLE_FONT_PAIRS.flat().map(file => path.join(ROOT, 'data/fonts', file));
+if (fontPaths.every(file => !fs.existsSync(file))) {
+    skip(fontSizeTestName, '配布仕様により4フォント実体が未収録');
+} else {
+    test(fontSizeTestName, () => {
+        for (const [file, full] of TITLE_FONT_PAIRS) {
+            const small = fs.statSync(path.join(ROOT, 'data/fonts', file)).size;
+            const large = fs.statSync(path.join(ROOT, 'data/fonts', full)).size;
+            assert.ok(small > 1000 && small < large / 10, file + ' は同一フォントの軽量字形');
+        }
+    });
+}
 
 test('r541 タイトル起動後のレイアウト切替では現在の軽量モードを正本として本体フォントを準備する', async () => {
     function makeBootstrap({ portrait }) {
@@ -40604,11 +40629,11 @@ test('r864 諸勢力月末待機後は操作権失効なら次勢力を処理せ
 });
 
 Promise.all(pendingTests).then(() => {
-    console.log(`\n${passed} passed, ${failed} failed`);
+    console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);
 }).catch(error => {
     _recordTestFailure('非同期テストランナー', error);
-    console.log(`\n${passed} passed, ${failed} failed`);
+    console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     process.exit(1);
 });
 
