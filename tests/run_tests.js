@@ -40652,6 +40652,71 @@ test('外交・大名一覧の威信/友好度ゲージの動的クラスに塗�
         '共通のゲージ表示幅はJSのCSS変数を参照する');
 });
 
+
+// r869: 所有者変更は保存時だけでなく、判定や副作用に用いるIDも数値で統一する。
+// 同じ所有者の文字列IDで、落城の忠誠・諸勢力副作用を誤発生させない。
+test('城所有者IDは変更入口で正規化し、同一所有者への文字列IDで落城副作用を起こさない', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: () => true } });
+    loadScript(ctx, 'js/castle_manager.js');
+    const Manager = vm.runInContext('CastleManager', ctx);
+    const execute = newOwnerId => {
+        const castle = { id: 11, ownerClan: 2, legionId: 0, castellanId: 0 };
+        const remaining = { id: 12, ownerClan: 2, legionId: 0, castellanId: 0 };
+        const member = { id: 21, clan: 2, loyalty: 0, isDaimyo: false };
+        const clans = [{ id: 2, homeCastleId: 0 }];
+        let backlash = 0;
+        const game = {
+            castles: [castle, remaining], clans, legions: [],
+            getClan: id => clans.find(c => c.id === Number(id)),
+            getClanBushos: id => Number(id) === 2 ? [member] : [],
+            kunishuSystem: { applyRelationDropOnCastleCapture() { backlash++; } }
+        };
+        new Manager(game).changeOwner(castle, newOwnerId, false);
+        return { owner: castle.ownerClan, loyalty: member.loyalty, backlash };
+    };
+    const numeric = execute(2);
+    assert.deepStrictEqual(numeric, { owner: 2, loyalty: 0, backlash: 0 });
+    assert.deepStrictEqual(execute('2'), numeric,
+        '所有者2と文字列「2」で、忠誠や諸勢力反発を変動させない');
+});
+
+test('城所有者IDを文字列で渡しても数値と同じ勢力変更・忠誠・外交対象整理になる', () => {
+    const ctx = createContext({ BushoStatusRules: { isActive: () => true } });
+    loadScript(ctx, 'js/castle_manager.js');
+    const Manager = vm.runInContext('CastleManager', ctx);
+    const execute = newOwnerId => {
+        const castle = { id: 11, ownerClan: 1, legionId: 0, castellanId: 0 };
+        const remaining = { id: 12, ownerClan: 1, legionId: 0, castellanId: 0 };
+        const members = [
+            { id: 21, clan: 1, loyalty: 80, isDaimyo: false },
+            { id: 22, clan: 2, loyalty: 40, isDaimyo: false }
+        ];
+        const clans = [
+            { id: 1, homeCastleId: 0, currentDiplomacyTarget: { targetId: 2 } },
+            { id: 2, homeCastleId: 0 }
+        ];
+        let backlash = 0;
+        const game = {
+            castles: [castle, remaining], clans, legions: [],
+            getClan: id => clans.find(c => c.id === Number(id)),
+            getClanBushos: id => members.filter(b => b.clan === id),
+            kunishuSystem: { applyRelationDropOnCastleCapture() { backlash++; } }
+        };
+        new Manager(game).changeOwner(castle, newOwnerId, false);
+        return {
+            owner: castle.ownerClan,
+            loyalties: members.map(b => b.loyalty),
+            backlash, diplomacyTarget: clans[0].currentDiplomacyTarget
+        };
+    };
+    const numeric = execute(2);
+    assert.deepStrictEqual(numeric, {
+        owner: 2, loyalties: [77, 43], backlash: 1, diplomacyTarget: null
+    });
+    assert.deepStrictEqual(execute('2'), numeric,
+        '通常の所有権移転は、文字列でも数値入力と完全に同じ副作用を持つ');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);

@@ -43,6 +43,8 @@ class CastleManager {
 
     // 城の持ち主を変更する魔法です。isEventがtrueの時は、イベントによる平和的な変更として扱います。
     changeOwner(castle, newOwnerId, isEvent = false, newLegionId = 0, previousCastellanId = undefined) {
+        // 所有者の保存・比較・忠誠/外交副作用では同じ数値IDを用いる。
+        newOwnerId = Number(newOwnerId) || 0;
         const oldOwnerId = Number(castle.ownerClan);
         const oldLegionId = Number(castle.legionId || 0);
         // 合戦では捕縛・撤退により、所有者変更前に旧城主が名簿から外れる。
