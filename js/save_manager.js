@@ -1158,9 +1158,18 @@ class SaveManager {
         try {
             // 保存先はロード一覧が扱う1～5だけに限定する。破損したlocalStorage値で
             // 参照されないスロットへ保存してしまうことを避ける。
-            const storedIndex = Number(localStorage.getItem('autoSaveIndex'));
-            const autoSaveIndex = Number.isInteger(storedIndex) && storedIndex >= 1 && storedIndex <= 5
-                ? storedIndex : 1;
+            // localStorageが拒否されてもIndexedDBが使えるなら保存を止めない。
+            // 共有ストレージが使えない間の巡回位置だけ、同じSaveManager内に保持する。
+            let autoSaveIndex = this._autoSaveFallbackIndex || 1;
+            if (!this._autoSaveStorageUnavailable) {
+                try {
+                    const storedIndex = Number(localStorage.getItem('autoSaveIndex'));
+                    autoSaveIndex = Number.isInteger(storedIndex) && storedIndex >= 1 && storedIndex <= 5
+                        ? storedIndex : 1;
+                } catch (_) {
+                    this._autoSaveStorageUnavailable = true;
+                }
+            }
             const storageKey = 'sengoku_autosave_slot' + autoSaveIndex;
 
             // 手動保存と同じスロット単位の直列化を使う。旧ゲームの書込みが
@@ -1177,7 +1186,16 @@ class SaveManager {
                 if (await saveToDB(storageKey, data, request.isCurrent) === false
                     || !request.isCurrent()) return;
                 this.game.hasSaveData = true;
-                localStorage.setItem('autoSaveIndex', autoSaveIndex === 5 ? 1 : autoSaveIndex + 1);
+                const nextIndex = autoSaveIndex === 5 ? 1 : autoSaveIndex + 1;
+                this._autoSaveFallbackIndex = nextIndex;
+                if (!this._autoSaveStorageUnavailable) {
+                    try {
+                        localStorage.setItem('autoSaveIndex', nextIndex);
+                    } catch (_) {
+                        // 保存データ自体は確定済み。次回以降もメモリ上の巡回位置を使う。
+                        this._autoSaveStorageUnavailable = true;
+                    }
+                }
             });
         } catch (e) {
             console.error('オートセーブに失敗しました:', e);

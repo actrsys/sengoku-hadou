@@ -21022,6 +21022,77 @@ test('r501 自動保存の保存先は1～5の範囲外なら正規スロット�
 });
 
 
+// localStorageが拒否されてもIndexedDBが正常なら、単一タブの自動保存を止めない。
+// 保存先メタ情報を更新できない場合、同じ起動中はメモリ側で巡回を維持する。
+test('オートセーブはlocalStorageが利用不能でも保存と5スロット巡回を継続する', async () => {
+    for (const mode of ['property', 'getItem', 'setItem']) {
+        const writes = [];
+        const values = new Map([['autoSaveIndex', '4']]);
+        const ctx = createContext({
+            console: { ...console, error() {} },
+            document: {getElementById() {return null;}}
+        });
+        if (mode === 'property') {
+            Object.defineProperty(ctx, 'localStorage', {get() {throw new Error('blocked storage');}});
+        } else {
+            ctx.localStorage = {
+                getItem(key) {
+                    if (mode === 'getItem') throw new Error('blocked getItem');
+                    return values.get(key) ?? null;
+                },
+                setItem(key, value) {
+                    if (mode === 'setItem') throw new Error('blocked setItem');
+                    values.set(key, String(value));
+                }
+            };
+        }
+        loadScript(ctx, 'js/save_manager.js');
+        ctx.__writes = writes;
+        vm.runInContext('saveToDB = async (key, data) => { __writes.push(key); };', ctx);
+        const game = {scenarioFolder:'1560_okehazama', hasSaveData:false, _autoSaveInProgress:false};
+        const saver = new ctx.SaveManager(game);
+        saver.showSaveGuard = () => {};
+        saver.hideSaveGuard = () => {};
+        saver._createSaveDataObj = async () => ({saveTimestamp: 1});
+        saver._validateSaveDataStructure = () => true;
+        for (let i = 0; i < 6; i++) await saver.executeAutoSave();
+        const first = mode === 'setItem' ? 4 : 1;
+        assert.deepStrictEqual(writes,
+            Array.from({length: 6}, (_, i) => `sengoku_autosave_slot${((first - 1 + i) % 5) + 1}`),
+            `${mode}: 正常に保存し、5スロットの巡回後は1番へ戻る`);
+        assert.strictEqual(game.hasSaveData, true, `${mode}: 保存実体がある場合に正しく記録する`);
+        assert.strictEqual(game._autoSaveInProgress, false, `${mode}: 保存ガードを解除する`);
+    }
+});
+
+test('localStorage不使用時も失敗した自動保存では保存先を進めない', async () => {
+    const writes = [];
+    const ctx = createContext({
+        console: { ...console, error() {} },
+        document: {getElementById() {return null;}}
+    });
+    Object.defineProperty(ctx, 'localStorage', {get() {throw new Error('blocked storage');}});
+    loadScript(ctx, 'js/save_manager.js');
+    ctx.__writes = writes;
+    ctx.__failWrite = true;
+    vm.runInContext('saveToDB = async (key, data) => { __writes.push(key); return __failWrite ? false : undefined; };', ctx);
+    const game = {scenarioFolder:'1560_okehazama', hasSaveData:false, _autoSaveInProgress:false};
+    const saver = new ctx.SaveManager(game);
+    saver.showSaveGuard = () => {};
+    saver.hideSaveGuard = () => {};
+    saver._createSaveDataObj = async () => ({saveTimestamp: 1});
+    saver._validateSaveDataStructure = () => true;
+    await saver.executeAutoSave();
+    assert.strictEqual(game.hasSaveData, false);
+    ctx.__failWrite = false;
+    await saver.executeAutoSave();
+    await saver.executeAutoSave();
+    assert.deepStrictEqual(writes, [
+        'sengoku_autosave_slot1', 'sengoku_autosave_slot1', 'sengoku_autosave_slot2'
+    ], '失敗で巡回させず、成功後だけ次の保存先へ進める');
+    assert.strictEqual(game.hasSaveData, true);
+});
+
 // r502: 旧シナリオの自動保存が書込待ちでも、後発シナリオの自動保存を欠落させない。
 test('r502 旧世代の自動保存待機は新世代の自動保存を阻害しない', async () => {
     let generation = 1;
