@@ -2334,6 +2334,7 @@ class UIManager {
         this._dialogGeneration = Number(this._dialogGeneration || 0) + 1;
         this._cutinGeneration = Number(this._cutinGeneration || 0) + 1;
         this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;
+        this._warModalOpenGeneration = Number(this._warModalOpenGeneration || 0) + 1;
         document.querySelectorAll('.responsive-army-box, .army-box').forEach(card => {
             this._cancelEmptyCardAnimation(card);
         });
@@ -3616,73 +3617,175 @@ class UIManager {
         this.info.showForceSelector(forces, onSelect, onCancel);
     }
     
+    // 固定DOMの再利用時は必ず非表示のまま全戦況と顔画像を準備する。
+    // 顔がロード済みでもdecode完了前に公開すると旧画像が残って見える端末がある。
+    async _waitForWarFaceImage(img, isCurrent = () => true) {
+        if (!img || !isCurrent()) return;
+        const fallbackSrc = 'data/images/faceicons/unknown_face.webp';
+        const waitReady = async () => {
+            if (typeof img.decode === 'function') {
+                try {
+                    await img.decode();
+                    return img.naturalWidth > 0;
+                } catch (error) {
+                    return !!(img.complete && img.naturalWidth > 0);
+                }
+            }
+            if (img.complete) return img.naturalWidth > 0;
+            return new Promise(resolve => {
+                let finished = false;
+                const done = () => {
+                    if (finished) return;
+                    finished = true;
+                    clearTimeout(timer);
+                    img.removeEventListener('load', done);
+                    img.removeEventListener('error', done);
+                    resolve(img.complete && img.naturalWidth > 0);
+                };
+                const timer = setTimeout(done, 1500);
+                img.addEventListener('load', done, { once: true });
+                img.addEventListener('error', done, { once: true });
+                if (img.complete) done();
+            });
+        };
+        img.loading = 'eager';
+        let ready = await waitReady();
+        if (!isCurrent()) return;
+        if (!ready && img.getAttribute('src') !== fallbackSrc) {
+            // 画像が存在しない場合は既存の不明顔を用い、前回の顔を残さない。
+            img.setAttribute('src', fallbackSrc);
+            ready = await waitReady();
+        }
+        if (!isCurrent()) return;
+        // 不明顔まで読み込めない環境でも、前戦の画像を出さない。
+        img.style.visibility = ready ? '' : 'hidden';
+    }
+
+    async _prepareSiegeWarModal() {
+        const state = this.game && this.game.warManager ? this.game.warManager.state : null;
+        if (!this.warModal || !state || !state.active) return false;
+        const generation = Number(this._warModalOpenGeneration || 0) + 1;
+        this._warModalOpenGeneration = generation;
+        const warManager = this.game.warManager;
+        const warGeneration = typeof warManager.getCurrentWarGeneration === 'function'
+            ? warManager.getCurrentWarGeneration() : null;
+        const isCurrent = () => generation === Number(this._warModalOpenGeneration || 0)
+            && this.game.warManager === warManager && warManager.state === state && state.active
+            && (warGeneration === null || warManager.getCurrentWarGeneration() === warGeneration);
+
+        // 旧閉鎖予約が新しい表示を消さないよう失効させるが、ここではまだ幕を開けない。
+        if (typeof this.cancelCoveredClose === 'function') this.cancelCoveredClose(this.warModal);
+        this.warModal.classList.add('hidden');
+        this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;
+        // 前戦の作戦ボタン・カード消滅演出を次の開戦へ持ち越さない。
+        if (this.warControls) {
+            this.warControls.replaceChildren();
+            this.warControls.classList.add('disabled-area');
+        }
+        const aiGuard = document.getElementById('war-ai-guard');
+        if (aiGuard) aiGuard.classList.add('hidden');
+        for (const card of this.warModal.querySelectorAll('.responsive-army-box, .army-box')) {
+            this._cancelEmptyCardAnimation(card);
+            card.dataset.hasUnit = 'false';
+        }
+
+        this.updateWarUI();
+        // 表示される顔だけを待つ。援軍不在のカードに残っている旧srcは対象外。
+        const visibleFaceIds = ['war-atk-face', 'war-def-face'];
+        for (const prefix of ['atk-self', 'atk-ally', 'def-self', 'def-ally']) {
+            const card = document.getElementById(`war-${prefix}-reinf-card`);
+            if (card && card.dataset.hasUnit === 'true') visibleFaceIds.push(`war-${prefix}-reinf-face`);
+        }
+        await Promise.all(visibleFaceIds.map(id => this._waitForWarFaceImage(document.getElementById(id), isCurrent)));
+        if (!isCurrent()) return false;
+
+        // この時点で戦況文字・顔・天候・カード配置が新しい戦いのものに揃っている。
+        if (Number(state.battleFocusCastleId) > 0 && !state.battleCameraLocked && typeof this.focusMapOnCastle === 'function') {
+            state.battleCameraLocked = true;
+            this.focusMapOnCastle(Number(state.battleFocusCastleId), {
+                transition: 'smooth', reason: 'battle_modal_open', anchor: 'territory',
+                diagnostic: false, lockInteraction: false
+            });
+        }
+        if (typeof this.suspendMainMapForBattle === 'function') this.suspendMainMapForBattle('siege-war');
+        if (typeof this.clearCommandMenu === 'function') this.clearCommandMenu();
+        this.prepareCoveredViewForOpen(this.warModal);
+        return true;
+    }
+
+    // 戦況の初期表示と毎ラウンドの天候表示は同じ窓口を使う。
+    updateWarWeatherUI(s = this.game && this.game.warManager && this.game.warManager.state) {
+        if (!s) return;
+        const info = document.getElementById('war-weather-info');
+        const visual = document.getElementById('war-visual-area');
+        const layer = document.getElementById('war-weather-layer');
+        if (!info || !visual || !layer) return;
+        visual.classList.remove('is-raining', 'is-snowing', 'is-heavy-snow');
+        layer.classList.remove('is-rain', 'is-snow', 'hidden');
+        if (s.isHeavySnow) visual.classList.add('is-heavy-snow');
+        if (s.weather === 'rain') {
+            info.textContent = '☔ 雨';
+            info.style.color = '#88ccff';
+            visual.classList.add('is-raining');
+            layer.classList.add('is-rain');
+        } else if (s.weather === 'snow') {
+            info.textContent = '⛄ 雪';
+            info.style.color = '#b3e5fc';
+            visual.classList.add('is-snowing');
+            layer.classList.add('is-snow');
+        } else {
+            info.textContent = '☀ 晴れ';
+            info.style.color = '';
+            layer.classList.add('hidden');
+        }
+    }
+
     setWarModalVisible(visible) {
-        if (!this.warModal) return;
-        if (visible) {
-            // 援軍参加などで開戦時にはプレイヤー非関与だった戦争が手動戦闘へ切り替わる場合も、
-            // モーダルを出す前に同じ戦場中心をカメラの正本にします。
-            const openingWarState = this.game && this.game.warManager ? this.game.warManager.state : null;
-            if (openingWarState && Number(openingWarState.battleFocusCastleId) > 0 && !openingWarState.battleCameraLocked && typeof this.focusMapOnCastle === 'function') {
-                openingWarState.battleCameraLocked = true;
-                this.focusMapOnCastle(Number(openingWarState.battleFocusCastleId), {
-                    transition: 'smooth',
-                    reason: 'battle_modal_open',
+        if (!this.warModal) return false;
+        if (visible) return this._prepareSiegeWarModal();
+        // 非表示中の画像decodeが旧攻城戦を再び開かないよう失効させる。
+        this._warModalOpenGeneration = Number(this._warModalOpenGeneration || 0) + 1;
+        // 固定war DOMを閉じる時点で、旧メッセージのtimer/callbackを次の戦闘から切り離す。
+        this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;
+
+        // r721: 戦場カメラの補正は、背景地図が復帰してから全画面coverを
+        // 外す前に行う。従来のafterHide内では地図が露出した後でscroll位置が
+        // 変わるため、戦闘終了時に画面が一瞬跳ねることがあった。
+        const focusWarMapUnderCover = () => {
+            const warState = this.game && this.game.warManager ? this.game.warManager.state : null;
+            if (warState && warState.battleCameraLocked && Number(warState.battleFocusCastleId) > 0 && typeof this.focusMapOnCastle === 'function') {
+                this.focusMapOnCastle(Number(warState.battleFocusCastleId), {
+                    transition: 'instant',
+                    reason: 'battle_modal_close',
                     anchor: 'territory',
                     diagnostic: false,
                     lockInteraction: false
                 });
             }
-            if (typeof this.suspendMainMapForBattle === 'function') {
-                this.suspendMainMapForBattle('siege-war');
-            }
-            this.prepareCoveredViewForOpen(this.warModal);
-            // ★追加：攻城戦が始まる時に、平時のコマンドリストを綺麗にお掃除して非表示にします！
-            if (typeof this.clearCommandMenu === 'function') {
-                this.clearCommandMenu();
-            }
+        };
+
+        const finishWarCoverClose = () => {
+            // 戦闘画面のカードの「部隊がいたよシール」は表示終了後に解放する。
+            const allCards = document.querySelectorAll('.responsive-army-box, .army-box');
+            allCards.forEach(card => {
+                this._cancelEmptyCardAnimation(card);
+                card.dataset.hasUnit = 'false';
+            });
+        };
+
+        if (!this.warModal.classList.contains('hidden') && typeof this.closeCoveredViewAfterRecovery === 'function') {
+            this.closeCoveredViewAfterRecovery(this.warModal, {
+                recoverUnderCover: () => {
+                    if (typeof this.resumeMainMapAfterBattle === 'function') this.resumeMainMapAfterBattle('siege-war');
+                    focusWarMapUnderCover();
+                },
+                afterHide: finishWarCoverClose
+            });
         } else {
-            // 固定war DOMを閉じる時点で、旧メッセージのtimer/callbackを次の戦闘から切り離す。
-            this._warActionMessageGeneration = Number(this._warActionMessageGeneration || 0) + 1;
-
-            // r721: 戦場カメラの補正は、背景地図が復帰してから全画面coverを
-            // 外す前に行う。従来のafterHide内では地図が露出した後でscroll位置が
-            // 変わるため、戦闘終了時に画面が一瞬跳ねることがあった。
-            const focusWarMapUnderCover = () => {
-                const warState = this.game && this.game.warManager ? this.game.warManager.state : null;
-                if (warState && warState.battleCameraLocked && Number(warState.battleFocusCastleId) > 0 && typeof this.focusMapOnCastle === 'function') {
-                    this.focusMapOnCastle(Number(warState.battleFocusCastleId), {
-                        transition: 'instant',
-                        reason: 'battle_modal_close',
-                        anchor: 'territory',
-                        diagnostic: false,
-                        lockInteraction: false
-                    });
-                }
-            };
-
-            const finishWarCoverClose = () => {
-                // 戦闘画面のカードの「部隊がいたよシール」は表示終了後に解放する。
-                const allCards = document.querySelectorAll('.responsive-army-box, .army-box');
-                allCards.forEach(card => {
-                    this._cancelEmptyCardAnimation(card);
-                    card.dataset.hasUnit = 'false';
-                });
-            };
-
-            if (!this.warModal.classList.contains('hidden') && typeof this.closeCoveredViewAfterRecovery === 'function') {
-                this.closeCoveredViewAfterRecovery(this.warModal, {
-                    recoverUnderCover: () => {
-                        if (typeof this.resumeMainMapAfterBattle === 'function') this.resumeMainMapAfterBattle('siege-war');
-                        focusWarMapUnderCover();
-                    },
-                    afterHide: finishWarCoverClose
-                });
-            } else {
-                if (typeof this.resumeMainMapAfterBattle === 'function') this.resumeMainMapAfterBattle('siege-war');
-                focusWarMapUnderCover();
-                this.warModal.classList.add('hidden');
-                finishWarCoverClose();
-            }
+            if (typeof this.resumeMainMapAfterBattle === 'function') this.resumeMainMapAfterBattle('siege-war');
+            focusWarMapUnderCover();
+            this.warModal.classList.add('hidden');
+            finishWarCoverClose();
         }
     }
     
@@ -4158,7 +4261,8 @@ class UIManager {
     updateWarUI() {
         if (!this.game.warManager.state.active) return;
         const s = this.game.warManager.state;
-        
+        this.updateWarWeatherUI(s);
+
         const setTxt = (id, val) => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -4199,10 +4303,13 @@ class UIManager {
             if (!el) return;
             const nextSrc = StatPresenter.safeFaceIconPath(busho && busho.faceIcon);
             if (el.getAttribute('src') !== nextSrc) {
+                el.onerror = () => {
+                    if (el.getAttribute('src') === nextSrc) setSrcEl(el, 'data/images/faceicons/unknown_face.webp');
+                };
                 setSrcEl(el, nextSrc);
-                el.onerror = () => { setSrcEl(el, 'data/images/faceicons/unknown_face.webp'); };
             }
             el.classList.remove('hidden');
+            el.style.visibility = '';
         };
 
         // PC版攻城戦では、部隊戦力を主役にしたまま余白へ部隊長能力を補助表示します。
@@ -4429,9 +4536,12 @@ class UIManager {
                 const leaderNameHtml = leader ? getCompressedBushoNameHtml(leader, isMobile) + "軍" : "不明";
                 
                 const leaderFaceSrc = StatPresenter.safeFaceIconPath(leader && leader.faceIcon);
+                if (faceImg) faceImg.style.visibility = '';
                 if (faceImg && faceImg.getAttribute('src') !== leaderFaceSrc) {
+                    faceImg.onerror = () => {
+                        if (faceImg.getAttribute('src') === leaderFaceSrc) setSrcEl(faceImg, 'data/images/faceicons/unknown_face.webp');
+                    };
                     setSrcEl(faceImg, leaderFaceSrc);
-                    faceImg.onerror = () => { setSrcEl(faceImg, 'data/images/faceicons/unknown_face.webp'); };
                 }
 
                 let orgName = "";

@@ -20945,6 +20945,7 @@ test('r494 攻城戦の城防御値は通常更新とダメージ演出更新の
     const UIManager = vm.runInContext('UIManager', context);
     const currentStats = { wallDefense: hostile };
     const ui = {
+        updateWarWeatherUI() {},
         game: { year: 1570, month: 2, warManager: { state: { active: true,
             round: 1, defender: { defense: hostile, isKunishu: false } } } }
     };
@@ -41386,6 +41387,157 @@ test('月初開始直後の例外後に実行中フラグだけが残らない',
     await retry;
 });
 
+test('r889 攻城戦は全データ更新と今回の顔画像decode後にだけ公開する', async () => {
+    const images = new Map();
+    const releases = new Map();
+    const makeImage = (id) => {
+        const img = fakeElement(id);
+        img.attrs = { src: `old-${id}.webp` };
+        img.naturalWidth = 80;
+        img.complete = true;
+        img.getAttribute = key => img.attrs[key] || null;
+        img.setAttribute = (key, val) => { img.attrs[key] = val; };
+        img.decode = () => new Promise(resolve => { releases.set(img.attrs.src, resolve); });
+        return img;
+    };
+    images.set('war-atk-face', makeImage('war-atk-face'));
+    images.set('war-def-face', makeImage('war-def-face'));
+    const elem = id => images.get(id) || null;
+    const context = createContext({ document: { getElementById: elem } });
+    loadScript(context, 'js/ui.js');
+    const view = Object.create(vm.runInContext('UIManager', context).prototype);
+    const modal = fakeElement('war-modal');
+    modal.classList.add('hidden');
+    modal.querySelectorAll = () => [];
+    const warState = { active: true, battleCameraLocked: true };
+    const manager = { state: warState, getCurrentWarGeneration: () => 10 };
+    view.game = { warManager: manager };
+    view.warModal = modal;
+    view.warControls = { classList: new FakeClassList(), replaceChildren() {} };
+    view._cancelEmptyCardAnimation = () => {};
+    const order = [];
+    view.updateWarUI = () => {
+        order.push('data');
+        images.get('war-atk-face').setAttribute('src', 'current-atk.webp');
+        images.get('war-def-face').setAttribute('src', 'current-def.webp');
+    };
+    view.prepareCoveredViewForOpen = () => { order.push('show'); modal.classList.remove('hidden'); };
+    view.suspendMainMapForBattle = () => order.push('suspend');
+    view.clearCommandMenu = () => order.push('clear');
+    view.cancelCoveredClose = () => {};
+    const opening = view.setWarModalVisible(true);
+    assert.deepStrictEqual(order, ['data'], '先に全データを更新し、公開は行わない');
+    assert.ok(modal.classList.contains('hidden'));
+    assert.strictEqual(images.get('war-atk-face').getAttribute('src'), 'current-atk.webp');
+    assert.strictEqual(images.get('war-def-face').getAttribute('src'), 'current-def.webp');
+    releases.get('current-atk.webp')();
+    await Promise.resolve();
+    assert.ok(modal.classList.contains('hidden'), '片側の画像だけでは開かない');
+    releases.get('current-def.webp')();
+    assert.strictEqual(await opening, true);
+    assert.deepStrictEqual(order, ['data', 'suspend', 'clear', 'show']);
+    assert.ok(!modal.classList.contains('hidden'));
+});
+
+test('r889 攻城戦は閉鎖・新戦争で旧画像decodeが完了しても再表示しない', async () => {
+    const releases = new Map();
+    const img = fakeElement('war-atk-face');
+    img.attrs = { src: 'old.webp' }; img.complete = true; img.naturalWidth = 80;
+    img.getAttribute = key => img.attrs[key] || null;
+    img.setAttribute = (key, val) => { img.attrs[key] = val; };
+    img.decode = () => new Promise(resolve => { releases.set(img.attrs.src, resolve); });
+    const context = createContext({ document: {
+        getElementById: id => id === 'war-atk-face' ? img : null,
+        querySelectorAll: () => []
+    }});
+    loadScript(context, 'js/ui.js');
+    const view = Object.create(vm.runInContext('UIManager', context).prototype);
+    const modal = fakeElement('war-modal'); modal.classList.add('hidden'); modal.querySelectorAll = () => [];
+    const stateA = { active: true }, stateB = { active: true };
+    let warGeneration = 1;
+    const manager = { state: stateA, getCurrentWarGeneration: () => warGeneration };
+    view.game = { warManager: manager };
+    view.warModal = modal;
+    view.warControls = { classList: new FakeClassList(), replaceChildren() {} };
+    view._cancelEmptyCardAnimation = () => {};
+    view.cancelCoveredClose = () => {};
+    view.clearCommandMenu = () => {};
+    view.suspendMainMapForBattle = () => {};
+    view.resumeMainMapAfterBattle = () => {};
+    let visibleCount = 0;
+    view.prepareCoveredViewForOpen = () => { visibleCount++; modal.classList.remove('hidden'); };
+    view.updateWarUI = () => img.setAttribute('src', manager.state === stateA ? 'a.webp' : 'b.webp');
+    const oldOpening = view.setWarModalVisible(true);
+    manager.state = stateB; warGeneration++;
+    const newOpening = view.setWarModalVisible(true);
+    releases.get('a.webp')();
+    assert.strictEqual(await oldOpening, false, '旧画像完了後でも新画面を操作しない');
+    assert.strictEqual(img.getAttribute('src'), 'b.webp');
+    assert.ok(modal.classList.contains('hidden'));
+    releases.get('b.webp')();
+    assert.strictEqual(await newOpening, true);
+    assert.strictEqual(visibleCount, 1);
+    const pendingOpening = view.setWarModalVisible(true);
+    view.setWarModalVisible(false);
+    releases.get('b.webp')();
+    assert.strictEqual(await pendingOpening, false, '閉鎖予約以降は旧画面を再表示しない');
+    assert.ok(modal.classList.contains('hidden'));
+    assert.strictEqual(visibleCount, 1);
+});
+
+test('r889 攻城戦の進行は画像準備が完了した戦争世代だけで開始する', async () => {
+    const context = createContext();
+    loadScript(context, 'js/war.js');
+    const manager = Object.create(vm.runInContext('WarManager', context).prototype);
+    const stateA = { active: true }, stateB = { active: true };
+    let generation = 1;
+    let ready;
+    manager.state = stateA;
+    manager.getCurrentWarGeneration = () => generation;
+    manager._isWarLifecycleCurrent = (n) => n === generation && manager.state.active;
+    manager._captureWarFlowContext = () => ({ generation });
+    manager._isWarFlowContextCurrent = flow => flow.generation === generation;
+    manager.game = { ui: { setWarModalVisible: () => new Promise(resolve => { ready = resolve; }) } };
+    let executed = 0;
+    manager._openPlayerSiegeWar(() => executed++);
+    assert.strictEqual(executed, 0, 'まだ表示されていない戦闘を進めない');
+    ready(true);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(executed, 1);
+    manager._openPlayerSiegeWar(() => executed++);
+    manager.state = stateB;
+    generation++;
+    ready(true);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(executed, 1, '旧戦争の読み込み完了が次戦争を進めない');
+});
+
+test('r889 攻城戦の天候表示は開戦時と各ラウンドで同じUI正本を使用する', () => {
+    const context = createContext();
+    const elements = new Map();
+    for (const id of ['war-weather-info', 'war-visual-area', 'war-weather-layer']) elements.set(id, fakeElement(id));
+    context.document = { getElementById: id => elements.get(id) || null };
+    loadScript(context, 'js/ui.js');
+    const view = Object.create(vm.runInContext('UIManager', context).prototype);
+    const info = elements.get('war-weather-info');
+    const visual = elements.get('war-visual-area');
+    const layer = elements.get('war-weather-layer');
+    view.updateWarWeatherUI({ weather: 'rain', isHeavySnow: false });
+    assert.strictEqual(info.textContent, '☔ 雨');
+    assert.ok(visual.classList.contains('is-raining'));
+    view.updateWarWeatherUI({ weather: 'snow', isHeavySnow: true });
+    assert.strictEqual(info.textContent, '⛄ 雪');
+    assert.ok(!visual.classList.contains('is-raining'));
+    assert.ok(visual.classList.contains('is-heavy-snow'));
+    view.updateWarWeatherUI({ weather: undefined });
+    assert.strictEqual(info.textContent, '☀ 晴れ');
+    assert.ok(layer.classList.contains('hidden'));
+    const warSource = read('js/war.js');
+    const weatherSection = warSource.slice(warSource.indexOf('    processWarRound() {'), warSource.indexOf('            // ★直近5ターンのダメージを記憶する箱'));
+    assert.ok(weatherSection.includes('this.game.ui.updateWarWeatherUI(s);'));
+    assert.ok(!weatherSection.includes("document.getElementById('war-weather-info')"), '天候表示の重複処理を残さない');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);
@@ -41394,4 +41546,5 @@ Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     process.exit(1);
 });
+
 

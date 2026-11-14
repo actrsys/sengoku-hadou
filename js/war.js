@@ -467,6 +467,22 @@ class WarManager {
         else this.endWar(false);
     }
 
+    // 固定攻城戦DOMは現在の戦況・顔画像を準備してから公開し、公開完了後に進行する。
+    // 旧戦争の顔画像読み込みが遅れて完了しても新戦争を再開しない。
+    _openPlayerSiegeWar(onReady) {
+        const state = this.state;
+        const generation = this.getCurrentWarGeneration();
+        const flow = this._captureWarFlowContext();
+        Promise.resolve(this.game.ui.setWarModalVisible(true)).then(opened => {
+            if (opened === false || this.state !== state
+                || !this._isWarLifecycleCurrent(generation)
+                || !this._isWarFlowContextCurrent(flow)) return;
+            onReady();
+        }).catch(error => {
+            console.error('攻城戦画面の準備に失敗しました:', error);
+        });
+    }
+
     startSiegeWarPhase() {
         const s = this.state; const W = window.WarParams.War;
         // 攻城戦開始時の援軍兵数を一度だけ記録する。攻城中の被害は
@@ -485,17 +501,19 @@ class WarManager {
         }
         
         if (s.isPlayerInvolved) { 
-            this.game.ui.setWarModalVisible(true); this.game.ui.clearWarLog();
-            
+            this.game.ui.clearWarLog();
+
             if (window.AudioManager) {
-                window.AudioManager.memorizeCurrentBgm(); 
-                window.AudioManager.playBGM('07_Underworld dance.ogg'); 
+                window.AudioManager.memorizeCurrentBgm();
+                window.AudioManager.playBGM('07_Underworld dance.ogg');
             }
-            
-            this._scheduleWarCallback(() => {
-                this.game.ui.log(`★ ${s.sourceCastle.name}軍が${s.defender.name}への攻城戦を開始！`, { history: false });
-                this.game.ui.updateWarUI(); this.processWarRound(); 
-            }, 500); 
+
+            this._openPlayerSiegeWar(() => {
+                this._scheduleWarCallback(() => {
+                    this.game.ui.log(`★ ${s.sourceCastle.name}軍が${s.defender.name}への攻城戦を開始！`, { history: false });
+                    this.processWarRound();
+                }, 500);
+            }); 
         } else { this._scheduleWarCallback(() => { this.resolveAutoWar(); }, 100); }
     }
     
@@ -611,7 +629,9 @@ class WarManager {
             // ★変更: 委任城なら強制的に手動戦闘になるのを防ぎます！
             // ★修正：守備側が「諸勢力」の時は、プレイヤーの城であっても強制的に画面をスキップさせます！
             if (s.isPlayerInvolved || (!s.defender.isKunishu && Number(s.defender.ownerClan) === Number(this.game.playerClanId) && !s.defender.isDelegated)) {
-                s.isPlayerInvolved = true; this.game.ui.setWarModalVisible(true); this.game.ui.updateWarUI(); this.processWarRound(); return;
+                s.isPlayerInvolved = true;
+                this._openPlayerSiegeWar(() => this.processWarRound());
+                return;
             }
 
             // ★ここを大改造！：AI同士のオートバトルでも、プレイヤー用と同じように頭を使った攻城戦をやらせます！
@@ -698,33 +718,9 @@ class WarManager {
                 }
             }
             
-            // 画面の見た目（文字とアニメーション）を更新します
-            const weatherInfo = document.getElementById('war-weather-info');
-            const visualArea = document.getElementById('war-visual-area');
-            const weatherLayer = document.getElementById('war-weather-layer');
-            if (weatherInfo && visualArea && weatherLayer) {
-                visualArea.classList.remove('is-raining', 'is-snowing', 'is-heavy-snow');
-                weatherLayer.classList.remove('is-rain', 'is-snow', 'hidden');
-
-                if (s.isHeavySnow) {
-                    visualArea.classList.add('is-heavy-snow');
-                }
-
-                if (s.weather === 'rain') {
-                    weatherInfo.innerText = "☔ 雨";
-                    weatherInfo.style.color = "#88ccff";
-                    visualArea.classList.add('is-raining');
-                    weatherLayer.classList.add('is-rain');
-                } else if (s.weather === 'snow') {
-                    weatherInfo.innerText = "⛄ 雪";
-                    weatherInfo.style.color = "#b3e5fc";
-                    visualArea.classList.add('is-snowing');
-                    weatherLayer.classList.add('is-snow');
-                } else {
-                    weatherInfo.innerText = "☀ 晴れ";
-                    weatherInfo.style.color = "";
-                    weatherLayer.classList.add('hidden');
-                }
+            // 初期表示と同じ正本で天候表示を更新する。
+            if (this.game.ui && typeof this.game.ui.updateWarWeatherUI === 'function') {
+                this.game.ui.updateWarWeatherUI(s);
             }
 
             // ★直近5ターンのダメージを記憶する箱を用意します
