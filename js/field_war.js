@@ -3661,21 +3661,13 @@ class FieldWarManager {
                 popup.style.left = `${elLeft + (elWidth / 2)}px`;
                 popup.style.top = `${elTop}px`;
                 
-                // 低FPS端末でも最低1回は完全表示されたフレームを通してから保持時間を数える。
-                // CSSアニメーションをappend直後から走らせると、重い実機では最終フレームへ飛んで一瞬に見える。
-                const retirePopup = async () => {
-                    await this._waitForFieldWarVisualState(0);
-                    await new Promise(r => setTimeout(r, 650));
-                    if (!popup.parentNode) return;
-
-                    const remove = () => {
-                        if (popup.parentNode) popup.parentNode.removeChild(popup);
-                    };
-                    popup.addEventListener('animationend', remove, { once: true });
-                    popup.classList.add('is-leaving');
-                    setTimeout(remove, 700);
+                // 数字は出現直後からCSSで上昇する。旧実装の650ms静止と800ms進行停止は設けない。
+                const remove = () => {
+                    if (popup.parentNode) popup.parentNode.removeChild(popup);
                 };
-                retirePopup();
+                popup.addEventListener('animationend', remove, { once: true });
+                // タブ非表示等でanimationendが来ない場合だけ後始末する。
+                setTimeout(remove, 1000);
             };
 
             showDamagePopup(dmgToDef, defEl);
@@ -3689,8 +3681,8 @@ class FieldWarManager {
                 atkRefs.soldierEl.textContent = String(attacker.soldiers);
             }
 
-            // ポップアップをしっかり見せるために少しだけ待ちます
-            await new Promise(r => setTimeout(r, 800));
+            // 先頭の描画機会だけ確保し、数字表示のために戦闘を固定停止させない。
+            await this._waitForFieldWarVisualState(0);
             if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
         } else {
             // プレイヤーがいない（AI同士）ならアニメーションをスキップしてパパッと減らします

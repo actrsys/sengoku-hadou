@@ -1136,7 +1136,7 @@ async function validateFieldWarTroopOverlay(cdp) {
                                 stroke:getComputedStyle(soldiers).webkitTextStrokeWidth,
                                 shadow:getComputedStyle(soldiers).textShadow,
                                 markerTransform:getComputedStyle(visual).transform,
-                                marker:rect(visual)});
+                                marker:rect(visual),unitZ:getComputedStyle(u).zIndex,markerZ:getComputedStyle(visual).zIndex,overlayZ:getComputedStyle(overlay).zIndex});
                         }
                         records.push({type,size,preview,directions});
                         u.remove();
@@ -1151,13 +1151,16 @@ async function validateFieldWarTroopOverlay(cdp) {
             const base=record.directions[0];
             assert.ok(base.soldiers.y < base.troop.bottom - 2, `${cfg.label}/${record.type}: 兵数が兵科画像の下部に完全に重なる`);
             assert.ok(base.soldiers.bottom <= base.troop.bottom + 0.6, `${cfg.label}/${record.type}: 兵数が兵科画像の下端を越えない`);
-            assert.ok(base.troop.bottom <= base.marker.y - 0.6, `${cfg.label}/${record.type}: 兵科画像が凸の描画領域を覆わない`);
+            assert.ok(base.troop.bottom <= base.marker.y + 3.5, `${cfg.label}/${record.type}: 兵科画像は凸の上端をわずかに覆うだけ`);
             assert.ok(Math.abs(base.troop.cx-base.marker.cx)<0.6, `${cfg.label}/${record.type}: 兵科画像と凸の中心軸が一致する`);
             assert.strictEqual(base.soldierStack,'1', `${cfg.label}/${record.type}: 兵数が兵科画像の前面にある`);
             assert.ok(parseFloat(base.stroke)>0, `${cfg.label}/${record.type}: 黒縁が設定されている`);
             assert.strictEqual(base.shadow,'none', `${cfg.label}/${record.type}: 左右にずれる黒い影を廃止する`);
             assert.ok(Math.abs(base.troop.cx-base.soldiers.cx)<0.6, `${cfg.label}/${record.type}: 兵科画像と兵数を中央揃えにする`);
-            assert.ok(base.troop.h >= 20 && base.troop.w >= 20, `${cfg.label}/${record.type}: 兵科画像が縮小され過ぎない`);
+            assert.ok(Math.abs(base.troop.h - 19.2) < 0.2 && Math.abs(base.troop.w - 19.2) < 0.2, `${cfg.label}/${record.type}: 兵科画像は24pxの約0.8倍`);
+            assert.strictEqual(base.unitZ, record.preview ? '24' : 'auto', `${cfg.label}/${record.type}: 通常部隊は階層を作らず、半透明プレビューだけの表示順を保つ`);
+            assert.strictEqual(base.markerZ, '20', `${cfg.label}/${record.type}: 凸は共通階層`);
+            assert.strictEqual(base.overlayZ, '25', `${cfg.label}/${record.type}: 別部隊の凸より兵科画像が前面`);
             assert.strictEqual(base.border,'0px', `${cfg.label}/${record.type}: 兵科画像を枠線で囲わない`);
             assert.strictEqual(base.background,'rgba(0, 0, 0, 0)', `${cfg.label}/${record.type}: 背景色を付けない`);
             assert.ok(base.backgroundImage.includes(`${record.type}.webp`), `${cfg.label}/${record.type}: 対応する兵科画像を使う`);
@@ -1172,6 +1175,43 @@ async function validateFieldWarTroopOverlay(cdp) {
         }
     }
     console.log('✓ 野戦兵科・兵数 PC/スマホ 6方向固定/プレビュー visual/layout regression');
+}
+
+async function validateFieldWarDamagePopup(cdp) {
+    // ダメージ表示の初回フレームで静止せず、水平位置を保って上昇することを実ブラウザで確認する。
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'animation.css'), 'utf8');
+    const html = fixtureHtml('field_war_fullscreen.html').replace('</head>', `<style>${css.replace(/<\/style/gi, '<\\/style')}</style></head>`);
+    for (const cfg of [
+        { label:'PC', width:1280, height:720, mobile:false, isPc:true },
+        { label:'mobile', width:360, height:640, mobile:true, isPc:false }
+    ]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width:cfg.width, height:cfg.height, deviceScaleFactor:1, mobile:cfg.mobile });
+        const result=await cdp.call('Runtime.evaluate', {
+            expression: `(async () => {
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc', ${cfg.isPc});
+                const map=document.createElement('div');map.id='fw-map';
+                map.style.cssText='position:relative;width:700px;height:500px;';
+                document.querySelector('.fw-main-area').appendChild(map);
+                const popup=document.createElement('div');popup.className='fw-damage-popup';popup.textContent='-1200';
+                popup.style.left='300px';popup.style.top='150px';map.appendChild(popup);
+                const rect=() => { const r=popup.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,center:r.x+r.width/2,opacity:getComputedStyle(popup).opacity}; };
+                const initial=rect();
+                await new Promise(resolve=>setTimeout(resolve,90));
+                const moving=rect();
+                await new Promise(resolve=>setTimeout(resolve,100));
+                const later=rect();
+                return {initial,moving,later,name:popup.getAnimations()[0]?.animationName||'',duration:getComputedStyle(popup).animationDuration};
+            })()`, returnByValue:true, awaitPromise:true
+        });
+        const v=result.result.value;
+        assert.strictEqual(v.name,'fw-popup',`${cfg.label}: 表示開始からダメージ数字をアニメーションする`);
+        assert.ok(v.moving.y < v.initial.y - 1,`${cfg.label}: 表示後90msで既に上昇している (${v.initial.y} -> ${v.moving.y})`);
+        assert.ok(v.later.y < v.moving.y - 1,`${cfg.label}: 数字が途中で静止しない (${v.moving.y} -> ${v.later.y})`);
+        assert.ok(Math.abs(v.initial.center-v.moving.center)<0.6 && Math.abs(v.moving.center-v.later.center)<0.6,
+            `${cfg.label}: 左右へ跳ばない`);
+    }
+    console.log('✓ 野戦ダメージ数字 PC/スマホ 出現直後から上昇・左右位置固定 visual regression');
 }
 
 async function validateFieldWarFullscreen(cdp) {
@@ -2290,6 +2330,7 @@ async function main() {
         await validateLowMemoryPagerLayout(cdp);
         await validateFieldWarFullscreen(cdp);
         await validateFieldWarTroopOverlay(cdp);
+        await validateFieldWarDamagePopup(cdp);
         await validateFieldTerrainLayout(cdp);
         await validateSiegeLayout(cdp);
         await validateTitleMenuStability(cdp);

@@ -4595,9 +4595,17 @@ test('野戦兵科画像の下部へ兵数を重ね、黒縁を均一化し、�
         return css.slice(start, css.indexOf('}', start) + 1);
     };
     const wrap = rule('.fw-unit-status-wrap');
-    assert.ok(/bottom:\s*calc\(100%\s*\+/.test(wrap), '兵科画像と数字は凸本体の上側に置く');
+    assert.ok(/bottom:\s*calc\(100%\s*-/.test(wrap), '兵科画像と数字は凸本体の上に近づけつつ重ねすぎない');
     assert.ok(wrap.includes('left: 50%') && wrap.includes('translateX(-50%)'), '兵科画像と数字を同じ中央線で固定する');
     assert.ok(!/\brotate\(|\bscale\(/.test(wrap), '兵科画像・兵数には凸の向き変更を適用しない');
+    assert.ok(wrap.includes('width: 19.2px') && wrap.includes('height: 19.2px'), '兵科画像は24pxの約0.8倍');
+    assert.ok(/bottom:\s*calc\(100%\s*-\s*3px\)/.test(wrap), '上方の別部隊から離して少し下げる');
+    const markerContainer = rule('.fw-unit');
+    assert.ok(markerContainer.includes('z-index: auto'), '部隊ごとの独立重なり階層を作らず、全兵科画像を全凸の前面へ出す');
+    assert.ok(rule('.fw-unit-icon').includes('z-index: 20'), '凸本体の共通重なり階層');
+    assert.ok(wrap.includes('z-index: 25'), '兵科画像は別の部隊の凸より前面');
+    assert.ok(!rule('.fw-unit-icon').includes('will-change: transform'), '全軍常時GPUレイヤー化を避ける');
+
     const icon = rule('.fw-troop-icon');
     assert.ok(icon.includes('position: absolute'), '兵科画像と兵数を縦積みせず重ねる');
     assert.ok(!/background-color\s*:|\bborder\s*:|border-radius\s*:/.test(icon), '画像に枠や背景を付けない');
@@ -11856,7 +11864,7 @@ test('野戦AIの攻撃可否は向き変更APに加えて攻撃1APまで確保�
     assert.ok(field.includes('unit.ap >= turnCost + 1 && this.canAttackTarget(tempUnit, e.x, e.y)'), '実行直前の攻撃対象選択も同じAP基準を使う');
 });
 
-test('野戦ダメージ演出は低FPS端末でも描画機会を通し、従来の交互点滅の見た目を維持する', () => {
+test('野戦ダメージ表示は出現直後から動き、固定停止で次の描画を妨げない', () => {
     const field = read('js/field_war.js');
     const css = read('css/animation.css');
     const style = read('css/style.css');
@@ -11865,22 +11873,24 @@ test('野戦ダメージ演出は低FPS端末でも描画機会を通し、従�
     assert.ok(field.includes('await this._waitForFieldWarVisualState(120);'));
     assert.ok(field.includes('await this._waitForFieldWarVisualState(35);'));
     assert.ok(field.includes('await this._waitForFieldWarVisualState(0);'));
-    assert.ok(field.includes("popup.classList.add('is-leaving');"));
-    assert.ok(css.includes('.fw-damage-popup.is-leaving'));
+    assert.ok(!field.includes("popup.classList.add('is-leaving');"), '停止後の2段階アニメーションは作らない');
+    assert.ok(!field.includes('setTimeout(r, 650)'), '数字を650ms止めない');
+    assert.ok(!field.includes('setTimeout(r, 800)'), 'ダメージ表示後に800msの固定停止を入れない');
+    assert.ok(!css.includes('.fw-damage-popup.is-leaving'), '古い終了用クラスを残さない');
     const popupRuleAt = css.indexOf('.fw-damage-popup {');
     const popupRuleEnd = css.indexOf('}', popupRuleAt);
     const popupRule = css.slice(popupRuleAt, popupRuleEnd + 1);
-    assert.ok(!popupRule.includes('animation:'), 'append直後からwall-clock animationを走らせない');
+    assert.ok(/animation:\s*fw-popup\s/.test(popupRule), '出現した時点から上昇が開始する');
+    assert.ok(popupRule.includes('transform: translateX(-50%)'), '初期状態と上昇中の水平位置を一致させる');
 
-    assert.ok(css.includes('.anim-battle-flash {\n    filter: brightness(2) drop-shadow(0 0 10px #ffffff);'), '攻守の部隊全体が交互に光る従来表現を維持する');
-    assert.ok(!css.includes('.anim-battle-flash::after'), 'リング表示への置換を行わない');
-
+    assert.ok(css.includes('.anim-battle-flash {\n    filter: brightness(2) drop-shadow(0 0 10px #ffffff);'), '交互点滅の表現は維持する');
+    assert.ok(!css.includes('.anim-battle-flash::after'));
     const unitRulesAt = style.indexOf('/* 野戦の部隊カラーと影 */');
     const unitRulesEnd = style.indexOf('/* 友軍カラー（野戦・ログ共通） */', unitRulesAt);
     const unitRules = style.slice(unitRulesAt, unitRulesEnd);
-    assert.ok(unitRules.includes('drop-shadow(1px 0 0'), '通常時の従来の縁取りを維持する');
-    assert.ok(unitRules.includes('drop-shadow(-1px 0 0'), '通常時の従来の縁取りを維持する');
-    assert.ok(unitRules.includes('drop-shadow(0 0 6px #ffff00)'), '選択中の従来の発光を維持する');
+    assert.ok(unitRules.includes('drop-shadow(1px 0 0'));
+    assert.ok(unitRules.includes('drop-shadow(-1px 0 0'));
+    assert.ok(unitRules.includes('drop-shadow(0 0 6px #ffff00)'));
 });
 
 test('野戦の交戦時は不要なsmooth scroll・DOM再探索・非表示ログlayoutを避ける', () => {
