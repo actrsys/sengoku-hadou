@@ -10680,7 +10680,7 @@ test('戦争準備の選択は非会話画面へ進む前に確認ダイアロ�
     const cleanupEnd = ui.indexOf('// ★修正：okBtnが見つからなくても', cleanupStart);
     const cleanupBlock = ui.slice(cleanupStart, cleanupEnd);
     assert.ok(cleanupStart >= 0, '非会話遷移用の明示的な即時close指定を持つ');
-    assert.ok(cleanupBlock.indexOf('closeCompletely();') < cleanupBlock.indexOf('const result = callback();'), '指定時はcallbackより先にダイアログを閉じる');
+    assert.ok(cleanupBlock.indexOf('closeCompletely(true);') < cleanupBlock.indexOf('callbackResult = callback();'), '指定時はcallbackより先にダイアログを閉じる');
     assert.ok(ui.includes('choice.closeBeforeAction === true'), 'カスタム選択肢でも先閉じを指定できる');
     assert.ok(ui.includes('dialog.customOpts?.closeBeforeOk === true'));
     assert.ok(ui.includes('dialog.customOpts?.closeBeforeCancel === true'));
@@ -33488,6 +33488,85 @@ test('r899 戦域点滅は攻城戦画面の復帰完了後に開始し、元の
     const visibleBlock=ui.slice(visibleStart,ui.indexOf('    clearWarLog()',visibleStart));
     assert.ok(visibleBlock.includes('return this.closeCoveredViewAfterRecovery(this.warModal'), '共通背景復帰が終わるPromiseを返す');
     assert.ok(!effort.slice(start,blink).includes('setTimeout('),'固定msで画面を間に合わせない');
+});
+
+test('r902 外交の非同期分岐中は会話を固定時間で閉じず、選択肢の公開へ引き継ぐ', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ui.js');
+    vm.runInNewContext('this.UI = UIManager', ctx);
+    const ui = Object.create(ctx.UI.prototype);
+    ui._dialogHandoffPending = false;
+    ui._dialogHandoffToken = 0;
+    ui._dialogHandoffHoldCount = 0;
+    const calls = [];
+    let completeAction;
+    const action = new Promise(resolve => { completeAction = resolve; });
+    // 本番の会話閉鎖窓口を、時計を進める代わりに直接呼ぶ。
+    ui._scheduleDialogHandoffClose(() => calls.push('closed-old'), 220, action);
+    assert.strictEqual(ui._dialogHandoffTimer, undefined, '次の非同期会話を待つ間は猶予タイマーを作らない');
+    assert.strictEqual(ui.isDialogShowing, false, '次の選択肢が会話キューを取得できる状態にする');
+    assert.strictEqual(ui._dialogHandoffPending, true, '旧会話を覆いとして保持する');
+    await Promise.resolve();
+    assert.deepStrictEqual(calls, []);
+    // 次の会話が先に到着した場合、元会話の非同期完了では新しい会話を閉じない。
+    ui._cancelDialogHandoffClose();
+    completeAction();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.deepStrictEqual(calls, [], '元の分岐完了は新しい会話の公開を妨げない');
+
+    let completeTerminal;
+    const terminalAction = new Promise(resolve => { completeTerminal = resolve; });
+    ui._scheduleDialogHandoffClose(() => calls.push('closed-terminal'), 220, terminalAction);
+    completeTerminal();
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    assert.deepStrictEqual(calls, ['closed-terminal'], '次の画面がないと確定したら旧会話を閉じる');
+    assert.strictEqual(ui._dialogHandoffPending, false);
+    const script = read('js/ui.js');
+    assert.ok(script.includes('scheduleHandoff(callbackResult)'), '会話の分岐コールバックのPromiseを共通handoffへ渡す');
+    assert.ok(script.includes('this._scheduleDialogHandoffClose(closeCompletely, graceMs, pendingAction)'), '通常会話と選択肢を同じ窓口で管理');
+});
+
+test('r902 外交の明示的引き渡し中は次画面が出るまで共通暗幕を保つ', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ui.js');
+    vm.runInNewContext('this.UI = UIManager', ctx);
+    const ui = Object.create(ctx.UI.prototype);
+    const states = new Set();
+    ui._modalBackdrop = {classList: {
+        contains(v) {return states.has(v);},
+        add(v) {states.add(v);},
+        remove(v) {states.delete(v);}
+    }};
+    ui._modalBackdropEpoch = 0;
+    ui._modalBackdropGeneration = 0;
+    ui._modalBackdropHolds = 0;
+    ui._dialogHandoffHoldCount = 1;
+    ui.isDialogShowing = false;
+    ui.dialogQueue = [];
+    ui.waitForCoveredMapPaint = () => Promise.resolve();
+    // 実際の処理中と同じように暗幕を表示し、長い非同期操作でも消さない。
+    const tickers = [];
+    const oldSetTimeout = ctx.setTimeout;
+    ctx.setTimeout = fn => {tickers.push(fn); return tickers.length;};
+    try {
+        ui._releaseModalHandoffBackdropAfterPaint();
+        for (let i=0; i<5; i++) {
+            if (tickers.length) tickers.shift()();
+            await Promise.resolve();
+            await Promise.resolve();
+            assert.ok(!states.has('hidden'), '外交の次画面をまだ準備中なら暗幕を維持');
+        }
+        ui._dialogHandoffHoldCount = 0;
+        if (tickers.length) tickers.shift()();
+        for (let i=0;i<5;i++) await Promise.resolve();
+        assert.ok(states.has('hidden'), '次の画面がないと確定してから暗幕を解除');
+    } finally {
+        ctx.setTimeout = oldSetTimeout;
+    }
+    const source=read('js/ui.js');
+    assert.ok(source.includes('const releaseActionBackdrop = closeBeforeAction'), '別画面へ進むボタンも共通暗幕を先に引き継ぐ');
+    assert.ok(source.includes('Promise.resolve(callbackResult).then(releaseActionBackdrop, releaseActionBackdrop)'), '非同期成功・失敗どちらでも暗幕を解放');
 });
 
 test('r900 共通暗幕の監視は強制リセットで重複せず、旧暗幕も再表示しない', () => {

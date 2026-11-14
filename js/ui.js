@@ -1106,7 +1106,8 @@ class UIManager {
             // 会話の顔画像decodeなどが進行中なら、固定時間で暗幕を剥がさない。
             // 次画面公開・会話完了・強制画面失効のいずれかで待機を終了する。
             while (epoch === this._modalBackdropEpoch && this._modalBackdropHolds === 0
-                && (this.isDialogShowing || (this.dialogQueue && this.dialogQueue.length > 0))) {
+                && (this.isDialogShowing || (this.dialogQueue && this.dialogQueue.length > 0)
+                    || (this._dialogHandoffHoldCount || 0) > 0)) {
                 await new Promise(resolve => setTimeout(resolve, 50));
             }
             if (typeof this.waitForCoveredMapPaint === 'function') await this.waitForCoveredMapPaint();
@@ -1187,7 +1188,7 @@ class UIManager {
         return true;
     }
 
-    _scheduleDialogHandoffClose(closeFn, graceMs = 180) {
+    _scheduleDialogHandoffClose(closeFn, graceMs = 180, pendingAction = null) {
         this._cancelDialogHandoffClose();
         const token = (this._dialogHandoffToken || 0) + 1;
         this._dialogHandoffToken = token;
@@ -1200,6 +1201,18 @@ class UIManager {
 
         // 明示的な画面引き渡し中は、固定時間では閉じません。
         if ((this._dialogHandoffHoldCount || 0) > 0) return;
+
+        // 外交の返答・分岐等、次の会話を準備する非同期コールバックがある場合は、
+        // 80/220ms経過だけで旧メッセージを閉じない。Promiseが完了するか次の
+        // 会話が公開されるまで、旧画面を入力不可のcoverとして保持する。
+        if (pendingAction && typeof pendingAction.then === 'function') {
+            const finishPendingAction = () => {
+                if (token === this._dialogHandoffToken && this._dialogHandoffPending
+                    && (this._dialogHandoffHoldCount || 0) === 0) this._closePendingDialogHandoffNow();
+            };
+            Promise.resolve(pendingAction).then(finishPendingAction, finishPendingAction);
+            return;
+        }
 
         this._dialogHandoffTimer = setTimeout(() => {
             if (!this._dialogHandoffPending || token !== this._dialogHandoffToken) return;
@@ -1464,7 +1477,7 @@ class UIManager {
                 }
             };
 
-            const continueOrClose = () => {
+            const continueOrClose = (pendingAction = null) => {
                 if (this.dialogQueue.length > 0) {
                     // 次の画像の decode 中も今の会話画面を保持し、準備完了時に中身だけ交換します。
                     this.isDialogShowing = true;
@@ -1476,45 +1489,54 @@ class UIManager {
                 // すぐ次が来るケースがあります。イベント/会話は少し長め、通常UIは短めに待ちます。
                 const isConversationLike = isBottomMessage || hasQueuedChoices;
                 const graceMs = isConversationLike ? 220 : 80;
-                this._scheduleDialogHandoffClose(closeCompletely, graceMs);
+                this._scheduleDialogHandoffClose(closeCompletely, graceMs, pendingAction);
             };
 
-            const scheduleHandoff = () => {
+            const scheduleHandoff = (pendingAction = null) => {
                 // showDialogAsync の resolve() で再開する async/await の継続処理を先に走らせ、
                 // 次の会話がキューへ積まれた後で「維持して続行／完全に閉じる」を判定します。
                 if (typeof queueMicrotask === 'function') {
-                    queueMicrotask(continueOrClose);
+                    queueMicrotask(() => continueOrClose(pendingAction));
                 } else {
-                    Promise.resolve().then(continueOrClose);
+                    Promise.resolve().then(() => continueOrClose(pendingAction));
                 }
             };
 
             // 会話から会話への切替は旧画面を保持しますが、出陣演出・マップ選択・別モーダルなど
             // 「次が会話ではない」遷移は、入力画面を先に閉じてから処理を始めます。
             // これにより、次画面が動き始めた後まで古い選択ボタンだけ残る状態を防ぎます。
+            // 直接次の画面へ移る指定のときも、操作中の元モーダルを閉じてから
+            // 非同期の次画面が公開されるまで、共通暗幕を維持する。
+            // 画面の正本は引き続きUIManager。個別の暗幕やタイマーは作らない。
+            const releaseActionBackdrop = closeBeforeAction && typeof this.beginModalHandoff === 'function'
+                ? this.beginModalHandoff() : null;
             if (closeBeforeAction) {
                 this._cancelDialogHandoffClose();
                 closeCompletely(true);
             }
 
+            let callbackResult = null;
             try {
                 if (callback) {
-                    const result = callback();
-                    // ★Round17：コールバックが async でも、その Promise の完了を待ってから
-                    // ダイアログを handoff してはいけません。
-                    // コールバック内で showDialogAsync() を await すると、
-                    // 「現在のダイアログは callback 完了待ち / 次のダイアログは現在の終了待ち」
-                    // という相互待ち（デッドロック）になります。
-                    // Promise はエラー監視だけ行い、画面の handoff 自体は即座に予約します。
-                    if (result && typeof result.then === 'function') {
-                        result.catch(e => console.error(e));
+                    callbackResult = callback();
+                    // コールバックの完了をここでawaitすると次の会話の入力と相互待ちになる。
+                    // 非同期エラーだけ監視し、引き継ぎの寿命は既存の共通処理へ渡す。
+                    if (callbackResult && typeof callbackResult.then === 'function') {
+                        Promise.resolve(callbackResult).catch(e => console.error(e));
                     }
                 }
             } catch (e) {
                 console.error("ダイアログの処理中にエラー:", e);
             }
 
-            if (!closeBeforeAction) scheduleHandoff();
+            if (releaseActionBackdrop) {
+                if (callbackResult && typeof callbackResult.then === 'function') {
+                    Promise.resolve(callbackResult).then(releaseActionBackdrop, releaseActionBackdrop);
+                } else {
+                    releaseActionBackdrop();
+                }
+            }
+            if (!closeBeforeAction) scheduleHandoff(callbackResult);
         };
         
         // ★修正：okBtnが見つからなくても、安全にフッター（ボタンの置き場）を見つける魔法です！
