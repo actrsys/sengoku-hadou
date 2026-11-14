@@ -4547,6 +4547,7 @@ test('r411のタイトル情報メニューは設定の下から差し替わり�
     assert.ok(bootstrap.includes('new CustomScrollbar(infoDetailBody)'), '情報詳細はゲーム共通の独自スクロールバーを使う');
     assert.ok(bootstrap.includes("window.__mobileLowMemoryMode"), '軽量モードでは独自スクロールバー生成を避ける');
     assert.ok(bootstrap.includes('企画・制作\\nACTORS SYSTEM\\nあや瀨'), 'クレジットにACTORS SYSTEMと制作者名を表示する');
+    assert.ok(!bootstrap.includes('各素材の権利・利用条件は「ライセンス」をご確認ください。'), 'クレジットは提供元表記のみにする');
     for (const provider of ['Six Realms -ASURA- Re.', '趣味工房にんじんわいん', '作曲者：荒芳樹', 'Samurai Classics Expanded Edition ～RPGツクール(R)音素材集～', '株式会社ビタースウィートエンタテインメント', '効果音ラボ', 'https://soundeffect-lab.info/']) {
         assert.ok(bootstrap.includes(provider), `ゲーム内クレジットの音素材提供元が不足: ${provider}`);
     }

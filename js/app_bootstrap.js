@@ -413,7 +413,7 @@
         bind('title-info-back-btn', showMainTitleMenu);
         bind('title-credit-btn', () => {
             const version = window.GameConfig?.Meta?.Version;
-            openInfoDetail('クレジット', `戦国覇道${version ? `\nver. ${version}` : ''}\n\n企画・制作\nACTORS SYSTEM\nあや瀨\n\n音楽\n『Six Realms -ASURA- Re.』\n趣味工房にんじんわいん\n作曲者：荒芳樹\n\n音楽・音素材\n『Samurai Classics Expanded Edition ～RPGツクール(R)音素材集～』\n株式会社ビタースウィートエンタテインメント\n\n効果音\n効果音ラボ\nhttps://soundeffect-lab.info/\n\n各素材の権利・利用条件は「ライセンス」をご確認ください。`);
+            openInfoDetail('クレジット', `戦国覇道${version ? `\nver. ${version}` : ''}\n\n企画・制作\nACTORS SYSTEM\nあや瀨\n\n音楽\n『Six Realms -ASURA- Re.』\n趣味工房にんじんわいん\n作曲者：荒芳樹\n\n音楽・音素材\n『Samurai Classics Expanded Edition ～RPGツクール(R)音素材集～』\n株式会社ビタースウィートエンタテインメント\n\n効果音\n効果音ラボ\nhttps://soundeffect-lab.info/`);
         });
         bind('title-license-btn', async () => {
             openInfoDetail('ライセンス', '読み込んでいます…', 'license-text');
