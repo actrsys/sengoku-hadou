@@ -15500,7 +15500,7 @@ test('戦後endWarはイベント・結果待ち後に旧戦争世代を継続�
     assert.ok(block.includes("await this.game.eventManager.processEvents('after_siege_war', s);\n                    if (!isCurrentWar()) return;"), '籠城戦後イベント待ち後に旧戦争を止める');
     assert.ok(block.includes('await this.autoResolvePrisoners(this.pendingPrisoners, winnerClan);\n                        if (!isCurrentWar()) return;'), 'AI捕虜処遇待ち後に旧戦争を止める');
     assert.ok(block.includes('await this.game.lifeSystem.checkClanExtinction'), '滅亡判定の非同期完了を待つ');
-    assert.ok(block.includes('await this.game.ui.showDialogAsync(aiResultMsg);\n                    if (!isCurrentWar()) return;'), 'AI結果会話待ち後に旧戦争を止める');
+    assert.ok(block.includes('await this.showWarOutcomeAsync(aiResultMsg, attackerWon, isRetreat);\n                    if (!isCurrentWar()) return;'), 'AI専用リザルト待ち後に旧戦争を止める');
     assert.ok(block.includes('await finishWarProcess();'), 'AI戦後処理は未監視Promiseとして投げっぱなしにしない');
     assert.ok(block.includes('} catch (e) {\n            if (!isCurrentWar()) return;'), '旧戦争由来の例外から新シナリオのfinishTurnへ進まない');
 });
@@ -33452,6 +33452,84 @@ test('r884 野戦終結後は最終操作部隊を失っても画面の余韻を
     assert.ok(!endBlock.includes('restoreMemorizedBgm()'), '野戦単独では平時音楽へ戻さず戦争結果へ引き渡す');
 });
 
+
+
+test('r898 戦争結果は地図点滅・制圧演出後の専用リザルトへ統一し、標準フッターを外側に置く', () => {
+    const html = read('index.html');
+    const css = read('css/style.css');
+    const effort = read('js/war_effort.js');
+    const view = read('js/ui_war_result.js');
+    const segment = effort.slice(effort.indexOf('async endWar(attackerWon'), effort.indexOf('processCaptures(defeatedCastle'));
+    assert.ok(html.includes('js/ui_war_result.js'), '専門ViewをUIManagerの後から読込む');
+    assert.ok(html.includes('id="war-result-modal"') && html.includes('id="war-result-close-btn"'));
+    const cardAt = html.indexOf('id="war-result-modal"');
+    const contentAt = html.indexOf('class="modal-content war-result-content"', cardAt);
+    const contentEnd = html.indexOf('            </div>\n            <div class="modal-footer war-result-footer">', contentAt);
+    assert.ok(contentAt >= 0 && contentEnd > contentAt, '標準フッターは結果内容枠の外側に置く');
+    assert.ok(css.includes('#war-result-modal .war-result-content') && css.includes('.war-result-armies'));
+    assert.ok(segment.indexOf('await this.game.ui.playBattleBlink(') < segment.indexOf('this.showWarOutcome('), '戦域点滅を見せてからリザルト表示');
+    assert.ok(segment.indexOf('await this.game.ui.playCaptureEffect(') < segment.lastIndexOf('this.showWarOutcome(resultMsg'), '領土色が切り替わってからリザルト表示');
+    assert.ok(!segment.includes('this.game.ui.showDialog(resultMsg'), '戦争結果の通常ダイアログを残さない');
+    assert.ok(view.includes("confirmBtn.addEventListener('click', finish, { once: true })"), '閉じる操作は専用画面が所有する');
+    assert.ok(view.includes('this.dismissWarResult(true)'), '旧結果の操作を新しい結果へ持ち越さない');
+    assert.ok(read('js/ui.js').includes('this.dismissWarResult(true)'), 'タイトル復帰などの強制切替でイベントを破棄');
+});
+
+test('r898 戦争リザルトは勝敗・撤退・指揮官・拠点を既存データから正しく表示する', () => {
+    const ctx = createContext();
+    vm.runInContext('class WarManager {}; this.WarManager = WarManager;', ctx);
+    loadScript(ctx, 'js/war_effort.js');
+    const manager = new ctx.WarManager();
+    manager.game = {playerClanId:1, getClan(id) { return {name: ({1:'織田家',2:'武田家'})[id]||'無名家'}; }};
+    manager.getDisplayClanName = (_, name) => name;
+    manager.isPlayerClanReinforcement = () => false;
+    manager.state = {isPlayerInvolved:true,
+        attacker:{ownerClan:1,isKunishu:false},defender:{id:3,name:'城A',ownerClan:2,isKunishu:false},oldDefClanId:2,
+        atkBushos:[{name:'信長'}],defBusho:{name:'信玄'}};
+    const win = manager.createWarResultPresentation('攻め落としました',true,false);
+    assert.strictEqual(win.title,'勝利');
+    assert.strictEqual(win.tone,'victory');
+    assert.strictEqual(win.attacker,'織田家');
+    assert.strictEqual(win.defender,'武田家');
+    assert.strictEqual(win.attackerLeader,'信長');
+    assert.strictEqual(win.defenderLeader,'信玄');
+    assert.strictEqual(win.target,'城Aの戦い');
+    assert.strictEqual(manager.createWarResultPresentation('守れず',false,false).title,'敗北');
+    assert.strictEqual(manager.createWarResultPresentation('撤退',false,true).title,'撤退');
+    manager.state.attacker.ownerClan = 2;
+    manager.state.oldDefClanId = 1;
+    assert.strictEqual(manager.createWarResultPresentation('防衛',false,false).title,'勝利');
+});
+
+test('r898 結果リザルトは閉じるまで進行せず、閉じる操作は1回だけ・強制破棄は無操作で終了する', async () => {
+    const elements = new Map();
+    const createEl = () => ({textContent:'',listeners:new Map(),
+        classList:{values:new Set(['hidden']),add(...v){v.forEach(x=>this.values.add(x));},remove(...v){v.forEach(x=>this.values.delete(x));},toggle(x,force){if(force)this.add(x);else this.remove(x);},contains(x){return this.values.has(x);}},
+        addEventListener(type,fn){this.listeners.set(type,fn);},removeEventListener(type,fn){if(this.listeners.get(type)===fn)this.listeners.delete(type);}});
+    for (const id of ['war-result-modal','war-result-close-btn','war-result-title','war-result-target','war-result-attacker','war-result-defender','war-result-attacker-leader','war-result-defender-leader','war-result-description']) elements.set(id,createEl());
+    const ctx = createContext({document:{getElementById(id){return elements.get(id)||null;}}});
+    vm.runInContext('class UIManager {}; this.UIManager = UIManager;', ctx);
+    loadScript(ctx, 'js/ui_war_result.js');
+    const ui = new ctx.UIManager();
+    let called = 0;
+    const data={title:'勝利',tone:'victory',target:'A城',attacker:'甲',defender:'乙',attackerLeader:'丙',defenderLeader:'丁',description:'確定結果'};
+    ui.showWarResult(data,()=>called++);
+    assert.strictEqual(called,0, '表示時点では戦後処理を進めない');
+    assert.strictEqual(elements.get('war-result-modal').classList.contains('hidden'),false);
+    assert.strictEqual(elements.get('war-result-title').textContent,'勝利');
+    const first = elements.get('war-result-close-btn').listeners.get('click');
+    first();
+    first();
+    assert.strictEqual(called,1, '重複クリックは無効');
+    assert.strictEqual(elements.get('war-result-modal').classList.contains('hidden'),true);
+    ui.showWarResult(data,()=>called++);
+    ui.dismissWarResult(true);
+    assert.strictEqual(elements.get('war-result-close-btn').listeners.size,0);
+    assert.strictEqual(called,1, 'タイトル復帰のキャンセル時にcallbackを起動しない');
+    const promise=ui.showWarResultAsync(data);
+    ui.dismissWarResult(true);
+    assert.strictEqual(await promise,false, '観戦の強制終了時に未解決Promiseを残さない');
+});
 
 // r897: 戦闘結果でのBGM停止と復帰は野戦・攻城戦の終了処理で分散させず戦争結果に集約する。
 test('r897 野戦・攻城戦は結果を確認する前に平時BGMを復帰しない', () => {

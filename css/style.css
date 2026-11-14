@@ -1464,6 +1464,39 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
     text-align: left !important;
 }
 
+/* 戦争結果の専用リザルト：戦後の地図を背景に残し、標準確定操作は内容枠外のfooterで統一する。 */
+#war-result-modal { z-index: 9650; background: rgba(0, 0, 0, 0.42); }
+#war-result-modal .war-result-content {
+    width: min(90%, 590px);
+    max-width: 590px;
+    padding: 20px 24px;
+    overflow: hidden !important;
+    background: linear-gradient(to bottom, #243e30 0%, #14291e 100%);
+    border-color: #c2a15e;
+    gap: 10px;
+}
+.war-result-kicker { color: #e4d1a1; font-size: 0.82rem; letter-spacing: 0.22em; }
+.war-result-title { font-family: var(--font-decorative-ja); font-size: 2.2rem; font-weight: bold; color: #f3da8f; line-height: 1.2; text-shadow: 1px 2px 3px #111; }
+#war-result-modal.is-defeat .war-result-title { color: #e0e5e9; }
+#war-result-modal.is-retreat .war-result-title { color: #d9c8aa; }
+.war-result-target { font-size: 0.95rem; color: #ded6ba; }
+.war-result-armies { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr); gap: 9px; align-items: center; }
+.war-result-army { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; min-width: 0; min-height: 96px; padding: 9px 4px; border: 1px solid rgba(215, 185, 112, .35); background: rgba(0, 0, 0, .23); border-radius: 4px; }
+.war-result-army-label { font-size: .75rem; color: #b8c4b5; }
+.war-result-army-name { font-size: 1.05rem; color: #fff4d6; overflow-wrap: anywhere; }
+.war-result-commander { font-size: .8rem; color: #c8d4c9; overflow-wrap: anywhere; }
+.war-result-versus { color: #bba36e; font-family: var(--font-decorative-ja); font-weight: bold; }
+.war-result-description { white-space: pre-line; font-size: .93rem; line-height: 1.5; color: #f2ead6; border-top: 1px solid rgba(212, 175, 55, .26); padding: 11px 4px 0; }
+#war-result-modal .war-result-footer { justify-content: center; }
+body:not(.is-pc) #war-result-modal .war-result-content { width: 93%; padding: 12px; gap: 7px; }
+body:not(.is-pc) .war-result-title { font-size: 1.7rem; }
+body:not(.is-pc) .war-result-target { font-size: .8rem; }
+body:not(.is-pc) .war-result-armies { gap: 4px; grid-template-columns: minmax(0, 1fr) 17px minmax(0, 1fr); }
+body:not(.is-pc) .war-result-army { min-height: 80px; padding: 7px 3px; }
+body:not(.is-pc) .war-result-army-name { font-size: .86rem; }
+body:not(.is-pc) .war-result-commander { font-size: .72rem; }
+body:not(.is-pc) .war-result-description { font-size: .81rem; }
+
 /* =========================================================
    スライダー画面（輸送・取引・出陣など）のレイアウト改修
    ========================================================= */

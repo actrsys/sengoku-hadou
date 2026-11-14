@@ -2324,6 +2324,8 @@ class UIManager {
     }
 
     forceResetModals(options = {}) {
+        // 専用戦争リザルトの旧クリック・観戦自動終了を失効させる。
+        if (typeof this.dismissWarResult === 'function') this.dismissWarResult(true);
         // 1paint待ちのcover終了も画面寿命に含める。ロード/タイトル復帰後に旧closeが
         // 新しい固定DOMを隠したり、旧結果callbackを走らせないよう世代ごと破棄する。
         this._coveredCloseEpoch = Number(this._coveredCloseEpoch || 0) + 1;

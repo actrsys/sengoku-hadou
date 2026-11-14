@@ -231,6 +231,32 @@
             <div class="cutin-text" id="cutin-message"></div>
         </div>
 
+        <!-- 戦争の決着だけを扱うリザルト。地図の戦域点滅・制圧演出を見せ終えた後に開く。 -->
+        <div id="war-result-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="war-result-title">
+            <div class="modal-content war-result-content">
+                <div class="war-result-kicker">合戦結果</div>
+                <div id="war-result-title" class="war-result-title"></div>
+                <div id="war-result-target" class="war-result-target"></div>
+                <div class="war-result-armies">
+                    <div class="war-result-army">
+                        <span class="war-result-army-label">攻撃軍</span>
+                        <strong id="war-result-attacker" class="war-result-army-name"></strong>
+                        <span id="war-result-attacker-leader" class="war-result-commander"></span>
+                    </div>
+                    <div class="war-result-versus">対</div>
+                    <div class="war-result-army">
+                        <span class="war-result-army-label">守備軍</span>
+                        <strong id="war-result-defender" class="war-result-army-name"></strong>
+                        <span id="war-result-defender-leader" class="war-result-commander"></span>
+                    </div>
+                </div>
+                <div id="war-result-description" class="war-result-description"></div>
+            </div>
+            <div class="modal-footer war-result-footer">
+                <button type="button" id="war-result-close-btn" class="btn-secondary">閉じる</button>
+            </div>
+        </div>
+
         <div id="result-modal" class="modal hidden">
             <div class="modal-content result-content">
                 <div id="result-body" class="result-body message-area"></div>
@@ -808,6 +834,7 @@
     <script src="js/legion_council_view.js"></script>
     <script src="js/interview_view.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/ui_war_result.js"></script>
     <script src="js/ui_map.js"></script>
     <script src="js/castle_manager.js"></script>
     <script src="js/custom_scrollbar.js"></script>

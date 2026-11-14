@@ -33,6 +33,58 @@ Object.assign(WarManager.prototype, {
         audio.restoreMemorizedBgm();
     },
 
+    // 戦後の地図点滅・制圧演出が完了してから表示する、戦争結果の統一入口。
+    // 結果の確定・勝敗計算はendWarが担当し、この関数は表示に必要な情報だけ組み立てる。
+    createWarResultPresentation(message, attackerWon, isRetreat) {
+        const s = this.state;
+        const pid = Number(this.game.playerClanId);
+        const isAtkPlayer = Number(s.attacker.ownerClan) === pid
+            || this.isPlayerClanReinforcement(s.reinforcement, pid)
+            || this.isPlayerClanReinforcement(s.selfReinforcement, pid)
+            || !!s.retreatedReinforcements?.some(r => r.isAttackerData && this.isPlayerClanReinforcement(r.data, pid));
+        const isDefPlayer = Number(s.oldDefClanId ?? s.defender.ownerClan) === pid
+            || this.isPlayerClanReinforcement(s.defReinforcement, pid)
+            || this.isPlayerClanReinforcement(s.defSelfReinforcement, pid)
+            || !!s.retreatedReinforcements?.some(r => !r.isAttackerData && this.isPlayerClanReinforcement(r.data, pid));
+        const playerWon = (attackerWon && isAtkPlayer) || (!attackerWon && isDefPlayer);
+        const playerRelevant = !!s.isPlayerInvolved;
+        const title = playerRelevant
+            ? (playerWon ? '勝利' : isRetreat ? '撤退' : '敗北')
+            : (attackerWon ? '攻撃軍勝利' : isRetreat ? '攻撃軍撤退' : '守備軍勝利');
+        const tone = playerRelevant
+            ? (playerWon ? 'victory' : isRetreat ? 'retreat' : 'defeat')
+            : (isRetreat ? 'retreat' : attackerWon ? 'victory' : 'defeat');
+        const nameFor = (clanId, fallback) => {
+            const clan = this.game.getClan(clanId);
+            return this.getDisplayClanName(clanId, clan?.name || fallback);
+        };
+        return {
+            title, tone,
+            target: `${s.defender?.name || '戦場'}の戦い`,
+            attacker: s.attacker.isKunishu ? (s.attacker.name || '諸勢力') : nameFor(s.attacker.ownerClan, '攻撃軍'),
+            defender: s.defender.isKunishu ? (s.defender.name || '諸勢力') : nameFor(s.oldDefClanId ?? s.defender.ownerClan, '守備軍'),
+            attackerLeader: s.atkBushos?.[0]?.name || '',
+            defenderLeader: s.defBusho?.name || '',
+            description: String(message || ''),
+            playerWon
+        };
+    },
+
+    showWarOutcome(message, attackerWon, isRetreat, onConfirm) {
+        const data = this.createWarResultPresentation(message, attackerWon, isRetreat);
+        // 結果のSEは専用リザルトの公開時にだけ鳴らす。確認後のBGM復帰は従来の終了窓口に任せる。
+        this.prepareWarResultAudio(data.playerWon);
+        const autoCloseTime = this.game.isWatchMode && !this.state.isPlayerInvolved ? 1500 : 0;
+        this.game.ui.showWarResult(data, onConfirm, autoCloseTime);
+    },
+
+    async showWarOutcomeAsync(message, attackerWon, isRetreat) {
+        const data = this.createWarResultPresentation(message, attackerWon, isRetreat);
+        this.prepareWarResultAudio(data.playerWon);
+        const autoCloseTime = this.game.isWatchMode && !this.state.isPlayerInvolved ? 1500 : 0;
+        return this.game.ui.showWarResultAsync(data, autoCloseTime);
+    },
+
     // 各援軍の攻城開始時兵数を保存する。野戦を経由した場合は野戦後の実数が基準。
     recordSiegeReinforcementStartingSoldiers(state = this.state) {
         if (!state || state._siegeReinforcementStartSoldiers) return;
@@ -2006,17 +2058,15 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.setWarModalVisible(false);
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-                    this.prepareWarResultAudio(attackerWon);
-                    this.game.ui.showDialog(resultMsg, false, () => {
-                        this.closeWar();
-                    }, null, { closeBeforeOk: true });
+                    this.showWarOutcome(resultMsg, attackerWon, false, () => {
+                        if (isCurrentWar()) this.closeWar();
+                    });
                 } else {
                     // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
                     if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-                        this.prepareWarResultAudio(false);
-                        await this.game.ui.showDialogAsync(resultMsg);
+                        await this.showWarOutcomeAsync(resultMsg, attackerWon, false);
                         if (!isCurrentWar()) return;
                     }
                     this.closeWar();
@@ -2146,17 +2196,15 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.setWarModalVisible(false);
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-                    this.prepareWarResultAudio(!attackerWon);
-                    this.game.ui.showDialog(resultMsg, false, () => {
-                        this.closeWar();
-                    }, null, { closeBeforeOk: true });
+                    this.showWarOutcome(resultMsg, attackerWon, false, () => {
+                        if (isCurrentWar()) this.closeWar();
+                    });
                 } else {
                     // ★追加：AIの城で反乱が起きた時も、専用のメッセージを出してタップを待ちます！
                     if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-                        this.prepareWarResultAudio(false);
-                        await this.game.ui.showDialogAsync(resultMsg);
+                        await this.showWarOutcomeAsync(resultMsg, attackerWon, false);
                         if (!isCurrentWar()) return;
                     }
                     this.closeWar();
@@ -2327,17 +2375,16 @@ Object.assign(WarManager.prototype, {
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
                     if (isAtkSide) {
-                        this.game.ui.showDialog(`敵軍は拠点を捨てて敗走しました！\n${s.defender.name}を占領します！`, false, finishWarProcess, null, { closeBeforeOk: true });
+                        this.showWarOutcome(`敵軍は拠点を捨てて敗走しました！\n${s.defender.name}を占領します！`, true, true, finishWarProcess);
                     } else {
-                        this.game.ui.showDialog(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, false, finishWarProcess, null, { closeBeforeOk: true });
+                        this.showWarOutcome(`撤退しました。\n${retreatTargetId ? '部隊は移動しました。' : '部隊は解散しました。'}`, true, true, finishWarProcess);
                     }
                 } else {
                     // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
                     if (aiResultMsg && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-                        this.prepareWarResultAudio(false);
-                    await this.game.ui.showDialogAsync(aiResultMsg);
+                        await this.showWarOutcomeAsync(aiResultMsg, attackerWon, isRetreat);
                         if (!isCurrentWar()) return;
                     }
                     await finishWarProcess();
@@ -2444,17 +2491,14 @@ Object.assign(WarManager.prototype, {
                 // ★追加：ダイアログを出す前にバリアを解除します！
                 if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
-                this.prepareWarResultAudio(attackerWon ? isAtkPlayer && !isRetreat : isDefPlayer);
-
-                this.game.ui.showDialog(resultMsg, false, finishWarProcess, null, { closeBeforeOk: true });
+                this.showWarOutcome(resultMsg, attackerWon, isRetreat, finishWarProcess);
             }
             else {
                 // ★AIの結果メッセージを最後に表示します（イベント決着時などは空なのでスキップ）
                 if (aiResultMsg && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-                    this.prepareWarResultAudio(false);
-                    await this.game.ui.showDialogAsync(aiResultMsg);
+                    await this.showWarOutcomeAsync(aiResultMsg, attackerWon, isRetreat);
                     if (!isCurrentWar()) return;
                 }
                 await finishWarProcess();
