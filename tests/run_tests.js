@@ -12756,6 +12756,100 @@ test('全画面戦闘は共通窓口で背景地図を休止しスマホでは c
     assert.ok(field.includes("this.game.ui.resumeMainMapAfterBattle('field-war')"));
 });
 
+test('野戦のハイライト差分更新は同じ状態でDOMクラスを書き換えず、攻撃範囲も保持する', () => {
+    const context = createContext({
+        addEventListener() {},
+        document: { getElementById() { return null; } }
+    });
+    loadScript(context, 'js/field_war.js');
+    const manager = new context.FieldWarManager({});
+    const player = {id: 1, x: 4, y: 4, isAttacker: true, isPlayer: true,
+        ap: 5, direction: 1, troopType: 'ashigaru', soldiers: 1300};
+    manager.units = [player,
+        {id: 2, x: 5, y: 5, isAttacker: false, soldiers: 800},
+        {id: 3, x: 12, y: 8, isAttacker: false, soldiers: 1500}];
+    manager.turnQueue = [player];
+    manager.mapEl = {};
+    manager.active = true;
+    manager.weather = 'sunny';
+    manager.turnCount = 1;
+    manager.state = 'PHASE_DIR';
+    manager.updateMenu = () => {};
+    manager.hexElements = {};
+    let edits = 0;
+    const newClassList = () => {
+        const values = new Set();
+        return {
+            add(...names) { edits++; names.forEach(n => values.add(n)); },
+            remove(...names) { edits++; names.forEach(n => values.delete(n)); },
+            contains(name) { return values.has(name); }
+        };
+    };
+    for (let x = 0; x < 20; x++) {
+        for (let row = 0; row < 12; row++) {
+            const y = row * 2 + x % 2;
+            manager.hexElements[`${x},${y}`] = {classList: newClassList()};
+        }
+    }
+    const highlighted = () => Object.entries(manager.hexElements)
+        .filter(([,el]) => ['current-pos','movable','attackable','fw-dir-highlight'].some(c => el.classList.contains(c)))
+        .map(([key,el]) => [key, ['current-pos','movable','attackable','fw-dir-highlight']
+            .filter(c => el.classList.contains(c))]);
+    manager.updateMap();
+    const before = JSON.stringify(highlighted());
+    assert.ok(manager.hexElements['4,4'].classList.contains('current-pos'));
+    assert.ok(manager.hexElements['5,5'].classList.contains('attackable'));
+    const firstEdits = edits;
+    const highlightedSetBefore = manager._fwHighlightedHexes;
+    const spareSetBefore = manager._fwNextHighlightedHexes;
+    manager.updateMap();
+    assert.strictEqual(JSON.stringify(highlighted()), before, '同じ表示結果を保持');
+    assert.strictEqual(edits, firstEdits, '同じ範囲でDOMクラスを消して付け直さない');
+    assert.strictEqual(manager._fwHighlightedHexes, spareSetBefore, '差分更新用Setを再利用');
+    assert.strictEqual(manager._fwNextHighlightedHexes, highlightedSetBefore, '前回分のSetも再利用');
+    manager.state = 'IDLE';
+    manager.updateMap();
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(highlighted())), [['4,4', ['current-pos']]],
+        '方向転換を離れたら範囲だけ解除し現在地は維持する');
+});
+
+test('野戦の攻撃範囲候補は敵の位置と周囲6HEXだけ調べ、全240HEXを走査しない', () => {
+    const context = createContext({
+        addEventListener() {},
+        document: { getElementById() { return null; } }
+    });
+    loadScript(context, 'js/field_war.js');
+    const manager = new context.FieldWarManager({});
+    const player = {id: 1, x: 4, y: 4, isAttacker: true, isPlayer: true,
+        ap: 5, direction: 1, troopType: 'ashigaru', soldiers: 1400};
+    manager.units = [player,
+        {id: 2, x: 5, y: 5, isAttacker: false},
+        {id: 3, x: 14, y: 6, isAttacker: false}];
+    manager.turnQueue = [player];
+    manager.mapEl = {};
+    manager.active = true;
+    manager.state = 'PHASE_ATTACK';
+    manager.weather = 'sunny';
+    manager.turnCount = 1;
+    manager.updateMenu = () => {};
+    manager.hexElements = {};
+    const newClassList = () => {
+        const values = new Set();
+        return { add(...v) { v.forEach(k => values.add(k)); },
+            remove(...v) { v.forEach(k => values.delete(k)); }, contains(k) {return values.has(k);} };
+    };
+    for (let x = 0; x < 20; x++) for (let row = 0; row < 12; row++) {
+        manager.hexElements[`${x},${row * 2 + x % 2}`] = {classList: newClassList()};
+    }
+    const realDistance = manager.getDistance.bind(manager);
+    let distanceCalls = 0;
+    manager.getDistance = (...args) => { distanceCalls++; return realDistance(...args); };
+    manager.updateMap();
+    assert.ok(distanceCalls < 20, `攻撃対象の判定は全HEXではなく敵2か所だけ（距離計算${distanceCalls}回）`);
+    assert.ok(manager.hexElements['5,5'].classList.contains('attackable'));
+    assert.ok(!manager.hexElements['14,6'].classList.contains('attackable'));
+});
+
 test('野戦描画は部隊DOMと前回ハイライトをキャッシュし動的styleタグを再生成しない', () => {
     const field = read('js/field_war.js');
     const css = read('css/style.css');

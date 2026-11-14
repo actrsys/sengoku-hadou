@@ -38,6 +38,7 @@ class FieldWarManager {
         // 描画更新ごとのDOM検索・全HEX走査を避けるための軽量キャッシュ。
         this._fwUnitElementCache = new Map();
         this._fwHighlightedHexes = new Set();
+        this._fwNextHighlightedHexes = new Set();
         this._fwPreviewRefs = null;
         // 固定の野戦Managerを複数戦闘で再利用するため、遅延callback/await後の継続を
         // 戦闘世代で分離する。旧戦闘のtimerが次のturnQueueや固定DOMへ触れないようにする。
@@ -756,6 +757,7 @@ class FieldWarManager {
         this.hexElements = null;
         this._fwUnitElementCache = new Map();
         this._fwHighlightedHexes = new Set();
+        this._fwNextHighlightedHexes = new Set();
         this._fwPreviewRefs = null;
         this.mapEl = mapEl || null;
         this.logEl = logEl || null;
@@ -1671,6 +1673,7 @@ class FieldWarManager {
         this.mapEl.innerHTML = ''; // 念のためお掃除
         this._fwUnitElementCache = new Map();
         this._fwHighlightedHexes = new Set();
+        this._fwNextHighlightedHexes = new Set();
         this._fwPreviewRefs = null;
 
         // 1. 移動ルートの線を引くための透明な画用紙（SVG）
@@ -1882,17 +1885,19 @@ class FieldWarManager {
         }
 
         // 4. マス目（HEX）のハイライト更新
-        // 毎回240マス全部を触らず、前回実際に光らせたマスだけ解除します。
-        this._fwHighlightedHexes.forEach(key => {
-            const hex = this.hexElements[key];
-            if (hex) hex.classList.remove('current-pos', 'movable', 'attackable', 'fw-dir-highlight');
-        });
-        this._fwHighlightedHexes.clear();
+        // 前後の差分だけクラスを書き換える。継続して光るHEXを毎回消して塗り直さない。
+        // 使い終えたSetを次の更新で再利用し、短命なSetの大量生成も避ける。
+        const previousHighlights = this._fwHighlightedHexes;
+        const nextHighlights = this._fwNextHighlightedHexes;
+        nextHighlights.clear();
         const addHexHighlight = (key, className) => {
             const hex = this.hexElements[key];
             if (!hex) return;
-            hex.classList.add(className);
-            this._fwHighlightedHexes.add(key);
+            if (!hex.classList.contains(className)) {
+                hex.classList.remove('current-pos', 'movable', 'attackable', 'fw-dir-highlight');
+                hex.classList.add(className);
+            }
+            nextHighlights.add(key);
         };
 
         // 必要なマス目だけにクラス（色塗り）を付与する
@@ -1971,32 +1976,45 @@ class FieldWarManager {
                     }
                 }
             } else if (this.state === 'PHASE_DIR' || this.state === 'PHASE_ATTACK') {
-                for (let x = 0; x < this.cols; x++) {
-                    for (let row = 0; row < this.rows; row++) {
-                        const y = (x % 2 === 0) ? row * 2 : row * 2 + 1;
-                        const hex = this.hexElements[`${x},${y}`];
-                        if (!hex) continue;
-                        if (x === unit.x && y === unit.y) continue; // current-posがついてるのでスキップ
-
-                        const targetUnit = this.units.find(u => u.x === x && u.y === y && u.isAttacker !== unit.isAttacker);
-                        if (targetUnit && this.canAttackTarget(unit, x, y)) {
-                            let targetDir = this.getDirection(unit.x, unit.y, x, y);
-                            let turnCost = this.getTurnCost(unit.direction, targetDir);
-                            if (unit.ap >= turnCost + 1) {
-                                addHexHighlight(`${x},${y}`, 'attackable');
-                            }
-                        } else if (this.state === 'PHASE_DIR' && this.getDistance(unit.x, unit.y, x, y) === 1) {
-                            let targetDir = this.getDirection(unit.x, unit.y, x, y);
-                            let turnCost = this.getTurnCost(unit.direction, targetDir);
-                            if (unit.ap >= turnCost) {
-                                addHexHighlight(`${x},${y}`, 'fw-dir-highlight');
-                            }
-                        }
-                    }
+                // 旧処理は毎回240HEXを走査していたが、対象は敵の位置と方向転換の隣接6HEXだけ。
+                // 敵が隣接し攻撃不可なら方向転換表示となる条件も含め、従来の優先順を維持する。
+                const targetPositions = new Map();
+                this.units.forEach(enemy => {
+                    if (enemy.isAttacker === unit.isAttacker) return;
+                    const key = `${enemy.x},${enemy.y}`;
+                    if (this.hexElements[key] && !targetPositions.has(key)) targetPositions.set(key, enemy);
+                });
+                const candidateKeys = new Set(targetPositions.keys());
+                if (this.state === 'PHASE_DIR') {
+                    this.getNeighbors(unit.x, unit.y).forEach(n => candidateKeys.add(`${n.x},${n.y}`));
                 }
+                candidateKeys.forEach(key => {
+                    if (!this.hexElements[key]) return;
+                    const [x, y] = key.split(',').map(Number);
+                    if (x === unit.x && y === unit.y) return; // 現在地はcurrent-posのみ
+                    const targetUnit = targetPositions.get(key);
+                    if (targetUnit && this.canAttackTarget(unit, x, y)) {
+                        const targetDir = this.getDirection(unit.x, unit.y, x, y);
+                        const turnCost = this.getTurnCost(unit.direction, targetDir);
+                        if (unit.ap >= turnCost + 1) addHexHighlight(key, 'attackable');
+                    } else if (this.state === 'PHASE_DIR' && this.getDistance(unit.x, unit.y, x, y) === 1) {
+                        const targetDir = this.getDirection(unit.x, unit.y, x, y);
+                        const turnCost = this.getTurnCost(unit.direction, targetDir);
+                        if (unit.ap >= turnCost) addHexHighlight(key, 'fw-dir-highlight');
+                    }
+                });
             }
         }
         
+        // 新しい範囲から外れたHEXだけを解除。両Setは交換して次回も再利用する。
+        previousHighlights.forEach(key => {
+            if (nextHighlights.has(key)) return;
+            const hex = this.hexElements[key];
+            if (hex) hex.classList.remove('current-pos', 'movable', 'attackable', 'fw-dir-highlight');
+        });
+        this._fwHighlightedHexes = nextHighlights;
+        this._fwNextHighlightedHexes = previousHighlights;
+
         this.updateMenu();
     }
 
@@ -2189,6 +2207,8 @@ class FieldWarManager {
         startNode.f = startNode.g + startNode.h;
 
         let openList = [startNode];
+        // 配列の投入順は同点経路の選択に使うため保持し、座標検索だけMapで高速化する。
+        const openNodes = new Map([[`${unit.x},${unit.y}`, startNode]]);
         let closedList = {};
         // 閉鎖ノードは再投入されないため、毎回Object.keysで全件数え直さない。
         let closedCount = 0;
@@ -2205,6 +2225,7 @@ class FieldWarManager {
             }
             let currentNode = openList.splice(minIndex, 1)[0];
             let currentKey = `${currentNode.x},${currentNode.y}`;
+            openNodes.delete(currentKey);
             
             closedList[currentKey] = true;
             closedCount++;
@@ -2258,9 +2279,11 @@ class FieldWarManager {
                 let hCost = this.getDistance(n.x, n.y, targetX, targetY);
                 let fCost = gCost + hCost;
 
-                let existingNode = openList.find(node => node.x === n.x && node.y === n.y);
+                let existingNode = openNodes.get(neighborKey);
                 if (!existingNode) {
-                    openList.push({ x: n.x, y: n.y, g: gCost, h: hCost, f: fCost, parent: currentNode });
+                    const nextNode = { x: n.x, y: n.y, g: gCost, h: hCost, f: fCost, parent: currentNode };
+                    openList.push(nextNode);
+                    openNodes.set(neighborKey, nextNode);
                 } else if (gCost < existingNode.g) {
                     existingNode.g = gCost;
                     existingNode.f = fCost;
