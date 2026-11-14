@@ -12970,6 +12970,93 @@ test('野戦描画は部隊DOMと前回ハイライトをキャッシュし動�
     assert.ok(css.includes(".fw-unit.is-sea-unit.attacker .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_attacker.webp'); }"));
 });
 
+test('r896 野戦の複数味方占有HEXでは敵距離と移動スキル参照を繰り返し構築しない', () => {
+    const skillCalls = [];
+    const ctx = createContext({
+        addEventListener() {}, document: {getElementById() {return null;}},
+        SkillManager: {calcTerrainMoveCost(unit, terrain, isSea, allies) {
+            skillCalls.push({ids: allies.map(a => a.id).join(','), terrain, isSea});
+            return terrain === 'plain' ? 1 : 2;
+        }}
+    });
+    loadScript(ctx, 'js/field_war.js');
+    const manager = new ctx.FieldWarManager({});
+    const player = {id: 1,x:4,y:4,isAttacker:true,isPlayer:true,ap:9,troopType:'ashigaru',direction:0,soldiers:1500};
+    manager.units = [player,
+        {id:2,x:4,y:6,isAttacker:true}, {id:3,x:5,y:5,isAttacker:true},
+        {id:4,x:10,y:10,isAttacker:false}, {id:5,x:12,y:12,isAttacker:false}];
+    manager.turnQueue=[player]; manager.mapEl={}; manager.active=true;manager.isInfoMode=false;
+    manager.state='PHASE_MOVE'; manager.updateMenu=()=>{};
+    manager.grid=Array.from({length:12},()=>Array.from({length:20},()=>({terrain:'plain',isSea:false})));
+    manager.reachable={'4,4':{cost:0},'4,6':{cost:1},'5,5':{cost:1},'3,5':{cost:1}};
+    const marked = new Set();
+    manager.hexElements=Object.fromEntries(Object.keys(manager.reachable).map(key=>[key,{
+        classList:{add(...a){a.forEach(c=>marked.add(key+':'+c));},remove(...a){a.forEach(c=>marked.delete(key+':'+c));},
+            contains(c){return marked.has(key+':'+c);}}
+    }]));
+    const origDistance=manager.getDistance.bind(manager);
+    const counts=new Map();
+    manager.getDistance=(...args)=>{const k=args.join(',');counts.set(k,(counts.get(k)||0)+1);return origDistance(...args);};
+    manager.updateMap();
+    assert.strictEqual(counts.get('4,4,10,10'),1,'攻撃中の部隊から敵1への距離を一度だけ計算する');
+    assert.strictEqual(counts.get('4,4,12,12'),1,'攻撃中の部隊から敵2への距離を一度だけ計算する');
+    assert.deepStrictEqual(skillCalls.map(c=>c.ids),['2,3','2,3'],'スキルに渡す味方配列の内容・並びを維持する');
+    assert.ok(marked.has('4,4:current-pos'));
+    assert.ok(marked.has('4,6:movable') && marked.has('5,5:movable'));
+    assert.ok(marked.has('3,5:movable'));
+});
+
+test('r896 野戦の軍勢詳細は不変ならDOMを保持し、兵数・選択タブ・軍勢存否の変更だけ反映する', () => {
+    const elements=new Map();
+    const el=id=>{
+        if (!elements.has(id)) {
+            const element={id,style:{},children:[],_html:'',writes:0};
+            Object.defineProperty(element,'innerHTML',{get(){return this._html;},set(v){this._html=v;this.writes++;this.children=[];}});
+            element.appendChild=child=>element.children.push(child);
+            elements.set(id,element);
+        }
+        return elements.get(id);
+    };
+    const ctx=createContext({addEventListener() {},document:{getElementById:el,createElement(){return {className:'',innerText:'',onclick:null};}},
+        StatPresenter:{escapePlainText(v){return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}}});
+    loadScript(ctx,'js/field_war.js');
+    const game={playerClanId:1,getBusho(){return {clan:1};},getClan(){return {name:'織田'};}};
+    const m=new ctx.FieldWarManager(game);
+    const makeUnit=(id,groupId,side,name)=>({id,groupId,isAttacker:side,name,isGeneral:true,soldiers:1000,
+        bushoId:11,stats:{ldr:80,str:70}});
+    const main=makeUnit(1,'atk_main',true,'織田信長');
+    const ally=makeUnit(2,'atk_self',true,'織田信忠');
+    const enemy=makeUnit(3,'def_main',false,'武田勝頼');
+    m.units=[main,ally,enemy];m.groupStats={atk_main:{rice:10,morale:50,training:60},atk_self:{rice:20,morale:55,training:70},
+        def_main:{rice:30,morale:45,training:65}};
+    m.warState={attacker:{ownerClan:1},defender:{ownerClan:2}};
+    m.isInfoMode=true;m._updateFieldWarHeader=()=>{};
+    m.updateStatus();
+    const tabs=el('fw-atk-tabs');const status=el('fw-atk-status');
+    assert.strictEqual(tabs.children.length,2);
+    const tabNode=tabs.children[1],statusHTML=status.innerHTML, tabWrites=tabs.writes, statusWrites=status.writes;
+    m.updateStatus();
+    assert.strictEqual(tabs.writes,tabWrites,'タブの内容が同じならDOMを再生成しない');
+    assert.strictEqual(status.writes,statusWrites,'軍勢の数値が同じならDOMを再生成しない');
+    assert.strictEqual(tabs.children[1],tabNode,'既存のタブとイベントを保持する');
+    tabNode.onclick();
+    assert.strictEqual(m.activeAtkTab,'self');
+    assert.notStrictEqual(status.innerHTML,statusHTML,'選択先の軍勢値を表示する');
+    const beforeSoldiers=status.writes;
+    ally.soldiers=987;m.updateStatus();
+    assert.strictEqual(status.writes,beforeSoldiers+1,'兵数の変化は再描画する');
+    assert.ok(status.innerHTML.includes('987'));
+    const beforeTabs=tabs.writes;
+    m.units=[main,enemy];m.updateStatus();
+    assert.strictEqual(m.activeAtkTab,'main','軍勢がなくなれば主力に戻る');
+    assert.ok(tabs.writes>beforeTabs && tabs.children.length===0,'消えた援軍のタブを撤去する');
+    assert.ok(status.innerHTML.includes('1000'),'残る主力の表示へ戻る');
+    // 固定DOMが別の野戦へ引き継がれても前戦闘の「同じHTML」判定を使わない。
+    m._fwStatusRenderCache=null;
+    const beforeReinit=status.writes;m.updateStatus();
+    assert.strictEqual(status.writes,beforeReinit+1,'新しい野戦ではDOMを必ず準備し直す');
+});
+
 test('野戦の非表示軍勢詳細は情報モード時だけ構築する', () => {
     const field = read('js/field_war.js');
     const start = field.indexOf('updateStatus() {');

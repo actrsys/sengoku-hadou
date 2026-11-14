@@ -47,6 +47,7 @@ class FieldWarManager {
         this._fwHighlightedHexes = new Set();
         this._fwNextHighlightedHexes = new Set();
         this._fwPreviewRefs = null;
+        this._fwStatusRenderCache = null;
         // 固定の野戦Managerを複数戦闘で再利用するため、遅延callback/await後の継続を
         // 戦闘世代で分離する。旧戦闘のtimerが次のturnQueueや固定DOMへ触れないようにする。
         this._fieldWarGeneration = 0;
@@ -766,6 +767,7 @@ class FieldWarManager {
         this._fwHighlightedHexes = new Set();
         this._fwNextHighlightedHexes = new Set();
         this._fwPreviewRefs = null;
+        this._fwStatusRenderCache = null;
         this.mapEl = mapEl || null;
         this.logEl = logEl || null;
     }
@@ -785,6 +787,8 @@ class FieldWarManager {
         this.modal = document.getElementById('field-war-modal');
         this.mapEl = document.getElementById('fw-map');
         this.logEl = document.getElementById('fw-log');
+        // 固定DOMは次の戦闘にも再利用される。前戦闘の描画同一判定を持ち越さない。
+        this._fwStatusRenderCache = null;
         
         if (this.modal) {
             // display:none はサイズ測定ができないため、レイアウトを保持する visibility を使う。
@@ -1361,49 +1365,52 @@ class FieldWarManager {
         const atkWrapper = document.getElementById('fw-atk-wrapper');
         const defWrapper = document.getElementById('fw-def-wrapper');
 
-        if (atkEl) atkEl.innerHTML = atkHTML;
-        if (defEl) defEl.innerHTML = defHTML;
-
-        // 攻撃側のタブの描画（左から並べます）
-        if (atkTabsEl) {
-            atkTabsEl.innerHTML = '';
-            let tabs = [];
-            if (stats.atk.main.exists) tabs.push({ id: 'main', label: '攻撃軍' });
-            if (stats.atk.self.exists) tabs.push({ id: 'self', label: '応援軍' });
-            if (stats.atk.ally.exists) tabs.push({ id: 'ally', label: '友軍' });
-            
-            if (tabs.length > 1) {
-                tabs.forEach(t => {
-                    const btn = document.createElement('div');
-                    btn.className = `fw-tab attacker ${this.activeAtkTab === t.id ? 'active' : ''}`;
-                    btn.innerText = t.label;
-                    btn.onclick = () => { this.activeAtkTab = t.id; this.updateStatus(); };
-                    atkTabsEl.appendChild(btn);
-                });
-            }
+        // 情報表示中に値が変わらなければ既存DOMを維持する。
+        // タブのイベントも再登録せず、選択状態や軍勢の存否が変わった時だけ再構築する。
+        const renderCache = this._fwStatusRenderCache || (this._fwStatusRenderCache = {});
+        if (atkEl && (renderCache.atkEl !== atkEl || renderCache.atkHTML !== atkHTML)) {
+            atkEl.innerHTML = atkHTML;
+            renderCache.atkEl = atkEl;
+            renderCache.atkHTML = atkHTML;
+        }
+        if (defEl && (renderCache.defEl !== defEl || renderCache.defHTML !== defHTML)) {
+            defEl.innerHTML = defHTML;
+            renderCache.defEl = defEl;
+            renderCache.defHTML = defHTML;
         }
 
-        // 守備側のタブの描画（右から並べます）
-        if (defTabsEl) {
-            defTabsEl.innerHTML = '';
-            let tabs = [];
-            if (stats.def.main.exists) tabs.push({ id: 'main', label: '守備軍' });
-            if (stats.def.self.exists) tabs.push({ id: 'self', label: '応援軍' });
-            if (stats.def.ally.exists) tabs.push({ id: 'ally', label: '友軍' });
-            
-            // 右端から「守備・応援・同盟」となるように順番をひっくり返します
-            tabs.reverse();
-            
+        // 攻守で重複していたタブ描画を一つの処理へ集約し、従来の並び順を保持する。
+        const renderTabs = (el, side, activeTab, reverse) => {
+            if (!el) return;
+            const tabs = [];
+            if (stats[side].main.exists) tabs.push({ id: 'main', label: side === 'atk' ? '攻撃軍' : '守備軍' });
+            if (stats[side].self.exists) tabs.push({ id: 'self', label: '応援軍' });
+            if (stats[side].ally.exists) tabs.push({ id: 'ally', label: '友軍' });
+            if (reverse) tabs.reverse();
+            const signature = `${activeTab}|${tabs.map(t => t.id).join(',')}`;
+            const elementKey = `${side}TabsEl`;
+            const signatureKey = `${side}TabsKey`;
+            if (renderCache[elementKey] === el && renderCache[signatureKey] === signature) return;
+            // タブが一つしかない場合は空表示のままとする。
+            el.innerHTML = '';
             if (tabs.length > 1) {
-                tabs.forEach(t => {
+                for (const tab of tabs) {
                     const btn = document.createElement('div');
-                    btn.className = `fw-tab defender ${this.activeDefTab === t.id ? 'active' : ''}`;
-                    btn.innerText = t.label;
-                    btn.onclick = () => { this.activeDefTab = t.id; this.updateStatus(); };
-                    defTabsEl.appendChild(btn);
-                });
+                    btn.className = `fw-tab ${side === 'atk' ? 'attacker' : 'defender'} ${activeTab === tab.id ? 'active' : ''}`;
+                    btn.innerText = tab.label;
+                    btn.onclick = () => {
+                        if (side === 'atk') this.activeAtkTab = tab.id;
+                        else this.activeDefTab = tab.id;
+                        this.updateStatus();
+                    };
+                    el.appendChild(btn);
+                }
             }
-        }
+            renderCache[elementKey] = el;
+            renderCache[signatureKey] = signature;
+        };
+        renderTabs(atkTabsEl, 'atk', this.activeAtkTab, false);
+        renderTabs(defTabsEl, 'def', this.activeDefTab, true);
 
         // プレイヤーの枠を手前に表示します
         const isAtkPlayer = (Number(this.warState.attacker.ownerClan) === Number(this.game.playerClanId));
@@ -1918,6 +1925,14 @@ class FieldWarManager {
             }
 
             if (this.state === 'PHASE_MOVE' || this.state === 'MOVE_PREVIEW') {
+                // この描画時点の部隊配置を一度だけ参照する。毎HEXの全隊走査を避け、
+                // 味方占有マスの計算だけ既存の通行判定に渡す。
+                const friendlyPositions = new Set();
+                for (const other of this.units) {
+                    if (other.isAttacker === unit.isAttacker) friendlyPositions.add(`${other.x},${other.y}`);
+                }
+                // 味方マスが複数ある場合にも敵距離と移動補正の参照は共通にする。
+                let occupiedMoveContext = null;
                 for (let key in this.reachable) {
                     let parts = key.split(',');
                     let x = parseInt(parts[0]);
@@ -1928,14 +1943,21 @@ class FieldWarManager {
                     if (x === unit.x && y === unit.y) continue; // current-posがついてるのでスキップ
 
                     // 敵や味方がいるか等チェック
-                    if (this.units.some(u => u.x === x && u.y === y && u.isAttacker === unit.isAttacker)) {
+                    if (friendlyPositions.has(key)) {
                         // 味方がいるマスの場合、通り抜けられるかチェック
-                        const enemies = this.units.filter(u => u.isAttacker !== unit.isAttacker);
-                        let minStartDist = 999;
-                        enemies.forEach(e => {
-                            let d = this.getDistance(unit.x, unit.y, e.x, e.y);
-                            if (d < minStartDist) minStartDist = d;
-                        });
+                        if (!occupiedMoveContext) {
+                            const enemies = this.units.filter(other => other.isAttacker !== unit.isAttacker);
+                            let minStartDist = 999;
+                            enemies.forEach(e => {
+                                let d = this.getDistance(unit.x, unit.y, e.x, e.y);
+                                if (d < minStartDist) minStartDist = d;
+                            });
+                            const tempAllies = typeof SkillManager !== 'undefined'
+                                ? this.units.filter(other => other.isAttacker === unit.isAttacker && other.id !== unit.id)
+                                : null;
+                            occupiedMoveContext = { enemies, minStartDist, tempAllies };
+                        }
+                        const { enemies, minStartDist, tempAllies } = occupiedMoveContext;
                         
                         let row_t = Math.floor(y / 2);
                         let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][x]) ? this.grid[row_t][x].terrain : 'plain';
@@ -1943,7 +1965,6 @@ class FieldWarManager {
                         
                         let baseCost = 1;
                         if (typeof SkillManager !== 'undefined') {
-                            const tempAllies = this.units.filter(u => u.isAttacker === unit.isAttacker && u.id !== unit.id);
                             baseCost = SkillManager.calcTerrainMoveCost(unit, terrain_t, isSea_t, tempAllies, this.game);
                         } else {
                             if (terrain_t === 'forest') baseCost = 2;
