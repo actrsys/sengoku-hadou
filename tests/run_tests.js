@@ -33668,6 +33668,36 @@ test('r898 結果リザルトは閉じるまで進行せず、閉じる操作は
     assert.strictEqual(await promise,false, '観戦の強制終了時に未解決Promiseを残さない');
 });
 
+// r901: 結果SEは戦闘BGMの有無と独立。AI自動戦争でも専用リザルトに音を付ける。
+test('r901 AI戦争のリザルトは平時BGMを止めず結果SEだけを鳴らし、停止済みの戦闘BGMでもSEを維持する', () => {
+    const ctx = createContext();
+    vm.runInContext('class WarManager {}; this.WarManager = WarManager;', ctx);
+    loadScript(ctx, 'js/war_effort.js');
+    const war = new ctx.WarManager();
+    const calls = [];
+    const audio = {
+        currentBgmName: 'SC_ex_Town2_Fortress.ogg',
+        bgmPlayer: { playing: () => true },
+        stopBGM() { calls.push('stop'); this.bgmPlayer = null; },
+        playSE(file) { calls.push('se:' + file); }
+    };
+    ctx.AudioManager = audio;
+    war.prepareWarResultAudio(false);
+    assert.deepStrictEqual(calls, ['se:event001.ogg'], 'AI自動戦争の結果SEは平時BGMの停止なしに鳴る');
+
+    calls.length = 0;
+    audio.currentBgmName = '08_Legend of bear slaying.ogg';
+    audio.bgmPlayer = null; // 再生失敗・停止済みでも、結果音まで落とさない
+    war.prepareWarResultAudio(true);
+    assert.deepStrictEqual(calls, ['se:victory.ogg'], '戦闘曲が既に停止していても結果SEを鳴らす');
+
+    calls.length = 0;
+    audio.currentBgmName = '07_Underworld dance.ogg';
+    audio.bgmPlayer = { playing: () => true };
+    war.prepareWarResultAudio(true);
+    assert.deepStrictEqual(calls, ['stop', 'se:victory.ogg'], '従来のプレイヤー攻城戦はBGM停止後に勝利SEを鳴らす');
+});
+
 // r897: 戦闘結果でのBGM停止と復帰は野戦・攻城戦の終了処理で分散させず戦争結果に集約する。
 test('r897 野戦・攻城戦は結果を確認する前に平時BGMを復帰しない', () => {
     const field = read('js/field_war.js');

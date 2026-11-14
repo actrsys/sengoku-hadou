@@ -7,15 +7,14 @@
 // Object.assign を使って、WarManager に魔法をくっつけます！
 Object.assign(WarManager.prototype, {
 
-    // 戦争結果が表示される瞬間だけ戦闘BGMを止める。勝利は既存の勝利SE、敗北・撤退は結果通知SE。
-    // AI同士の戦争など、戦闘BGMが鳴っていない時の曲は止めない。
+    // 戦争結果のSEはリザルト公開時に鳴らす。戦闘BGMが鳴っている場合だけ停止し、
+    // AI自動戦争などの平時BGMは中断しない。音声の再生責務はAudioManagerへ委譲する。
     prepareWarResultAudio(playerVictory = false) {
         const audio = window.AudioManager;
         if (!audio) return;
         const isBattleBgm = audio.currentBgmName === '08_Legend of bear slaying.ogg'
             || audio.currentBgmName === '07_Underworld dance.ogg';
-        if (!isBattleBgm || !audio.bgmPlayer) return;
-        audio.stopBGM();
+        if (isBattleBgm && audio.bgmPlayer) audio.stopBGM();
         audio.playSE(playerVictory ? 'victory.ogg' : 'event001.ogg');
     },
 
