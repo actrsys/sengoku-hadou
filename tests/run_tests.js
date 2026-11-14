@@ -4549,6 +4549,29 @@ test('r411のタイトル情報メニューは設定の下から差し替わり�
     assert.ok(bootstrap.includes('企画・制作\\nACTORS SYSTEM\\nあや瀨'), 'クレジットにACTORS SYSTEMと制作者名を表示する');
 });
 
+test('タイトルのライセンスは作品素材の取扱いと第三者ライセンスを同じ正本から表示する', () => {
+    const license = read('THIRD_PARTY_LICENSES.txt');
+    const bootstrap = read('js/app_bootstrap.js');
+    assert.ok(bootstrap.includes("fetch('THIRD_PARTY_LICENSES.txt'"), 'ゲーム内表示は配布テキストを読む');
+    assert.ok(bootstrap.includes("infoDetailBody.textContent = text"), '読み込んだ本文をそのまま表示する');
+    for (const text of [
+        '【本作品のオリジナルコンテンツの利用について】',
+        '画像（人物画・イラスト・背景・アイコン等）',
+        '音楽・効果音などの音声',
+        '文章（シナリオ・イベント・会話・列伝・解説等）',
+        '抜き取り・抽出・収集',
+        '素材単体や素材集として公開・提供・再配布',
+        '他の作品、ゲーム、',
+        '私的使用、適法な引用',
+        '第三者が権利を持つソフトウェア・フォント等',
+        'MIT、zlib、SIL Open Font License'
+    ]) assert.ok(license.includes(text), `ライセンス本文の必要項目が欠落: ${text}`);
+    assert.ok(license.indexOf('【本作品のオリジナルコンテンツの利用について】')
+        < license.indexOf('1. howler.js 2.2.4'), '作品素材の利用規約を第三者ライセンスの前に表示する');
+    assert.ok(license.includes('Permission is hereby granted, free of charge'), 'MIT条件を保持する');
+    assert.ok(license.includes('SIL OPEN FONT LICENSE Version 1.1'), 'OFL条件を保持する');
+});
+
 test('設定値参照側に独自フォールバック値を残さない', () => {
     const jsFiles = [];
     const walk = dir => {
@@ -40786,6 +40809,95 @@ test('城所有者IDを文字列で渡しても数値と同じ勢力変更・忠
     });
     assert.deepStrictEqual(execute('2'), numeric,
         '通常の所有権移転は、文字列でも数値入力と完全に同じ副作用を持つ');
+});
+
+// 同じ年月の月初が画面切替待ちで二重起動しても、派閥恩恵・相場更新を二度実行しない。
+test('月初カットイン待機中の同月二重開始は先行1件だけを実行する', async () => {
+    let factionEffects = 0, marketUpdates = 0;
+    const releases = [];
+    const ctx = createContext({ EconomyRules: { updateMonthlyProvinceMarketRates() { marketUpdates++; } } });
+    loadScript(ctx, 'js/turn_manager.js');
+    const TurnManager = vm.runInContext('TurnManager', ctx);
+    const game = {
+        phase:'game', year:1560, month:1, currentIndex:0,
+        getCurrentTurnCastle: () => null,
+        writeSystemDiagnostic() {},
+        factionSystem: { applyStartMonthSameFactionEffects() { factionEffects++; } },
+        ui: {
+            clearCommandMenu() {},
+            showCutin() { return new Promise(resolve => releases.push(resolve)); }
+        }
+    };
+    const manager = new TurnManager(game);
+    game.turnManager = manager;
+    const first = manager.startMonth();
+    const second = manager.startMonth();
+    const counts = [factionEffects, marketUpdates, releases.length];
+    game.month = 2; // 続きの月次処理に進まず、入口で起きた副作用だけを比較する。
+    releases.forEach(resolve => resolve());
+    await Promise.all([first, second]);
+    assert.deepStrictEqual(counts, [1, 1, 1], '同月中は月初の入口とカットインを重複実行しない');
+});
+
+// 新シナリオ／翌月を待機中の古いfinallyで誤解放しない。月末と同じ所有権境界を持つ。
+test('失効した旧月初の終了は後発月初の実行権を解除しない', async () => {
+    let effects = 0;
+    const releases = [];
+    const ctx = createContext({ EconomyRules: { updateMonthlyProvinceMarketRates() {} } });
+    loadScript(ctx, 'js/turn_manager.js');
+    const TurnManager = vm.runInContext('TurnManager', ctx);
+    const game = {
+        phase:'game', year:1560, month:1, currentIndex:0,
+        getCurrentTurnCastle: () => null,
+        writeSystemDiagnostic() {},
+        factionSystem: { applyStartMonthSameFactionEffects() { effects++; } },
+        ui: {
+            clearCommandMenu() {},
+            showCutin() { return new Promise(resolve => releases.push(resolve)); }
+        }
+    };
+    const manager = new TurnManager(game);
+    game.turnManager = manager;
+    const first = manager.startMonth();
+    // 月初開始後、シナリオ切替が進行した状態を模擬する。
+    manager.abortForScenarioTransition();
+    game.month = 2;
+    const second = manager.startMonth();
+    releases[0]();
+    await first;
+    const duplicate = manager.startMonth();
+    const observed = { effects, cutins: releases.length };
+    game.month = 3;
+    releases.slice(1).forEach(resolve => resolve());
+    await Promise.all([second, duplicate]);
+    assert.deepStrictEqual(observed, { effects: 2, cutins: 2 },
+        '旧月初の終了は、新月の月初実行権を消さない');
+});
+
+// 失敗時の実行権は解放する。ただし途中確定済みの副作用を自動再適用する仕様ではない。
+test('月初開始直後の例外後に実行中フラグだけが残らない', async () => {
+    let attempts = 0;
+    const ctx = createContext({ EconomyRules: { updateMonthlyProvinceMarketRates() {} } });
+    loadScript(ctx, 'js/turn_manager.js');
+    const TurnManager = vm.runInContext('TurnManager', ctx);
+    let release;
+    const game = {
+        phase:'game', year:1560, month:1, currentIndex:0,
+        getCurrentTurnCastle: () => null,
+        writeSystemDiagnostic() {},
+        factionSystem: { applyStartMonthSameFactionEffects() {
+            if (++attempts === 1) throw new Error('検証用の月初入口エラー');
+        } },
+        ui: { clearCommandMenu() {}, showCutin() { return new Promise(resolve => { release = resolve; }); } }
+    };
+    const manager = new TurnManager(game);
+    game.turnManager = manager;
+    await assert.rejects(manager.startMonth(), /検証用の月初入口エラー/);
+    const retry = manager.startMonth();
+    assert.strictEqual(attempts, 2, '失敗した月初の実行中フラグを残さない');
+    game.month = 2;
+    release();
+    await retry;
 });
 
 Promise.all(pendingTests).then(() => {

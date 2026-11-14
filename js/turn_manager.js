@@ -18,6 +18,8 @@ class TurnManager {
         // 同一年月・同一シナリオ世代の月末処理は、最初の実行だけが確定する。
         // 世代が切り替わった後の新処理は旧Promiseに妨げられない。
         this._endMonthRun = null;
+        // 同年月・同世代で重なった月初は、先行処理だけが月次副作用を確定する。
+        this._startMonthRun = null;
     }
 
     abortForScenarioTransition() {
@@ -171,6 +173,14 @@ class TurnManager {
             && Number(game.year) === expectedYear
             && Number(game.month) === expectedMonth;
         if (!isCurrentFlow()) return;
+        // 月初カットイン・イベント待機中の重複起動は派閥恩恵や月次収入を二重適用する。
+        // 月末と同じ世代・年月の実行権で、進行中の同月再入だけを抑止する。
+        const existingRun = this._startMonthRun;
+        if (existingRun && existingRun.generation === turnFlowGeneration
+            && existingRun.year === expectedYear && existingRun.month === expectedMonth) return;
+        const run = { generation: turnFlowGeneration, year: expectedYear, month: expectedMonth };
+        this._startMonthRun = run;
+        try {
         this._cancelAllActionsDonePromptTimer();
         game.hasAutoSavedThisMonth = false; // ★月が替わったので、オートセーブ済みの印を消します
         game.writeSystemDiagnostic('month_start:start');
@@ -415,6 +425,10 @@ class TurnManager {
         if (!isCurrentFlow()) return;
     
         game.processTurn();
+        } finally {
+            // 失効した旧月初が、翌月や新シナリオの実行権を消さない。
+            if (this._startMonthRun === run) this._startMonthRun = null;
+        }
     }
 
     /** 委任城・他勢力で共通のAIターン開始処理。 */
