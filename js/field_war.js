@@ -2972,6 +2972,11 @@ class FieldWarManager {
                 if (this.modal) this.modal.classList.add('hidden');
             }
             if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration, false)) return;
+            if (this.playerWasInvolved && this.warState?.isPlayerInvolved !== false
+                && !this.units.some(u => u.isPlayer) && window.AudioManager) {
+                // 決着の場面を見せ終えてから平時BGMへ戻す。途中離脱時の従来経路とは排他的。
+                window.AudioManager.restoreMemorizedBgm();
+            }
             
             // ★野戦の画面を閉じたあとにイベントを発火させます（裏に隠れて操作不能になるのを防ぐため）
             if (this.game.eventManager) {
@@ -2991,6 +2996,9 @@ class FieldWarManager {
             this._scheduleFieldWarCallback(() => {
                 finishProcess();
             }, 1500, false);
+        } else if (this.playerWasInvolved && this.modal && !this.modal.classList.contains('hidden')) {
+            // 最後の操作部隊を失った場合も、決着通知の直後に背面地図を露出させない。
+            this._scheduleFieldWarCallback(() => finishProcess(), 300, false);
         } else {
             finishProcess();
         }
@@ -3937,11 +3945,30 @@ class FieldWarManager {
         this.checkMoraleCollapse();
 
         attacker.hasActionDone = true;
-        this.state = 'IDLE'; // ★シールドを解除して操作できるように戻します
-        
-        // ★追加: この戦闘の結果、プレイヤーが操作する部隊が全滅していなくなったかチェック
-        const stillPlayerInvolved = this.units.some(u => u.isPlayer);
 
+        // 総大将の最後の一撃や、プレイヤー最後の部隊の壊滅では、先に野戦画面を隠すと
+        // 兵数0・ダメージ数字・部隊消滅が見えない。ここだけ描画の完了を待ってから進める。
+        // 勝敗の確定は従来どおり checkEndCondition() が担当し、ここでは演出が必要かだけ判断する。
+        const stillPlayerInvolved = this.units.some(u => u.isPlayer);
+        const generalDefeated = !this.units.some(u => u.isAttacker && u.isGeneral)
+            || !this.units.some(u => !u.isAttacker && u.isGeneral);
+        if (isPlayerInvolved && (generalDefeated || !stillPlayerInvolved)) {
+            // 数字が0になった状態をいったん描画し、少し見せてから壊滅部隊を消す。
+            // この間は ANIMATING を維持し、追加入力や次部隊への進行を許さない。
+            await this._waitForFieldWarVisualState(220);
+            if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
+            this.updateMap();
+            this.updateStatus();
+            // ダメージ数字の上昇アニメーション(0.65秒)を最後まで見せ、消滅後も少し余韻を残す。
+            await this._waitForFieldWarVisualState(550);
+            if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
+            if (generalDefeated) {
+                this.checkEndCondition();
+                return;
+            }
+        }
+
+        this.state = 'IDLE';
         if (stillPlayerInvolved) {
             this.updateMap();
             this.updateStatus();

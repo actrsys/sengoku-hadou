@@ -32824,6 +32824,122 @@ test('r710 野戦で敵部隊を壊滅させたグループの士気+3が他グ�
     }
 });
 
+// r884: 最後の一撃で総大将や最後の操作部隊が消える場合も、野戦画面をすぐ閉じず
+// ダメージ・兵数0・部隊の消滅を描いてから結果へ進む。勝敗計算は現行の正本を使用する。
+test('r884 野戦の総大将撃破は兵数0→部隊消滅→ダメージ終了→決着通知の順で画面を保持する', async () => {
+    const makeClassList = () => ({
+        contains: () => false, add() {}, remove() {}, toggle() {}
+    });
+    const ctx = createContext({
+        addEventListener() {},
+        setTimeout(callback, ms) { return ms === 1000 ? 0 : setTimeout(callback, ms); },
+        document: {
+            createElement: () => ({ style: {}, addEventListener() {}, parentNode: null }),
+            getElementById: () => null
+        },
+        WarParams: { War: { AutoWarDamageRate: 1 }, Military: { MaxTrainingInternal: 120, MaxMoraleInternal: 120 } },
+        WarSystem: { calcLoyaltyBattleBonus: () => 0, calcHomeBonusMultiplier: () => 1 },
+        SkillManager: {
+            calcFieldWeatherAtkModifier: () => 1, calcFieldWeatherDefModifier: () => 1,
+            ignoresFlankRearPenalty: () => false,
+            getCriticalResult: () => ({ isCritical: false, atkMult: 1, defMult: 1, finalDmgMult: 1 }),
+            getUnderdogSkillModifiers: () => ({ atkMult: 1, defMult: 1, isKabukimono: false, isChinzei: false }),
+            calcSkillDamageModifier: () => 1, calcSkillDefenseModifier: () => 1,
+            calcAptitudeDamageModifier: () => 1, calcAptitudeDefenseModifier: () => 1,
+            calcFieldDeathProbModifier: () => 0
+        }
+    });
+    loadScript(ctx, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', ctx);
+    const makeUnit = (id, side, soldiers, general, isPlayer) => ({
+        id, bushoId: id, name: `武将${id}`, isAttacker: side, isGeneral: general,
+        groupId: side ? 'atk_main' : 'def_main', soldiers, initialSoldiers: soldiers,
+        troopType: 'kiba', direction: 0, x: side ? 0 : 1, y: 0, isPlayer,
+        stats: { ldr: 85, str: 90, int: 70, charm: 70 }, hasActionDone: false
+    });
+    for (const scenario of [
+        { label: '敵総大将壊滅', atkPlayer: true, defPlayer: false, result: 'attacker_win_fatal' },
+        { label: '自軍総大将壊滅', atkPlayer: false, defPlayer: true, result: 'attacker_win_fatal' }
+    ]) {
+        const events = [];
+        const game = {
+            playerClanId: scenario.atkPlayer ? 1 : 2, year: 1570,
+            getBusho(id) { return { id, clan: id === 1 ? 1 : 2, factionId: 0, originalEndYear: 1600, strength: 60 }; }
+        };
+        const field = new Field(game);
+        field.active = true;
+        field.playerWasInvolved = true;
+        field.fieldEndNoticeShown = false;
+        field.mapEl = { appendChild() {} };
+        field.modal = { classList: makeClassList() };
+        field.log = () => {};
+        field.updateStatus = () => {};
+        field.scrollToCenterPos = () => {};
+        field.isNightTurn = () => false;
+        field.getDistance = () => 1;
+        field.getDirection = () => 0;
+        field.grid = [];
+        field.weather = 'sunny';
+        field.isHeavySnowBattle = false;
+        field.turnCount = 1;
+        field.maxTurns = 100;
+        field.warState = {
+            attacker: { ownerClan: 1, name: '攻撃' }, defender: { ownerClan: 2, name: '守備' },
+            sourceCastle: { id: 1 }, deadSoldiers: { attacker: 0, defender: 0 }
+        };
+        const attacker = makeUnit(1, true, 6000, true, scenario.atkPlayer);
+        const defender = makeUnit(2, false, 1, true, scenario.defPlayer);
+        field.units = [attacker, defender];
+        field.groupStats = {
+            atk_main: { rice: 1000, morale: 50, training: 50 },
+            def_main: { rice: 1000, morale: 50, training: 50 }
+        };
+        field._fwUnitElementCache = new Map();
+        for (const unit of field.units) {
+            field._fwUnitElementCache.set(unit.id, {
+                el: { style: { left: '0px', top: '0px', width: '24px', display: '' }, classList: makeClassList() },
+                soldierEl: { textContent: String(unit.soldiers) }
+            });
+        }
+        const defenderRefs = field._fwUnitElementCache.get(defender.id);
+        field.updateMap = () => {
+            if (!field.units.includes(defender)) {
+                defenderRefs.el.style.display = 'none';
+                events.push('部隊消滅');
+            }
+        };
+        field._waitForFieldWarVisualState = async (ms) => {
+            if (ms === 220) {
+                assert.strictEqual(defenderRefs.soldierEl.textContent, '0', `${scenario.label}: 被害0兵数を先に表示する`);
+                assert.notStrictEqual(defenderRefs.el.style.display, 'none', `${scenario.label}: 0を表示する前に消さない`);
+                assert.strictEqual(field.state, 'ANIMATING', '決着中は操作可能に戻さない');
+            }
+            if (ms === 550) assert.strictEqual(defenderRefs.el.style.display, 'none', '消滅を先に反映する');
+            events.push(`wait:${ms}`);
+        };
+        field.finishFieldWarWithNotice = (result, message) => {
+            events.push('決着通知');
+            field.testResult = result;
+            assert.ok(message.length > 0, '結末の文章を出す');
+            assert.strictEqual(field.modal.classList.contains('hidden'), false, '通知まで野戦画面を維持する');
+        };
+        await field.executeAttack(attacker, defender);
+        assert.strictEqual(defender.soldiers, 0, `${scenario.label}: 実際の攻撃で壊滅`);
+        assert.strictEqual(field.testResult, scenario.result, `${scenario.label}: 元の勝敗条件を保つ`);
+        const tail = events.filter(e => e === 'wait:0' || e === 'wait:220' || e === 'wait:550' || e === '部隊消滅' || e === '決着通知');
+        assert.deepStrictEqual(tail, ['wait:0', 'wait:220', '部隊消滅', 'wait:550', '決着通知'], `${scenario.label}: 順序を維持`);
+    }
+});
+
+test('r884 野戦終結後は最終操作部隊を失っても画面の余韻を維持し、重複BGM復帰しない', () => {
+    const field = read('js/field_war.js');
+    const endAt = field.indexOf('    async endFieldWar(resultType) {');
+    const endBlock = field.slice(endAt, field.indexOf('\n    onHexClick(x, y)', endAt));
+    assert.ok(endBlock.includes("this.playerWasInvolved && this.modal && !this.modal.classList.contains('hidden')"));
+    assert.ok(endBlock.includes('finishProcess(), 300, false'), '最後の操作部隊が消えても即座に地図へ戻らない');
+    assert.ok(endBlock.includes("this.warState?.isPlayerInvolved !== false"), '既に途中離脱で平時音楽へ戻した場合は繰り返さない');
+});
+
 // r711: 諸勢力親善の地図候補と城内対象一覧を同一の友好度上限条件で絞る。
 // 複数勢力が同じ城にいるとき、既に100の対象が選択画面に混入しないこと。
 test('r711 同城の諸勢力親善で友好度100の対象を一覧から除外する', () => {
