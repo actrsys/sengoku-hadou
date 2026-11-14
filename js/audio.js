@@ -723,15 +723,17 @@ class AudioManager {
         }
     }
 
-    // メモ帳に書いてあるBGMをもう一度鳴らす魔法
+    // 記憶したBGMへ戻す。同じ曲が再生中・読み込み中なら再起動しない。
+    // stopBGM()は曲名を残すため、曲名だけでなくプレイヤーの有無も確認する。
     restoreMemorizedBgm() {
-        if (this.memoBgmName) {
-            this.playBGM(this.memoBgmName);
-            this.memoBgmName = null; // 鳴らしたらメモは消しておきます
-        } else {
-            // 万が一メモが白紙だった時は、とりあえずいつもの曲を鳴らします
-            this.playBGM('SC_ex_Town2_Fortress.ogg'); 
-        }
+        const target = this.memoBgmName || 'SC_ex_Town2_Fortress.ogg';
+        const player = this.bgmPlayer;
+        const alreadyRequested = player && this.currentBgmName === target && (
+            (typeof player.playing === 'function' && player.playing()) ||
+            (typeof player.state === 'function' && player.state() === 'loading')
+        );
+        this.memoBgmName = null;
+        if (!alreadyRequested) this.playBGM(target);
     }
     
 }

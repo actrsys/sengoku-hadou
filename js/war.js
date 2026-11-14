@@ -1155,9 +1155,6 @@ class WarManager {
                          if (this.game && this.game.ui && typeof this.game.ui.setWarModalVisible === 'function') {
                              this.game.ui.setWarModalVisible(false);
                          }
-                         if (window.AudioManager) {
-                             window.AudioManager.restoreMemorizedBgm();
-                         }
                      }
                  }
 

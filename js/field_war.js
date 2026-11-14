@@ -2724,8 +2724,6 @@ class FieldWarManager {
         this.retreatedUnits.push(unit);
         
         // ★追加: 撤退前のプレイヤー参加状況をメモ
-        const wasPlayerInvolved = this.units.some(u => u.isPlayer);
-
         // 戦場から部隊を消す
         this.units = this.units.filter(u => u.id !== unit.id);
         
@@ -2744,11 +2742,6 @@ class FieldWarManager {
             // ★追加: プレイヤーが操作する部隊がいなくなったら、AI野戦へ移行するため画面を隠す
             const modal = document.getElementById('field-war-modal');
             if (modal) modal.classList.add('hidden');
-            
-            // ★追加: プレイヤーが撤退していなくなった瞬間に、BGMを平時に戻す！
-            if (wasPlayerInvolved && window.AudioManager) {
-                window.AudioManager.restoreMemorizedBgm();
-            }
             
             // ★修正: 大元の戦争データにも「プレイヤーはもういない」とメモを残します！
             if (this.warState) {
@@ -3118,12 +3111,6 @@ class FieldWarManager {
                 if (this.modal) this.modal.classList.add('hidden');
             }
             if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration, false)) return;
-            if (this.playerWasInvolved && this.warState?.isPlayerInvolved !== false
-                && !this.units.some(u => u.isPlayer) && window.AudioManager) {
-                // 決着の場面を見せ終えてから平時BGMへ戻す。途中離脱時の従来経路とは排他的。
-                window.AudioManager.restoreMemorizedBgm();
-            }
-            
             // ★野戦の画面を閉じたあとにイベントを発火させます（裏に隠れて操作不能になるのを防ぐため）
             if (this.game.eventManager) {
                 // イベントマネージャー（受付）を経由させることでフラグが保存されます
@@ -4098,11 +4085,6 @@ class FieldWarManager {
             const modal = document.getElementById('field-war-modal');
             if (modal && isPlayerInvolved) {
                 modal.classList.add('hidden');
-                // ★追加: プレイヤーの部隊が全滅していなくなった瞬間に、BGMを平時に戻す！
-                if (window.AudioManager) {
-                    window.AudioManager.restoreMemorizedBgm();
-                }
-                
                 // ★修正: 大元の戦争データにも「プレイヤーはもういない」とメモを残します！
                 if (this.warState) {
                     this.warState.isPlayerInvolved = false;

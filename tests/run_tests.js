@@ -33449,7 +33449,94 @@ test('r884 野戦終結後は最終操作部隊を失っても画面の余韻を
     const endBlock = field.slice(endAt, field.indexOf('\n    onHexClick(x, y)', endAt));
     assert.ok(endBlock.includes("this.playerWasInvolved && this.modal && !this.modal.classList.contains('hidden')"));
     assert.ok(endBlock.includes('finishProcess(), 300, false'), '最後の操作部隊が消えても即座に地図へ戻らない');
-    assert.ok(endBlock.includes("this.warState?.isPlayerInvolved !== false"), '既に途中離脱で平時音楽へ戻した場合は繰り返さない');
+    assert.ok(!endBlock.includes('restoreMemorizedBgm()'), '野戦単独では平時音楽へ戻さず戦争結果へ引き渡す');
+});
+
+
+// r897: 戦闘結果でのBGM停止と復帰は野戦・攻城戦の終了処理で分散させず戦争結果に集約する。
+test('r897 野戦・攻城戦は結果を確認する前に平時BGMを復帰しない', () => {
+    const field = read('js/field_war.js');
+    const siege = read('js/war.js');
+    const war = read('js/war_effort.js');
+    assert.ok(!field.includes('restoreMemorizedBgm()'), '野戦の途中退出・決着で先に戻さない');
+    assert.ok(!siege.includes('restoreMemorizedBgm()'), '攻城の最終兵力判定時に先に戻さない');
+    assert.ok(!war.includes('window.AudioManager.restoreMemorizedBgm()'), '戦後処理の重複復帰を解消');
+    assert.ok(war.includes('this.restoreWarBgmAfterResult();'));
+    assert.ok(war.includes('this.prepareWarResultAudio('));
+});
+
+test('r897 戦争結果SEの後、確認操作で一度だけBGMを戻し連戦では再度復帰できる', () => {
+    const ctx = createContext();
+    vm.runInContext('class WarManager {}; this.WarManager = WarManager;', ctx);
+    loadScript(ctx, 'js/war_effort.js');
+    const WarManager = ctx.WarManager;
+    const events = [];
+    const music = {
+        currentBgmName: '08_Legend of bear slaying.ogg', memoBgmName: 'SC_ex_Town2_Fortress.ogg', bgmPlayer: {},
+        stopBGM() { events.push('stop'); this.bgmPlayer = null; },
+        playSE(name) { events.push('se:' + name); },
+        restoreMemorizedBgm() {
+            events.push('restore');
+            this.currentBgmName = this.memoBgmName;
+            this.memoBgmName = null;
+            this.bgmPlayer = { playing: () => true };
+        }
+    };
+    ctx.AudioManager = music;
+    const war = new WarManager();
+    war._warGeneration = 7;
+    war.prepareWarResultAudio(false);
+    assert.deepStrictEqual(events, ['stop','se:event001.ogg'], '敗北時はBGMを止め、結果SEを先に鳴らす');
+    war.restoreWarBgmAfterResult();
+    war.restoreWarBgmAfterResult();
+    assert.deepStrictEqual(events, ['stop','se:event001.ogg','restore'], '結果の確認後だけ、一度戻す');
+    war._warGeneration = 8;
+    music.currentBgmName = '07_Underworld dance.ogg';
+    music.memoBgmName = 'SC_ex_Town2_Fortress.ogg';
+    music.bgmPlayer = {};
+    war.prepareWarResultAudio(true);
+    war.restoreWarBgmAfterResult();
+    assert.deepStrictEqual(events.slice(3), ['stop','se:victory.ogg','restore'], '次の戦争で勝利SEと復帰が正常に働く');
+    music.currentBgmName = '08_Legend of bear slaying.ogg';
+    music.memoBgmName = 'SC_ex_Town2_Fortress.ogg';
+    music.bgmPlayer = {};
+    war._warGeneration = 9;
+    war.restoreWarBgmAfterResult();
+    assert.strictEqual(events.at(-1), 'restore', '通知を省いたAI戦争もcloseWarから復帰できる');
+    const restoredCount = events.filter(event => event === 'restore').length;
+    war._warGeneration = 10;
+    music.currentBgmName = 'SC_ex_Scene3_Odyssey.ogg';
+    music.memoBgmName = 'SC_ex_Town2_Fortress.ogg';
+    war.restoreWarBgmAfterResult();
+    assert.strictEqual(events.filter(event => event === 'restore').length, restoredCount, 'AI合戦時の外交・イベントBGMには干渉しない');
+});
+
+test('r897 BGM復帰は再生済・読み込み中の同一曲を巻き戻さず、停止状態なら再開する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/audio.js');
+    const audio = ctx.AudioManager;
+    const requests = [];
+    audio.playBGM = file => {
+        requests.push(file);
+        audio.currentBgmName = file;
+        audio.bgmPlayer = { playing: () => true, state: () => 'loaded' };
+    };
+    const peace = 'SC_ex_Town2_Fortress.ogg';
+    audio.currentBgmName = peace;
+    audio.bgmPlayer = { playing: () => true, state: () => 'loaded' };
+    audio.memoBgmName = peace;
+    audio.restoreMemorizedBgm();
+    audio.restoreMemorizedBgm();
+    assert.strictEqual(requests.length, 0, '再生中は二度復帰しても再起動しない');
+    audio.bgmPlayer = { playing: () => false, state: () => 'loading' };
+    audio.restoreMemorizedBgm();
+    assert.strictEqual(requests.length, 0, '再生を予約済みのロード中も再生成しない');
+    audio.bgmPlayer = null;
+    audio.restoreMemorizedBgm();
+    assert.deepStrictEqual(requests, [peace], '停止済みの同名曲は再生できる');
+    audio.memoBgmName = 'SC_ex_Town1_Castle.ogg';
+    audio.restoreMemorizedBgm();
+    assert.deepStrictEqual(requests, [peace, 'SC_ex_Town1_Castle.ogg'], '異なる記憶曲は従来どおり切り替わる');
 });
 
 // r711: 諸勢力親善の地図候補と城内対象一覧を同一の友好度上限条件で絞る。

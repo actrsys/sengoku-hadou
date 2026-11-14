@@ -7,6 +7,32 @@
 // Object.assign を使って、WarManager に魔法をくっつけます！
 Object.assign(WarManager.prototype, {
 
+    // 戦争結果が表示される瞬間だけ戦闘BGMを止める。勝利は既存の勝利SE、敗北・撤退は結果通知SE。
+    // AI同士の戦争など、戦闘BGMが鳴っていない時の曲は止めない。
+    prepareWarResultAudio(playerVictory = false) {
+        const audio = window.AudioManager;
+        if (!audio) return;
+        const isBattleBgm = audio.currentBgmName === '08_Legend of bear slaying.ogg'
+            || audio.currentBgmName === '07_Underworld dance.ogg';
+        if (!isBattleBgm || !audio.bgmPlayer) return;
+        audio.stopBGM();
+        audio.playSE(playerVictory ? 'victory.ogg' : 'event001.ogg');
+    },
+
+    // 復帰タイミングは戦争結果の確定操作（または通知を省いた戦争の終了）の一度だけ。
+    // 戦争世代で判定し、捕虜・外交イベント等を挟んでcloseWarへ進んでも再生を巻き戻さない。
+    restoreWarBgmAfterResult() {
+        const generation = Number(this._warGeneration || 0);
+        if (this._warBgmRestoredGeneration === generation) return;
+        const audio = window.AudioManager;
+        if (!audio) return;
+        const isBattleBgm = audio.currentBgmName === '08_Legend of bear slaying.ogg'
+            || audio.currentBgmName === '07_Underworld dance.ogg';
+        if (!isBattleBgm) return;
+        this._warBgmRestoredGeneration = generation;
+        audio.restoreMemorizedBgm();
+    },
+
     // 各援軍の攻城開始時兵数を保存する。野戦を経由した場合は野戦後の実数が基準。
     recordSiegeReinforcementStartingSoldiers(state = this.state) {
         if (!state || state._siegeReinforcementStartSoldiers) return;
@@ -1685,10 +1711,8 @@ Object.assign(WarManager.prototype, {
                 // ★追加：演出が終わったのでバリアを解除します！
                 if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
-                // ★ここから追加：合戦結果の画面を閉じたら、平時のBGMに戻す！
-                if (window.AudioManager && s.isPlayerInvolved) {
-                    window.AudioManager.restoreMemorizedBgm();
-                }
+                // 結果を確認して画面を進めた時にだけ、平時BGMを復帰させる。
+                this.restoreWarBgmAfterResult();
 
                 // 一元管理の魔法で透明化を完全に解除します！
                 this.game.ui.restoreAIGuardText(true);
@@ -1982,23 +2006,16 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.setWarModalVisible(false);
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-                    if (attackerWon) {
-                        if (window.AudioManager) {
-                            // ★修正：フェードアウトさせると音量が0になって戻らなくなるので、ピタッと止める魔法にします！
-                            if (typeof window.AudioManager.stopBGM === 'function') {
-                                window.AudioManager.stopBGM();
-                            }
-                            window.AudioManager.playSE('victory.ogg');
-                        }
-                    }
-                    this.game.ui.showDialog(resultMsg, false, () => { 
-                        this.closeWar(); 
+                    this.prepareWarResultAudio(attackerWon);
+                    this.game.ui.showDialog(resultMsg, false, () => {
+                        this.closeWar();
                     }, null, { closeBeforeOk: true });
                 } else {
                     // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
                     if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+                        this.prepareWarResultAudio(false);
                         await this.game.ui.showDialogAsync(resultMsg);
                         if (!isCurrentWar()) return;
                     }
@@ -2129,14 +2146,16 @@ Object.assign(WarManager.prototype, {
                     this.game.ui.setWarModalVisible(false);
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-                    this.game.ui.showDialog(resultMsg, false, () => { 
-                        this.closeWar(); 
+                    this.prepareWarResultAudio(!attackerWon);
+                    this.game.ui.showDialog(resultMsg, false, () => {
+                        this.closeWar();
                     }, null, { closeBeforeOk: true });
                 } else {
                     // ★追加：AIの城で反乱が起きた時も、専用のメッセージを出してタップを待ちます！
                     if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+                        this.prepareWarResultAudio(false);
                         await this.game.ui.showDialogAsync(resultMsg);
                         if (!isCurrentWar()) return;
                     }
@@ -2317,7 +2336,8 @@ Object.assign(WarManager.prototype, {
                     if (aiResultMsg && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                         // ★追加：ダイアログを出す前にバリアを解除します！
                         if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
-                        await this.game.ui.showDialogAsync(aiResultMsg);
+                        this.prepareWarResultAudio(false);
+                    await this.game.ui.showDialogAsync(aiResultMsg);
                         if (!isCurrentWar()) return;
                     }
                     await finishWarProcess();
@@ -2424,16 +2444,8 @@ Object.assign(WarManager.prototype, {
                 // ★追加：ダイアログを出す前にバリアを解除します！
                 if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
 
-                if (attackerWon && !isRetreat && isAtkPlayer) {
-                    if (window.AudioManager) {
-                        // ★修正：フェードアウトさせると音量が0になって戻らなくなるので、ピタッと止める魔法にします！
-                        if (typeof window.AudioManager.stopBGM === 'function') {
-                            window.AudioManager.stopBGM();
-                        }
-                        window.AudioManager.playSE('victory.ogg');
-                    }
-                }
-                
+                this.prepareWarResultAudio(attackerWon ? isAtkPlayer && !isRetreat : isDefPlayer);
+
                 this.game.ui.showDialog(resultMsg, false, finishWarProcess, null, { closeBeforeOk: true });
             }
             else {
@@ -2441,6 +2453,7 @@ Object.assign(WarManager.prototype, {
                 if (aiResultMsg && this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
+                    this.prepareWarResultAudio(false);
                     await this.game.ui.showDialogAsync(aiResultMsg);
                     if (!isCurrentWar()) return;
                 }
@@ -3190,10 +3203,8 @@ Object.assign(WarManager.prototype, {
             this.game.ui.hideAIWarThinking();
         }
 
-        // ★諸勢力との戦いが終わった時も平時のBGMに戻す！
-        if (window.AudioManager && this.state.isPlayerInvolved) {
-            window.AudioManager.restoreMemorizedBgm();
-        }
+        // ダイアログを閉じて戦後画面へ戻る段階で復帰。一度戻した曲は再起動しない。
+        this.restoreWarBgmAfterResult();
 
         // ★追加：諸勢力との戦いで城主が討ち死にした場合などに備えて、念のため再確認します！
         if (this.state.sourceCastle) {
