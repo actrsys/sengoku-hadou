@@ -1177,6 +1177,74 @@ async function validateFieldWarTroopOverlay(cdp) {
     console.log('✓ 野戦兵科・兵数 PC/スマホ 6方向固定/プレビュー visual/layout regression');
 }
 
+async function validateFieldWarCombatLayering(cdp) {
+    // 交戦点滅で親のfilterがstacking contextを作り、他部隊の凸が兵科の前に出ないか実ブラウザで検査。
+    const animationCss = fs.readFileSync(path.join(ROOT, 'css', 'animation.css'), 'utf8');
+    const html = fixtureHtml('field_war_fullscreen.html').replace('</head>', `<style>${animationCss.replace(/<\/style/gi, '<\\/style')}</style></head>`);
+    for (const cfg of [
+        { label:'PC', width:1280, height:720, mobile:false },
+        { label:'mobile', width:360, height:640, mobile:true }
+    ]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', {width:cfg.width, height:cfg.height, deviceScaleFactor:1, mobile:cfg.mobile});
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.innerHTML = '<div id="fw-layer-test" style="position:relative;width:260px;height:220px"></div>';
+                const map = document.getElementById('fw-layer-test');
+                const makeUnit = (id, top) => {
+                    const unit = document.createElement('div');
+                    unit.className = 'fw-unit attacker';
+                    unit.id = id;
+                    unit.style.cssText = 'left:100px;top:'+top+'px;width:31px;height:31px;transition:none';
+                    unit.innerHTML = '<div class="fw-unit-shadow"></div><div class="fw-unit-icon"></div>' +
+                        '<div class="fw-unit-status-wrap"><div class="fw-troop-icon" data-type="ashigaru"></div>' +
+                        '<div class="fw-unit-soldiers">5000</div></div>';
+                    map.appendChild(unit);
+                    return unit;
+                };
+                const a = makeUnit('unit-a', 110);
+                const b = makeUnit('unit-b', 93);
+                a.querySelector('.fw-unit-status-wrap').style.pointerEvents = 'auto';
+                b.querySelector('.fw-unit-icon').style.pointerEvents = 'auto';
+                const overlayRect = a.querySelector('.fw-unit-status-wrap').getBoundingClientRect();
+                const checkX = overlayRect.left + overlayRect.width / 2;
+                const checkY = overlayRect.top + overlayRect.height / 2;
+                const hit = () => document.elementFromPoint(checkX, checkY)?.closest('.fw-unit')?.id || null;
+                const before = hit();
+                a.classList.add('active', 'anim-battle-flash');
+                const during = {
+                    hit:hit(), rootFilter:getComputedStyle(a).filter,
+                    iconFilter:getComputedStyle(a.querySelector('.fw-unit-icon')).filter,
+                    unitZ:getComputedStyle(a).zIndex,
+                    iconZ:getComputedStyle(a.querySelector('.fw-unit-icon')).zIndex,
+                    overlayZ:getComputedStyle(a.querySelector('.fw-unit-status-wrap')).zIndex
+                };
+                a.style.filter = 'brightness(2)'; // 旧バグの再現: 親へfilterを掛けると他部隊の凸が前面に来る
+                const brokenOrder = hit();
+                a.style.removeProperty('filter');
+                a.classList.remove('anim-battle-flash');
+                const after = {
+                    hit:hit(), rootFilter:getComputedStyle(a).filter,
+                    iconFilter:getComputedStyle(a.querySelector('.fw-unit-icon')).filter
+                };
+                return {before,during,brokenOrder,after};
+            })()`, returnByValue:true, awaitPromise:true
+        });
+        const state = result.result.value;
+        assert.strictEqual(state.before, 'unit-a', `${cfg.label}: 通常時に兵科・兵数が別部隊の凸より前面にある`);
+        assert.strictEqual(state.during.hit, 'unit-a', `${cfg.label}: 点滅時も兵科・兵数が別部隊の凸より前面に残る`);
+        assert.strictEqual(state.during.rootFilter, 'none', `${cfg.label}: 点滅で部隊親にfilterを掛けない`);
+        assert.ok(state.during.iconFilter.includes('brightness(2)') && state.during.iconFilter.includes('drop-shadow'), `${cfg.label}: 凸画像の明滅は維持する`);
+        assert.strictEqual(state.during.unitZ, 'auto', `${cfg.label}: 点滅中の親z-indexはauto`);
+        assert.strictEqual(state.during.iconZ, '20', `${cfg.label}: 凸本体の階層は20`);
+        assert.strictEqual(state.during.overlayZ, '25', `${cfg.label}: 兵科・兵数の階層は25`);
+        assert.strictEqual(state.brokenOrder, 'unit-b', `${cfg.label}: 親filterによる旧バグの重なり逆転を再現できる`);
+        assert.strictEqual(state.after.hit, 'unit-a', `${cfg.label}: 点滅終了後に重なり順が元に戻る`);
+        assert.strictEqual(state.after.rootFilter, 'none', `${cfg.label}: 点滅終了後も親filterは付かない`);
+    }
+    console.log('✓ 野戦交戦点滅 PC/スマホ 兵科・兵数の重なり順 visual/layout regression');
+}
+
 async function validateFieldWarDamagePopup(cdp) {
     // ダメージ表示の初回フレームで静止せず、水平位置を保って上昇することを実ブラウザで確認する。
     const css = fs.readFileSync(path.join(ROOT, 'css', 'animation.css'), 'utf8');
@@ -2330,6 +2398,7 @@ async function main() {
         await validateLowMemoryPagerLayout(cdp);
         await validateFieldWarFullscreen(cdp);
         await validateFieldWarTroopOverlay(cdp);
+        await validateFieldWarCombatLayering(cdp);
         await validateFieldWarDamagePopup(cdp);
         await validateFieldTerrainLayout(cdp);
         await validateSiegeLayout(cdp);

@@ -11916,7 +11916,8 @@ test('野戦ダメージ表示は出現直後から動き、固定停止で次�
     assert.ok(/animation:\s*fw-popup\s/.test(popupRule), '出現した時点から上昇が開始する');
     assert.ok(popupRule.includes('transform: translateX(-50%)'), '初期状態と上昇中の水平位置を一致させる');
 
-    assert.ok(css.includes('.anim-battle-flash {\n    filter: brightness(2) drop-shadow(0 0 10px #ffffff);'), '交互点滅の表現は維持する');
+    assert.ok(css.includes('.fw-unit.anim-battle-flash .fw-unit-icon {\n    filter: brightness(2) drop-shadow(0 0 10px #ffffff);'), '交互点滅の明滅は凸画像だけへ適用する');
+    assert.ok(!/\.anim-battle-flash\s*\{\s*filter\s*:/.test(css), '部隊全体のfilterで兵科・兵数の重なり階層を閉じ込めない');
     assert.ok(!css.includes('.anim-battle-flash::after'));
     // 凸本体は陣営色を載せた完成済み画像を使い、戦場上では画像表示だけにする。
     const iconRuleAt = style.indexOf('.fw-unit-shadow {');
@@ -11938,6 +11939,20 @@ test('野戦ダメージ表示は出現直後から動き、固定停止で次�
     assert.ok(iconRules.includes('land_attacker_general.webp') && iconRules.includes('ship_attacker_general.webp'), '総大将の白縁版画像を使う');
     assert.ok(iconRules.includes('.fw-unit.active .fw-unit-icon { filter: drop-shadow(0 0 4px #ffff00); }'), '選択中のみ光彩を使う');
     assert.strictEqual((iconRules.match(/drop-shadow\(/g) || []).length, 1, '全軍の多重影を復活させない');
+});
+
+test('野戦交戦の点滅では部隊コンテナを重なり階層化せず、兵科・兵数を前面に保つ', () => {
+    const css = read('css/style.css');
+    const animation = read('css/animation.css');
+    const field = read('js/field_war.js');
+    const flash = animation.match(/\.fw-unit\.anim-battle-flash \.fw-unit-icon\s*\{([^}]*)\}/);
+    assert.ok(flash && flash[1].includes('brightness(2) drop-shadow(0 0 10px #ffffff)'), '点滅時の凸画像だけに従来の明滅を適用する');
+    assert.ok(!/\.anim-battle-flash\s*\{[^}]*filter\s*:/.test(animation), '親部隊へのfilterを禁止する');
+    assert.ok(css.includes('.fw-unit {') && css.includes('z-index: auto;'), '部隊の共通階層を保つ');
+    assert.ok(css.includes('.fw-unit-status-wrap {') && css.includes('z-index: 25;'), '兵科・兵数のレイヤーを維持する');
+    assert.ok(css.includes('.fw-unit-icon {') && css.includes('z-index: 20;'), '凸画像の階層は兵科より下に保つ');
+    assert.ok(field.includes("el.classList.add('anim-battle-flash')") && field.includes("el.classList.remove('anim-battle-flash')"), '既存の交互点滅のタイミングと回数は維持する');
+    assert.ok(!/\.fw-unit\.anim-battle-flash\s*\{[^}]*z-index\s*:/.test(animation), '点滅中だけ部隊を前面へ移さない');
 });
 
 test('野戦の交戦時は不要なsmooth scroll・DOM再探索・非表示ログlayoutを避ける', () => {

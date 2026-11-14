@@ -103,10 +103,11 @@ body:not(.is-pc) #war-visual-area .war-mobile-card-popup {
 
 /* -----------------------------------------
    5. 野戦での交互点滅
-   - 低FPS端末でCSSアニメーションの途中フレームが飛ばないよう、
-     明滅の時間管理はFieldWarManager側で描画フレームを確認して行います。
+   - 明滅の時間管理はFieldWarManager側で描画フレームを確認して行います。
+   - 部隊コンテナへのfilterは新たな重なり階層を作り、兵科・兵数が他部隊の凸より
+     背面に落ちるため禁止。凸画像だけを光らせ、既存の共通z-indexを保持します。
    ----------------------------------------- */
-.anim-battle-flash {
+.fw-unit.anim-battle-flash .fw-unit-icon {
     filter: brightness(2) drop-shadow(0 0 10px #ffffff);
 }
 
