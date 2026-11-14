@@ -101,7 +101,7 @@
 
 - **PCは16:9、スマホは9:16の固定論理画面**。等比縮小と黒帯に従い、内部のPC/スマホ判定は `body.is-pc` を正本とする。物理viewportやUAに基づく画面ごとの再判定をしない。必要な端末差は原則CSS。 <!-- RULE:UI-VIEWPORT -->
 - 標準モーダル確定・戻るは内容枠外の共通フッターを使い、標準間隔 `--modal-footer-gap: 12px` を正本とする。下部会話の選択肢は `--dialog-choice-footer-gap: 18px` の目的付き例外。PC/スマホで恣意的な数値を増やさない。画面全体を勝手にスクロールさせず、必要ならページ分割・タブ。
-- **ちらつき禁止**：ロード幕の解除は `UIManager.hideLoadingScreen()` に集約し、フォント・表示対象画像のload/decode・配置・必要なpaint完了後に公開する。固定ms待機やロード後の旧画面の一瞬表示でごまかさない。会話→会話はhandoff、会話→戦場や他画面は入力を適切に閉じてから遷移する。
+- **ちらつき禁止**：ロード幕の解除は `UIManager.hideLoadingScreen()` に集約し、フォント・表示対象画像のload/decode・配置・必要なpaint完了後に公開する。固定ms待機やロード後の旧画面の一瞬表示でごまかさない。会話→会話はhandoff、会話→戦場や他画面は入力を適切に閉じてから遷移する。 野戦開幕はプレイヤー側総大将への初期カメラ配置・地形と部隊の準備を非表示で済ませ、公開後に攻守の総大将と援軍込みの総兵力を短く比較表示してから最初の行動を開始する。AI同士の非表示戦闘へこの演出を適用しない。
 - **非同期画面遷移の完了契約**：タイトル↔ゲームの固定DOM切替は `UIManager.showGameSurface()` / `showTitleSurface()`、タイトル復帰と後始末は `returnToTitle()` を正本とする。後続の新規画面生成やシナリオ選択は `await returnToTitle()` **だけで進めず、戻り値が `true` であることを確認**する。失効時の `false` を成功扱いしない。タイトル復帰の世代判定を呼出元へ複製しない。 <!-- RULE:UI-RETURN -->
 - **ロード幕の具体的な待機契約**：`hideLoadingScreen()` は `await` して引き渡し、可視 `img` と可視CSS背景（疑似要素を含む）のload/decode、可視画面の矩形、実paint機会を共通監視する。`img.complete` だけでdecode完了としない。後から非同期に画面要素を組む処理は開始時に `UIManager.trackLoadingTask(promise)` へ登録する。隠れた画像・lazy画像まで無理に待たず、旧世代の完了予約で新しいロード幕を消さない。詳しい契約は技術リファレンスの旧最優先規則原文も確認する。 <!-- RULE:UI-LOADING -->
 - **論理座標・入力**：固定画面内の行高や収容数は論理CSS pxで計算し、縮尺がかかった `getBoundingClientRect()` の物理表示値と `clientHeight` 等を混在させない。タッチ時の二度目の正常操作を抑止せず、`input` / `select` / `textarea` / `contenteditable` に共通の `blur()` / `preventDefault()` を掛けない。独自スクロールバーは開始指の終了時だけドラッグを終える。特殊なSEやモーダル外形固定の細則は技術リファレンスを参照する。

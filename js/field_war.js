@@ -629,20 +629,73 @@ class FieldWarManager {
             // visibility:hidden なら画面の実寸は計測でき、途中の地形や旧カメラは見えない。
             this.startTurn(true);
             this.adjustMapScale();
-            if (this.turnQueue.length > 0) {
-                this.scrollToUnit(this.turnQueue[0], { instant: true, force: true });
+            // まずプレイヤー側の総大将を映す。初手の行動者が敵軍でも開幕にカメラを動かさない。
+            const openingGeneral = this.units.find(unit => unit.isPlayer && unit.isGeneral)
+                || this.units.find(unit => unit.isPlayer);
+            if (openingGeneral) {
+                this.scrollToUnit(openingGeneral, { instant: true, force: true });
             }
+            this._prepareFieldWarOpeningBriefing(openingGeneral);
             if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
             if (this.modal) this.modal.style.visibility = '';
-            // 完成済みの戦場を1回表示してからターン進行へ入る。
-            // 旧戦闘に切り替わっていれば、待機後は一切操作しない。
-            await this._waitForFieldWarVisualState();
+            // 今回の軍勢と初期カメラを公開し、比較演出を見せ終えてからターン処理を始める。
+            await this._playFieldWarOpeningBriefing(fieldWarGeneration);
             if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
             if (this.mapEl) this.mapEl.style.transition = '';
             this.processQueue();
         } else {
             this.startTurn();
         }
+    }
+
+    // 戦力比較は本戦の部隊リストを正本とし、援軍も含めた兵数を合計する。
+    // 独立した戦力キャッシュは持たず、画面テキストへの反映だけを担当する。
+    _prepareFieldWarOpeningBriefing(openingGeneral) {
+        const briefing = document.getElementById('fw-opening-briefing');
+        if (!briefing) return;
+        this._hideFieldWarOpeningBriefing();
+        if (!openingGeneral) return;
+
+        const ourIsAttacker = openingGeneral.isAttacker;
+        const fillSide = (side, isAttacker) => {
+            const members = this.units.filter(unit => unit.isAttacker === isAttacker);
+            const general = members.find(unit => unit.isGeneral && !unit.isReinforcement)
+                || members.find(unit => unit.isGeneral) || members[0];
+            const total = members.reduce((sum, unit) => sum + Math.max(0, Number(unit.soldiers) || 0), 0);
+            const label = document.getElementById(`fw-opening-${side}-side`);
+            const leader = document.getElementById(`fw-opening-${side}-general`);
+            const soldiers = document.getElementById(`fw-opening-${side}-soldiers`);
+            if (label) label.textContent = `${side === 'own' ? '我が軍' : '敵軍'}（${isAttacker ? '攻撃' : '守備'}）`;
+            if (leader) leader.textContent = general ? `${general.isGeneral ? '総大将' : '代表武将'} ${general.name}` : '指揮武将 不明';
+            if (soldiers) soldiers.textContent = total.toLocaleString('ja-JP');
+        };
+        fillSide('own', ourIsAttacker);
+        fillSide('opponent', !ourIsAttacker);
+        briefing.classList.remove('hidden');
+        briefing.setAttribute('aria-hidden', 'false');
+    }
+
+    _hideFieldWarOpeningBriefing() {
+        const briefing = document.getElementById('fw-opening-briefing');
+        if (!briefing) return;
+        briefing.classList.add('hidden');
+        briefing.classList.remove('is-leaving');
+        briefing.setAttribute('aria-hidden', 'true');
+    }
+
+    async _playFieldWarOpeningBriefing(generation) {
+        // 初期描画と約1秒の兵力比較を終えるまで、通常の行動キューを動かさない。
+        const briefing = document.getElementById('fw-opening-briefing');
+        if (!briefing || briefing.classList.contains('hidden')) {
+            await this._waitForFieldWarVisualState();
+            return;
+        }
+        await this._waitForFieldWarVisualState(1050);
+        if (!this._isFieldWarLifecycleCurrent(generation)) return;
+        briefing.classList.add('is-leaving');
+        await this._waitForFieldWarVisualState(230);
+        if (!this._isFieldWarLifecycleCurrent(generation)) return;
+        this._hideFieldWarOpeningBriefing();
     }
 
     _unbindFieldWarScrollEvents() {
@@ -671,6 +724,7 @@ class FieldWarManager {
 
     releaseFieldWarVisualResources() {
         this._unbindFieldWarScrollEvents();
+        this._hideFieldWarOpeningBriefing();
         // 開始準備中に戦闘が破棄されても、固定DOMの非表示指定を次の戦闘へ残さない。
         const modal = this.modal || document.getElementById('field-war-modal');
         if (modal) modal.style.visibility = '';

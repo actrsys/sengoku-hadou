@@ -2984,6 +2984,26 @@ body:not(.is-pc) .busho-detail-biography-text {
 .fw-map-scroll::-webkit-scrollbar { display: none; }
 .fw-map-scroll.grabbing { cursor: grabbing; }
 
+/* 開幕の兵力比較は現在の部隊データから一度だけ表示する。地形・部隊DOMにはアニメーションをかけない。 */
+.fw-opening-briefing { position: absolute; top: 12px; left: 8px; right: 8px; z-index: 105; display: flex; align-items: flex-start; justify-content: center; gap: clamp(5px, 1.3vw, 12px); pointer-events: none; opacity: 1; transition: opacity 0.22s ease-out; color: #fff; text-align: center; }
+.fw-opening-briefing.is-leaving { opacity: 0; }
+.fw-opening-army { flex: 1 1 0; min-width: 0; max-width: 300px; padding: 9px 12px; border-radius: 5px; background: rgba(10, 14, 18, 0.88); border: 1px solid #d0b377; box-shadow: 0 2px 7px rgba(0, 0, 0, 0.55); animation: fw-opening-reveal 0.3s ease-out both; }
+.fw-opening-army.is-opponent { border-color: #81a9d1; }
+.fw-opening-army-label { font-size: 0.78rem; color: #e0c281; font-weight: bold; }
+.fw-opening-army.is-opponent .fw-opening-army-label { color: #accfeb; }
+.fw-opening-general { margin: 3px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.95rem; font-weight: bold; }
+.fw-opening-soldiers { border-top: 1px solid rgba(255, 255, 255, 0.3); padding-top: 4px; display: flex; align-items: baseline; justify-content: center; gap: 8px; font-size: 0.78rem; white-space: nowrap; }
+.fw-opening-soldiers strong { font-size: 1.27rem; font-variant-numeric: tabular-nums; }
+.fw-opening-versus { flex: none; align-self: center; font-weight: bold; font-size: 1.2rem; color: #f8e4ae; text-shadow: 0 1px 3px #000; }
+@keyframes fw-opening-reveal { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: translateY(0); } }
+body:not(.is-pc) .fw-opening-army { padding: 7px 5px; }
+body:not(.is-pc) .fw-opening-general { font-size: 0.74rem; }
+body:not(.is-pc) .fw-opening-army-label { font-size: 0.7rem; }
+body:not(.is-pc) .fw-opening-soldiers { font-size: 0.66rem; gap: 4px; }
+body:not(.is-pc) .fw-opening-soldiers strong { font-size: 0.95rem; }
+body:not(.is-pc) .fw-opening-versus { font-size: 0.93rem; }
+@media (prefers-reduced-motion: reduce) { .fw-opening-army { animation: none; } .fw-opening-briefing { transition: none; } }
+
 .fw-floating-status { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 100; gap: 10px; }
 .fw-status-wrapper { display: flex; flex-direction: column; gap: 5px; flex: 1; max-width: 300px; pointer-events: none; }
 

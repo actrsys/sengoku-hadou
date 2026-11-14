@@ -41648,8 +41648,8 @@ test('r891 野戦開始は地形・ターン順・初期カメラを準備して
     manager.updateWeather = () => {};
     manager.adjustMapScale = () => { order.push('scale'); };
     manager.scrollToUnit = (unit, options) => {
-        assert.ok(manager.turnQueue.length > 0, 'カメラの移動先は確定済みの行動部隊');
-        assert.strictEqual(unit, manager.turnQueue[0]);
+        assert.ok(manager.turnQueue.length > 0, 'カメラ配置前にターン順を確定する');
+        assert.strictEqual(unit, manager.units.find(u => u.isPlayer && u.isGeneral), '先手が敵軍でも味方総大将へカメラを合わせる');
         assert.ok(options.instant && options.force, '表示前は即時カメラ配置');
         assert.strictEqual(modal.style.visibility, 'hidden', 'まだ表示しない');
         order.push('focus');
@@ -41673,7 +41673,7 @@ test('r891 野戦開始は地形・ターン順・初期カメラを準備して
     assert.ok(order.indexOf('render') < order.indexOf('scale'));
     assert.ok(order.indexOf('scale') < order.indexOf('focus'));
     assert.ok(!order.includes('turn'), '最初の描画前にターンを進めない');
-    assert.strictEqual(manager.turnQueue[0].bushoId, 2, '最初の行動者は既存の速度順で決める');
+    assert.strictEqual(manager.turnQueue[0].bushoId, 2, '初手の行動者は既存の速度順で決める');
     allowPaint();
     await opening;
     assert.strictEqual(order[order.length - 1], 'turn', '画面公開・描画後に処理開始');
@@ -41699,8 +41699,8 @@ test('r891 野戦開始の描画待ち中に戦闘世代が変われば旧ター
     assert.ok(start.includes('this.adjustMapScale();'), '公開前に倍率を適用する');
     assert.ok(source.includes("this.mapEl.style.transition = 'none';"), '開幕時だけ拡大のアニメーションを止める');
     assert.ok(start.includes("if (this.mapEl) this.mapEl.style.transition = '';"), '描画完了後は元のズーム演出へ戻す');
-    assert.ok(start.includes('this.scrollToUnit(this.turnQueue[0], { instant: true, force: true });'), '公開前に行動者へカメラを合わせる');
-    assert.ok(start.includes('await this._waitForFieldWarVisualState();'), '公開直後に1回描画を通す');
+    assert.ok(start.includes('this.scrollToUnit(openingGeneral, { instant: true, force: true });'), '公開前に自軍総大将へカメラを合わせる');
+    assert.ok(start.includes('await this._playFieldWarOpeningBriefing(fieldWarGeneration);'), '軍勢比較演出が終わるまでターンを開始しない');
     assert.ok(start.includes("if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;\n            if (this.mapEl) this.mapEl.style.transition = '';\n            this.processQueue();"), '旧戦闘の待機復帰では行動しない');
     const Field = (() => {
         const ctx = createContext({ document: { getElementById() { return null; } } });
@@ -41724,6 +41724,78 @@ test('r891 野戦開始の描画待ち中に戦闘世代が変われば旧ター
     await wait;
     assert.strictEqual(started, 0);
     assert.ok(source.includes("if (modal) modal.style.visibility = '';"), '中断時の非表示指定を解放する');
+});
+
+test('r892 開幕兵力比較は既存部隊データから総大将と援軍を含む総兵力を正しく表示する', () => {
+    const names = ['fw-opening-briefing', 'fw-opening-own-side', 'fw-opening-own-general',
+        'fw-opening-own-soldiers', 'fw-opening-opponent-side', 'fw-opening-opponent-general',
+        'fw-opening-opponent-soldiers'];
+    const fields = Object.fromEntries(names.map(id => [id, fakeElement(id)]));
+    for (const el of Object.values(fields)) {
+        el.attrs = {};
+        el.setAttribute = function(key, value) { this.attrs[key] = value; };
+    }
+    fields['fw-opening-briefing'].classList.add('hidden');
+    const context = createContext({ document: { getElementById: id => fields[id] || null } });
+    loadScript(context, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', context);
+    const manager = Object.create(Field.prototype);
+    manager.units = [
+        { name: '攻撃総大将', isAttacker: true, isGeneral: true, isPlayer: false, soldiers: 600 },
+        { name: '攻撃援軍', isAttacker: true, isGeneral: false, isPlayer: false, isReinforcement: true, soldiers: 180 },
+        { name: '守備総大将', isAttacker: false, isGeneral: true, isPlayer: true, soldiers: 530 },
+        { name: '守備援軍', isAttacker: false, isGeneral: false, isPlayer: false, isReinforcement: true, soldiers: 270 }
+    ];
+    manager._prepareFieldWarOpeningBriefing(manager.units[2]);
+    assert.strictEqual(fields['fw-opening-own-side'].textContent, '我が軍（守備）');
+    assert.strictEqual(fields['fw-opening-opponent-side'].textContent, '敵軍（攻撃）');
+    assert.strictEqual(fields['fw-opening-own-general'].textContent, '総大将 守備総大将');
+    assert.strictEqual(fields['fw-opening-opponent-general'].textContent, '総大将 攻撃総大将');
+    assert.strictEqual(fields['fw-opening-own-soldiers'].textContent, '800');
+    assert.strictEqual(fields['fw-opening-opponent-soldiers'].textContent, '780');
+    assert.ok(!fields['fw-opening-briefing'].classList.contains('hidden'));
+    manager._hideFieldWarOpeningBriefing();
+    assert.ok(fields['fw-opening-briefing'].classList.contains('hidden'));
+    assert.strictEqual(fields['fw-opening-briefing'].attrs['aria-hidden'], 'true');
+    assert.ok(read('index.html').includes('id="fw-opening-briefing"'), '紹介演出のDOMは固定し再利用する');
+    assert.ok(read('css/style.css').includes('body:not(.is-pc) .fw-opening-army'), 'スマホ版は論理レイアウトモードで調整する');
+});
+
+test('r892 開幕の兵力比較中は行動を開始せず、中断時には旧演出が残らない', async () => {
+    const briefing = fakeElement('fw-opening-briefing');
+    briefing.attrs = {};
+    briefing.setAttribute = (name, value) => { briefing.attrs[name] = value; };
+    const context = createContext({ document: { getElementById: id => id === 'fw-opening-briefing' ? briefing : null } });
+    loadScript(context, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', context);
+    const manager = Object.create(Field.prototype);
+    manager._fieldWarGeneration = 1;
+    manager.active = true;
+    const resumes = [];
+    const waits = [];
+    manager._waitForFieldWarVisualState = delay => {
+        waits.push(delay);
+        return new Promise(resolve => resumes.push(resolve));
+    };
+    const intro = manager._playFieldWarOpeningBriefing(1);
+    assert.strictEqual(waits[0], 1050, '戦力比較を約1秒表示する');
+    assert.ok(!briefing.classList.contains('is-leaving'), '紹介中は表示する');
+    resumes.shift()();
+    for (let i = 0; i < 4 && waits.length < 2; i++) await Promise.resolve();
+    assert.strictEqual(waits[1], 230, '紹介後に短いフェードアウトを行う');
+    assert.ok(briefing.classList.contains('is-leaving'));
+    resumes.shift()();
+    await intro;
+    assert.ok(briefing.classList.contains('hidden'), '行動開始前に紹介表示を消す');
+
+    manager._fieldWarGeneration = 2;
+    const abandoned = manager._playFieldWarOpeningBriefing(2);
+    manager._fieldWarGeneration = 3;
+    manager.active = false;
+    manager._hideFieldWarOpeningBriefing();
+    resumes.shift()();
+    await abandoned;
+    assert.ok(briefing.classList.contains('hidden'), '古い演出が終了しても再表示されない');
 });
 
 test('r891 野戦の初回カメラは即時スクロール、後続の通常追従は従来の滑らかなスクロール', () => {
