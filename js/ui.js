@@ -1046,6 +1046,7 @@ class UIManager {
     // 既存の会話handoff・画像decode・地図復旧窓口はそのまま正本とし、
     // ここは「最後のモーダルが閉じた～次が現れる」空白フレームだけを受け持つ。
     _initModalHandoffBackdrop() {
+        // 固定DOMの監視はUIManagerの初期化時に一度だけ登録し、強制リセットで作り直さない。
         this._modalBackdrop = document.getElementById('modal-handoff-backdrop');
         this._modalBackdropEpoch = 0;
         this._modalBackdropGeneration = 0;
@@ -1102,12 +1103,10 @@ class UIManager {
         this._modalBackdropEpoch = epoch;
         const finish = async () => {
             if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-            // 新しい会話が画像decode中なら、固定時間で暗幕を外さない。
-            // 通常の独立したモーダルを閉じる場合だけ短時間で地図へ復帰する。
-            const deadline = Date.now() + 5000;
+            // 会話の顔画像decodeなどが進行中なら、固定時間で暗幕を剥がさない。
+            // 次画面公開・会話完了・強制画面失効のいずれかで待機を終了する。
             while (epoch === this._modalBackdropEpoch && this._modalBackdropHolds === 0
-                && (this.isDialogShowing || (this.dialogQueue && this.dialogQueue.length > 0))
-                && Date.now() < deadline) {
+                && (this.isDialogShowing || (this.dialogQueue && this.dialogQueue.length > 0))) {
                 await new Promise(resolve => setTimeout(resolve, 50));
             }
             if (typeof this.waitForCoveredMapPaint === 'function') await this.waitForCoveredMapPaint();
@@ -2424,8 +2423,8 @@ class UIManager {
         this._coveredCloseEpoch = Number(this._coveredCloseEpoch || 0) + 1;
         this._coveredCloseTokens = new WeakMap();
         this._coveredClosePromises = new WeakMap();
-        // 会話・選択・結果など異種モーダルの表示切替は、暗幕の連続性をここで共通管理する。
-        this._initModalHandoffBackdrop();
+        // 監視はUIManager初期化時に一度だけ登録済み。強制リセットでは
+        // 既存監視を使い続け、旧遷移を世代失効させたまま新しい幕を作らない。
         // 共通会話も固定DOMを共有する非同期Viewとして扱う。顔画像decode・handoff・自動閉じを
         // 現在世代から切り離し、強制切替後に古い会話が復活／新しい会話を自動操作しないようにする。
         this._dialogGeneration = Number(this._dialogGeneration || 0) + 1;

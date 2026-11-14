@@ -33490,6 +33490,70 @@ test('r899 戦域点滅は攻城戦画面の復帰完了後に開始し、元の
     assert.ok(!effort.slice(start,blink).includes('setTimeout('),'固定msで画面を間に合わせない');
 });
 
+test('r900 共通暗幕の監視は強制リセットで重複せず、旧暗幕も再表示しない', () => {
+    const source=read('js/ui.js');
+    const reset=source.slice(source.indexOf('    forceResetModals(options = {}) {'), source.indexOf('    showDaimyoList()', source.indexOf('    forceResetModals(options = {}) {')));
+    assert.ok(!reset.includes('this._initModalHandoffBackdrop();'), '固定DOM監視を強制リセット時に再作成しない');
+    const observers=[];
+    class MockObserver {
+        constructor(onChange) {this.onChange=onChange; this.disconnected=false; observers.push(this);}
+        observe() {}
+        disconnect() {this.disconnected=true;}
+        flush() {if(!this.disconnected)this.onChange();}
+    }
+    const visibleClasses=new Set();
+    const modal={id:'result-modal',classList:{contains:v=>visibleClasses.has(v)},style:{display:''}};
+    const backdropClasses=new Set(['hidden']);
+    const backdrop={classList:{add:v=>backdropClasses.add(v),remove:v=>backdropClasses.delete(v),contains:v=>backdropClasses.has(v)},style:{}};
+    const ctx=createContext({document:{getElementById:id=>id==='modal-handoff-backdrop'?backdrop:null,querySelectorAll:()=>[modal]},MutationObserver:MockObserver,getComputedStyle:()=>({background:'rgba(0,0,0,.5)'})});
+    loadScript(ctx,'js/ui.js');
+    const UI=vm.runInContext('UIManager',ctx), ui=Object.create(UI.prototype);
+    ui._initModalHandoffBackdrop();
+    assert.strictEqual(observers.length,1);
+    // モーダルが開いた状態からタイトル復帰相当の強制終了へ切り替える。
+    for(let i=0;i<5;i++){
+        ui._clearModalHandoffBackdrop();
+        visibleClasses.add('hidden');
+        observers[0].flush();
+        assert.ok(backdropClasses.has('hidden'),'強制終了で旧暗幕は再表示されない');
+        visibleClasses.delete('hidden');
+        observers[0].flush();
+    }
+    assert.strictEqual(observers.length,1,'監視数は強制終了回数で増えない');
+    const oldGeneration=ui._modalBackdropGeneration;
+    const close=ui.beginModalHandoff();
+    ui._clearModalHandoffBackdrop();
+    close();
+    assert.strictEqual(ui._modalBackdropHolds,0,'旧画面の解放は新画面の暗幕状態を操作しない');
+    assert.ok(ui._modalBackdropGeneration>oldGeneration,'強制終了時の世代番号は単調増加');
+});
+
+test('r900 次の会話画像が5秒を超えても共通暗幕を解放せず、実際の表示完了を待つ', async () => {
+    let elapsed=0, ticks=0;
+    const coverStates=new Set();
+    const cover={classList:{add:v=>coverStates.add(v),remove:v=>coverStates.delete(v),contains:v=>coverStates.has(v)},style:{}};
+    let ui;
+    const ctx=createContext({Date:{now:()=>elapsed},setTimeout:callback=>{
+        elapsed+=1000;
+        ticks++;
+        if(ticks===8)ui.isDialogShowing=false;
+        callback();
+    }});
+    loadScript(ctx,'js/ui.js');
+    const UI=vm.runInContext('UIManager',ctx);
+    ui=Object.create(UI.prototype);
+    ui._modalBackdrop=cover;
+    ui._modalBackdropEpoch=1;
+    ui._modalBackdropHolds=0;
+    ui.isDialogShowing=true;
+    ui.dialogQueue=[];
+    ui.waitForCoveredMapPaint=async()=>{};
+    ui._releaseModalHandoffBackdropAfterPaint();
+    for(let i=0;i<40&&!coverStates.has('hidden');i++)await Promise.resolve();
+    assert.strictEqual(ticks,8,'次の会話が準備中は5秒で諦めず、終了まで待つ');
+    assert.ok(coverStates.has('hidden'),'会話準備が終わったあとは暗幕を解放する');
+});
+
 test('r899 モーダル間の暗幕は単一のUIManagerが管理し、画面失効時に後始末する', () => {
     const html=read('index.html');
     const css=read('css/style.css');
