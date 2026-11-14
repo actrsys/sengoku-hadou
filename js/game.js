@@ -665,7 +665,7 @@ class GameManager {
             'data/images/map/shiro_icon003.webp', 'data/images/map/shiro_icon004.webp',
             'data/images/map/various_forces.webp',
             'data/images/icon/ashigaru.webp', 'data/images/icon/kiba.webp',
-            'data/images/icon/teppo.webp', 'data/images/icon/gear_icon.webp',
+            'data/images/icon/teppo.webp',
             'data/images/field_war_images/butai_icon.png',
             'data/images/field_war_images/ship_icon.png'
         ];

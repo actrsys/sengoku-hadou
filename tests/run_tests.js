@@ -4554,9 +4554,57 @@ test('r411のタイトル情報メニューは設定の下から差し替わり�
     assert.ok(bootstrap.includes('企画・制作\\nACTORS SYSTEM\\nあや瀨'), 'クレジットにACTORS SYSTEMと制作者名を表示する');
     assert.ok(bootstrap.includes('生成AIの利用（プログラム・画像制作）\\nChatGPT（OpenAI）\\nGemini（Google）\\nGrok（xAI／Created with Grok）'), '使用した生成AIを用途とともにクレジットに記載する');
     assert.ok(!bootstrap.includes('各素材の権利・利用条件は「ライセンス」をご確認ください。'), 'クレジットは提供元表記のみにする');
+    for (const provider of ['画像・アイコン素材', 'イラストAC（ACワークス）', 'https://www.ac-illust.com/', 'シルエットイラスト（サニーサンデー）', 'https://www.silhouette-illust.com/']) {
+        assert.ok(bootstrap.includes(provider), `ゲーム内クレジットの画像・アイコン素材提供元が不足: ${provider}`);
+    }
     for (const provider of ['Six Realms -ASURA- Re.', '趣味工房にんじんわいん', '作曲者：荒芳樹', 'Samurai Classics Expanded Edition ～RPGツクール(R)音素材集～', '株式会社ビタースウィートエンタテインメント', '効果音ラボ', 'https://soundeffect-lab.info/']) {
         assert.ok(bootstrap.includes(provider), `ゲーム内クレジットの音素材提供元が不足: ${provider}`);
     }
+});
+
+test('足軽・騎馬・鉄砲は添付の透過カラーWebPで表示し、歯車と旧配布元を参照しない', () => {
+    const bootstrap = read('js/app_bootstrap.js');
+    const gameSource = read('js/game.js');
+    const css = read('css/style.css');
+    assert.ok(!bootstrap.includes('ICOOON MONO'), '旧アイコン提供元をクレジットから撤去する');
+    assert.ok(!bootstrap.includes('icooon-mono.com'), '旧素材サイトのURLも撤去する');
+    assert.ok(!fs.existsSync(path.join(ROOT, 'data/images/icon/gear_icon.webp')), '未使用の歯車画像を撤去する');
+    assert.ok(!gameSource.includes('gear_icon.webp'), '歯車の不要な先読みも撤去する');
+    const iconStyles = css.slice(css.indexOf('.fw-troop-icon {'), css.indexOf('/* 部隊アイコン下部の兵数表示'));
+    assert.ok(iconStyles.includes('background-size: contain'), '画像の縦横比を維持する');
+    assert.ok(!iconStyles.includes('mask-image'), 'カラー画像を白いシルエットに変換しない');
+    for (const type of ['ashigaru', 'kiba', 'teppo']) {
+        const src = `data/images/icon/${type}.webp`;
+        const data = fs.readFileSync(path.join(ROOT, src));
+        assert.strictEqual(data.toString('ascii', 0, 4), 'RIFF', `${type}: WebPのRIFFヘッダ`);
+        assert.strictEqual(data.toString('ascii', 8, 12), 'WEBP', `${type}: WebP形式`);
+        assert.strictEqual(data.toString('ascii', 12, 16), 'VP8X', `${type}: 透過可能な拡張WebP`);
+        assert.strictEqual(data.readUIntLE(24, 3) + 1, 256, `${type}: 元画像の幅`);
+        assert.strictEqual(data.readUIntLE(27, 3) + 1, 256, `${type}: 元画像の高さ`);
+        assert.ok(iconStyles.includes(`background-image: url('../${src}')`), `${type}: カラー画像を参照する`);
+        assert.ok(gameSource.includes(`'${src}'`), `${type}: 使用する画像は引き続き先読みする`);
+    }
+});
+
+test('野戦の兵科アイコンと兵数は枠なしの縦配置で、凸の向きとは無関係に固定される', () => {
+    const css = read('css/style.css');
+    const warSource = read('js/field_war.js');
+    const rule = (selector) => {
+        const start = css.indexOf(`${selector} {`);
+        assert.ok(start >= 0, `${selector}: CSS定義が存在する`);
+        return css.slice(start, css.indexOf('}', start) + 1);
+    };
+    const wrap = rule('.fw-unit-status-wrap');
+    assert.ok(wrap.includes('flex-direction: column'), '兵科アイコンは兵数の上に配置する');
+    assert.ok(wrap.includes('left: 50%') && wrap.includes('translateX(-50%)'), '兵科と兵数を同じ中央線で固定する');
+    assert.ok(!/\brotate\(|\bscale\(/.test(wrap), '兵科と兵数の枠には向き変更や縮小を適用しない');
+    const icon = rule('.fw-troop-icon');
+    assert.ok(!/background-color\s*:|\bborder\s*:|border-radius\s*:/.test(icon), '兵科画像の背景枠・枠線を除去する');
+    assert.ok(rule('.fw-troop-icon::after').includes('background-size: contain'), '透過カラーWebPの縦横比を保つ');
+    assert.ok(rule('.fw-unit-icon').includes('rotate(var(--fw-dir'), '回転するのは凸の本体だけ');
+    assert.strictEqual((warSource.match(/<div class="fw-unit-icon"><\/div>\s*<div class="fw-unit-status-wrap">/g) || []).length, 2,
+        '本体と移動プレビューの両方で、固定表示を回転する凸の兄弟要素にする');
+    assert.ok(/fw-troop-icon[^\n]*<\/div>\s*<div class="fw-unit-soldiers"/.test(warSource), 'DOM上でも兵科アイコンが兵数の前にある');
 });
 
 test('利用規約・クレジット・ライセンスは独立し、各TXTだけが本文の正本になる', () => {
@@ -4678,6 +4726,9 @@ test('タイトルの利用規約・ライセンスは実イベントから別�
     click('title-credit-btn');
     assert.strictEqual(el('title-info-detail-title').textContent, 'クレジット');
     assert.ok(el('title-info-detail-body').textContent.includes('効果音ラボ'));
+    for (const provider of ['イラストAC（ACワークス）', 'シルエットイラスト（サニーサンデー）']) {
+        assert.ok(el('title-info-detail-body').textContent.includes(provider), `表示モーダルに画像・アイコン素材の提供元が不足: ${provider}`);
+    }
     assert.ok(el('title-info-detail-body').textContent.includes('生成AIの利用（プログラム・画像制作）\nChatGPT（OpenAI）\nGemini（Google）\nGrok（xAI／Created with Grok）'), '表示モーダルに生成AI利用のクレジットを記載する');
     assert.ok(!el('title-info-detail-body').textContent.includes('各素材の権利・利用条件は'));
     click('title-info-detail-back-btn');

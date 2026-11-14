@@ -1096,6 +1096,74 @@ async function validateDialogConfirmPlacement(cdp) {
     console.log('✓ 会話確認 はい/いいえ PC維持 / スマホ下部配置 visual/layout regression');
 }
 
+async function validateFieldWarTroopOverlay(cdp) {
+    const html = fixtureHtml('field_war_fullscreen.html');
+    for (const cfg of [
+        { label:'PC', width:1280, height:720, mobile:false, isPc:true },
+        { label:'mobile', width:360, height:640, mobile:true, isPc:false }
+    ]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width:cfg.width, height:cfg.height, deviceScaleFactor:1, mobile:cfg.mobile });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc', ${cfg.isPc});
+                const rect = (el) => {
+                    const r=el.getBoundingClientRect();
+                    return {x:r.x,y:r.y,w:r.width,h:r.height,cx:r.x+r.width/2};
+                };
+                const records=[];
+                for (const [type,size] of [['ashigaru',16],['kiba',24],['teppo',31]]) {
+                    for (const preview of [false,true]) {
+                        const u=document.createElement('div');
+                        u.className=preview?'fw-unit preview attacker':'fw-unit attacker';
+                        u.style.cssText='left:100px;top:100px;width:'+size+'px;height:'+size+'px;transition:none';
+                        u.innerHTML='<div class="fw-unit-icon" style="transition:none"></div>'+
+                            '<div class="fw-unit-status-wrap"><div class="fw-troop-icon" data-type="'+type+'"></div>'+
+                            '<div class="fw-unit-soldiers">5000</div></div>';
+                        document.body.appendChild(u);
+                        const overlay=u.querySelector('.fw-unit-status-wrap');
+                        const troop=u.querySelector('.fw-troop-icon');
+                        const soldiers=u.querySelector('.fw-unit-soldiers');
+                        const visual=u.querySelector('.fw-unit-icon');
+                        const directions=[];
+                        for(let d=0;d<6;d++) {
+                            u.style.setProperty('--fw-dir', d*60+'deg');
+                            directions.push({overlay:rect(overlay),troop:rect(troop),soldiers:rect(soldiers),
+                                background:getComputedStyle(troop).backgroundColor,
+                                border:getComputedStyle(troop).borderTopWidth,
+                                backgroundImage:getComputedStyle(troop,'::after').backgroundImage,
+                                markerTransform:getComputedStyle(visual).transform});
+                        }
+                        records.push({type,size,preview,directions});
+                        u.remove();
+                    }
+                }
+                return records;
+            })()`, returnByValue:true, awaitPromise:true
+        });
+        const records=result.result.value;
+        assert.strictEqual(records.length,6, `${cfg.label}: 兵科3種×実部隊/プレビューを検査`);
+        for(const record of records) {
+            const base=record.directions[0];
+            assert.ok(base.troop.y+base.troop.h <= base.soldiers.y+0.6, `${cfg.label}/${record.type}: 兵科画像が兵数より上にある`);
+            assert.ok(Math.abs(base.troop.cx-base.soldiers.cx)<0.6, `${cfg.label}/${record.type}: 兵科画像と兵数を中央揃えにする`);
+            assert.ok(base.troop.h >= 20 && base.troop.w >= 20, `${cfg.label}/${record.type}: 兵科画像が縮小され過ぎない`);
+            assert.strictEqual(base.border,'0px', `${cfg.label}/${record.type}: 兵科画像を枠線で囲わない`);
+            assert.strictEqual(base.background,'rgba(0, 0, 0, 0)', `${cfg.label}/${record.type}: 背景色を付けない`);
+            assert.ok(base.backgroundImage.includes(`${record.type}.webp`), `${cfg.label}/${record.type}: 対応する兵科画像を使う`);
+            for(const [dir,state] of record.directions.entries()) {
+                for(const part of ['overlay','troop','soldiers']) {
+                    for(const metric of ['x','y','w','h']) {
+                        assert.ok(Math.abs(state[part][metric]-base[part][metric])<0.1,
+                            `${cfg.label}/${record.type}/${record.preview?'preview':'unit'}/${dir*60}度: ${part}.${metric}が向きで変わらない`);
+                    }
+                }
+            }
+        }
+    }
+    console.log('✓ 野戦兵科・兵数 PC/スマホ 6方向固定/プレビュー visual/layout regression');
+}
+
 async function validateFieldWarFullscreen(cdp) {
     const html = fixtureHtml('field_war_fullscreen.html');
     const cases = [
@@ -2211,6 +2279,7 @@ async function main() {
         await validateSettingsTabsLayout(cdp);
         await validateLowMemoryPagerLayout(cdp);
         await validateFieldWarFullscreen(cdp);
+        await validateFieldWarTroopOverlay(cdp);
         await validateFieldTerrainLayout(cdp);
         await validateSiegeLayout(cdp);
         await validateTitleMenuStability(cdp);
