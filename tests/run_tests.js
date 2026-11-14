@@ -4552,14 +4552,36 @@ test('r411のタイトル情報メニューは設定の下から差し替わり�
     assert.ok(bootstrap.includes('new CustomScrollbar(infoDetailBody)'), '情報詳細はゲーム共通の独自スクロールバーを使う');
     assert.ok(bootstrap.includes("window.__mobileLowMemoryMode"), '軽量モードでは独自スクロールバー生成を避ける');
     assert.ok(bootstrap.includes('企画・制作\\nACTORS SYSTEM\\nあや瀨'), 'クレジットにACTORS SYSTEMと制作者名を表示する');
-    assert.ok(bootstrap.includes('生成AIの利用（プログラム・画像制作）\\nChatGPT（OpenAI）\\nGemini（Google）\\nGrok（xAI／Created with Grok）'), '使用した生成AIを用途とともにクレジットに記載する');
+    assert.ok(bootstrap.includes('制作支援ツール（生成AI）\\nChatGPT（OpenAI）\\nGemini（Google）\\nGrok（xAI／Created with Grok）'), '生成AIの提供元を制作支援ツールとしてクレジットに記載する');
+    assert.ok(!bootstrap.includes('シルエットイラスト（サニーサンデー）'), '旧シルエット素材の提供元表示を削除する');
+    assert.ok(!bootstrap.includes('silhouette-illust.com'), '旧シルエット素材のURLを削除する');
+    assert.ok(!bootstrap.includes('生成AIの利用（プログラム・画像制作）'), '旧生成AI見出しを残さない');
     assert.ok(!bootstrap.includes('各素材の権利・利用条件は「ライセンス」をご確認ください。'), 'クレジットは提供元表記のみにする');
-    for (const provider of ['画像・アイコン素材', 'イラストAC（ACワークス）', 'https://www.ac-illust.com/', 'シルエットイラスト（サニーサンデー）', 'https://www.silhouette-illust.com/']) {
+    for (const provider of ['画像・アイコン素材', 'イラストAC（ACワークス）', 'https://www.ac-illust.com/']) {
         assert.ok(bootstrap.includes(provider), `ゲーム内クレジットの画像・アイコン素材提供元が不足: ${provider}`);
     }
     for (const provider of ['Six Realms -ASURA- Re.', '趣味工房にんじんわいん', '作曲者：荒芳樹', 'Samurai Classics Expanded Edition ～RPGツクール(R)音素材集～', '株式会社ビタースウィートエンタテインメント', '効果音ラボ', 'https://soundeffect-lab.info/']) {
         assert.ok(bootstrap.includes(provider), `ゲーム内クレジットの音素材提供元が不足: ${provider}`);
     }
+});
+
+test('国衆の添付アイコンを地図に表示し、旧シルエット画像を残さない', () => {
+    const newAsset = 'data/images/map/kunishu_icon.webp';
+    const oldAsset = 'data/images/map/various_forces.webp';
+    const newIcon = path.join(ROOT, newAsset);
+    assert.ok(fs.existsSync(newIcon), '新しい国衆アイコンの実体を配布する');
+    const bytes = fs.readFileSync(newIcon);
+    assert.strictEqual(bytes.toString('ascii', 0, 4), 'RIFF', '新アイコンはWebP形式');
+    assert.strictEqual(bytes.toString('ascii', 8, 12), 'WEBP', '新アイコンはWebP形式');
+    assert.ok(!fs.existsSync(path.join(ROOT, oldAsset)), '旧シルエット画像を削除する');
+    const map = read('js/ui_map.js');
+    const game = read('js/game.js');
+    const css = read('css/style.css');
+    assert.ok(map.includes(`<img src="${newAsset}" class="kunishu-icon-img">`), '国衆は新アイコンを参照する');
+    assert.ok(game.includes(`'${newAsset}'`), '開始時の先読みは新アイコンを参照する');
+    assert.ok(!map.includes(oldAsset) && !game.includes(oldAsset), '旧画像への参照を残さない');
+    assert.ok(css.includes('.kunishu-icon-wrap { position: relative; width: 22px; height: 22px;'), '地図用の見やすい表示寸法を維持する');
+    assert.ok(css.includes('.kunishu-icon-img { width: 100%; height: 100%; object-fit: contain;'), '画像の縦横比を保持する');
 });
 
 test('足軽・騎馬・鉄砲は添付の透過カラーWebPで表示し、歯車と旧配布元を参照しない', () => {
@@ -4739,10 +4761,11 @@ test('タイトルの利用規約・ライセンスは実イベントから別�
     click('title-credit-btn');
     assert.strictEqual(el('title-info-detail-title').textContent, 'クレジット');
     assert.ok(el('title-info-detail-body').textContent.includes('効果音ラボ'));
-    for (const provider of ['イラストAC（ACワークス）', 'シルエットイラスト（サニーサンデー）']) {
+    for (const provider of ['イラストAC（ACワークス）']) {
         assert.ok(el('title-info-detail-body').textContent.includes(provider), `表示モーダルに画像・アイコン素材の提供元が不足: ${provider}`);
     }
-    assert.ok(el('title-info-detail-body').textContent.includes('生成AIの利用（プログラム・画像制作）\nChatGPT（OpenAI）\nGemini（Google）\nGrok（xAI／Created with Grok）'), '表示モーダルに生成AI利用のクレジットを記載する');
+    assert.ok(el('title-info-detail-body').textContent.includes('制作支援ツール（生成AI）\nChatGPT（OpenAI）\nGemini（Google）\nGrok（xAI／Created with Grok）'), '表示モーダルに制作支援ツールの提供元を記載する');
+    assert.ok(!el('title-info-detail-body').textContent.includes('シルエットイラスト'), 'ゲーム内表示から旧シルエット素材の提供元を撤去する');
     assert.ok(!el('title-info-detail-body').textContent.includes('各素材の権利・利用条件は'));
     click('title-info-detail-back-btn');
     assert.ok(el('title-info-detail-modal').classList.contains('hidden'), '利用規約等のモーダルをゲーム内で閉じられる');

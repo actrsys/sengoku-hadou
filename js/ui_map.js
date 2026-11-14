@@ -1697,7 +1697,7 @@ Object.assign(UIManager.prototype, {
                 kunishuSignature.push([k.id, k.leaderId, kName, kLeaderName]);
                 kunishuHtml += `
                     <div class="kunishu-icon-wrap">
-                        <img src="data/images/map/various_forces.webp" class="kunishu-icon-img">
+                        <img src="data/images/map/kunishu_icon.webp" class="kunishu-icon-img">
                         <div class="hover-info kunishu-hover-info">
                             <div class="info-line">${escapeName(kName)}</div>
                             <div class="info-line">${escapeName(kLeaderName)}</div>
