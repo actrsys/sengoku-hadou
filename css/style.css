@@ -3117,18 +3117,18 @@ body:not(.is-pc) .busho-detail-biography-text {
 .fw-unit.is-sea-unit .fw-unit-icon::before { -webkit-mask-image: url('../data/images/field_war_images/ship_icon.png') !important; mask-image: url('../data/images/field_war_images/ship_icon.png') !important; }
 .fw-unit.preview { opacity: 0.6; animation: fw-blink 1s infinite; z-index: 18; }
 
-/* 凸の回転とは独立させ、兵科画像を兵数の真上に固定する（移動プレビューも共通）。 */
-.fw-unit-status-wrap { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; pointer-events: none; z-index: 25; }
+/* 兵科画像と兵数は凸本体の上に固定し、向き変更では回転させない（プレビューも共通）。 */
+.fw-unit-status-wrap { position: absolute; bottom: calc(100% + 1px); left: 50%; transform: translateX(-50%); width: 24px; height: 24px; pointer-events: none; z-index: 25; }
 
-/* 兵科アイコンは透過カラー画像だけを表示し、枠や背景色を付けない。 */
-.fw-troop-icon { width: 24px; height: 24px; flex: 0 0 24px; }
+/* 兵科画像は透過カラーのまま配置し、枠・背景を付けない。 */
+.fw-troop-icon { position: absolute; inset: 0; width: 100%; height: 100%; }
 .fw-troop-icon::after { content: ""; display: block; width: 100%; height: 100%; background-size: contain; background-repeat: no-repeat; background-position: center; }
 .fw-troop-icon[data-type="ashigaru"]::after { background-image: url('../data/images/icon/ashigaru.webp'); }
 .fw-troop-icon[data-type="kiba"]::after { background-image: url('../data/images/icon/kiba.webp'); }
 .fw-troop-icon[data-type="teppo"]::after { background-image: url('../data/images/icon/teppo.webp'); }
 
-/* 兵数も兵科画像と同じ非回転レイヤーに置き、向き変更でずらさない。 */
-.fw-unit-soldiers { font-size: 10px; color: #fff; font-weight: bold; text-align: center; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; white-space: nowrap; line-height: 1; letter-spacing: 0.5px; }
+/* 兵数を画像下部へ重ねて手前に描き、黒縁は文字を中心に均一な太さにする。 */
+.fw-unit-soldiers { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 1; font-size: 10px; color: #fff; font-weight: bold; text-align: center; -webkit-text-stroke: 0.8px #000; paint-order: stroke fill; text-shadow: none; white-space: nowrap; line-height: 1; letter-spacing: 0; }
 
 /* 野戦の部隊カラーと影 */
 .fw-unit.attacker .fw-unit-icon { filter: drop-shadow(1px 0 0 #8e0000) drop-shadow(-1px 0 0 #8e0000) drop-shadow(0 1px 0 #8e0000) drop-shadow(0 -1px 0 #8e0000) drop-shadow(2px 2px 2px rgba(0,0,0,0.8)); }

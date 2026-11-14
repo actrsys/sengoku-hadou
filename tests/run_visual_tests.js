@@ -1109,7 +1109,7 @@ async function validateFieldWarTroopOverlay(cdp) {
                 document.body.classList.toggle('is-pc', ${cfg.isPc});
                 const rect = (el) => {
                     const r=el.getBoundingClientRect();
-                    return {x:r.x,y:r.y,w:r.width,h:r.height,cx:r.x+r.width/2};
+                    return {x:r.x,y:r.y,w:r.width,h:r.height,cx:r.x+r.width/2,bottom:r.bottom};
                 };
                 const records=[];
                 for (const [type,size] of [['ashigaru',16],['kiba',24],['teppo',31]]) {
@@ -1132,7 +1132,11 @@ async function validateFieldWarTroopOverlay(cdp) {
                                 background:getComputedStyle(troop).backgroundColor,
                                 border:getComputedStyle(troop).borderTopWidth,
                                 backgroundImage:getComputedStyle(troop,'::after').backgroundImage,
-                                markerTransform:getComputedStyle(visual).transform});
+                                soldierStack:getComputedStyle(soldiers).zIndex,
+                                stroke:getComputedStyle(soldiers).webkitTextStrokeWidth,
+                                shadow:getComputedStyle(soldiers).textShadow,
+                                markerTransform:getComputedStyle(visual).transform,
+                                marker:rect(visual)});
                         }
                         records.push({type,size,preview,directions});
                         u.remove();
@@ -1145,7 +1149,13 @@ async function validateFieldWarTroopOverlay(cdp) {
         assert.strictEqual(records.length,6, `${cfg.label}: 兵科3種×実部隊/プレビューを検査`);
         for(const record of records) {
             const base=record.directions[0];
-            assert.ok(base.troop.y+base.troop.h <= base.soldiers.y+0.6, `${cfg.label}/${record.type}: 兵科画像が兵数より上にある`);
+            assert.ok(base.soldiers.y < base.troop.bottom - 2, `${cfg.label}/${record.type}: 兵数が兵科画像の下部に完全に重なる`);
+            assert.ok(base.soldiers.bottom <= base.troop.bottom + 0.6, `${cfg.label}/${record.type}: 兵数が兵科画像の下端を越えない`);
+            assert.ok(base.troop.bottom <= base.marker.y - 0.6, `${cfg.label}/${record.type}: 兵科画像が凸の描画領域を覆わない`);
+            assert.ok(Math.abs(base.troop.cx-base.marker.cx)<0.6, `${cfg.label}/${record.type}: 兵科画像と凸の中心軸が一致する`);
+            assert.strictEqual(base.soldierStack,'1', `${cfg.label}/${record.type}: 兵数が兵科画像の前面にある`);
+            assert.ok(parseFloat(base.stroke)>0, `${cfg.label}/${record.type}: 黒縁が設定されている`);
+            assert.strictEqual(base.shadow,'none', `${cfg.label}/${record.type}: 左右にずれる黒い影を廃止する`);
             assert.ok(Math.abs(base.troop.cx-base.soldiers.cx)<0.6, `${cfg.label}/${record.type}: 兵科画像と兵数を中央揃えにする`);
             assert.ok(base.troop.h >= 20 && base.troop.w >= 20, `${cfg.label}/${record.type}: 兵科画像が縮小され過ぎない`);
             assert.strictEqual(base.border,'0px', `${cfg.label}/${record.type}: 兵科画像を枠線で囲わない`);

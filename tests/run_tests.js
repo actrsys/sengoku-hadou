@@ -4586,7 +4586,7 @@ test('足軽・騎馬・鉄砲は添付の透過カラーWebPで表示し、歯�
     }
 });
 
-test('野戦の兵科アイコンと兵数は枠なしの縦配置で、凸の向きとは無関係に固定される', () => {
+test('野戦兵科画像の下部へ兵数を重ね、黒縁を均一化し、凸本体を隠さない', () => {
     const css = read('css/style.css');
     const warSource = read('js/field_war.js');
     const rule = (selector) => {
@@ -4595,16 +4595,21 @@ test('野戦の兵科アイコンと兵数は枠なしの縦配置で、凸の�
         return css.slice(start, css.indexOf('}', start) + 1);
     };
     const wrap = rule('.fw-unit-status-wrap');
-    assert.ok(wrap.includes('flex-direction: column'), '兵科アイコンは兵数の上に配置する');
-    assert.ok(wrap.includes('left: 50%') && wrap.includes('translateX(-50%)'), '兵科と兵数を同じ中央線で固定する');
-    assert.ok(!/\brotate\(|\bscale\(/.test(wrap), '兵科と兵数の枠には向き変更や縮小を適用しない');
+    assert.ok(/bottom:\s*calc\(100%\s*\+/.test(wrap), '兵科画像と数字は凸本体の上側に置く');
+    assert.ok(wrap.includes('left: 50%') && wrap.includes('translateX(-50%)'), '兵科画像と数字を同じ中央線で固定する');
+    assert.ok(!/\brotate\(|\bscale\(/.test(wrap), '兵科画像・兵数には凸の向き変更を適用しない');
     const icon = rule('.fw-troop-icon');
-    assert.ok(!/background-color\s*:|\bborder\s*:|border-radius\s*:/.test(icon), '兵科画像の背景枠・枠線を除去する');
+    assert.ok(icon.includes('position: absolute'), '兵科画像と兵数を縦積みせず重ねる');
+    assert.ok(!/background-color\s*:|\bborder\s*:|border-radius\s*:/.test(icon), '画像に枠や背景を付けない');
     assert.ok(rule('.fw-troop-icon::after').includes('background-size: contain'), '透過カラーWebPの縦横比を保つ');
+    const numbers = rule('.fw-unit-soldiers');
+    assert.ok(numbers.includes('position: absolute') && numbers.includes('bottom: 0'), '数字を兵科画像の下端に重ねる');
+    assert.ok(numbers.includes('z-index: 1'), '数字を兵科画像より前面に描画する');
+    assert.ok(numbers.includes('-webkit-text-stroke:') && numbers.includes('text-shadow: none'), '黒縁は方向別の影を使わず文字中心に均一に付ける');
     assert.ok(rule('.fw-unit-icon').includes('rotate(var(--fw-dir'), '回転するのは凸の本体だけ');
     assert.strictEqual((warSource.match(/<div class="fw-unit-icon"><\/div>\s*<div class="fw-unit-status-wrap">/g) || []).length, 2,
-        '本体と移動プレビューの両方で、固定表示を回転する凸の兄弟要素にする');
-    assert.ok(/fw-troop-icon[^\n]*<\/div>\s*<div class="fw-unit-soldiers"/.test(warSource), 'DOM上でも兵科アイコンが兵数の前にある');
+        '実部隊とプレビューの両方で、凸と画像・数字を別レイヤーに置く');
+    assert.ok(/fw-troop-icon[^\n]*<\/div>\s*<div class="fw-unit-soldiers"/.test(warSource), '画像と数字のDOM順を保つ');
 });
 
 test('利用規約・クレジット・ライセンスは独立し、各TXTだけが本文の正本になる', () => {
