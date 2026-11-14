@@ -4,6 +4,13 @@ const FIELD_WAR_HEX_DIRECTIONS = [
     {dx: 0, dy: -2, dir: 0}, {dx: 1, dy: -1, dir: 1}, {dx: 1, dy: 1, dir: 2},
     {dx: 0, dy: 2, dir: 3}, {dx: -1, dy: 1, dir: 4}, {dx: -1, dy: -1, dir: 5}
 ];
+// 遠距離の向き計算で毎回同じ6方向の平方根を求めない。
+// 元の (dx / sqrt(dx² + dy²)), (dy / sqrt(dx² + dy²)) と同じ式で初期化する。
+const FIELD_WAR_NORMALIZED_DIRECTIONS = FIELD_WAR_HEX_DIRECTIONS.map(d => ({
+    x: d.dx / Math.sqrt(d.dx * d.dx + d.dy * d.dy),
+    y: d.dy / Math.sqrt(d.dx * d.dx + d.dy * d.dy),
+    dir: d.dir
+}));
 
 /**
  * field_war.js
@@ -1628,9 +1635,12 @@ class FieldWarManager {
     }
 
     // ★追加: 攻撃可能かどうかの判定関数（兵科による違いを吸収）
-    canAttackTarget(attacker, targetX, targetY) {
+    canAttackTarget(attacker, targetX, targetY, knownTargetDir) {
         const dist = this.getDistance(attacker.x, attacker.y, targetX, targetY);
-        let targetDir = this.getDirection(attacker.x, attacker.y, targetX, targetY);
+        // AIの候補判定で直前に求めた方向は再計算しない。省略時は従来どおり計算する。
+        let targetDir = knownTargetDir === undefined
+            ? this.getDirection(attacker.x, attacker.y, targetX, targetY)
+            : knownTargetDir;
 
         if (attacker.troopType === 'teppo') {
             if (attacker.hasMoved) return false; // 鉄砲は移動後攻撃不可
@@ -2085,8 +2095,8 @@ class FieldWarManager {
         const mag = Math.sqrt(vecX*vecX + vecY*vecY);
         if (mag === 0) return 0;
         
-        for(let d of dirs) {
-            const dot = ((d.dx/Math.sqrt(d.dx*d.dx + d.dy*d.dy)) * (vecX/mag)) + ((d.dy/Math.sqrt(d.dx*d.dx + d.dy*d.dy)) * (vecY/mag));
+        for (const d of FIELD_WAR_NORMALIZED_DIRECTIONS) {
+            const dot = (d.x * (vecX / mag)) + (d.y * (vecY / mag));
             if (dot > maxDot) {
                 maxDot = dot;
                 bestDir = d.dir;
@@ -4147,19 +4157,17 @@ class FieldWarManager {
     _getAIAttackOpportunityAt(unit, x, y, direction, remainingAP, hasMoved, enemies, engagementContext, preferredTargetId = null) {
         if (remainingAP < 1) return null;
         let best = null;
+        // 候補HEXごとに仮部隊は1つだけ作り、敵ごとの向きだけ更新する。
+        // canAttackTarget() は参照のみで、AI評価・元部隊・乱数系列を変更しない。
+        const tempUnit = Object.assign({}, unit, { x, y, direction, hasMoved });
 
         enemies.forEach(enemy => {
             const targetDir = this.getDirection(x, y, enemy.x, enemy.y);
             const turnCost = this.getTurnCost(direction, targetDir);
             if (remainingAP < turnCost + 1) return;
 
-            const tempUnit = Object.assign({}, unit, {
-                x,
-                y,
-                direction: targetDir,
-                hasMoved
-            });
-            if (!this.canAttackTarget(tempUnit, enemy.x, enemy.y)) return;
+            tempUnit.direction = targetDir;
+            if (!this.canAttackTarget(tempUnit, enemy.x, enemy.y, targetDir)) return;
 
             let score = 0;
             if (enemy.id === preferredTargetId) score += WarParams.FieldAI.Support.PreferredAttackTargetBonus;
@@ -4342,6 +4350,24 @@ class FieldWarManager {
             // ターゲット選択と同じ交戦コンテキストを移動にも使う。
             const isAnyAllyEngaged = engagementContext.anyAllyEngaged;
 
+            // このターン中に変わらない補正は候補マスごとに計算し直さない。
+            // 加算の順序と乱数消費は従来の候補ループ内のまま維持する。
+            const terrainPreferenceScale = Math.max(
+                WarParams.FieldAI.Support.TerrainPreferenceMinScale,
+                1.0 - supportUrgency * WarParams.FieldAI.Support.TerrainPreferenceReduction
+            );
+            const cautionScale = (!unit.isGeneral && supportUrgency > 0)
+                ? Math.max(WarParams.FieldAI.Support.CautionMinScale, 1.0 - supportUrgency * WarParams.FieldAI.Support.CautionReduction)
+                : 1.0;
+            const idealTeppoDist = (!isFleeing && unit.troopType === 'teppo')
+                ? ((this.weather === 'rain' || this.weather === 'snow' || this.isNightTurn()) ? 2 : 3)
+                : 3;
+            let generalDangerFactor = 0;
+            if (!unit.isGeneral && myGeneral) {
+                generalDangerFactor = Math.max(0.0, Math.min(1.0, distToTarget / 10));
+                if (engagementContext.ownGeneralEngaged) generalDangerFactor = Math.max(generalDangerFactor, 1.0);
+            }
+
             // ★お掃除: 逃げている時は無駄に重いルート検索(A*)をしないようにブロック
             let aStarIdealHexes = {};
             if (!isFleeing) {
@@ -4400,10 +4426,6 @@ class FieldWarManager {
                 }
 
                 // 味方が交戦中なら地形の好悪は残しつつ、救援より優先して足を止めない。
-                const terrainPreferenceScale = Math.max(
-                    WarParams.FieldAI.Support.TerrainPreferenceMinScale,
-                    1.0 - supportUrgency * WarParams.FieldAI.Support.TerrainPreferenceReduction
-                );
                 let row_t = Math.floor(ny / 2);
                 let terrain_t = (this.grid && this.grid[row_t] && this.grid[row_t][nx]) ? this.grid[row_t][nx].terrain : 'plain';
                 
@@ -4435,11 +4457,10 @@ class FieldWarManager {
 
                     if (unit.troopType === 'teppo') {
                         // 鉄砲も無限に遠ざからず、常に「適切な距離」をキープしようとする
-                        let idealDist = (this.weather === 'rain' || this.weather === 'snow' || this.isNightTurn()) ? 2 : 3;
                         if (dToEnemy === 1) {
                             score -= 100; // 隣接は絶対に避ける
                         } else {
-                            let distDiff = Math.abs(dToEnemy - idealDist);
+                            let distDiff = Math.abs(dToEnemy - idealTeppoDist);
                             score -= distDiff * 20; // 理想の距離から外れるほど減点
                         }
                     } else if (unit.troopType === 'kiba') {
@@ -4503,21 +4524,15 @@ class FieldWarManager {
                         let isKiba = unit.troopType === 'kiba';
                         
                         // 通常は敵が近いほど隊形拘束を弱めるが、総大将自身が交戦中なら救援のため逆に結束を優先する。
-                        let dangerFactor = Math.max(0.0, Math.min(1.0, distToTarget / 10));
-                        if (engagementContext.ownGeneralEngaged) dangerFactor = Math.max(dangerFactor, 1.0);
-                        
                         if (dToGen >= 1 && dToGen <= 3) {
-                            score += (isKiba ? 10 : 30) * dangerFactor; 
+                            score += (isKiba ? 10 : 30) * generalDangerFactor;
                         } else if (dToGen > 3) {
                             let basePenalty = isKiba ? 2 : (unit.isReinforcement ? 20 : 10);
-                            score -= (dToGen - 3) * (basePenalty * dangerFactor); 
+                            score -= (dToGen - 3) * (basePenalty * generalDangerFactor); 
                         }
                     }
 
                     // 性格は平時の間合いには反映するが、一般部隊が交戦中の味方を見捨てる理由にはしない。
-                    const cautionScale = (!unit.isGeneral && supportUrgency > 0)
-                        ? Math.max(WarParams.FieldAI.Support.CautionMinScale, 1.0 - supportUrgency * WarParams.FieldAI.Support.CautionReduction)
-                        : 1.0;
                     if (unit.isGeneral && myPersonality !== 'aggressive') {
                         // 後方の安全な距離（4〜5）を維持しようとする
                         let safeDist = 5;

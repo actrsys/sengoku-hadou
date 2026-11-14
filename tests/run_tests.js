@@ -11994,6 +11994,112 @@ test('野戦AIは交戦支援をターゲット・移動・攻撃で共通評価
     assert.strictEqual(manager._getAIMoveBudget(unit, 1), 3, '交戦救援時は川越え等のため全APを前進へ使える');
 });
 
+test('野戦の6方向正規化は従来の全座標間の向き判定と一致する', () => {
+    const ctx = createContext({ addEventListener() {} });
+    loadScript(ctx, 'js/field_war.js');
+    const manager = new ctx.FieldWarManager({});
+    const dirs = [
+        {dx: 0, dy: -2, dir: 0}, {dx: 1, dy: -1, dir: 1}, {dx: 1, dy: 1, dir: 2},
+        {dx: 0, dy: 2, dir: 3}, {dx: -1, dy: 1, dir: 4}, {dx: -1, dy: -1, dir: 5}
+    ];
+    // 改修前の式を検査専用の参照値として使用。同点時の先着順も比較する。
+    const legacyDirection = (x, y, nx, ny) => {
+        for (const d of dirs) if (nx - x === d.dx && ny - y === d.dy) return d.dir;
+        const vx = nx - x, vy = ny - y, mag = Math.sqrt(vx * vx + vy * vy);
+        if (mag === 0) return 0;
+        let maxDot = -Infinity, bestDir = 0;
+        for (const d of dirs) {
+            const dot = (d.dx / Math.sqrt(d.dx * d.dx + d.dy * d.dy)) * (vx / mag)
+                + (d.dy / Math.sqrt(d.dx * d.dx + d.dy * d.dy)) * (vy / mag);
+            if (dot > maxDot) { maxDot = dot; bestDir = d.dir; }
+        }
+        return bestDir;
+    };
+    for (let x = 0; x < 20; x++) for (let y = 0; y < 24; y++) {
+        for (let nx = 0; nx < 20; nx++) for (let ny = 0; ny < 24; ny++) {
+            assert.strictEqual(manager.getDirection(x, y, nx, ny), legacyDirection(x, y, nx, ny),
+                `座標(${x},${y})→(${nx},${ny})`);
+        }
+    }
+});
+
+test('野戦AIの攻撃候補は仮部隊を1候補1回だけ生成し敵ごとの向きだけ更新する', () => {
+    const ctx = createContext({ addEventListener() {} });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/field_war.js');
+    const manager = new ctx.FieldWarManager({});
+    const unit = { id: 'own', x: 1, y: 4, isGeneral: false, direction: 5, troopType: 'ashigaru', hasMoved: false };
+    const enemies = [
+        { id: 'north', x: 8, y: 6, isGeneral: false, troopType: 'ashigaru' },
+        { id: 'general', x: 7, y: 8, isGeneral: true, troopType: 'kiba' },
+        { id: 'teppo', x: 9, y: 4, isGeneral: false, troopType: 'teppo' }
+    ];
+    const context = { generalThreatEnemyIds: new Set(), engagedEnemyIds: new Set(), engagementCountByEnemy: new Map() };
+    const checked = [];
+    manager.getTurnCost = () => 0;
+    manager.canAttackTarget = (candidate, x, y) => {
+        checked.push({ candidate, x, y, direction: candidate.direction });
+        return true;
+    };
+    const chosen = manager._getAIAttackOpportunityAt(unit, 4, 6, 0, 3, true, enemies, context);
+    assert.strictEqual(checked.length, enemies.length, '全敵候補を評価する');
+    for (const item of checked) {
+        assert.strictEqual(item.candidate, checked[0].candidate, '同じ仮部隊を再利用する');
+        assert.strictEqual(item.candidate.x, 4);
+        assert.strictEqual(item.candidate.y, 6);
+        assert.strictEqual(item.candidate.hasMoved, true);
+        assert.strictEqual(item.direction, manager.getDirection(4, 6, item.x, item.y), '各敵への方向は個別に更新される');
+    }
+    assert.strictEqual(unit.direction, 5, '実部隊の向きを変更しない');
+    assert.strictEqual(unit.x, 1, '実部隊の座標を変更しない');
+    assert.strictEqual(unit.hasMoved, false, '実部隊の移動済み状態を変更しない');
+    assert.strictEqual(chosen.enemy, enemies[1], '総大将を優先する既存評価を維持する');
+});
+
+test('野戦AIの攻撃可否は既算出の方向を受け取り二重の方向演算を避ける', () => {
+    const ctx = createContext({ addEventListener() {} });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/field_war.js');
+    const manager = new ctx.FieldWarManager({});
+    let directionComputations = 0;
+    const originalDirection = manager.getDirection.bind(manager);
+    manager.getDirection = (...args) => { directionComputations++; return originalDirection(...args); };
+
+    for (const troopType of ['ashigaru', 'kiba', 'teppo']) {
+        for (const weather of ['sunny', 'rain', 'snow']) {
+            for (const hasMoved of [false, true]) {
+                manager.weather = weather;
+                manager.turnCount = 6;
+                for (let i = 0; i < 120; i++) {
+                    const x = (i * 7) % 20, y = (i * 11) % 24;
+                    const targetX = (i * 13 + 3) % 20, targetY = (i * 17 + 5) % 24;
+                    const unit = {x, y, direction: i % 6, troopType, hasMoved};
+                    directionComputations = 0;
+                    const original = manager.canAttackTarget(unit, targetX, targetY);
+                    assert.strictEqual(directionComputations, 1, '従来の3引数では方向を1回計算する');
+                    const targetDirection = originalDirection(x, y, targetX, targetY);
+                    directionComputations = 0;
+                    const optimized = manager.canAttackTarget(unit, targetX, targetY, targetDirection);
+                    assert.strictEqual(optimized, original, `攻撃可否が一致する: ${troopType}, ${weather}, ${hasMoved}, ${i}`);
+                    assert.strictEqual(directionComputations, 0, '既算出の方向では二重計算を行わない');
+                }
+            }
+        }
+    }
+
+    const unit = {id:'u', x:2, y:4, direction:0, troopType:'ashigaru', hasMoved:false};
+    const enemies = [
+        {id:'a', x:3, y:5, troopType:'ashigaru', isGeneral:false},
+        {id:'b', x:4, y:4, troopType:'teppo', isGeneral:true},
+        {id:'c', x:2, y:2, troopType:'kiba', isGeneral:false}
+    ];
+    const engagement = {generalThreatEnemyIds:new Set(), engagedEnemyIds:new Set(), engagementCountByEnemy:new Map()};
+    directionComputations = 0;
+    manager._getAIAttackOpportunityAt(unit, 2, 4, 0, 4, false, enemies, engagement);
+    assert.strictEqual(directionComputations, enemies.length, '候補HEXの各敵への方向計算はそれぞれ1回だけ');
+    assert.deepStrictEqual([unit.x, unit.y, unit.direction], [2, 4, 0], '元の部隊データは不変');
+});
+
 test('野戦AIの攻撃可否は向き変更APに加えて攻撃1APまで確保する', () => {
     const ctx = createContext({ addEventListener() {} });
     loadScript(ctx, 'js/config.js');
