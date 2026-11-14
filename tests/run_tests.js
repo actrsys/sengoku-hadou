@@ -11885,12 +11885,25 @@ test('野戦ダメージ表示は出現直後から動き、固定停止で次�
 
     assert.ok(css.includes('.anim-battle-flash {\n    filter: brightness(2) drop-shadow(0 0 10px #ffffff);'), '交互点滅の表現は維持する');
     assert.ok(!css.includes('.anim-battle-flash::after'));
-    const unitRulesAt = style.indexOf('/* 野戦の部隊カラーと影 */');
-    const unitRulesEnd = style.indexOf('/* 友軍カラー（野戦・ログ共通） */', unitRulesAt);
+    // 縁取りのために全軍へ多段drop-shadowをかけると、戦場のカメラ移動時に
+    // 合成負荷が急増する。輪郭と本体を同形mask二層にして色・向きを維持する。
+    const iconRuleAt = style.indexOf('.fw-unit-icon::before,');
+    const iconRuleEnd = style.indexOf('.fw-unit.preview {', iconRuleAt);
+    const iconRules = style.slice(iconRuleAt, iconRuleEnd);
+    assert.ok(iconRules.includes('.fw-unit-icon::after'), '凸の輪郭を共通maskで描く');
+    assert.ok(iconRules.includes('-webkit-mask-size: 100%'), '輪郭は本体より一段外側に描く');
+    assert.ok(iconRules.includes('calc(100% - 2px)'), '本体の色を輪郭より内側に描く');
+    assert.ok(iconRules.includes('.fw-unit.is-sea-unit .fw-unit-icon::after'), '操船でも輪郭を同形で切り替える');
+    const unitRulesAt = style.indexOf('/* 部隊本体の色と縁色は同じmask');
+    const unitRulesEnd = style.indexOf('/* =========================================================\n   スマホ専用のオーバーライド', unitRulesAt);
+    assert.ok(unitRulesAt > 0 && unitRulesEnd > unitRulesAt);
     const unitRules = style.slice(unitRulesAt, unitRulesEnd);
-    assert.ok(unitRules.includes('drop-shadow(1px 0 0'));
-    assert.ok(unitRules.includes('drop-shadow(-1px 0 0'));
-    assert.ok(unitRules.includes('drop-shadow(0 0 6px #ffff00)'));
+    for (const c of ['attacker', 'defender', 'attacker.ally', 'defender.ally', 'attacker.self-ally', 'defender.self-ally']) {
+        assert.ok(unitRules.includes(`.fw-unit.${c} { --fw-unit-fill:`), `${c}の塗りと輪郭色を保持`);
+    }
+    assert.ok(unitRules.includes('.fw-unit.general .fw-unit-icon::after { background-color: #ffffff; }'), '総大将の白縁を維持する');
+    assert.ok(unitRules.includes('.fw-unit.active .fw-unit-icon { filter: drop-shadow(0 0 4px #ffff00); }'), '選択中のみ光彩を使う');
+    assert.strictEqual((unitRules.match(/drop-shadow\(/g) || []).length, 1, '全軍の多重影を復活させない');
 });
 
 test('野戦の交戦時は不要なsmooth scroll・DOM再探索・非表示ログlayoutを避ける', () => {
