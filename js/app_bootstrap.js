@@ -396,6 +396,7 @@
                         return response.text();
                     })
                     .catch((error) => {
+                        infoDocumentPromises.delete(fileName);
                         console.warn(`${title}の読み込みに失敗しました:`, error);
                         return `${title}を読み込めませんでした。`;
                     }));
@@ -424,7 +425,7 @@
         bind('title-terms-btn', () => openInfoDocument('利用規約', 'TERMS_OF_USE.txt'));
         bind('title-credit-btn', () => {
             const version = window.GameConfig?.Meta?.Version;
-            openInfoDetail('クレジット', `戦国覇道${version ? `\nver. ${version}` : ''}\n\n企画・制作\nACTORS SYSTEM\nあや瀨\n\n音楽\n『Six Realms -ASURA- Re.』\n趣味工房にんじんわいん\n作曲者：荒芳樹\n\n音楽・音素材\n『Samurai Classics Expanded Edition ～RPGツクール(R)音素材集～』\n株式会社ビタースウィートエンタテインメント\n\n効果音\n効果音ラボ\nhttps://soundeffect-lab.info/`);
+            openInfoDetail('クレジット', `戦国覇道${version ? `\nver. ${version}` : ''}\n\n企画・制作\nACTORS SYSTEM\nあや瀨\n\n生成AIの利用（プログラム・画像制作）\nChatGPT（OpenAI）\nGemini（Google）\nGrok（xAI／Created with Grok）\n\n音楽\n『Six Realms -ASURA- Re.』\n趣味工房にんじんわいん\n作曲者：荒芳樹\n\n音楽・音素材\n『Samurai Classics Expanded Edition ～RPGツクール(R)音素材集～』\n株式会社ビタースウィートエンタテインメント\n\n効果音\n効果音ラボ\nhttps://soundeffect-lab.info/`);
         });
         bind('title-license-btn', () => openInfoDocument('ライセンス', 'THIRD_PARTY_LICENSES.txt'));
         bind('title-info-detail-back-btn', closeInfoDetail);

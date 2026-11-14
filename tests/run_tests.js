@@ -4552,6 +4552,7 @@ test('r411のタイトル情報メニューは設定の下から差し替わり�
     assert.ok(bootstrap.includes('new CustomScrollbar(infoDetailBody)'), '情報詳細はゲーム共通の独自スクロールバーを使う');
     assert.ok(bootstrap.includes("window.__mobileLowMemoryMode"), '軽量モードでは独自スクロールバー生成を避ける');
     assert.ok(bootstrap.includes('企画・制作\\nACTORS SYSTEM\\nあや瀨'), 'クレジットにACTORS SYSTEMと制作者名を表示する');
+    assert.ok(bootstrap.includes('生成AIの利用（プログラム・画像制作）\\nChatGPT（OpenAI）\\nGemini（Google）\\nGrok（xAI／Created with Grok）'), '使用した生成AIを用途とともにクレジットに記載する');
     assert.ok(!bootstrap.includes('各素材の権利・利用条件は「ライセンス」をご確認ください。'), 'クレジットは提供元表記のみにする');
     for (const provider of ['Six Realms -ASURA- Re.', '趣味工房にんじんわいん', '作曲者：荒芳樹', 'Samurai Classics Expanded Edition ～RPGツクール(R)音素材集～', '株式会社ビタースウィートエンタテインメント', '効果音ラボ', 'https://soundeffect-lab.info/']) {
         assert.ok(bootstrap.includes(provider), `ゲーム内クレジットの音素材提供元が不足: ${provider}`);
@@ -4642,9 +4643,9 @@ test('タイトルの利用規約・ライセンスは実イベントから別�
         fetch(fileName, options) {
             assert.deepStrictEqual({ ...options }, { cache: 'no-store' }, '古い配信キャッシュを利用しない');
             requests.push(fileName);
-            return new Promise(resolve => pending.set(fileName, resolve));
+            return new Promise((resolve, reject) => pending.set(fileName, { resolve, reject }));
         },
-        console
+        console: { warn() {} }
     };
     const bindStaticUiEvents = vm.runInNewContext(`(function () { ${bootstrap.slice(start, end)} return bindStaticUiEvents; })()`, sandbox);
     bindStaticUiEvents();
@@ -4659,19 +4660,25 @@ test('タイトルの利用規約・ライセンスは実イベントから別�
     const licenseOpen = click('title-license-btn');
     assert.strictEqual(el('title-info-detail-title').textContent, 'ライセンス');
     assert.ok(el('title-info-detail-body').classList.contains('license-text'), '第三者ライセンスは原文向け書式');
-    pending.get('TERMS_OF_USE.txt')({ ok: true, text: async () => read('TERMS_OF_USE.txt') });
+    pending.get('TERMS_OF_USE.txt').reject(new Error('一時的な取得失敗'));
     await termsOpen;
     assert.strictEqual(el('title-info-detail-title').textContent, 'ライセンス');
     assert.strictEqual(el('title-info-detail-body').textContent, '読み込んでいます…', '古い利用規約がライセンス表示へ混ざらない');
-    pending.get('THIRD_PARTY_LICENSES.txt')({ ok: true, text: async () => read('THIRD_PARTY_LICENSES.txt') });
+    pending.get('THIRD_PARTY_LICENSES.txt').resolve({ ok: true, text: async () => read('THIRD_PARTY_LICENSES.txt') });
     await licenseOpen;
     assert.strictEqual(el('title-info-detail-body').textContent, read('THIRD_PARTY_LICENSES.txt'));
-    await click('title-terms-btn');
+    const termsRetry = click('title-terms-btn');
+    assert.deepStrictEqual(requests, ['TERMS_OF_USE.txt', 'THIRD_PARTY_LICENSES.txt', 'TERMS_OF_USE.txt'], '取得失敗したTXTだけ開き直し時に再取得する');
+    pending.get('TERMS_OF_USE.txt').resolve({ ok: true, text: async () => read('TERMS_OF_USE.txt') });
+    await termsRetry;
     assert.strictEqual(el('title-info-detail-body').textContent, read('TERMS_OF_USE.txt'));
-    assert.deepStrictEqual(requests, ['TERMS_OF_USE.txt', 'THIRD_PARTY_LICENSES.txt'], '文書は各1回だけ取得して再利用する');
+    await click('title-license-btn');
+    assert.strictEqual(el('title-info-detail-body').textContent, read('THIRD_PARTY_LICENSES.txt'));
+    assert.deepStrictEqual(requests, ['TERMS_OF_USE.txt', 'THIRD_PARTY_LICENSES.txt', 'TERMS_OF_USE.txt'], '成功したTXTのキャッシュは維持する');
     click('title-credit-btn');
     assert.strictEqual(el('title-info-detail-title').textContent, 'クレジット');
     assert.ok(el('title-info-detail-body').textContent.includes('効果音ラボ'));
+    assert.ok(el('title-info-detail-body').textContent.includes('生成AIの利用（プログラム・画像制作）\nChatGPT（OpenAI）\nGemini（Google）\nGrok（xAI／Created with Grok）'), '表示モーダルに生成AI利用のクレジットを記載する');
     assert.ok(!el('title-info-detail-body').textContent.includes('各素材の権利・利用条件は'));
     click('title-info-detail-back-btn');
     assert.ok(el('title-info-detail-modal').classList.contains('hidden'), '利用規約等のモーダルをゲーム内で閉じられる');
