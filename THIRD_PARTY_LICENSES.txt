@@ -22,14 +22,22 @@
 その他の権利制限規定に基づく利用を妨げるものではありません。通常のゲーム動作に
 必要な一時的な読み込み・保存も、素材の無断転用とは区別します。
 
-第三者が権利を持つソフトウェア・フォント等には、それぞれの権利者による
-ライセンスが適用されます。以下のMIT、zlib、SIL Open Font License等の許諾を
-本項で制限するものではなく、本作品の独自素材について第三者ライセンスによる
-利用許諾を新たに与えるものでもありません。
-
 Original game content is not licensed for extraction, republication, or reuse
 in other works without permission from its rights holder. This notice does
-not override applicable copyright exceptions or the third-party licenses below.
+not override applicable copyright exceptions or third-party licenses.
+
+【第三者提供素材・ソフトウェアの取扱い】
+
+本ゲームに含まれる第三者提供の画像・音声（音楽・効果音を含む）・文章などの素材、
+フォント、および第三者ソフトウェアには、それぞれの権利者または提供元が定める
+ライセンス・利用条件が適用されます。
+本規約と個別の利用条件が抵触する場合は、当該素材またはソフトウェアについて
+適用される個別の利用条件を優先します。本規約によって、個別の利用条件や
+法令で認められた権利を制限したり、認められていない権利を新たに付与したり
+するものではありません。
+本ゲームに含まれることをもって、第三者素材・ソフトウェアの抽出、複製、改変、
+転載、再配布、他作品への転用などが一律に許諾されるものではありません。
+ご利用にあたっては、対象に適用される個別の利用条件をご確認ください。
 
 【第三者ソフトウェア・フォントのライセンス】
 

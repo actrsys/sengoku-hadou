@@ -4547,6 +4547,9 @@ test('r411のタイトル情報メニューは設定の下から差し替わり�
     assert.ok(bootstrap.includes('new CustomScrollbar(infoDetailBody)'), '情報詳細はゲーム共通の独自スクロールバーを使う');
     assert.ok(bootstrap.includes("window.__mobileLowMemoryMode"), '軽量モードでは独自スクロールバー生成を避ける');
     assert.ok(bootstrap.includes('企画・制作\\nACTORS SYSTEM\\nあや瀨'), 'クレジットにACTORS SYSTEMと制作者名を表示する');
+    for (const provider of ['Six Realms -ASURA- Re.', '趣味工房にんじんわいん', '作曲者：荒芳樹', 'Samurai Classics Expanded Edition ～RPGツクール(R)音素材集～', '株式会社ビタースウィートエンタテインメント', '効果音ラボ', 'https://soundeffect-lab.info/']) {
+        assert.ok(bootstrap.includes(provider), `ゲーム内クレジットの音素材提供元が不足: ${provider}`);
+    }
 });
 
 test('タイトルのライセンスは作品素材の取扱いと第三者ライセンスを同じ正本から表示する', () => {
@@ -4563,11 +4566,27 @@ test('タイトルのライセンスは作品素材の取扱いと第三者ラ�
         '素材単体や素材集として公開・提供・再配布',
         '他の作品、ゲーム、',
         '私的使用、適法な引用',
-        '第三者が権利を持つソフトウェア・フォント等',
-        'MIT、zlib、SIL Open Font License'
+        '【第三者提供素材・ソフトウェアの取扱い】',
+        '第三者提供の画像・音声',
+        'フォント、および第三者ソフトウェア',
+        '本規約と個別の利用条件が抵触する場合',
+        '個別の利用条件を優先します',
+        '認められていない権利を新たに付与',
+        '再配布、他作品への転用',
     ]) assert.ok(license.includes(text), `ライセンス本文の必要項目が欠落: ${text}`);
     assert.ok(license.indexOf('【本作品のオリジナルコンテンツの利用について】')
         < license.indexOf('1. howler.js 2.2.4'), '作品素材の利用規約を第三者ライセンスの前に表示する');
+    const thirdPartySection = license.slice(
+        license.indexOf('【第三者提供素材・ソフトウェアの取扱い】'),
+        license.indexOf('【第三者ソフトウェア・フォントのライセンス】')
+    );
+    assert.ok(thirdPartySection.includes('個別の利用条件を優先します'), '第三者素材の個別条件の優先を明記する');
+    assert.ok(thirdPartySection.includes('法令で認められた権利を制限したり'), '法令上の利用を妨げない');
+    for (const individual of ['効果音ラボ', 'Six Realms -ASURA- Re.', 'Samurai Classics']) {
+        assert.ok(!thirdPartySection.includes(individual), `個別素材の案内が共通規約に残っている: ${individual}`);
+    }
+    assert.ok(license.indexOf('【第三者提供素材・ソフトウェアの取扱い】')
+        < license.indexOf('【第三者ソフトウェア・フォントのライセンス】'), '共通の取り扱いを第三者ライセンスの前に表示する');
     assert.ok(license.includes('Permission is hereby granted, free of charge'), 'MIT条件を保持する');
     assert.ok(license.includes('SIL OPEN FONT LICENSE Version 1.1'), 'OFL条件を保持する');
 });
