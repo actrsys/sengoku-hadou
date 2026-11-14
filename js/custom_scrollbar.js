@@ -19,11 +19,9 @@ class CustomScrollbar {
         // 親が 'scroll-wrapper' じゃなければ、自動で枠を作って囲みます
         if (this.list.parentElement && this.list.parentElement.classList.contains('scroll-wrapper')) {
             this.wrapper = this.list.parentElement;
-            this._createdWrapper = false;
         } else {
             this.wrapper = document.createElement('div');
             this.wrapper.className = 'scroll-wrapper';
-            this._createdWrapper = true;
 
             // リストの大きさの情報を、外枠にも引き継ぎます
             this.wrapper.style.flex = this.list.style.flex || '1';
@@ -365,7 +363,7 @@ class CustomScrollbar {
         if (this.list) {
             this.list.classList.remove('hide-native-scroll');
             if (this.onListScroll) this.list.removeEventListener('scroll', this.onListScroll);
-            if (this.isTouchInput && this.onListTouchMove) this.list.removeEventListener('touchmove', this.onListTouchMove);
+            if (this.onListTouchMove) this.list.removeEventListener('touchmove', this.onListTouchMove);
         }
         if (this.thumbY && this.onStartY) {
             this.thumbY.removeEventListener('mousedown', this.onStartY);

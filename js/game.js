@@ -1641,13 +1641,31 @@ class GameManager {
 
 }
 
+// タッチ入力のスクロール許可はここで一元化する。軽量モードでは独自スクロールバーを
+// 生成しないため、固定のクラス名だけで許可判定すると利用規約等の本文が読めなくなる。
+// 実際に縦スクロールできるモーダル／タイトル内の要素だけ、ネイティブ操作へ渡す。
+function canUseNativeTouchScroll(target) {
+    if (!target || typeof target.closest !== 'function') return false;
+    // 地図、共通一覧、メッセージ等の既存入力経路は変更しない。
+    if (target.closest('.scroll-wrapper, .list-container, #map-scroll-container, .fw-map-scroll, .scenario-desc-box, .result-body, .message-area')) return true;
+
+    const contentRoot = target.closest('#title-info-detail-modal, #title-screen, .modal');
+    if (!contentRoot) return false;
+    for (let element = target; element; element = element.parentElement) {
+        if (element.scrollHeight > element.clientHeight + 1) {
+            const overflowY = window.getComputedStyle(element).overflowY;
+            if (overflowY === 'auto' || overflowY === 'scroll') return true;
+        }
+        if (element === contentRoot) break;
+    }
+    return false;
+}
+
 function initializeGameApp() {
     // 右クリックのゲーム内操作・ネイティブ入力保護は UIManager.initContextMenu に一本化する。
-    // ここで一律に抑止すると、検索欄のコピー／貼り付けメニューまで失われる。
+    // スクロール可能な説明本文は軽量モードでもOS標準の指スクロールを使う。
     document.addEventListener('touchmove', (e) => {
-        if (!e.target.closest('.scroll-wrapper, .list-container, #map-scroll-container, .fw-map-scroll, .scenario-desc-box, .result-body, .message-area')) {
-            e.preventDefault();
-        }
+        if (!canUseNativeTouchScroll(e.target) && e.cancelable) e.preventDefault();
     }, { passive: false });
 
     window.GameApp = new GameManager();

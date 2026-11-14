@@ -811,7 +811,7 @@ class FieldWarManager {
                     if (this.isFwZooming) return;
 
                     this.isFwZooming = true;
-                    setTimeout(() => { this.isFwZooming = false; }, 300);
+                    this._scheduleFieldWarCallback(() => { this.isFwZooming = false; }, 300);
 
                     if (e.deltaY < 0) this.changeFwMapZoom(1, e.clientX, e.clientY);
                     else if (e.deltaY > 0) this.changeFwMapZoom(-1, e.clientX, e.clientY);
@@ -850,12 +850,12 @@ class FieldWarManager {
 
                     if (diff > 40) {
                         this.isFwZooming = true;
-                        setTimeout(() => { this.isFwZooming = false; }, 300);
+                        this._scheduleFieldWarCallback(() => { this.isFwZooming = false; }, 300);
                         this.changeFwMapZoom(1, centerX, centerY);
                         initialPinchDist = currentDist;
                     } else if (diff < -40) {
                         this.isFwZooming = true;
-                        setTimeout(() => { this.isFwZooming = false; }, 300);
+                        this._scheduleFieldWarCallback(() => { this.isFwZooming = false; }, 300);
                         this.changeFwMapZoom(-1, centerX, centerY);
                         initialPinchDist = currentDist;
                     }
@@ -3635,15 +3635,23 @@ class FieldWarManager {
             if (atkEl && defEl) {
                 const flashOnce = async (el) => {
                     el.classList.add('anim-battle-flash');
-                    await this._waitForFieldWarVisualState(120);
-                    el.classList.remove('anim-battle-flash');
+                    try {
+                        await this._waitForFieldWarVisualState(120);
+                        if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return false;
+                    } finally {
+                        // 戦闘中断時も点滅クラスを残さない。旧DOMへの作用に限る。
+                        el.classList.remove('anim-battle-flash');
+                    }
                     await this._waitForFieldWarVisualState(35);
+                    return this._isFieldWarLifecycleCurrent(fieldWarGeneration);
                 };
                 for (let i = 0; i < 4; i++) {
-                    await flashOnce(atkEl);
-                    await flashOnce(defEl);
+                    if (!await flashOnce(atkEl)) return;
+                    if (!await flashOnce(defEl)) return;
                 }
             }
+            // 点滅を挟まない場合も、旧戦闘の計算を新シナリオに確定させない。
+            if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
 
             // 点滅が終わったら兵数を減らします
             defender.soldiers -= dmgToDef;
@@ -3863,84 +3871,48 @@ class FieldWarManager {
             }
         }
 
-        if (defender.isWounded) {
-            // ★負傷した部隊の撤退処理
-            this.log(`${defender.name}が負傷しました！　${defender.name}隊は戦場から離脱します！`);
-            this.units = this.units.filter(u => u.id !== defender.id);
-            
-            // マップ上にアイコンが残っていたら隠します
-            const el = document.getElementById(`fw-unit-el-${defender.id}`);
-            if (el) el.style.display = 'none';
-
-            // 兵士が残っている場合は撤退済みリストに入れる（戦後に兵士を回収させるため）
-            if (defender.soldiers > 0) {
-                if (!this.retreatedUnits) this.retreatedUnits = [];
-                this.retreatedUnits.push(defender);
-            }
-        } else if (defender.soldiers <= 0) {
-            this.log(`${defender.name}隊が壊滅した！`);
-            this.units = this.units.filter(u => u.id !== defender.id);
-            
-            // 壊滅した陣営の士気ダウン（本人は-3、友軍は-1）
-            const losePrefix = defender.isAttacker ? 'atk_' : 'def_';
+        // 攻撃側・反撃側の壊滅は同じ士気規則で確定する。壊滅した部隊と撃破者の所属だけを渡す。
+        const applyDestroyedUnitMorale = (destroyed, victor) => {
+            const losePrefix = destroyed.isAttacker ? 'atk_' : 'def_';
             for (let key in this.groupStats) {
                 if (key.startsWith(losePrefix) && this.groupStats[key]) {
-                    let drop = (key === defender.groupId) ? 3 : 1;
+                    const drop = key === destroyed.groupId ? 3 : 1;
                     this.groupStats[key].morale = Math.max(0, this.groupStats[key].morale - drop);
                 }
             }
-            // 倒した陣営の士気アップ（本人は+3、友軍は+1）
-            const winPrefix = attacker.isAttacker ? 'atk_' : 'def_';
+            const winPrefix = victor.isAttacker ? 'atk_' : 'def_';
             for (let key in this.groupStats) {
                 if (key.startsWith(winPrefix) && this.groupStats[key]) {
-                    let rise = (key === attacker.groupId) ? 3 : 1;
+                    const rise = key === victor.groupId ? 3 : 1;
                     const maxMorale = window.WarParams.Military.MaxMoraleInternal;
                     this.groupStats[key].morale = Math.min(maxMorale, this.groupStats[key].morale + rise);
                 }
             }
-            this.log(`部隊の壊滅により、${defender.name}隊が所属する軍の士気が大きく下がり、友軍の士気も下がった！`);
-            this.log(`${attacker.name}隊が所属する軍の士気が大きく上がり、友軍の士気も上がった！`);
-        }
+            this.log(`部隊の壊滅により、${destroyed.name}隊が所属する軍の士気が大きく下がり、友軍の士気も下がった！`);
+            this.log(`${victor.name}隊が所属する軍の士気が大きく上がり、友軍の士気も上がった！`);
+        };
 
-        if (attacker.isWounded) {
-            // 負傷した部隊の撤退処理
-            this.log(`${attacker.name}が負傷しました！　${attacker.name}隊は戦場から離脱します！`);
-            this.units = this.units.filter(u => u.id !== attacker.id);
-            
-            // マップ上にアイコンが残っていたら隠します
-            const el = document.getElementById(`fw-unit-el-${attacker.id}`);
-            if (el) el.style.display = 'none';
+        // 攻撃・反撃のいずれが被害側でも、負傷離脱と兵力0壊滅は同じ経路で処理する。
+        // 守備側→攻撃側の順序、負傷時の残兵回収、壊滅時の士気補正は従来どおり。
+        const resolveCasualty = (unit, opponent) => {
+            if (unit.isWounded) {
+                this.log(`${unit.name}が負傷しました！　${unit.name}隊は戦場から離脱します！`);
+                this.units = this.units.filter(u => u.id !== unit.id);
+                const el = document.getElementById(`fw-unit-el-${unit.id}`);
+                if (el) el.style.display = 'none';
+                if (unit.soldiers > 0) {
+                    if (!this.retreatedUnits) this.retreatedUnits = [];
+                    this.retreatedUnits.push(unit);
+                }
+            } else if (unit.soldiers <= 0) {
+                this.log(`${unit.name}隊が壊滅した！`);
+                this.units = this.units.filter(u => u.id !== unit.id);
+                applyDestroyedUnitMorale(unit, opponent);
+            }
+        };
+        resolveCasualty(defender, attacker);
+        resolveCasualty(attacker, defender);
 
-            // 兵士が残っている場合は撤退済みリストに入れる（戦後に兵士を回収させるため）
-            if (attacker.soldiers > 0) {
-                if (!this.retreatedUnits) this.retreatedUnits = [];
-                this.retreatedUnits.push(attacker);
-            }
-        } else if (attacker.soldiers <= 0) {
-            this.log(`${attacker.name}隊が壊滅した！`);
-            this.units = this.units.filter(u => u.id !== attacker.id);
-            
-            // 壊滅した陣営の士気ダウン（本人は-3、友軍は-1）
-            const losePrefix = attacker.isAttacker ? 'atk_' : 'def_';
-            for (let key in this.groupStats) {
-                if (key.startsWith(losePrefix) && this.groupStats[key]) {
-                    let drop = (key === attacker.groupId) ? 3 : 1;
-                    this.groupStats[key].morale = Math.max(0, this.groupStats[key].morale - drop);
-                }
-            }
-            // 倒した陣営の士気アップ（本人は+3、友軍は+1）
-            const winPrefix = defender.isAttacker ? 'atk_' : 'def_';
-            for (let key in this.groupStats) {
-                if (key.startsWith(winPrefix) && this.groupStats[key]) {
-                    let rise = (key === defender.groupId) ? 3 : 1;
-                    const maxMorale = window.WarParams.Military.MaxMoraleInternal;
-                    this.groupStats[key].morale = Math.min(maxMorale, this.groupStats[key].morale + rise);
-                }
-            }
-            this.log(`部隊の壊滅により、${attacker.name}隊が所属する軍の士気が大きく下がり、友軍の士気も下がった！`);
-            this.log(`${defender.name}隊が所属する軍の士気が大きく上がり、友軍の士気も上がった！`);
-        }
-        
         // ★追加: 戦闘のダメージや部隊壊滅によって士気が0になった部隊がないか、瞬時にチェックします！
         this.checkMoraleCollapse();
 

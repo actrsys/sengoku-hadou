@@ -4685,6 +4685,47 @@ test('利用規約・クレジット・ライセンスは独立し、各TXTだ�
 });
 
 
+test('r886 軽量表示の長文とモーダルは標準の指スクロールを通し地図操作は止める', () => {
+    const source = read('js/game.js');
+    const start = source.indexOf('function canUseNativeTouchScroll(target) {');
+    const end = source.indexOf('\nfunction initializeGameApp()', start);
+    assert.ok(start >= 0 && end > start, 'ゲーム全体のtouchmove抑止を既存の正本で制御する');
+    assert.ok(source.includes('if (!canUseNativeTouchScroll(e.target) && e.cancelable) e.preventDefault();'));
+    const canScroll = vm.runInNewContext(`(function () { ${source.slice(start, end)} return canUseNativeTouchScroll; })()`, {
+        window: { getComputedStyle: element => ({ overflowY: element.overflowY || 'visible' }) }
+    });
+    const makeNode = (id, classes = [], parentElement = null, scrollHeight = 200, clientHeight = 200, overflowY = 'visible') => ({
+        id, classes, parentElement, scrollHeight, clientHeight, overflowY,
+        closest(selector) {
+            const selectors = selector.split(',').map(item => item.trim());
+            for (let node = this; node; node = node.parentElement) {
+                if (selectors.some(token => token.startsWith('#') ? node.id === token.slice(1)
+                    : token.startsWith('.') && node.classes.includes(token.slice(1)))) return node;
+            }
+            return null;
+        }
+    });
+    const infoModal = makeNode('title-info-detail-modal', ['modal']);
+    const infoContent = makeNode('', ['title-info-detail-content', 'modal-content'], infoModal);
+    const legalBody = makeNode('title-info-detail-body', ['title-info-detail-body'], infoContent, 1800, 240, 'auto');
+    assert.ok(canScroll(legalBody), '独自スクロールバーがない軽量表示の利用規約本文を許可');
+    assert.ok(canScroll(makeNode('', [], legalBody)), '本文内の文字をなぞってもスクロールを許可');
+    legalBody.scrollHeight = legalBody.clientHeight;
+    assert.ok(!canScroll(legalBody), 'スクロールする必要のない固定本文の操作は不用意に通さない');
+    legalBody.scrollHeight = 1800;
+    const title = makeNode('title-screen');
+    const titleContent = makeNode('', ['title-content'], title, 970, 480, 'auto');
+    assert.ok(canScroll(titleContent), '縦長画面でタイトルメニュー自体が長くなった場合も通す');
+    const scenarioModal = makeNode('scenario-modal', ['modal']);
+    const scenarioList = makeNode('scenario-list', ['clan-grid'], scenarioModal, 940, 360, 'auto');
+    assert.ok(canScroll(scenarioList), 'シナリオ選択等のスクロール領域も通す');
+    const map = makeNode('map-wrapper', [], null, 2500, 500, 'auto');
+    assert.ok(!canScroll(map), '地図など画面外の操作禁止は維持');
+    assert.ok(canScroll(makeNode('map-scroll-container', [], map)), '既存地図スクロール入力は維持');
+    assert.ok(canScroll(makeNode('', ['list-container'], scenarioModal)), '従来の一覧入力は維持');
+    assert.ok(canScroll(makeNode('', ['scroll-wrapper'], infoModal)), '通常モードの独自スクロールバーも維持');
+});
+
 test('タイトルの利用規約・ライセンスは実イベントから別々のTXTを読み込み、非同期結果を混同しない', async () => {
     const bootstrap = read('js/app_bootstrap.js');
     const start = bootstrap.indexOf('function bindStaticUiEvents() {');
@@ -32800,6 +32841,7 @@ test('r710 野戦で敵部隊を壊滅させたグループの士気+3が他グ�
         x, y: 0, stats: { ldr: 85, str: 90, int: 70, charm: 70 }, isPlayer: false, hasActionDone: false
     });
     for (const attackingArmy of [true, false]) {
+        for (const killedByCounter of [false, true]) {
         const game = { playerClanId: 99, year: 1570,
             getBusho(id) { return { id, clan: id % 2 ? 1 : 2, factionId: 0, originalEndYear: 1600, strength: 60 }; }
         };
@@ -32827,7 +32869,7 @@ test('r710 野戦で敵部隊を壊滅させたグループの士気+3が他グ�
         field.retreatedUnits = [];
         field.groupStats = Object.fromEntries(['atk_main', 'atk_ally', 'def_main', 'def_ally'].map(k =>
             [k, { rice: 1000, morale: 50, training: 50 }]));
-        await field.executeAttack(winner, losingUnit); // 本番のダメージと壊滅・士気更新を使用。
+        await field.executeAttack(killedByCounter ? losingUnit : winner, killedByCounter ? winner : losingUnit); // 攻撃撃破と反撃撃破の両方を実処理で確認。
         assert.strictEqual(losingUnit.soldiers, 0, '通常攻撃で相手部隊を壊滅');
         assert.strictEqual(field.units.includes(losingUnit), false, '壊滅部隊は戦場から除去');
         assert.strictEqual(field.groupStats[winnerGroup].morale, 56,
@@ -32836,7 +32878,50 @@ test('r710 野戦で敵部隊を壊滅させたグループの士気+3が他グ�
             `${otherWinnerGroup}には他グループ撃破支援として+1のみ`);
         assert.strictEqual(field.groupStats[loserGroup].morale, 44,
             `${loserGroup}は戦闘劣勢-3および被撃破グループ-3`);
+        }
     }
+});
+
+test('独自スクロールバーは入力方式の切替後でも登録済みタッチ監視を破棄する', () => {
+    const ctx = createContext({ document: { body: { classList: new FakeClassList([]) } } });
+    loadScript(ctx, 'js/custom_scrollbar.js');
+    const Scrollbar = vm.runInContext('CustomScrollbar', ctx);
+    const registered = new Map();
+    const touchHandler = () => {};
+    const list = {
+        classList: { remove() {} },
+        style: { scrollSnapType: '' },
+        removeEventListener(type, listener) {
+            if (registered.get(type) === listener) registered.delete(type);
+        }
+    };
+    registered.set('touchmove', touchHandler); // 先にtouch端末として作成された監視。
+    const scrollbar = Object.create(Scrollbar.prototype);
+    Object.assign(scrollbar, {
+        _destroyed: false, _savedScrollSnapType: null, _scrollSnapRestoreToken: 0,
+        list, onListTouchMove: touchHandler, _detachDragListeners() {}
+    });
+    list.customScrollbar = scrollbar;
+    // 終了時にはマウス入力側へ変わっていても、登録時の監視は解除が必要。
+    assert.strictEqual(scrollbar.isTouchInput, false);
+    scrollbar.destroy();
+    assert.strictEqual(registered.has('touchmove'), false, '古いtouchmoveが一覧に残留しない');
+    assert.strictEqual(list.customScrollbar, null);
+    assert.strictEqual(scrollbar._destroyed, true);
+});
+
+test('野戦の撃破士気更新は攻撃と反撃で単一の規則を使用する', () => {
+    const field = read('js/field_war.js');
+    const attackStart = field.indexOf('    async executeAttack(attacker, defender) {');
+    const attackEnd = field.indexOf('    // AIが「誰を助けるべきか」', attackStart);
+    const block = field.slice(attackStart, attackEnd);
+    assert.strictEqual((block.match(/const applyDestroyedUnitMorale = /g) || []).length, 1);
+    assert.strictEqual((block.match(/const resolveCasualty = /g) || []).length, 1);
+    assert.ok(block.includes('resolveCasualty(defender, attacker);'));
+    assert.ok(block.includes('resolveCasualty(attacker, defender);'));
+    assert.ok(block.includes('applyDestroyedUnitMorale(unit, opponent);'));
+    assert.strictEqual((block.match(/this\.groupStats\[key\]\.morale = Math\.max\(0, this\.groupStats\[key\]\.morale - drop\)/g) || []).length, 1,
+        '士気低下の算式を攻守別に二重化しない');
 });
 
 // r884: 最後の一撃で総大将や最後の操作部隊が消える場合も、野戦画面をすぐ閉じず
@@ -32874,7 +32959,8 @@ test('r884 野戦の総大将撃破は兵数0→部隊消滅→ダメージ終�
     });
     for (const scenario of [
         { label: '敵総大将壊滅', atkPlayer: true, defPlayer: false, result: 'attacker_win_fatal' },
-        { label: '自軍総大将壊滅', atkPlayer: false, defPlayer: true, result: 'attacker_win_fatal' }
+        { label: '自軍総大将壊滅', atkPlayer: false, defPlayer: true, result: 'attacker_win_fatal' },
+        { label: '点滅途中でタイトル復帰', atkPlayer: true, defPlayer: false, abortDuringFlash: true }
     ]) {
         const events = [];
         const game = {
@@ -32885,7 +32971,8 @@ test('r884 野戦の総大将撃破は兵数0→部隊消滅→ダメージ終�
         field.active = true;
         field.playerWasInvolved = true;
         field.fieldEndNoticeShown = false;
-        field.mapEl = { appendChild() {} };
+        field.mapEl = { appendChild() { events.push('ダメージ表示'); } };
+        if (scenario.abortDuringFlash) field.releaseFieldWarVisualResources = () => { events.push('描画資源解放'); };
         field.modal = { classList: makeClassList() };
         field.log = () => {};
         field.updateStatus = () => {};
@@ -32924,6 +33011,13 @@ test('r884 野戦の総大将撃破は兵数0→部隊消滅→ダメージ終�
             }
         };
         field._waitForFieldWarVisualState = async (ms) => {
+            if (scenario.abortDuringFlash && ms === 120) {
+                // 実際の点滅のawait中に、タイトル復帰・他タブ操作で世代が失効する経路。
+                field.abortForScenarioTransition();
+                events.push('戦闘中断');
+                return;
+            }
+            if (scenario.abortDuringFlash) throw new Error(`中断済み戦闘がwait:${ms}へ進行した`);
             if (ms === 220) {
                 assert.strictEqual(defenderRefs.soldierEl.textContent, '0', `${scenario.label}: 被害0兵数を先に表示する`);
                 assert.notStrictEqual(defenderRefs.el.style.display, 'none', `${scenario.label}: 0を表示する前に消さない`);
@@ -32939,11 +33033,46 @@ test('r884 野戦の総大将撃破は兵数0→部隊消滅→ダメージ終�
             assert.strictEqual(field.modal.classList.contains('hidden'), false, '通知まで野戦画面を維持する');
         };
         await field.executeAttack(attacker, defender);
+        if (scenario.abortDuringFlash) {
+            assert.strictEqual(attacker.soldiers, 6000, '中断後に攻撃側の兵力を変更しない');
+            assert.strictEqual(defender.soldiers, 1, '中断後に防御側の兵力を変更しない');
+            assert.strictEqual(field.warState, null, '戦闘の世代と戦闘状態は破棄済み');
+            assert.deepStrictEqual(events, ['描画資源解放', '戦闘中断'], 'ダメージ表示・追加点滅・決着通知へ進まない');
+            continue;
+        }
         assert.strictEqual(defender.soldiers, 0, `${scenario.label}: 実際の攻撃で壊滅`);
         assert.strictEqual(field.testResult, scenario.result, `${scenario.label}: 元の勝敗条件を保つ`);
         const tail = events.filter(e => e === 'wait:0' || e === 'wait:220' || e === 'wait:550' || e === '部隊消滅' || e === '決着通知');
         assert.deepStrictEqual(tail, ['wait:0', 'wait:220', '部隊消滅', 'wait:550', '決着通知'], `${scenario.label}: 順序を維持`);
     }
+});
+
+test('野戦ズームの解除予約は旧戦闘の世代を跨いで新戦闘の操作ロックを解除しない', () => {
+    const source = read('js/field_war.js');
+    const zoomAt = source.indexOf('            // ★野戦マップのズーム操作');
+    const zoomEnd = source.indexOf("            scrollEl.addEventListener('click'", zoomAt);
+    const zoomBlock = source.slice(zoomAt, zoomEnd);
+    assert.strictEqual((zoomBlock.match(/this\._scheduleFieldWarCallback\(\(\) => \{ this\.isFwZooming = false; \}, 300\);/g) || []).length, 3,
+        'ホイールとピンチ両方向の解除予約は同じ戦闘寿命の窓口へ集約する');
+    assert.ok(!zoomBlock.includes('setTimeout(() => { this.isFwZooming = false; }'), '旧戦闘からの無保護タイマーを残さない');
+    const pending = [];
+    const ctx = createContext({
+        addEventListener() {},
+        setTimeout(callback) { pending.push(callback); return pending.length; }
+    });
+    loadScript(ctx, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', ctx);
+    const field = new Field({});
+    field.active = true;
+    field._beginFieldWarLifecycle();
+    field.isFwZooming = true;
+    field._scheduleFieldWarCallback(() => { field.isFwZooming = false; }, 300);
+    field._beginFieldWarLifecycle(); // 新しい野戦を開始した状態。
+    pending.shift()();
+    assert.strictEqual(field.isFwZooming, true, '前の戦闘に属するズーム解除は新戦闘へ効かない');
+    field._scheduleFieldWarCallback(() => { field.isFwZooming = false; }, 300);
+    pending.shift()();
+    assert.strictEqual(field.isFwZooming, false, '現在の戦闘のズーム解除は正常に動く');
 });
 
 test('r884 野戦終結後は最終操作部隊を失っても画面の余韻を維持し、重複BGM復帰しない', () => {
