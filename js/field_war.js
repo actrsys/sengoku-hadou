@@ -1634,7 +1634,6 @@ class FieldWarManager {
         pEl.className = 'fw-unit preview hidden'; // 最初は hidden
         pEl.style.pointerEvents = 'none';
         pEl.innerHTML = `
-            <div class="fw-unit-shadow"></div>
             <div class="fw-unit-icon"></div>
             <div class="fw-unit-status-wrap">
                 <div class="fw-troop-icon"></div>
@@ -1672,7 +1671,6 @@ class FieldWarManager {
             uEl.style.pointerEvents = 'none'; 
             
             uEl.innerHTML = `
-                <div class="fw-unit-shadow"></div>
                 <div class="fw-unit-icon"></div>
                 <div class="fw-unit-status-wrap">
                     <div class="fw-troop-icon" data-type="${u.troopType}"></div>

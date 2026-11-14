@@ -3112,42 +3112,15 @@ body:not(.is-pc) .busho-detail-biography-text {
 }
 
 .fw-unit { width: 24px; height: 24px; position: absolute; display: flex; justify-content: center; align-items: center; transition: left 0.3s, top 0.3s; pointer-events: none; z-index: auto; }
-/* 凸本体はあらかじめ色付き画像にしておき、戦場上では単純な画像表示だけにします。
-   CSS mask の都度着色や多段 drop-shadow を避け、視認性とスクロール性能を両立します。 */
-.fw-unit-shadow { position: absolute; inset: 0; background-repeat: no-repeat; background-size: contain; background-position: center center; pointer-events: none; z-index: 18; opacity: 0.9; }
-.fw-unit-icon { position: absolute; inset: 0; background-repeat: no-repeat; background-size: contain; background-position: center center; pointer-events: none; z-index: 20; transform: rotate(var(--fw-dir, 0deg)); transition: transform 0.3s; }
-
-/* 影画像は陸戦用と海戦用を分け、CSS filter ではなく軽量な透過画像を敷きます。 */
-.fw-unit .fw-unit-shadow { background-image: url('../data/images/field_war_images/land_shadow.webp'); }
-.fw-unit.is-sea-unit .fw-unit-shadow { background-image: url('../data/images/field_war_images/ship_shadow.webp'); }
-
-/* 凸本体は陣営ごとに事前生成した画像を使います。 */
-.fw-unit.attacker .fw-unit-icon { background-image: url('../data/images/field_war_images/land_attacker.webp'); }
-.fw-unit.defender .fw-unit-icon { background-image: url('../data/images/field_war_images/land_defender.webp'); }
-.fw-unit.attacker.ally .fw-unit-icon { background-image: url('../data/images/field_war_images/land_attacker_ally.webp'); }
-.fw-unit.defender.ally .fw-unit-icon { background-image: url('../data/images/field_war_images/land_defender_ally.webp'); }
-.fw-unit.attacker.self-ally .fw-unit-icon { background-image: url('../data/images/field_war_images/land_attacker_self_ally.webp'); }
-.fw-unit.defender.self-ally .fw-unit-icon { background-image: url('../data/images/field_war_images/land_defender_self_ally.webp'); }
-.fw-unit.attacker.general .fw-unit-icon { background-image: url('../data/images/field_war_images/land_attacker_general.webp'); }
-.fw-unit.defender.general .fw-unit-icon { background-image: url('../data/images/field_war_images/land_defender_general.webp'); }
-.fw-unit.attacker.ally.general .fw-unit-icon { background-image: url('../data/images/field_war_images/land_attacker_ally_general.webp'); }
-.fw-unit.defender.ally.general .fw-unit-icon { background-image: url('../data/images/field_war_images/land_defender_ally_general.webp'); }
-.fw-unit.attacker.self-ally.general .fw-unit-icon { background-image: url('../data/images/field_war_images/land_attacker_self_ally_general.webp'); }
-.fw-unit.defender.self-ally.general .fw-unit-icon { background-image: url('../data/images/field_war_images/land_defender_self_ally_general.webp'); }
-
-.fw-unit.is-sea-unit.attacker .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_attacker.webp'); }
-.fw-unit.is-sea-unit.defender .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_defender.webp'); }
-.fw-unit.is-sea-unit.attacker.ally .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_attacker_ally.webp'); }
-.fw-unit.is-sea-unit.defender.ally .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_defender_ally.webp'); }
-.fw-unit.is-sea-unit.attacker.self-ally .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_attacker_self_ally.webp'); }
-.fw-unit.is-sea-unit.defender.self-ally .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_defender_self_ally.webp'); }
-.fw-unit.is-sea-unit.attacker.general .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_attacker_general.webp'); }
-.fw-unit.is-sea-unit.defender.general .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_defender_general.webp'); }
-.fw-unit.is-sea-unit.attacker.ally.general .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_attacker_ally_general.webp'); }
-.fw-unit.is-sea-unit.defender.ally.general .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_defender_ally_general.webp'); }
-.fw-unit.is-sea-unit.attacker.self-ally.general .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_attacker_self_ally_general.webp'); }
-.fw-unit.is-sea-unit.defender.self-ally.general .fw-unit-icon { background-image: url('../data/images/field_war_images/ship_defender_self_ally_general.webp'); }
-
+/* 凸本体の縁を5〜6段のdrop-shadow合成で描かない。2枚の同形maskで輪郭色を構成し、
+   カメラスクロール中に全軍の高コストfilterを毎フレーム再合成しない。 */
+.fw-unit-icon { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 20; transform: rotate(var(--fw-dir, 0deg)); transition: transform 0.3s; }
+.fw-unit-icon::before,
+.fw-unit-icon::after { content: ""; display: block; position: absolute; inset: 0; -webkit-mask-image: url('../data/images/field_war_images/butai_icon.png'); mask-image: url('../data/images/field_war_images/butai_icon.png'); -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; }
+.fw-unit-icon::before { z-index: 1; -webkit-mask-size: calc(100% - 2px); mask-size: calc(100% - 2px); background-color: var(--fw-unit-fill, #e53935); transition: background-color 0.3s; }
+.fw-unit-icon::after { z-index: 0; -webkit-mask-size: 100%; mask-size: 100%; background-color: var(--fw-unit-outline, #8e0000); }
+.fw-unit.is-sea-unit .fw-unit-icon::before,
+.fw-unit.is-sea-unit .fw-unit-icon::after { -webkit-mask-image: url('../data/images/field_war_images/ship_icon.png'); mask-image: url('../data/images/field_war_images/ship_icon.png'); }
 .fw-unit.preview { opacity: 0.6; animation: fw-blink 1s infinite; z-index: 24; }
 
 /* 兵科画像と兵数は凸本体の上に固定し、向き変更では回転させない（プレビューも共通）。 */
@@ -3163,7 +3136,15 @@ body:not(.is-pc) .busho-detail-biography-text {
 /* 兵数を画像下部へ重ねて手前に描き、黒縁は文字を中心に均一な太さにする。 */
 .fw-unit-soldiers { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 1; font-size: 8px; color: #fff; font-weight: bold; text-align: center; -webkit-text-stroke: 0.64px #000; paint-order: stroke fill; text-shadow: none; white-space: nowrap; line-height: 1; letter-spacing: 0; }
 
-/* 総大将の白縁は画像側に持たせ、選択中だけ一段の光彩を使用。 */
+/* 部隊本体の色と縁色は同じmaskを使う2層で表現する。毎部隊の多段filterを廃止。 */
+.fw-unit.attacker { --fw-unit-fill: #e53935; --fw-unit-outline: #8e0000; }
+.fw-unit.defender { --fw-unit-fill: #1e88e5; --fw-unit-outline: #004ba0; }
+.fw-unit.attacker.ally { --fw-unit-fill: #ff9800; --fw-unit-outline: #e65100; }
+.fw-unit.defender.ally { --fw-unit-fill: #4caf50; --fw-unit-outline: #27e372; }
+.fw-unit.attacker.self-ally { --fw-unit-fill: #f48fb1; --fw-unit-outline: #d81b60; }
+.fw-unit.defender.self-ally { --fw-unit-fill: #4fc3f7; --fw-unit-outline: #0288d1; }
+/* 総大将の白縁を援軍の色指定より優先する。選択中だけ一段の光彩を使用。 */
+.fw-unit.general .fw-unit-icon::after { background-color: #ffffff; }
 .fw-unit.active .fw-unit-icon { filter: drop-shadow(0 0 4px #ffff00); }
 
 /* =========================================================
