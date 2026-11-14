@@ -1,4 +1,3 @@
-console.log("【確認】field_war.js の読み込みを開始しました！");
 
 // 野戦の経路探索・向き計算で共用する固定HEX方向。毎回の配列生成を避ける。
 const FIELD_WAR_HEX_DIRECTIONS = [
@@ -597,6 +596,11 @@ class FieldWarManager {
                 this.game.ui.clearCommandMenu();
             }
 
+            // 同じ固定戦場DOMを再利用するため、前戦闘の拡大率を新しい戦場へ持ち越さない。
+            // 画面はレイアウト可能な状態で隠しておき、今回の部隊とカメラを揃えてから公開する。
+            this.fwZoomLevel = undefined;
+            this.fwZoomStages = null;
+            this.currentMapScale = undefined;
             this.initUI();
             this.initMapElements(); // ★追加：最初に1回だけマス目を作る魔法
             this.updateMap();
@@ -608,10 +612,6 @@ class FieldWarManager {
                 window.AudioManager.playBGM('08_Legend of bear slaying.ogg'); // 野戦BGM再生
             }
             
-            // 野戦の画面が表示されたあとに、大きさをピッタリに合わせる魔法を使います
-            this._scheduleFieldWarCallback(() => {
-                this.adjustMapScale();
-            }, 50); // 画面ができるまで一瞬（0.05秒）だけ待ってからサイズを合わせます
         } else {
             // ★プレイヤーがいない場合、画面に野戦マップが出ないように隠します！
             const modal = document.getElementById('field-war-modal');
@@ -624,7 +624,25 @@ class FieldWarManager {
         }
         if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
 
-        this.startTurn();
+        if (isPlayerInvolved) {
+            // 先にターン順を確定するが、まだ行動・AI・追従カメラは開始しない。
+            // visibility:hidden なら画面の実寸は計測でき、途中の地形や旧カメラは見えない。
+            this.startTurn(true);
+            this.adjustMapScale();
+            if (this.turnQueue.length > 0) {
+                this.scrollToUnit(this.turnQueue[0], { instant: true, force: true });
+            }
+            if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
+            if (this.modal) this.modal.style.visibility = '';
+            // 完成済みの戦場を1回表示してからターン進行へ入る。
+            // 旧戦闘に切り替わっていれば、待機後は一切操作しない。
+            await this._waitForFieldWarVisualState();
+            if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;
+            if (this.mapEl) this.mapEl.style.transition = '';
+            this.processQueue();
+        } else {
+            this.startTurn();
+        }
     }
 
     _unbindFieldWarScrollEvents() {
@@ -653,6 +671,9 @@ class FieldWarManager {
 
     releaseFieldWarVisualResources() {
         this._unbindFieldWarScrollEvents();
+        // 開始準備中に戦闘が破棄されても、固定DOMの非表示指定を次の戦闘へ残さない。
+        const modal = this.modal || document.getElementById('field-war-modal');
+        if (modal) modal.style.visibility = '';
 
         const mapEl = this.mapEl || document.getElementById('fw-map');
         if (mapEl) {
@@ -663,6 +684,7 @@ class FieldWarManager {
             mapEl.style.width = '';
             mapEl.style.height = '';
             mapEl.style.margin = '';
+            mapEl.style.transition = '';
         }
 
         const clearIds = ['fw-atk-status', 'fw-def-status', 'fw-atk-tabs', 'fw-def-tabs', 'fw-unit-info', 'fw-log'];
@@ -702,6 +724,8 @@ class FieldWarManager {
         this.logEl = document.getElementById('fw-log');
         
         if (this.modal) {
+            // display:none はサイズ測定ができないため、レイアウトを保持する visibility を使う。
+            this.modal.style.visibility = 'hidden';
             if (this.game.ui && typeof this.game.ui.prepareCoveredViewForOpen === 'function') this.game.ui.prepareCoveredViewForOpen(this.modal);
             else this.modal.classList.remove('hidden');
         }
@@ -711,6 +735,9 @@ class FieldWarManager {
         const totalH = (this.rows * 2 - 1) * (this.hexH / 2) + this.hexH;
         
         if (this.mapEl) {
+            // 開幕時だけtransformの0.3秒補間を止め、カメラ計算と実際の描画倍率を一致させる。
+            // 公開後の最初のpaintを過ぎたら従来のズーム演出へ戻す。
+            this.mapEl.style.transition = 'none';
             this.mapEl.style.width = `${totalW}px`;
             this.mapEl.style.height = `${totalH}px`;
             this.mapEl.oncontextmenu = (e) => {
@@ -1026,7 +1053,7 @@ class FieldWarManager {
         });
     }
 
-    scrollToUnit(unit) {
+    scrollToUnit(unit, { instant = false, force = false } = {}) {
         const scrollEl = document.getElementById('fw-map-scroll');
         const mapEl = document.getElementById('fw-map');
         if (!scrollEl || !mapEl) return;
@@ -1056,11 +1083,19 @@ class FieldWarManager {
             py >= scrollEl.scrollTop + marginY &&
             py <= scrollEl.scrollTop + containerH - marginY
         );
-        if (isComfortablyVisible) return;
+        if (!force && isComfortablyVisible) return;
 
+        const left = px - containerW / 2;
+        const top = py - containerH / 2;
+        if (instant) {
+            // 初回表示前はスクロール演出を作らず、前戦闘のsmooth scrollも確実に上書きする。
+            scrollEl.scrollLeft = left;
+            scrollEl.scrollTop = top;
+            return;
+        }
         scrollEl.scrollTo({
-            left: px - containerW / 2,
-            top: py - containerH / 2,
+            left,
+            top,
             behavior: (!document.body.classList.contains('is-pc') && document.body.classList.contains('battle-lightweight-mode')) ? 'auto' : 'smooth'
         });
     }
@@ -2268,7 +2303,7 @@ class FieldWarManager {
         this.updateStatus();
     }
 
-    startTurn() {
+    startTurn(deferQueueProcessing = false) {
         if (!this.active) return;
 
         // ★追加：毎ターン開始時に天候の判定をします
@@ -2334,6 +2369,9 @@ class FieldWarManager {
             const speedB = b.stats.ldr + b.stats.str;
             return speedB - speedA;
         });
+
+        // 初回公開時だけ、ターン順の準備と実際の行動開始を分ける。
+        if (deferQueueProcessing) return;
 
         // ★追加：AI同士の高速戦闘でブラウザがフリーズしないように、ターンの最初に少しだけ息継ぎをします！
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
@@ -4585,4 +4623,3 @@ class FieldWarManager {
 }
 
 window.FieldWarManager = FieldWarManager;
-console.log("【確認】field_war.js の読み込みが完了しました！");

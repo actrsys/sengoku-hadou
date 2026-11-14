@@ -10004,6 +10004,86 @@ test('戦闘カメラは城種点ではなく領域重心を使い点滅位置�
     assert.ok(map.includes("anchor: 'territory'"), '戦闘系カメラは領域中心アンカーを使う');
 });
 
+test('地図の新カメラ命令が現位置と一致しても旧smooth移動・入力ロック・待機を必ず解除する', async () => {
+    const frames = [];
+    const cancelled = [];
+    const scroll = {
+        style: { pointerEvents: '' }, scrollLeft: 100, scrollTop: 0,
+        scrollWidth: 5000, scrollHeight: 3000, clientWidth: 1000, clientHeight: 700
+    };
+    const ctx = createContext({
+        UIManager: class UIManager {},
+        document: {
+            body: { classList: { contains: name => name === 'is-pc' } },
+            getElementById: key => key === 'map-scroll-container' ? scroll : null
+        },
+        getComputedStyle: () => ({ display: 'block' }),
+        requestAnimationFrame: fn => { frames.push(fn); return frames.length; },
+        cancelAnimationFrame: id => { cancelled.push(id); },
+        performance: { now: () => 0 }
+    });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.mapEl = { style: { left: '0px', top: '0px' } };
+    ui.mapScale = 1;
+    ui.game = {};
+    const oldFocus = ui.focusMapOnCastle({ pixelX: 2500, pixelY: 1500 }, { transition: 'smooth' });
+    assert.strictEqual(frames.length, 1);
+    assert.strictEqual(scroll.style.pointerEvents, 'none', '旧移動中は入力をロックする');
+    const noOpFocus = ui.focusMapOnCastle({ pixelX: 600, pixelY: 350 }, { transition: 'instant' });
+    assert.strictEqual(await noOpFocus, true, '現在地への新命令は再移動しない');
+    assert.strictEqual(await oldFocus, false, '古い移動を解放して待機元に中断を通知する');
+    assert.strictEqual(scroll.style.pointerEvents, '', '新命令の早期完了でも旧入力ロックを解放する');
+    assert.strictEqual(ui._mapFocusLockCount, 0);
+    assert.strictEqual(ui._cancelActiveMapFocus, null);
+    assert.deepStrictEqual(cancelled, [1], '旧フレームのキャンセルを予約する');
+    frames[0](1000); // ブラウザによる遅延発火でも旧カメラは無効
+    assert.strictEqual(scroll.scrollLeft, 100);
+    assert.strictEqual(scroll.scrollTop, 0);
+});
+
+test('地図の異なる目的地への再指示も旧アニメーションだけを解放し新移動を維持する', async () => {
+    const frames = [];
+    const scroll = {
+        style: { pointerEvents: '' }, scrollLeft: 100, scrollTop: 0,
+        scrollWidth: 5000, scrollHeight: 3000, clientWidth: 1000, clientHeight: 700
+    };
+    const ctx = createContext({
+        UIManager: class UIManager {},
+        document: {
+            body: { classList: { contains: name => name === 'is-pc' } },
+            getElementById: key => key === 'map-scroll-container' ? scroll : null
+        },
+        getComputedStyle: () => ({ display: 'block' }),
+        requestAnimationFrame: fn => { frames.push(fn); return frames.length; },
+        cancelAnimationFrame() {},
+        performance: { now: () => 0 }
+    });
+    loadScript(ctx, 'js/ui_map.js');
+    const ui = new ctx.UIManager();
+    ui.mapEl = { style: { left: '0px', top: '0px' } };
+    ui.mapScale = 1;
+    ui.game = {};
+    const oldFocus = ui.focusMapOnCastle({ pixelX: 2500, pixelY: 1500 }, { transition: 'smooth' });
+    const newFocus = ui.focusMapOnCastle({ pixelX: 1600, pixelY: 650 }, { transition: 'instant' });
+    assert.strictEqual(await oldFocus, false);
+    assert.strictEqual(scroll.style.pointerEvents, 'none', '旧移動の解除で新移動のロックを消さない');
+    assert.strictEqual(ui._mapFocusLockCount, 1);
+    assert.strictEqual(frames.length, 2);
+    frames[0](1000); // 中断済みのsmoothコールバックは新カメラを上書きしない
+    assert.strictEqual(scroll.scrollLeft, 1100);
+    frames[1](1000);
+    assert.strictEqual(await newFocus, true);
+    assert.strictEqual(scroll.style.pointerEvents, '');
+    assert.strictEqual(ui._mapFocusLockCount, 0);
+});
+
+test('野戦スクリプトの起動確認だけの一時console.logを配布版へ残さない', () => {
+    const field = read('js/field_war.js');
+    assert.ok(!field.includes('【確認】field_war.js の読み込み'), 'モジュール読み込みごとの試験用ログを削除する');
+    assert.ok(field.includes('window.FieldWarManager = FieldWarManager;'), '野戦Manager公開は維持する');
+});
+
 test('低FPS端末のsmoothカメラは最初の遅延で目的地へワープしない', () => {
     const map = read('js/ui_map.js');
     assert.ok(map.includes('let elapsed = 0'));
@@ -12001,7 +12081,7 @@ test('野戦の交戦時は不要なsmooth scroll・DOM再探索・非表示ロ�
     assert.ok(field.includes('const p1Visible = p1.x >= left && p1.x <= right'));
     assert.ok(field.includes('if (p1Visible && p2Visible) return;'), '交戦両部隊が見えている時は再センタリングしない');
     assert.ok(field.includes('const isComfortablyVisible = ('));
-    assert.ok(field.includes('if (isComfortablyVisible) return;'), '行動部隊が見えている時は毎ターン再センタリングしない');
+    assert.ok(field.includes('if (!force && isComfortablyVisible) return;'), '行動部隊が見えている時は毎ターン再センタリングしない');
     assert.ok(field.includes('const atkRefs = this._fwUnitElementCache.get(attacker.id);'));
     assert.ok(field.includes('const defRefs = this._fwUnitElementCache.get(defender.id);'));
     assert.ok(field.includes("if (!this.logEl.classList.contains('hidden'))"), '非表示ログでscrollHeightを読まない');
@@ -41536,6 +41616,140 @@ test('r889 攻城戦の天候表示は開戦時と各ラウンドで同じUI正�
     const weatherSection = warSource.slice(warSource.indexOf('    processWarRound() {'), warSource.indexOf('            // ★直近5ターンのダメージを記憶する箱'));
     assert.ok(weatherSection.includes('this.game.ui.updateWarWeatherUI(s);'));
     assert.ok(!weatherSection.includes("document.getElementById('war-weather-info')"), '天候表示の重複処理を残さない');
+});
+
+test('r891 野戦開始は地形・ターン順・初期カメラを準備してから公開し、描画後に行動開始する', async () => {
+    const modal = fakeElement('field-war-modal');
+    modal.style.visibility = '';
+    const order = [];
+    const context = createContext({
+        HexMapGenerator: class { generate() { return { cols: 20, rows: 12, grid: [] }; } },
+        document: {
+            body: { classList: new FakeClassList(['is-pc']) },
+            getElementById: id => id === 'field-war-modal' ? modal : null
+        }
+    });
+    loadScript(context, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', context);
+    const manager = Object.create(Field.prototype);
+    manager._fieldWarGeneration = 0;
+    manager.game = {
+        playerClanId: 1, month: 1,
+        getBusho() { return null; },
+        ui: { suspendMainMapForBattle() { order.push('suspend'); }, clearCommandMenu() { order.push('clear'); } },
+        eventManager: { async processEvents() {} }
+    };
+    manager.hideUnitInfo = () => {};
+    manager.initUI = () => { order.push('ui'); manager.modal = modal; modal.style.visibility = 'hidden'; };
+    manager.initMapElements = () => { order.push('map'); };
+    manager.updateMap = () => { order.push('render'); };
+    manager.updateStatus = () => {};
+    manager.log = () => {};
+    manager.updateWeather = () => {};
+    manager.adjustMapScale = () => { order.push('scale'); };
+    manager.scrollToUnit = (unit, options) => {
+        assert.ok(manager.turnQueue.length > 0, 'カメラの移動先は確定済みの行動部隊');
+        assert.strictEqual(unit, manager.turnQueue[0]);
+        assert.ok(options.instant && options.force, '表示前は即時カメラ配置');
+        assert.strictEqual(modal.style.visibility, 'hidden', 'まだ表示しない');
+        order.push('focus');
+    };
+    let allowPaint;
+    manager._waitForFieldWarVisualState = () => new Promise(resolve => { allowPaint = resolve; });
+    manager.processQueue = () => { order.push('turn'); };
+    const busho = (id, score) => ({ id, name: `武将${id}`, leadership: score, strength: score, intelligence: 50, charm: 50 });
+    const state = {
+        attacker: { ownerClan: 1, rice: 500, morale: 50, training: 50 },
+        defender: { ownerClan: 2, rice: 500, morale: 50, training: 50 },
+        sourceCastle: { isDelegated: false },
+        atkAssignments: [{ soldiers: 500, busho: busho(1, 60) }],
+        defAssignments: [{ soldiers: 500, busho: busho(2, 85) }]
+    };
+    const opening = manager.startFieldWar(state, () => {});
+    for (let i = 0; i < 6 && !allowPaint; i++) await Promise.resolve();
+    assert.strictEqual(typeof allowPaint, 'function', '画面公開後の描画待ちへ進む');
+    assert.strictEqual(modal.style.visibility, '', '初期カメラ確定後に画面を公開');
+    assert.ok(order.indexOf('map') < order.indexOf('render'));
+    assert.ok(order.indexOf('render') < order.indexOf('scale'));
+    assert.ok(order.indexOf('scale') < order.indexOf('focus'));
+    assert.ok(!order.includes('turn'), '最初の描画前にターンを進めない');
+    assert.strictEqual(manager.turnQueue[0].bushoId, 2, '最初の行動者は既存の速度順で決める');
+    allowPaint();
+    await opening;
+    assert.strictEqual(order[order.length - 1], 'turn', '画面公開・描画後に処理開始');
+
+    // 同じManagerの再入場中にタイトルへ戻った場合も、保留中のターンを復帰しない。
+    allowPaint = null;
+    const discardedOpening = manager.startFieldWar(state, () => {});
+    for (let i = 0; i < 6 && !allowPaint; i++) await Promise.resolve();
+    assert.strictEqual(typeof allowPaint, 'function');
+    const turnCount = order.filter(item => item === 'turn').length;
+    manager.abortForScenarioTransition();
+    assert.ok(modal.classList.contains('hidden'), '中断後はモーダルを閉じる');
+    assert.strictEqual(modal.style.visibility, '', '非表示準備のスタイルは次戦闘に残さない');
+    allowPaint();
+    await discardedOpening;
+    assert.strictEqual(order.filter(item => item === 'turn').length, turnCount, '旧画面の描画待ち復帰でターンを進めない');
+});
+
+test('r891 野戦開始の描画待ち中に戦闘世代が変われば旧ターンは進行しない', async () => {
+    const source = read('js/field_war.js');
+    const start = source.slice(source.indexOf('async startFieldWar('), source.indexOf('    _unbindFieldWarScrollEvents()'));
+    assert.ok(start.includes('this.startTurn(true);'), '初回だけターン準備と実行を分離する');
+    assert.ok(start.includes('this.adjustMapScale();'), '公開前に倍率を適用する');
+    assert.ok(source.includes("this.mapEl.style.transition = 'none';"), '開幕時だけ拡大のアニメーションを止める');
+    assert.ok(start.includes("if (this.mapEl) this.mapEl.style.transition = '';"), '描画完了後は元のズーム演出へ戻す');
+    assert.ok(start.includes('this.scrollToUnit(this.turnQueue[0], { instant: true, force: true });'), '公開前に行動者へカメラを合わせる');
+    assert.ok(start.includes('await this._waitForFieldWarVisualState();'), '公開直後に1回描画を通す');
+    assert.ok(start.includes("if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration)) return;\n            if (this.mapEl) this.mapEl.style.transition = '';\n            this.processQueue();"), '旧戦闘の待機復帰では行動しない');
+    const Field = (() => {
+        const ctx = createContext({ document: { getElementById() { return null; } } });
+        loadScript(ctx, 'js/field_war.js');
+        return vm.runInContext('FieldWarManager', ctx);
+    })();
+    const manager = Object.create(Field.prototype);
+    manager._fieldWarGeneration = 2;
+    manager.active = true;
+    let started = 0;
+    const old = manager._fieldWarGeneration;
+    const paint = new Promise(resolve => { manager._resumePaint = resolve; });
+    const wait = (async () => {
+        await paint;
+        if (!manager._isFieldWarLifecycleCurrent(old)) return;
+        started++;
+    })();
+    manager._fieldWarGeneration++;
+    manager.active = false;
+    manager._resumePaint();
+    await wait;
+    assert.strictEqual(started, 0);
+    assert.ok(source.includes("if (modal) modal.style.visibility = '';"), '中断時の非表示指定を解放する');
+});
+
+test('r891 野戦の初回カメラは即時スクロール、後続の通常追従は従来の滑らかなスクロール', () => {
+    const context = createContext({ document: { body: { classList: new FakeClassList(['is-pc']) } } });
+    loadScript(context, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', context);
+    const field = Object.create(Field.prototype);
+    field.hexW = 30;
+    field.hexH = 26;
+    const moves = [];
+    const scroll = {
+        clientWidth: 120, clientHeight: 100,
+        scrollLeft: 0, scrollTop: 0,
+        scrollTo(value) { moves.push(value); this.scrollLeft = value.left; this.scrollTop = value.top; }
+    };
+    const map = { style: { transform: 'scale(2)' } };
+    context.document.getElementById = id => id === 'fw-map-scroll' ? scroll : id === 'fw-map' ? map : null;
+    const unit = { x: 13, y: 11 };
+    field.scrollToUnit(unit, { instant: true, force: true });
+    assert.strictEqual(scroll.scrollLeft, (13 * 22.5 + 15) * 2 - 60);
+    assert.strictEqual(scroll.scrollTop, (11 * 13 + 13) * 2 - 50);
+    assert.strictEqual(moves.length, 0, '開始準備時にはsmooth scroll APIを使わない');
+    scroll.scrollLeft = 0; scroll.scrollTop = 0;
+    field.scrollToUnit(unit);
+    assert.strictEqual(moves.length, 1, '通常ターンは従来の追従カメラ');
+    assert.strictEqual(moves[0].behavior, 'smooth');
 });
 
 Promise.all(pendingTests).then(() => {

@@ -1303,6 +1303,13 @@ Object.assign(UIManager.prototype, {
         const targetLeft = Math.max(0, Math.min(maxLeft, scaledX - sc.clientWidth / 2));
         const targetTop = Math.max(0, Math.min(maxTop, scaledY - sc.clientHeight / 2));
 
+        // 新しいカメラ命令が有効なら、目標位置が現位置と一致していても
+        // 旧smooth移動を必ず終了させる。旧rAFが後から地図を動かすのを防ぐ。
+        // 旧移動の入力ロックと完了待機も、既存のcleanupで同時に解放する。
+        if (typeof this._cancelActiveMapFocus === 'function') {
+            this._cancelActiveMapFocus();
+        }
+
         // ほぼ目的地なら再スクロールしません。これが二重カメラ指定の見た目上の揺れも防ぎます。
         if (Math.abs(sc.scrollLeft - targetLeft) < 1 && Math.abs(sc.scrollTop - targetTop) < 1) {
             return Promise.resolve(true);
@@ -1335,12 +1342,6 @@ Object.assign(UIManager.prototype, {
 
         if (this.game && typeof this.game.writeSystemDiagnostic === 'function' && options.reason && options.diagnostic !== false) {
             this.game.writeSystemDiagnostic(`map_focus:${options.reason}:${transition}:start`, castles[0]);
-        }
-
-        // 新しいカメラ命令が来たら、前のsmooth移動はそこで終わらせます。
-        // イベント中の「ぱっと場面転換」が前のアニメーションに引っ張られないための処理です。
-        if (typeof this._cancelActiveMapFocus === 'function') {
-            this._cancelActiveMapFocus();
         }
 
         return new Promise(resolve => {
