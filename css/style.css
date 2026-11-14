@@ -3060,64 +3060,57 @@ body:not(.is-pc) .busho-detail-biography-text {
 
 /* =========================================================
    野戦地形チップ
-   - 1マスごとのアニメーションを持たせず、静的なSVGパターンで質感を出します。
-   - SVGは地形ごとに共通なので、数百HEXでも画像資源を使い回せます。
+   - SVGの都度描画ではなく、240x208のlossless WebP地形チップを30x26へ縮小表示します。
+   - HEX境界線とclip-pathは維持しつつ、背景画像は共通アセットを使い回します。
    ========================================================= */
+.hex-plain,
+.hex-forest,
+.hex-river,
+.hex-mountain,
+.hex-sea,
+#fw-main-area.is-heavy-snow .hex-river {
+    background-repeat: no-repeat !important;
+    background-position: center center !important;
+    background-size: 100% 100% !important;
+    image-rendering: auto;
+}
 .hex-plain {
     background-color: #769c58 !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26' viewBox='0 0 30 26'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M4 20l1-4M7 21l2-5M19 8l1-4M22 9l2-5M12 15l1-3M25 19l1-3' stroke='%235a7f42' stroke-width='1' opacity='.55'/%3E%3Cpath d='M3 7h4M16 20h4M24 12h3' stroke='%23a9c985' stroke-width='1' opacity='.4'/%3E%3C/g%3E%3C/svg%3E") !important;
-    background-size: 30px 26px !important;
+    background-image: url('../data/images/field_war_tiles/plain.webp') !important;
 }
 .hex-forest {
     background-color: #2f5734 !important;
-    /* 森は波線ではなく、大小の樹冠が面として連なる斑点状の質感にします。 */
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='52' viewBox='0 0 60 52'%3E%3Cg stroke-linecap='round' stroke-linejoin='round'%3E%3Cg fill='%233b6840' opacity='.92'%3E%3Ccircle cx='2' cy='8' r='8'/%3E%3Ccircle cx='15' cy='4' r='9'/%3E%3Ccircle cx='30' cy='10' r='10'/%3E%3Ccircle cx='47' cy='5' r='9'/%3E%3Ccircle cx='59' cy='13' r='9'/%3E%3Ccircle cx='8' cy='28' r='10'/%3E%3Ccircle cx='23' cy='23' r='9'/%3E%3Ccircle cx='39' cy='29' r='11'/%3E%3Ccircle cx='55' cy='25' r='9'/%3E%3Ccircle cx='17' cy='46' r='11'/%3E%3Ccircle cx='34' cy='44' r='9'/%3E%3Ccircle cx='52' cy='47' r='10'/%3E%3C/g%3E%3Cg fill='%2324452b' opacity='.72'%3E%3Ccircle cx='8' cy='15' r='5'/%3E%3Ccircle cx='36' cy='7' r='5'/%3E%3Ccircle cx='17' cy='31' r='6'/%3E%3Ccircle cx='49' cy='35' r='6'/%3E%3Ccircle cx='3' cy='48' r='6'/%3E%3C/g%3E%3Cg fill='none' stroke='%237aa06c' stroke-width='1.4' opacity='.48'%3E%3Cpath d='M-4 8q6-5 12 0M11 5q5-4 10 0M25 12q6-5 12 0M43 6q5-4 10 0M4 29q6-5 12 0M20 24q5-4 10 0M34 30q7-5 14 0M12 47q6-5 12 0M29 44q5-4 10 0M47 48q6-5 12 0'/%3E%3C/g%3E%3Cg stroke='%231a3923' stroke-width='1' opacity='.58'%3E%3Cpath d='M9 20v5M31 17v5M48 17v4M23 35v5M42 39v4M14 50v4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") !important;
-    background-size: 60px 52px !important;
+    background-image: url('../data/images/field_war_tiles/forest.webp') !important;
 }
 .hex-river {
     background-color: #4b91b4 !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26' viewBox='0 0 30 26'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M-4 8C4 3 10 13 18 8S31 4 35 8' stroke='%237fc4d7' stroke-width='2' opacity='.72'/%3E%3Cpath d='M-2 18C5 14 10 22 17 18S27 14 33 17' stroke='%23366f94' stroke-width='1.5' opacity='.62'/%3E%3Cpath d='M7 4c3-2 6-2 9 0M18 13c3-2 6-2 9 0' stroke='%23d5edf2' stroke-width='1' opacity='.48'/%3E%3C/g%3E%3C/svg%3E") !important;
-    background-size: 30px 26px !important;
+    background-image: url('../data/images/field_war_tiles/river.webp') !important;
     animation: none !important;
 }
 .hex-mountain {
     background-color: #8a6847 !important;
-    /* 山は森や川の曲線と分離し、茶色い地肌・斜面・低い尾根を斜線中心で描きます。 */
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='52' viewBox='0 0 60 52'%3E%3Cg stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M-8 38L6 20L16 27L29 10L41 24L52 15L68 36V56H-8Z' fill='%2378583e' opacity='.68'/%3E%3Cpath d='M-6 45L8 30L18 36L31 22L43 34L55 25L67 42V56H-6Z' fill='%23664a35' opacity='.58'/%3E%3Cg fill='none' stroke='%23c29a68' stroke-width='1.6' opacity='.82'%3E%3Cpath d='M-5 34L6 20L16 27L29 10L41 24L52 15L65 32'/%3E%3Cpath d='M2 45L10 34L19 39L31 25L42 36L54 28L61 36'/%3E%3C/g%3E%3Cg fill='none' stroke='%234f392b' stroke-width='1.15' opacity='.72'%3E%3Cpath d='M6 22L2 31M12 25L7 35M29 13L23 25M35 17L29 30M52 18L47 28M57 24L52 34M18 38L14 46M42 36L37 46'/%3E%3C/g%3E%3Cg fill='none' stroke='%23dfbc82' stroke-width='1' opacity='.44'%3E%3Cpath d='M18 17l4-5M39 22l4-5M8 34l4-4M31 33l4-4M52 32l4-4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") !important;
-    background-size: 60px 52px !important;
+    background-image: url('../data/images/field_war_tiles/mountain.webp') !important;
 }
-
-/* 座標ごとにパターン位置だけずらし、同じチップの連続感を弱めます。 */
-.fw-hex.terrain-variant-1 { background-position: -7px 3px !important; }
-.fw-hex.terrain-variant-2 { background-position: 6px -4px !important; }
-
-/* 海は多重グラデーションを毎HEXで合成せず、1枚の静的な波模様を使い回します。 */
 .hex-sea {
     background-color: #285c83 !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='26' viewBox='0 0 30 26'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M-5 7Q1 3 7 7t12 0t12 0' stroke='%235f91ad' stroke-width='1.5' opacity='.75'/%3E%3Cpath d='M-2 17Q4 13 10 17t12 0t12 0' stroke='%231c435f' stroke-width='1.5' opacity='.85'/%3E%3Cpath d='M4 11q4-2 8 0M20 21q4-2 8 0' stroke='%23bfd4df' stroke-width='1' opacity='.35'/%3E%3C/g%3E%3C/svg%3E") !important;
-    background-size: 30px 26px !important;
-    image-rendering: auto;
+    background-image: url('../data/images/field_war_tiles/sea.webp') !important;
 }
 
-/* 大雪時の川（氷）：波のアニメーションを消し、水色に太さの違う斜めの光沢（氷のヒビや反射）を表現します */
+/* 大雪時の川は専用の凍結チップへ差し替え、常時アニメーションは行わない。 */
 #fw-main-area.is-heavy-snow .hex-river {
     background-color: #b3e5fc !important;
-    background-image: 
-        linear-gradient(135deg, transparent 20%, rgba(255, 255, 255, 0.8) 22%, transparent 24%),
-        linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.3) 55%, transparent 60%),
-        linear-gradient(135deg, transparent 80%, rgba(255, 255, 255, 0.9) 82%, transparent 84%) !important;
-    background-size: 100% 100% !important;
-    background-position: 0 0 !important;
+    background-image: url('../data/images/field_war_tiles/river_frozen.webp') !important;
     animation: none !important;
 }
 
 .fw-unit { width: 24px; height: 24px; position: absolute; display: flex; justify-content: center; align-items: center; transition: left 0.3s, top 0.3s; pointer-events: none; z-index: auto; }
-/* 凸本体はあらかじめ色付き画像にしておき、戦場上では単純な画像表示だけにします。
-   CSS mask の都度着色や多段 drop-shadow を避け、視認性とスクロール性能を両立します。 */
-.fw-unit-shadow { position: absolute; inset: 0; background-repeat: no-repeat; background-size: contain; background-position: center center; pointer-events: none; z-index: 18; opacity: 0.9; }
+/* 凸本体は陣営色と細い最外周黒線を画像に焼き込んでおき、戦場上では表示のみ行う。
+   CSS mask の都度着色や多段 drop-shadow を避け、視認性とスクロール性能を両立する。 */
+.fw-unit-shadow { position: absolute; inset: 0; background-repeat: no-repeat; background-size: contain; background-position: center center; pointer-events: none; z-index: 18; opacity: 1; transform: translate(1px, 1.5px) rotate(var(--fw-dir, 0deg)); transition: transform 0.3s; }
 .fw-unit-icon { position: absolute; inset: 0; background-repeat: no-repeat; background-size: contain; background-position: center center; pointer-events: none; z-index: 20; transform: rotate(var(--fw-dir, 0deg)); transition: transform 0.3s; }
 
-/* 影画像は陸戦用と海戦用を分け、CSS filter ではなく軽量な透過画像を敷きます。 */
+/* 影は本体と同じ輪郭・同じ透明余白の画像を使い、向きも同期させる。
+   画面座標系で少しだけ下にずらす。引き伸ばし・動的blurは行わない。 */
 .fw-unit .fw-unit-shadow { background-image: url('../data/images/field_war_images/land_shadow.webp'); }
 .fw-unit.is-sea-unit .fw-unit-shadow { background-image: url('../data/images/field_war_images/ship_shadow.webp'); }
 

@@ -10837,11 +10837,19 @@ test('会話・コマンド・評定から結果へ進む時は重い背景更�
 });
 
 
-test('野戦地形チップは静的な共通描画を使い、川をマス単位で常時アニメーションしない', () => {
+test('野戦地形チップは240x208のlossless WebPを30x26へ縮小表示し、川をマス単位で常時アニメーションしない', () => {
     const css = read('css/style.css');
     const field = read('js/field_war.js');
+    const game = read('js/game.js');
     assert.ok(css.includes('.hex-plain {') && css.includes('.hex-forest {') && css.includes('.hex-mountain {') && css.includes('.hex-river {') && css.includes('.hex-sea {'));
-    assert.ok(css.includes("data:image/svg+xml"), '地形質感は共通の静的SVGを使い回す');
+    for (const name of ['plain.webp', 'forest.webp', 'mountain.webp', 'river.webp', 'sea.webp', 'river_frozen.webp']) {
+        assert.ok(css.includes(`field_war_tiles/${name}`), `${name} を地形チップとして使う`);
+        assert.ok(game.includes(`field_war_tiles/${name}`), `${name} を先読みする`);
+    }
+    const terrainStart = css.indexOf('/* =========================================================\n   野戦地形チップ');
+    const terrainEnd = css.indexOf('.fw-unit {', terrainStart);
+    const terrainBlock = css.slice(terrainStart, terrainEnd);
+    assert.ok(!terrainBlock.includes('data:image/svg+xml'), '地形質感の都度SVG描画をやめ、共通WebPを使い回す');
     const riverStart = css.indexOf('.hex-river {');
     const riverEnd = css.indexOf('.hex-mountain {', riverStart);
     const riverBlock = css.slice(riverStart, riverEnd);
@@ -10853,18 +10861,20 @@ test('野戦地形チップは静的な共通描画を使い、川をマス単�
     assert.ok(!hexBlock.includes('will-change: filter'), '数百HEXをwill-changeで個別レイヤー化しない');
     assert.ok(!hexBlock.includes('translateZ(0)'), '数百HEXをtranslateZで個別レイヤー化しない');
     assert.ok(field.includes('hex.dataset.terrain = visualTerrain'));
-    assert.ok(field.includes('terrain-variant-${Math.abs((x * 17 + row * 31)) % 3}'), '静的な座標差分で反復感だけ弱める');
-    const forestStart = css.indexOf('.hex-forest {');
-    const forestEnd = css.indexOf('.hex-river {', forestStart);
-    const forestBlock = css.slice(forestStart, forestEnd);
-    const mountainStart = css.indexOf('.hex-mountain {');
-    const mountainEnd = css.indexOf('/* 座標ごとにパターン位置', mountainStart);
-    const mountainBlock = css.slice(mountainStart, mountainEnd);
-    assert.ok(forestBlock.includes('background-size: 60px 52px'), '森は単独アイコンではなく複数HEXで馴染む広い樹冠パターンを使う');
-    assert.ok(mountainBlock.includes('background-size: 60px 52px'), '山は単独の尖峰ではなく複数HEXで馴染む広い低山・尾根パターンを使う');
-    assert.ok(forestBlock.includes('%3Ccircle'), '森は川の流線と区別できる樹冠の塊を使う');
-    assert.ok(mountainBlock.includes('#8a6847') || mountainBlock.includes('%238a6847'), '山は森・川と区別しやすい茶色系の地肌を使う');
-    assert.ok(mountainBlock.includes('L6 20') && !mountainBlock.includes('%3Ccircle'), '山は樹冠や水面の波ではなく斜面・尾根線で描く');
+    assert.ok(!field.includes('terrain-variant-${Math.abs((x * 17 + row * 31)) % 3}'), '画像化に伴い背景ずらし差分をやめる');
+    const plainStart = css.indexOf('.hex-plain {');
+    const plainEnd = css.indexOf('.hex-forest {', plainStart);
+    const plainBlock = css.slice(plainStart, plainEnd);
+    assert.ok(plainBlock.includes("background-image: url('../data/images/field_war_tiles/plain.webp') !important;"));
+    const snowStart = css.indexOf('#fw-main-area.is-heavy-snow .hex-river {');
+    const snowEnd = css.indexOf('.fw-unit {', snowStart);
+    const snowBlock = css.slice(snowStart, snowEnd);
+    assert.ok(snowBlock.includes("background-image: url('../data/images/field_war_tiles/river_frozen.webp') !important;"), '大雪の川も専用WebPへ差し替える');
+    const commonStart = css.indexOf('.hex-plain,');
+    const commonEnd = css.indexOf('.hex-plain {', commonStart);
+    const commonBlock = css.slice(commonStart, commonEnd);
+    assert.ok(commonBlock.includes('background-position: center center !important;'), '背景位置は中央固定にする');
+    assert.ok(commonBlock.includes('background-size: 100% 100% !important;'), '240x208の地形チップを30x26へ縮小表示する');
 });
 
 test('雨雪は背景座標の全画面再描画ではなく少数の合成レイヤーを移動する', () => {
@@ -11914,6 +11924,9 @@ test('野戦ダメージ表示は出現直後から動き、固定停止で次�
     const iconRules = style.slice(iconRuleAt, iconRuleEnd);
     assert.ok(iconRules.includes(".fw-unit .fw-unit-shadow { background-image: url('../data/images/field_war_images/land_shadow.webp'); }"), '陸戦用の影画像を使う');
     assert.ok(iconRules.includes(".fw-unit.is-sea-unit .fw-unit-shadow { background-image: url('../data/images/field_war_images/ship_shadow.webp'); }"), '海戦用の影画像を使う');
+    assert.ok(iconRules.includes('transform: translate(1px, 1.5px) rotate(var(--fw-dir, 0deg))'), '影と本体の回転角・中心を一致させ、ずらしは画面座標で一定にする');
+    assert.ok(iconRules.includes('.fw-unit-icon { position: absolute; inset: 0; background-repeat: no-repeat; background-size: contain; background-position: center center;'), '本体と影で同じレイアウト箱を用いる');
+    assert.ok(!iconRules.includes('mask-image:'), '影と本体を実行時マスク合成に戻さない');
     for (const path of [
         'land_attacker.webp', 'land_defender.webp', 'land_attacker_ally.webp', 'land_defender_ally.webp',
         'land_attacker_self_ally.webp', 'land_defender_self_ally.webp',

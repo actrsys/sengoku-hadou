@@ -691,7 +691,13 @@ class GameManager {
             'data/images/field_war_images/ship_attacker_ally_general.webp',
             'data/images/field_war_images/ship_defender_ally_general.webp',
             'data/images/field_war_images/ship_attacker_self_ally_general.webp',
-            'data/images/field_war_images/ship_defender_self_ally_general.webp'
+            'data/images/field_war_images/ship_defender_self_ally_general.webp',
+            'data/images/field_war_tiles/plain.webp',
+            'data/images/field_war_tiles/forest.webp',
+            'data/images/field_war_tiles/mountain.webp',
+            'data/images/field_war_tiles/river.webp',
+            'data/images/field_war_tiles/sea.webp',
+            'data/images/field_war_tiles/river_frozen.webp'
         ];
         for (let i = 0; i < paths.length && isCurrent(); i += 4) {
             await Promise.all(paths.slice(i, i + 4).map(src => this._loadAssetImage(src)));

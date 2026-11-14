@@ -1611,9 +1611,6 @@ class FieldWarManager {
                     const visualTerrain = cell.isSea ? 'sea' : cell.terrain;
                     hex.dataset.terrain = visualTerrain;
                     hex.classList.add(`hex-${visualTerrain}`);
-                    // 同じ模様が碁盤目状に反復して見えないよう、座標から決まる静的なずらしだけを付けます。
-                    // 乱数やアニメーションは使わないため、再描画コストやゲームロジックには影響しません。
-                    hex.classList.add(`terrain-variant-${Math.abs((x * 17 + row * 31)) % 3}`);
                 }
                 
                 hex.style.left = `${x * (this.hexW * 0.75)}px`;
