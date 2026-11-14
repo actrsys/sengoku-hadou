@@ -47,7 +47,9 @@ Object.assign(WarManager.prototype, {
             || this.isPlayerClanReinforcement(s.defSelfReinforcement, pid)
             || !!s.retreatedReinforcements?.some(r => !r.isAttackerData && this.isPlayerClanReinforcement(r.data, pid));
         const playerWon = (attackerWon && isAtkPlayer) || (!attackerWon && isDefPlayer);
-        const playerRelevant = !!s.isPlayerInvolved;
+        // 操作部隊の全滅でisPlayerInvolvedはfalseになる。合戦当事者かどうかは
+        // 終戦時に確定した勢力参加フラグを使い、敗北を第三者向けの見出しにしない。
+        const playerRelevant = !!s.isPlayerFactionInvolved;
         const title = playerRelevant
             ? (playerWon ? '勝利' : isRetreat ? '撤退' : '敗北')
             : (attackerWon ? '攻撃軍勝利' : isRetreat ? '攻撃軍撤退' : '守備軍勝利');
@@ -56,7 +58,8 @@ Object.assign(WarManager.prototype, {
             : (isRetreat ? 'retreat' : attackerWon ? 'victory' : 'defeat');
         const nameFor = (clanId, fallback) => {
             const clan = this.game.getClan(clanId);
-            return this.getDisplayClanName(clanId, clan?.name || fallback);
+            // 専用リザルトでは「当家」への省略をせず、実際の勢力名を出す。
+            return clan?.name || fallback;
         };
         return {
             title, tone,
@@ -1718,6 +1721,14 @@ Object.assign(WarManager.prototype, {
                 if (clanData && clanData.color) defColor = DataManager.hexToRgb(clanData.color);
             }
             
+            // 戦域点滅は地図を見せる演出。攻城戦の全画面が残る場合は
+            // 従来の閉鎖・地図復旧処理を完了してから点滅を開始する。
+            // 非表示戦争の経路や野戦だけで終わる経路では余計な待機を行わない。
+            if (this.game.ui.warModal && !this.game.ui.warModal.classList.contains('hidden')) {
+                const closed = await this.game.ui.setWarModalVisible(false);
+                if (!isCurrentWar() || closed === false) return;
+            }
+
             // 勝敗が決まる前に、戦場となった城の領土を2秒間点滅させる（この間は操作不可）
             if (this.canShowNotify(s.isPlayerFactionInvolved, s.isPlayerInvolved)) {
                 const resultBlinkCompleted = await this.game.ui.playBattleBlink(s.defender.id, atkColor, defColor, 2000);
@@ -1745,8 +1756,9 @@ Object.assign(WarManager.prototype, {
                 const atkProvData = this.game.getProvince(s.sourceCastle.provinceId);
                 const defClanData = this.game.getClan(s.oldDefClanId);
                 const defProvData = this.game.getProvince(s.defender.provinceId);
-                const atkDaimyoName = this.getDisplayClanName(s.attacker.ownerClan, atkClanData ? atkClanData.name : (s.attacker.isKunishu ? s.attacker.name : (atkProvData ? atkProvData.province : "中立")));
-                const defDaimyoName = this.getDisplayClanName(s.oldDefClanId, defClanData ? defClanData.name : (s.defender.isKunishu ? s.defender.name : (defProvData ? defProvData.province : "中立")));
+                // 結果本文も専用リザルトでは「当家」に省略せず、実際の勢力名で統一する。
+                const atkDaimyoName = this.getHistoryClanName(s.attacker.ownerClan, atkClanData ? atkClanData.name : (s.attacker.isKunishu ? s.attacker.name : (atkProvData ? atkProvData.province : "中立")));
+                const defDaimyoName = this.getHistoryClanName(s.oldDefClanId, defClanData ? defClanData.name : (s.defender.isKunishu ? s.defender.name : (defProvData ? defProvData.province : "中立")));
                 
                 if (attackerWon) {
                     aiResultMsg = `${atkDaimyoName}の${s.atkBushos[0].name}が\n${defDaimyoName}の${s.defender.name}を攻め落としました！`;
@@ -2018,17 +2030,18 @@ Object.assign(WarManager.prototype, {
                 // ★追加：誰が鎮圧したのか分かるように、攻撃側の情報を取得します
                 const atkClanData = this.game.getClan(s.attacker.ownerClan);
                 const atkDaimyoName = this.getDisplayClanName(s.attacker.ownerClan, atkClanData ? atkClanData.name : "大名家");
+                const atkResultClanName = this.getHistoryClanName(s.attacker.ownerClan, atkDaimyoName);
                 const leaderName = s.atkBushos[0].name;
                 
                 if (attackerWon) {
-                    resultMsg = `${atkDaimyoName}の${leaderName}が、${s.defender.name}の鎮圧に成功しました！`;
+                    resultMsg = `${atkResultClanName}の${leaderName}が、${s.defender.name}の鎮圧に成功しました！`;
                     this.game.ui.log(`【諸勢力制圧】${atkDaimyoName}の${leaderName}が、${s.defender.name}の鎮圧に成功しました！`, { history: false });
                     const kunishuName = kunishu && typeof kunishu.getName === 'function' ? kunishu.getName(this.game) : s.defender.name;
                     const atkHistoryClan = this.getHistoryClanName(s.attacker.ownerClan, atkDaimyoName);
                     this.recordWarHistory(`【諸勢力壊滅】${kunishuName}は${atkHistoryClan}に制圧され、壊滅しました。`, this.getWarHistoryClanIds(s));
                     if (kunishu) this.game.kunishuSystem.disbandDestroyedKunishu(kunishu);
                 } else {
-                    resultMsg = `${atkDaimyoName}の${leaderName}は、${s.defender.name}の鎮圧に失敗しました……`;
+                    resultMsg = `${atkResultClanName}の${leaderName}は、${s.defender.name}の鎮圧に失敗しました……`;
                     this.game.ui.log(`【諸勢力制圧】${atkDaimyoName}の${leaderName}は、${s.defender.name}の鎮圧に失敗しました……`, { history: false });
                     const kunishuName = kunishu && typeof kunishu.getName === 'function' ? kunishu.getName(this.game) : s.defender.name;
                     const atkHistoryClan = this.getHistoryClanName(s.attacker.ownerClan, atkDaimyoName);
@@ -2059,7 +2072,7 @@ Object.assign(WarManager.prototype, {
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                     this.showWarOutcome(resultMsg, attackerWon, false, () => {
-                        if (isCurrentWar()) this.closeWar();
+                        if (isCurrentWar()) return this.closeWar();
                     });
                 } else {
                     // ★修正：戦闘画面は飛ばしますが、結果のメッセージは表示してタップを待ちます！
@@ -2197,7 +2210,7 @@ Object.assign(WarManager.prototype, {
                     // ★追加：ダイアログを出す前にバリアを解除します！
                     if (typeof this.game.ui.hideMapGuard === 'function') this.game.ui.hideMapGuard(true);
                     this.showWarOutcome(resultMsg, attackerWon, false, () => {
-                        if (isCurrentWar()) this.closeWar();
+                        if (isCurrentWar()) return this.closeWar();
                     });
                 } else {
                     // ★追加：AIの城で反乱が起きた時も、専用のメッセージを出してタップを待ちます！

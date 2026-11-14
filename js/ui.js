@@ -376,6 +376,8 @@ class UIManager {
         this._coveredCloseEpoch = 0;
         this._coveredCloseTokens = new WeakMap();
         this._coveredClosePromises = new WeakMap();
+        // 会話・選択・結果など異種モーダルの表示切替は、暗幕の連続性をここで共通管理する。
+        this._initModalHandoffBackdrop();
         // 月初／月末の処理ラベルは、会話が閉じた直後に即復帰すると
         // 次の会話との間で「月末処理中…」等が一瞬だけ見える。
         // 実際に静かな処理が続いた時だけ再表示するため、会話後の短い猶予をUI側で一元管理する。
@@ -1038,6 +1040,96 @@ class UIManager {
             this._prepareDialogFaceImage(leftFace),
             this._prepareDialogFaceImage(rightFace)
         ]).then(([leftImg, rightImg]) => ({ leftImg, rightImg }));
+    }
+
+    // 固定モーダル同士の切れ目で背景だけが1フレーム現れることを防ぐ共通の暗幕。
+    // 既存の会話handoff・画像decode・地図復旧窓口はそのまま正本とし、
+    // ここは「最後のモーダルが閉じた～次が現れる」空白フレームだけを受け持つ。
+    _initModalHandoffBackdrop() {
+        this._modalBackdrop = document.getElementById('modal-handoff-backdrop');
+        this._modalBackdropEpoch = 0;
+        this._modalBackdropGeneration = 0;
+        this._modalBackdropHolds = 0;
+        this._modalBackdropLastVisible = null;
+        if (!this._modalBackdrop || typeof MutationObserver !== 'function') return;
+        this._modalBackdropModals = Array.from(document.querySelectorAll('#game-screen .modal'));
+        this._modalBackdropObserver = new MutationObserver(() => this._syncModalHandoffBackdrop());
+        this._modalBackdropModals.forEach(modal => {
+            this._modalBackdropObserver.observe(modal, { attributes: true, attributeFilter: ['class', 'style'] });
+        });
+        this._syncModalHandoffBackdrop();
+    }
+
+    _clearModalHandoffBackdrop() {
+        this._modalBackdropGeneration = Number(this._modalBackdropGeneration || 0) + 1;
+        this._modalBackdropEpoch = Number(this._modalBackdropEpoch || 0) + 1;
+        this._modalBackdropHolds = 0;
+        this._modalBackdropLastVisible = null;
+        if (this._modalBackdrop) this._modalBackdrop.classList.add('hidden');
+    }
+
+    _syncModalHandoffBackdrop() {
+        const backdrop = this._modalBackdrop;
+        if (!backdrop) return;
+        // 画面外の旧モーダルではなく、今実際に開いている固定DOMだけを数える。
+        const visible = (this._modalBackdropModals || []).filter(modal =>
+            !modal.classList.contains('hidden') && modal.style.display !== 'none');
+        if (visible.length) {
+            this._modalBackdropLastVisible = visible[visible.length - 1];
+            this._modalBackdropEpoch = Number(this._modalBackdropEpoch || 0) + 1;
+            backdrop.classList.add('hidden');
+            return;
+        }
+        if (!this._modalBackdropLastVisible) return;
+        // MutationObserverはブラウザの次のpaintより前に実行されるため、
+        // 個々の閉じる処理をすべて書き換えなくても空白フレームを遮蔽できる。
+        const source = this._modalBackdropLastVisible;
+        this._modalBackdropLastVisible = null;
+        // 野戦・攻城戦の全画面は背景復帰とpaintを待つ専用の閉鎖契約がある。
+        // ここで追加の暗幕を掛けると地図上の戦域点滅・制圧演出を隠すため対象外。
+        if (source.id === 'war-modal' || source.id === 'field-war-modal') return;
+        if (typeof getComputedStyle === 'function') {
+            const style = getComputedStyle(source);
+            backdrop.style.background = style.background;
+        }
+        backdrop.classList.remove('hidden');
+        this._releaseModalHandoffBackdropAfterPaint(160);
+    }
+
+    _releaseModalHandoffBackdropAfterPaint(delay = 0) {
+        if (!this._modalBackdrop || this._modalBackdrop.classList.contains('hidden')) return;
+        const epoch = Number(this._modalBackdropEpoch || 0) + 1;
+        this._modalBackdropEpoch = epoch;
+        const finish = async () => {
+            if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+            // 新しい会話が画像decode中なら、固定時間で暗幕を外さない。
+            // 通常の独立したモーダルを閉じる場合だけ短時間で地図へ復帰する。
+            const deadline = Date.now() + 5000;
+            while (epoch === this._modalBackdropEpoch && this._modalBackdropHolds === 0
+                && (this.isDialogShowing || (this.dialogQueue && this.dialogQueue.length > 0))
+                && Date.now() < deadline) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            if (typeof this.waitForCoveredMapPaint === 'function') await this.waitForCoveredMapPaint();
+            if (epoch !== this._modalBackdropEpoch || this._modalBackdropHolds > 0) return;
+            if (this._modalBackdrop) this._modalBackdrop.classList.add('hidden');
+        };
+        finish().catch(e => console.error('モーダル暗幕解放に失敗しました:', e));
+    }
+
+    // 戦後処理など非同期の引継ぎでは、処理完了または次画面公開まで暗幕を保持する。
+    // 個別画面へ別々のタイマー・暗幕・世代番号を増やさない。
+    beginModalHandoff() {
+        const generation = Number(this._modalBackdropGeneration || 0);
+        this._modalBackdropHolds = (this._modalBackdropHolds || 0) + 1;
+        let finished = false;
+        return () => {
+            if (finished) return;
+            finished = true;
+            if (generation !== Number(this._modalBackdropGeneration || 0)) return;
+            this._modalBackdropHolds = Math.max(0, this._modalBackdropHolds - 1);
+            if (this._modalBackdropHolds === 0) this._releaseModalHandoffBackdropAfterPaint();
+        };
     }
 
     // 使者選択など「別モーダル → 会話」も、次画面が実際に可視化されるまで元画面を保持します。
@@ -2324,6 +2416,7 @@ class UIManager {
     }
 
     forceResetModals(options = {}) {
+        this._clearModalHandoffBackdrop();
         // 専用戦争リザルトの旧クリック・観戦自動終了を失効させる。
         if (typeof this.dismissWarResult === 'function') this.dismissWarResult(true);
         // 1paint待ちのcover終了も画面寿命に含める。ロード/タイトル復帰後に旧closeが
@@ -2331,6 +2424,8 @@ class UIManager {
         this._coveredCloseEpoch = Number(this._coveredCloseEpoch || 0) + 1;
         this._coveredCloseTokens = new WeakMap();
         this._coveredClosePromises = new WeakMap();
+        // 会話・選択・結果など異種モーダルの表示切替は、暗幕の連続性をここで共通管理する。
+        this._initModalHandoffBackdrop();
         // 共通会話も固定DOMを共有する非同期Viewとして扱う。顔画像decode・handoff・自動閉じを
         // 現在世代から切り離し、強制切替後に古い会話が復活／新しい会話を自動操作しないようにする。
         this._dialogGeneration = Number(this._dialogGeneration || 0) + 1;
@@ -3776,7 +3871,7 @@ class UIManager {
         };
 
         if (!this.warModal.classList.contains('hidden') && typeof this.closeCoveredViewAfterRecovery === 'function') {
-            this.closeCoveredViewAfterRecovery(this.warModal, {
+            return this.closeCoveredViewAfterRecovery(this.warModal, {
                 recoverUnderCover: () => {
                     if (typeof this.resumeMainMapAfterBattle === 'function') this.resumeMainMapAfterBattle('siege-war');
                     focusWarMapUnderCover();
@@ -3789,6 +3884,7 @@ class UIManager {
             this.warModal.classList.add('hidden');
             finishWarCoverClose();
         }
+        return Promise.resolve(true);
     }
     
     clearWarLog() {

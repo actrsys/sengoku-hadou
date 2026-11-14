@@ -33454,6 +33454,69 @@ test('r884 野戦終結後は最終操作部隊を失っても画面の余韻を
 
 
 
+test('r899 戦争リザルトは当家の省略名を使わず実勢力名を表示し、全滅後も参戦家の結果を維持する', () => {
+    const ctx = createContext();
+    vm.runInContext('class WarManager {}; this.WarManager = WarManager;', ctx);
+    loadScript(ctx, 'js/war_effort.js');
+    const war = new ctx.WarManager();
+    war.game = {playerClanId:11, getClan(id) {return {name: id === 11 ? '織田家' : '武田家'};}};
+    war.getDisplayClanName = () => '当家';
+    war.isPlayerClanReinforcement = () => false;
+    war.state = {
+        isPlayerFactionInvolved:true, isPlayerInvolved:false,
+        attacker:{ownerClan:11,isKunishu:false},
+        defender:{id:3,name:'城A',ownerClan:12,isKunishu:false},oldDefClanId:12,
+        atkBushos:[{name:'信長'}], defBusho:{name:'信玄'}
+    };
+    const result = war.createWarResultPresentation('敗北',false,false);
+    assert.strictEqual(result.title,'敗北');
+    assert.strictEqual(result.tone,'defeat');
+    assert.strictEqual(result.attacker,'織田家');
+    assert.strictEqual(result.defender,'武田家');
+    war.state.isPlayerFactionInvolved = false;
+    assert.strictEqual(war.createWarResultPresentation('第三者',false,false).title,'守備軍勝利');
+});
+
+test('r899 戦域点滅は攻城戦画面の復帰完了後に開始し、元の閉鎖処理を共通で待つ', () => {
+    const effort=read('js/war_effort.js');
+    const ui=read('js/ui.js');
+    const start=effort.indexOf('async endWar(attackerWon');
+    const blink=effort.indexOf('await this.game.ui.playBattleBlink(',start);
+    const close=effort.indexOf('await this.game.ui.setWarModalVisible(false)',start);
+    assert.ok(close>start&&close<blink,'全画面攻城戦の閉鎖と背景復旧後に点滅する');
+    const visibleStart=ui.indexOf('    setWarModalVisible(visible) {');
+    const visibleBlock=ui.slice(visibleStart,ui.indexOf('    clearWarLog()',visibleStart));
+    assert.ok(visibleBlock.includes('return this.closeCoveredViewAfterRecovery(this.warModal'), '共通背景復帰が終わるPromiseを返す');
+    assert.ok(!effort.slice(start,blink).includes('setTimeout('),'固定msで画面を間に合わせない');
+});
+
+test('r899 モーダル間の暗幕は単一のUIManagerが管理し、画面失効時に後始末する', () => {
+    const html=read('index.html');
+    const css=read('css/style.css');
+    const source=read('js/ui.js');
+    assert.ok(html.includes('id="modal-handoff-backdrop" class="hidden"'));
+    assert.ok(css.includes('#modal-handoff-backdrop {'));
+    assert.ok(source.includes('new MutationObserver(() => this._syncModalHandoffBackdrop())'), '既存モーダルの可視変化を共通監視');
+    assert.ok(source.includes('this._initModalHandoffBackdrop();'), 'UIManager初期化で設定');
+    assert.ok(source.includes('this._clearModalHandoffBackdrop();'), '強制画面復帰で解除');
+    assert.ok(read('js/ui_war_result.js').includes('this.beginModalHandoff()'), '戦後の非同期遷移も同じ窓口');
+    const ctx=createContext();
+    loadScript(ctx, 'js/ui.js');
+    vm.runInContext('this._TestUIManager=UIManager',ctx);
+    const ui=Object.create(ctx._TestUIManager.prototype);
+    const cssClasses=new Set(['hidden']);
+    ui._modalBackdrop={classList:{add(v){cssClasses.add(v)},remove(v){cssClasses.delete(v)},contains(v){return cssClasses.has(v)}},style:{}};
+    ui._modalBackdropEpoch=0;
+    ui._modalBackdropGeneration=0;
+    ui._modalBackdropHolds=0;
+    const close=ui.beginModalHandoff();
+    assert.strictEqual(ui._modalBackdropHolds,1);
+    ui._clearModalHandoffBackdrop();
+    close();
+    assert.strictEqual(ui._modalBackdropHolds,0, '失効した旧結果画面の解放が次画面を操作しない');
+    assert.ok(cssClasses.has('hidden'));
+});
+
 test('r898 戦争結果は地図点滅・制圧演出後の専用リザルトへ統一し、標準フッターを外側に置く', () => {
     const html = read('index.html');
     const css = read('css/style.css');
@@ -33483,7 +33546,7 @@ test('r898 戦争リザルトは勝敗・撤退・指揮官・拠点を既存デ
     manager.game = {playerClanId:1, getClan(id) { return {name: ({1:'織田家',2:'武田家'})[id]||'無名家'}; }};
     manager.getDisplayClanName = (_, name) => name;
     manager.isPlayerClanReinforcement = () => false;
-    manager.state = {isPlayerInvolved:true,
+    manager.state = {isPlayerInvolved:true,isPlayerFactionInvolved:true,
         attacker:{ownerClan:1,isKunishu:false},defender:{id:3,name:'城A',ownerClan:2,isKunishu:false},oldDefClanId:2,
         atkBushos:[{name:'信長'}],defBusho:{name:'信玄'}};
     const win = manager.createWarResultPresentation('攻め落としました',true,false);
@@ -33499,6 +33562,16 @@ test('r898 戦争リザルトは勝敗・撤退・指揮官・拠点を既存デ
     manager.state.attacker.ownerClan = 2;
     manager.state.oldDefClanId = 1;
     assert.strictEqual(manager.createWarResultPresentation('防衛',false,false).title,'勝利');
+    // プレイヤーの操作可能部隊が全滅しても参戦した事実は消えず、結果は当人目線で表示する。
+    manager.state.isPlayerInvolved = false;
+    assert.strictEqual(manager.createWarResultPresentation('防衛',true,false).title,'敗北');
+    assert.strictEqual(manager.createWarResultPresentation('防衛',false,false).title,'勝利');
+    manager.state.oldDefClanId = 2;
+    manager.state.attacker.ownerClan = 1;
+    assert.strictEqual(manager.createWarResultPresentation('攻略失敗',false,false).title,'敗北');
+    assert.strictEqual(manager.createWarResultPresentation('攻略失敗',false,false).attacker,'織田家');
+    manager.state.isPlayerFactionInvolved = false;
+    assert.strictEqual(manager.createWarResultPresentation('第三者戦',false,false).title,'守備軍勝利');
 });
 
 test('r898 結果リザルトは閉じるまで進行せず、閉じる操作は1回だけ・強制破棄は無操作で終了する', async () => {

@@ -31,8 +31,23 @@ Object.assign(UIManager.prototype, {
         this._warResultGeneration = generation;
         const finish = () => {
             if (generation !== this._warResultGeneration) return;
+            const completeHandoff = typeof this.beginModalHandoff === 'function'
+                ? this.beginModalHandoff() : () => {};
             this.dismissWarResult(false);
-            if (typeof onConfirm === 'function') onConfirm();
+            try {
+                const result = typeof onConfirm === 'function' ? onConfirm() : null;
+                if (result && typeof result.then === 'function') {
+                    Promise.resolve(result).then(completeHandoff, error => {
+                        completeHandoff();
+                        console.error('戦争リザルト後処理に失敗しました:', error);
+                    });
+                } else {
+                    completeHandoff();
+                }
+            } catch (error) {
+                completeHandoff();
+                throw error;
+            }
         };
         this._warResultConfirm = finish;
         confirmBtn.addEventListener('click', finish, { once: true });
