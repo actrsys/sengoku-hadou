@@ -4531,13 +4531,18 @@ test('r411のタイトル情報メニューは設定の下から差し替わり�
     const css = read('css/style.css');
     assert.ok(html.indexOf('id="settings-btn"') < html.indexOf('id="info-title-btn"'), '情報は設定の直下に置く');
     assert.ok(html.includes('id="title-info-menu" class="title-menu-buttons hidden"'));
+    assert.ok(html.includes('id="title-terms-btn"'));
     assert.ok(html.includes('id="title-credit-btn"'));
     assert.ok(html.includes('id="title-license-btn"'));
+    assert.ok(html.indexOf('id="title-terms-btn"') < html.indexOf('id="title-credit-btn"'), '利用規約を情報メニューの先頭に置く');
+    assert.ok(html.indexOf('id="title-credit-btn"') < html.indexOf('id="title-license-btn"'), 'クレジットとライセンスの順序を維持する');
     assert.ok(html.includes('id="title-contact-btn" class="title-btn title-btn-disabled" disabled'), '問い合わせだけを選択不可にする');
     assert.ok(html.includes('id="title-info-back-btn"'));
     assert.ok(bootstrap.includes("bind('info-title-btn', showInfoTitleMenu)"));
     assert.ok(bootstrap.includes("bind('title-info-back-btn', showMainTitleMenu)"));
-    assert.ok(bootstrap.includes("fetch('THIRD_PARTY_LICENSES.txt'"), 'ライセンス本文は既存ファイルを正本にする');
+    assert.ok(bootstrap.includes("fetch(fileName, { cache: 'no-store' })"), '情報TXTの読み込みは共通化する');
+    assert.ok(bootstrap.includes("bind('title-terms-btn', () => openInfoDocument('利用規約', 'TERMS_OF_USE.txt'))"), '利用規約は独立した配布TXTを読む');
+    assert.ok(bootstrap.includes("bind('title-license-btn', () => openInfoDocument('ライセンス', 'THIRD_PARTY_LICENSES.txt'))"), 'ライセンスは既存の配布TXTを読む');
     assert.ok(bootstrap.includes("titleScreen.addEventListener('contextmenu'"), '情報メニューはPC右クリックでも戻れる');
     assert.ok(bootstrap.includes("infoDetailModal.addEventListener('contextmenu'"), '情報詳細もPC右クリックで一段戻れる');
     assert.ok(css.includes('#title-screen .title-menu-buttons'), 'トップと情報メニューは同じ配置規則を共用する');
@@ -4553,11 +4558,12 @@ test('r411のタイトル情報メニューは設定の下から差し替わり�
     }
 });
 
-test('タイトルのライセンスは作品素材の取扱いと第三者ライセンスを同じ正本から表示する', () => {
+test('利用規約・クレジット・ライセンスは独立し、各TXTだけが本文の正本になる', () => {
+    const terms = read('TERMS_OF_USE.txt');
     const license = read('THIRD_PARTY_LICENSES.txt');
     const bootstrap = read('js/app_bootstrap.js');
-    assert.ok(bootstrap.includes("fetch('THIRD_PARTY_LICENSES.txt'"), 'ゲーム内表示は配布テキストを読む');
-    assert.ok(bootstrap.includes("infoDetailBody.textContent = text"), '読み込んだ本文をそのまま表示する');
+    assert.ok(terms.startsWith('戦国覇道 - 利用規約'), '利用規約は専用TXTとする');
+    assert.ok(license.startsWith('戦国覇道 - 第三者提供素材・ソフトウェアのライセンス'), 'ライセンスは専用TXTとする');
     for (const text of [
         '【本作品のオリジナルコンテンツの利用について】',
         '画像（人物画・イラスト・背景・アイコン等）',
@@ -4566,30 +4572,109 @@ test('タイトルのライセンスは作品素材の取扱いと第三者ラ�
         '抜き取り・抽出・収集',
         '素材単体や素材集として公開・提供・再配布',
         '他の作品、ゲーム、',
-        '私的使用、適法な引用',
-        '【第三者提供素材・ソフトウェアの取扱い】',
-        '第三者提供の画像・音声',
-        'フォント、および第三者ソフトウェア',
-        '本規約と個別の利用条件が抵触する場合',
-        '個別の利用条件を優先します',
-        '認められていない権利を新たに付与',
-        '再配布、他作品への転用',
-    ]) assert.ok(license.includes(text), `ライセンス本文の必要項目が欠落: ${text}`);
-    assert.ok(license.indexOf('【本作品のオリジナルコンテンツの利用について】')
-        < license.indexOf('1. howler.js 2.2.4'), '作品素材の利用規約を第三者ライセンスの前に表示する');
+        '私的使用、適法な引用'
+    ]) assert.ok(terms.includes(text), `利用規約本文の必要項目が欠落: ${text}`);
+    assert.ok(!terms.includes('【第三者提供素材・ソフトウェアの取扱い】'), '第三者ライセンスの共通条件を利用規約に二重記載しない');
+    assert.ok(!terms.includes('Permission is hereby granted, free of charge'), '個別ライセンス原文を利用規約に複製しない');
+    assert.ok(!license.includes('【本作品のオリジナルコンテンツの利用について】'), '作品素材の利用規約をライセンスに残さない');
     const thirdPartySection = license.slice(
         license.indexOf('【第三者提供素材・ソフトウェアの取扱い】'),
         license.indexOf('【第三者ソフトウェア・フォントのライセンス】')
     );
-    assert.ok(thirdPartySection.includes('個別の利用条件を優先します'), '第三者素材の個別条件の優先を明記する');
-    assert.ok(thirdPartySection.includes('法令で認められた権利を制限したり'), '法令上の利用を妨げない');
-    for (const individual of ['効果音ラボ', 'Six Realms -ASURA- Re.', 'Samurai Classics']) {
-        assert.ok(!thirdPartySection.includes(individual), `個別素材の案内が共通規約に残っている: ${individual}`);
+    for (const text of [
+        '第三者提供の画像・音声',
+        'フォント、および第三者ソフトウェア',
+        '本ゲームの利用規約または本書の記載と個別の利用条件が抵触',
+        '個別の利用条件を優先します',
+        '認められていない権利を新たに付与',
+        '再配布、他作品への転用',
+        '法令で認められた'
+    ]) assert.ok(thirdPartySection.includes(text), `第三者素材の共通条項が欠落: ${text}`);
+    for (const provider of ['効果音ラボ', 'Six Realms -ASURA- Re.', 'Samurai Classics']) {
+        assert.ok(!thirdPartySection.includes(provider), `個別の音源利用条件を一律条項に混入させない: ${provider}`);
     }
-    assert.ok(license.indexOf('【第三者提供素材・ソフトウェアの取扱い】')
-        < license.indexOf('【第三者ソフトウェア・フォントのライセンス】'), '共通の取り扱いを第三者ライセンスの前に表示する');
     assert.ok(license.includes('Permission is hereby granted, free of charge'), 'MIT条件を保持する');
     assert.ok(license.includes('SIL OPEN FONT LICENSE Version 1.1'), 'OFL条件を保持する');
+    assert.ok(bootstrap.includes('const infoDocumentPromises = new Map()'), '両方のTXTは共通の読込キャッシュを使う');
+    assert.ok(bootstrap.includes('infoDetailBody.textContent = text'), 'HTMLではなくTXT本文をそのまま安全に表示する');
+    assert.ok(bootstrap.includes("title === 'ライセンス' ? 'license-text' : ''"), '利用規約にはモノスペースのライセンス書式を適用しない');
+});
+
+
+test('タイトルの利用規約・ライセンスは実イベントから別々のTXTを読み込み、非同期結果を混同しない', async () => {
+    const bootstrap = read('js/app_bootstrap.js');
+    const start = bootstrap.indexOf('function bindStaticUiEvents() {');
+    const end = bootstrap.indexOf('function mediaMatches(query) {', start);
+    assert.ok(start >= 0 && end > start, '実際のタイトル情報イベント登録関数を検査する');
+    const handlers = new Map();
+    const elements = new Map();
+    const makeClassList = (...initial) => {
+        const names = new Set(initial);
+        return {
+            add: value => names.add(value),
+            remove: value => names.delete(value),
+            contains: value => names.has(value),
+            toggle: (value, force) => {
+                const enable = force === undefined ? !names.has(value) : !!force;
+                if (enable) names.add(value);
+                else names.delete(value);
+                return enable;
+            }
+        };
+    };
+    const el = id => {
+        if (!elements.has(id)) elements.set(id, {
+            id,
+            textContent: '',
+            scrollTop: 0,
+            classList: makeClassList('hidden'),
+            setAttribute() {},
+            addEventListener(type, handler) { handlers.set(`${id}:${type}`, handler); },
+        });
+        return elements.get(id);
+    };
+    const pending = new Map();
+    const requests = [];
+    const sandbox = {
+        window: { GameApp: null, GameConfig: { Meta: { Version: 'r-test' } } },
+        document: { getElementById: el, body: { classList: makeClassList('is-pc') } },
+        CustomScrollbar: class { scheduleUpdate() {} update() {} },
+        fetch(fileName, options) {
+            assert.deepStrictEqual({ ...options }, { cache: 'no-store' }, '古い配信キャッシュを利用しない');
+            requests.push(fileName);
+            return new Promise(resolve => pending.set(fileName, resolve));
+        },
+        console
+    };
+    const bindStaticUiEvents = vm.runInNewContext(`(function () { ${bootstrap.slice(start, end)} return bindStaticUiEvents; })()`, sandbox);
+    bindStaticUiEvents();
+    const click = id => {
+        const handler = handlers.get(`${id}:click`);
+        assert.ok(handler, `操作できるタイトルボタン: ${id}`);
+        return handler();
+    };
+    const termsOpen = click('title-terms-btn');
+    assert.strictEqual(el('title-info-detail-title').textContent, '利用規約');
+    assert.ok(!el('title-info-detail-body').classList.contains('license-text'), '日本語利用規約は普通の書式');
+    const licenseOpen = click('title-license-btn');
+    assert.strictEqual(el('title-info-detail-title').textContent, 'ライセンス');
+    assert.ok(el('title-info-detail-body').classList.contains('license-text'), '第三者ライセンスは原文向け書式');
+    pending.get('TERMS_OF_USE.txt')({ ok: true, text: async () => read('TERMS_OF_USE.txt') });
+    await termsOpen;
+    assert.strictEqual(el('title-info-detail-title').textContent, 'ライセンス');
+    assert.strictEqual(el('title-info-detail-body').textContent, '読み込んでいます…', '古い利用規約がライセンス表示へ混ざらない');
+    pending.get('THIRD_PARTY_LICENSES.txt')({ ok: true, text: async () => read('THIRD_PARTY_LICENSES.txt') });
+    await licenseOpen;
+    assert.strictEqual(el('title-info-detail-body').textContent, read('THIRD_PARTY_LICENSES.txt'));
+    await click('title-terms-btn');
+    assert.strictEqual(el('title-info-detail-body').textContent, read('TERMS_OF_USE.txt'));
+    assert.deepStrictEqual(requests, ['TERMS_OF_USE.txt', 'THIRD_PARTY_LICENSES.txt'], '文書は各1回だけ取得して再利用する');
+    click('title-credit-btn');
+    assert.strictEqual(el('title-info-detail-title').textContent, 'クレジット');
+    assert.ok(el('title-info-detail-body').textContent.includes('効果音ラボ'));
+    assert.ok(!el('title-info-detail-body').textContent.includes('各素材の権利・利用条件は'));
+    click('title-info-detail-back-btn');
+    assert.ok(el('title-info-detail-modal').classList.contains('hidden'), '利用規約等のモーダルをゲーム内で閉じられる');
 });
 
 test('設定値参照側に独自フォールバック値を残さない', () => {

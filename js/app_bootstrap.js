@@ -337,7 +337,7 @@
         const infoDetailModal = document.getElementById('title-info-detail-modal');
         const infoDetailTitle = document.getElementById('title-info-detail-title');
         const infoDetailBody = document.getElementById('title-info-detail-body');
-        let licenseTextPromise = null;
+        const infoDocumentPromises = new Map();
         let infoDetailScrollbar = null;
 
         const showMainTitleMenu = () => {
@@ -388,19 +388,29 @@
             updateInfoDetailScrollbar();
         };
 
-        const loadThirdPartyLicenses = async () => {
-            if (!licenseTextPromise) {
-                licenseTextPromise = fetch('THIRD_PARTY_LICENSES.txt', { cache: 'no-store' })
+        const loadInfoDocument = (fileName, title) => {
+            if (!infoDocumentPromises.has(fileName)) {
+                infoDocumentPromises.set(fileName, fetch(fileName, { cache: 'no-store' })
                     .then((response) => {
                         if (!response.ok) throw new Error(`HTTP ${response.status}`);
                         return response.text();
                     })
                     .catch((error) => {
-                        console.warn('ライセンス文書の読み込みに失敗しました:', error);
-                        return 'ライセンス情報を読み込めませんでした。';
-                    });
+                        console.warn(`${title}の読み込みに失敗しました:`, error);
+                        return `${title}を読み込めませんでした。`;
+                    }));
             }
-            return licenseTextPromise;
+            return infoDocumentPromises.get(fileName);
+        };
+
+        const openInfoDocument = async (title, fileName) => {
+            openInfoDetail(title, '読み込んでいます…', title === 'ライセンス' ? 'license-text' : '');
+            const text = await loadInfoDocument(fileName, title);
+            if (!infoDetailModal || infoDetailModal.classList.contains('hidden')) return;
+            if (infoDetailTitle?.textContent !== title) return;
+            infoDetailBody.textContent = text;
+            infoDetailBody.scrollTop = 0;
+            updateInfoDetailScrollbar();
         };
 
         bind('start-btn', () => getGame()?.startNewGame());
@@ -411,19 +421,12 @@
         bind('settings-btn', () => getGame()?.commandSystem?.executeSystemCommand('settings'));
         bind('info-title-btn', showInfoTitleMenu);
         bind('title-info-back-btn', showMainTitleMenu);
+        bind('title-terms-btn', () => openInfoDocument('利用規約', 'TERMS_OF_USE.txt'));
         bind('title-credit-btn', () => {
             const version = window.GameConfig?.Meta?.Version;
             openInfoDetail('クレジット', `戦国覇道${version ? `\nver. ${version}` : ''}\n\n企画・制作\nACTORS SYSTEM\nあや瀨\n\n音楽\n『Six Realms -ASURA- Re.』\n趣味工房にんじんわいん\n作曲者：荒芳樹\n\n音楽・音素材\n『Samurai Classics Expanded Edition ～RPGツクール(R)音素材集～』\n株式会社ビタースウィートエンタテインメント\n\n効果音\n効果音ラボ\nhttps://soundeffect-lab.info/`);
         });
-        bind('title-license-btn', async () => {
-            openInfoDetail('ライセンス', '読み込んでいます…', 'license-text');
-            const text = await loadThirdPartyLicenses();
-            if (!infoDetailModal || infoDetailModal.classList.contains('hidden')) return;
-            if (infoDetailTitle?.textContent !== 'ライセンス') return;
-            infoDetailBody.textContent = text;
-            infoDetailBody.scrollTop = 0;
-            updateInfoDetailScrollbar();
-        });
+        bind('title-license-btn', () => openInfoDocument('ライセンス', 'THIRD_PARTY_LICENSES.txt'));
         bind('title-info-detail-back-btn', closeInfoDetail);
         bind('scenario-close-btn', () => getGame()?.ui?.returnToTitle());
         bind('result-close-btn', () => getGame()?.ui?.closeResultModal());

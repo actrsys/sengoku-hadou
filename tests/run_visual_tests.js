@@ -1591,6 +1591,7 @@ async function validateTitleMenuStability(cdp) {
                         main: rect(document.getElementById('menu-buttons')),
                         info: rect(document.getElementById('title-info-menu')),
                         start: rect(document.getElementById('start-btn')),
+                        terms: rect(document.getElementById('title-terms-btn')),
                         credit: rect(document.getElementById('title-credit-btn'))
                     };
                 })()`,
@@ -1608,7 +1609,9 @@ async function validateTitleMenuStability(cdp) {
         approx(after.content.top, before.content.top, 0.25, `${isPc ? 'PC' : 'スマホ'}: タイトル外枠Y位置を固定する`);
         approx(after.menu.top, before.menu.top, 0.25, `${isPc ? 'PC' : 'スマホ'}: メニュー領域Y位置を固定する`);
         approx(after.info.height, before.main.height, 0.25, `${isPc ? 'PC' : 'スマホ'}: 情報メニューと通常メニューの総高さを一致させる`);
-        approx(after.credit.top, before.start.top, 0.25, `${isPc ? 'PC' : 'スマホ'}: クレジットとはじめからの先頭位置を一致させる`);
+        approx(after.terms.top, before.start.top, 0.25, `${isPc ? 'PC' : 'スマホ'}: 利用規約とはじめからの先頭位置を一致させる`);
+        assert.ok(after.credit.top >= after.terms.bottom, `${isPc ? 'PC' : 'スマホ'}: 利用規約とクレジットを重ねない`);
+        assert.ok(after.credit.bottom <= after.info.bottom + 0.5, `${isPc ? 'PC' : 'スマホ'}: クレジットを情報メニュー内に収める`);
     };
     await checkAt(1200, 800, true);
     await checkAt(390, 844, false);
