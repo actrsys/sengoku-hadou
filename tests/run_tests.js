@@ -44042,6 +44042,59 @@ test('r932 結果画面を開いたまま強制タイトル復帰しても旧結
     assert.strictEqual(newActions, 0);
 });
 
+
+// r933: 外交確認や歴史イベントの会話中に別タブが操作権を取得できる。
+// 画面は隠れても動的フッターのボタンが旧会話callbackを保持するため、
+// 強制リセット後は旧ボタンと顔画像をDOMから解放し、次の会話へ状態を持ち越さない。
+test('r933 強制画面リセットは会話の旧ボタン・顔画像DOMと入力状態を解放する', () => {
+    const ctx = createContext({ document: {
+        body: {classList: new FakeClassList()},
+        querySelectorAll(selector) { return selector === '.modal' ? [dialogModal] : []; },
+        getElementById(id) {
+            return ({'dialog-modal': dialogModal, 'dialog-left-face': leftFace, 'dialog-right-face': rightFace})[id] || null;
+        }
+    }});
+    const oldWar = { id: 91, actors: Array(100).fill('旧戦争') };
+    const oldButton = { onclick() { return oldWar; } };
+    const footer = {
+        children: [oldButton], style: { pointerEvents: 'none' },
+        replaceChildren(...children) { this.children = children; }
+    };
+    const content = {style:{cursor:'pointer'}, removeEventListener() {}};
+    const dialogModal = {
+        id:'dialog-modal', classList:new FakeClassList(), style:{cursor:'pointer'},
+        querySelector(selector) {
+            if (selector === '.modal-footer') return footer;
+            if (selector === '.modal-content') return content;
+            return null;
+        },
+        removeEventListener() {}
+    };
+    const face = id => ({id, children:[{src:'old-face.png'}], replaceChildren(...children) {this.children=children;}});
+    const leftFace = face('left');
+    const rightFace = face('right');
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const ui = Object.create(UI.prototype);
+    ui._battleSuspendOwners = new Set();
+    ui._clearModalHandoffBackdrop = () => {};
+    ui._cancelDialogHandoffClose = () => {};
+    ui._cancelProcessingStatusReveal = () => {};
+    ui._cancelEmptyCardAnimation = () => {};
+    ui.hideContextMenu = () => {};
+    ui.clearCommandMenu = () => {};
+    ui._currentEventClickHandler = () => oldWar;
+    ui.forceResetModals({skipBackgroundRecovery:true});
+    assert.ok(dialogModal.classList.contains('hidden'), 'タイトル復帰は旧会話を非表示にする');
+    assert.strictEqual(footer.children.length, 0, '旧会話を参照する選択ボタンDOMを解放');
+    assert.strictEqual(leftFace.children.length, 0, '旧話者の顔画像DOMを解放');
+    assert.strictEqual(rightFace.children.length, 0, '旧話者の顔画像DOMを解放');
+    assert.strictEqual(footer.style.pointerEvents, '', '入力遮断を次の会話へ持ち越さない');
+    assert.strictEqual(dialogModal.style.cursor, '', '会話固有のカーソルを解除');
+    assert.strictEqual(content.style.cursor, '', '内容枠のカーソルを解除');
+    assert.strictEqual(ui._currentEventClickHandler, null, '旧画面イベントも解放');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);

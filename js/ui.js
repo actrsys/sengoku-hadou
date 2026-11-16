@@ -2520,6 +2520,23 @@ class UIManager {
             if (dialogContent) dialogContent.removeEventListener('click', this._currentEventClickHandler);
         }
         this._currentEventClickHandler = null;
+        // 強制切替では会話の動的フッターと顔画像も終了する。
+        // 会話キューだけを空にしても固定DOM内のボタンが旧戦争・外交callbackを
+        // 閉包に保持するため、旧画面を隠す時に実体を外す。通常の会話連続表示には触れない。
+        if (dialogModal && typeof dialogModal.querySelector === 'function') {
+            const footer = dialogModal.querySelector('.modal-footer');
+            if (footer) {
+                footer.replaceChildren();
+                footer.style.pointerEvents = '';
+            }
+            const content = dialogModal.querySelector('.modal-content');
+            if (content) content.style.cursor = '';
+            dialogModal.style.cursor = '';
+        }
+        for (const id of ['dialog-left-face', 'dialog-right-face']) {
+            const face = document.getElementById(id);
+            if (face && typeof face.replaceChildren === 'function') face.replaceChildren();
+        }
 
         // 戦闘途中のタイトル復帰・強制終了でも、スマホ地図を display:none のまま持ち越さない。
         const battleState = this._battleSuspendState;
