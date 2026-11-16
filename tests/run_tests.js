@@ -16556,6 +16556,31 @@ test('r406の自動部隊配分は各部隊1万5千・選択武将数×1万5千�
     assert.ok(result.every(row => row.soldiers <= 15000), '各部隊1万5千以下');
 });
 
+// r934: 兵数0の候補が、実際に出陣する武将の鉄砲割当枠を奪ってはならない。
+// 手動の部隊分割とAI側はいずれも同じTroopAllocationServiceを通る。
+test('r934 兵数0の候補は装備割当枠を消費せず、兵数のある総大将へ装備を配分する', () => {
+    const ctx = createContext({ SkillManager: { getAptitudeLevel: rank => rank === 'S' ? 5 : 0 } });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/troop_allocation.js');
+    const bushos = Array.from({ length: 5 }, (_, index) => ({
+        id: index + 1, leadership: index === 0 ? 40 : 95 - index,
+        strength: index === 0 ? 40 : 95 - index,
+        aptKiba: 'E', aptTeppo: 'S'
+    }));
+    for (const isPlayerUI of [false, true]) {
+        const assignments = ctx.TroopAllocationService.autoDivideSoldiers({
+            bushos, totalSoldiers: 5, totalHorses: 0, totalGuns: 5, isPlayerUI
+        });
+        const deployed = assignments.filter(a => a.soldiers > 0);
+        assert.strictEqual(deployed.length, 1, '兵士5人は1部隊へ集まる');
+        assert.strictEqual(deployed[0].busho.id, 1, '総大将の兵士を失わない');
+        assert.strictEqual(deployed[0].troopType, 'teppo', '0人の候補に枠を奪われず総大将へ鉄砲を配分');
+        assert.ok(assignments.filter(a => a.soldiers === 0).every(a => a.troopType === 'ashigaru'),
+            '出陣しない0人候補へ装備部隊の属性を付けない');
+        assert.strictEqual(assignments.reduce((sum, a) => sum + a.soldiers, 0), 5, '総兵数は不変');
+    }
+});
+
 test('r406の手動・自動援軍も選択武将数に応じた共通兵数上限を使う', () => {
     const ctx = createContext({ SkillManager: { getAptitudeLevel: () => 0 } });
     loadScript(ctx, 'js/config.js');

@@ -188,8 +188,10 @@ class TroopAllocationService {
         };
 
         for (const assignment of sortedAssignments) {
-            const isGeneral = assignment.index === 0;
             const requested = assignment.req;
+            // 配分0人の武将は戦場へ出ない。装備数・鉄砲部隊枠を消費させない。
+            if (requested <= 0) continue;
+            const isGeneral = assignment.index === 0;
             const threshold = (isGeneral && !isPlayerUI)
                 ? requested
                 : requested * equipmentMinimumRatio;
