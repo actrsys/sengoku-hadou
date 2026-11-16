@@ -2388,6 +2388,56 @@ async function validateDialogChoiceBackdrop(cdp) {
     console.log('✓ r910 会話の選択肢はPC/スマホとも背景タップで誤決定しない（実ブラウザ）');
 }
 
+// r911: 結果の後続会話を待つ間も同じ「閉じる」を連打できるため、画面寿命を一度だけ終了する。
+async function validateResultModalDoubleClose(cdp) {
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const html = `<!doctype html><html><head><style>.hidden{display:none!important}</style></head><body>
+        <div id="game-screen"><div id="result-modal" class="modal hidden">
+        <div id="result-body"></div><div id="result-footer"></div></div></div></body></html>`;
+    for (const isPc of [true, false]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', {width:isPc?1280:360,height:isPc?720:640,deviceScaleFactor:1,mobile:!isPc});
+        const result = await cdp.call('Runtime.evaluate', {
+            expression:`(async()=>{
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc',${isPc});
+                const UI=(new Function(${JSON.stringify(uiSource+'\nreturn UIManager;')}))();
+                const ui=Object.create(UI.prototype);
+                ui.resultModal=document.getElementById('result-modal');
+                ui.resultBody=document.getElementById('result-body');
+                ui.hideAIGuardTemporarily=()=>{};
+                ui.restoreAIGuard=()=>{};
+                ui.prepareCoveredViewForOpen=el=>el.classList.remove('hidden');
+                ui.pauseBackgroundUpdates=()=>{};
+                ui.resumeBackgroundUpdates=()=>{};
+                let progresses=0,actions=0,normalCloses=0;
+                ui.game={checkAllActionsDone(){progresses++;}};
+                ui.closeCoveredViewAfterRecovery=(el,opts)=>{normalCloses++;opts.recoverUnderCover?.();el.classList.add('hidden');opts.afterHide?.();return Promise.resolve(true);};
+                let finish;
+                const pending=new Promise(resolve=>{finish=resolve;});
+                ui.showResultModal('断交しました',()=>{actions++;return pending;},null,null,{handoffToNextDialog:true});
+                document.querySelector('#result-footer button').click();
+                document.querySelector('#result-footer button').click();
+                await new Promise(resolve=>setTimeout(resolve,65));
+                const held=!ui.resultModal.classList.contains('hidden');
+                const during={held,progresses,actions,normalCloses};
+                finish();await new Promise(resolve=>setTimeout(resolve,20));
+                const firstClosed=ui.resultModal.classList.contains('hidden');
+                ui.showResultModal('次の結果');
+                document.querySelector('#result-footer button').click();
+                const secondClosed=ui.resultModal.classList.contains('hidden');
+                return{during,firstClosed,secondClosed,progresses,normalCloses};
+            })()`,returnByValue:true,awaitPromise:true
+        });
+        if (result.exceptionDetails) throw Error(result.exceptionDetails.text+' '+JSON.stringify(result.exceptionDetails.exception));
+        const d=result.result?.value;
+        assert.deepStrictEqual(d.during,{held:true,progresses:0,actions:1,normalCloses:0},
+            `${isPc?'PC':'スマホ'}: 結果の二重終了を防ぐ: ${JSON.stringify(d)}`);
+        assert.ok(d.firstClosed&&d.secondClosed&&d.progresses===1&&d.normalCloses===1,
+            `${isPc?'PC':'スマホ'}: 後続完了と次の結果の通常終了は維持する: ${JSON.stringify(d)}`);
+    }
+    console.log('✓ r911 結果画面の連打はPC/スマホとも会話引継ぎを壊さない（実ブラウザ）');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -2470,6 +2520,7 @@ async function main() {
         await validateBreakAllianceResultTransition(cdp);
         await validateTerminalDialogCoveredPaint(cdp);
         await validateDialogChoiceBackdrop(cdp);
+        await validateResultModalDoubleClose(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

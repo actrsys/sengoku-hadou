@@ -10866,8 +10866,8 @@ test('結果画面との引き渡しは結果を先に表示し背景復帰も�
     assert.ok(showBlock.indexOf('this._closePendingDialogHandoffNow()') < showBlock.indexOf("typeof updateBehindCover === 'function'"), '旧会話を結果へ引き渡してから背景更新へ進む');
     assert.ok(showBlock.indexOf("typeof updateBehindCover === 'function'") < showBlock.indexOf('this.pauseBackgroundUpdates()'), '背景更新は結果画面の覆いの下・背景停止前に行う');
 
-    const closeEnd = ui.indexOf('showQuantityModal(', closeStart);
-    const closeBlock = ui.slice(closeStart, closeEnd > closeStart ? closeEnd : closeStart + 2800);
+    const closeEnd = ui.indexOf('\n    closeSelector() {', closeStart);
+    const closeBlock = ui.slice(closeStart, closeEnd);
     assert.ok(closeBlock.includes('this.closeCoveredViewAfterRecovery(this.resultModal'), '結果画面自身を背景復帰中のcoverとして保持する');
     assert.ok(closeBlock.includes('recoverUnderCover: () => this.resumeBackgroundUpdates()'), '結果画面の下で背景復帰を開始する');
     assert.ok(closeBlock.includes('afterHide: finishClose'), '通常の結果終了は実paint後にだけ後処理へ進む');
@@ -14881,7 +14881,7 @@ test('共通会話は強制モーダルリセットを世代境界として古�
     assert.ok(processBlock.includes('this._dialogAutoCloseTimer = autoCloseTimer;'), '自動閉じtimerを強制リセットから破棄できる');
     assert.ok(processBlock.includes('if (this._dialogAutoCloseTimer === autoCloseTimer) this._dialogAutoCloseTimer = null;'), '通常完了でもtimer参照を残さない');
 
-    const resetBlock = ui.slice(resetAt, resetAt + 2200);
+    const resetBlock = ui.slice(resetAt, ui.indexOf('\n    log(msg, historyOptions = null)', resetAt));
     assert.ok(resetBlock.includes('this._dialogGeneration = Number(this._dialogGeneration || 0) + 1;'), '強制リセットで旧decode/timer世代を無効化する');
     assert.ok(resetBlock.includes('this._cancelDialogHandoffClose();'), '旧handoffの閉じ予約を残さない');
     assert.ok(resetBlock.includes('clearTimeout(this._dialogAutoCloseTimer);'), '旧自動閉じtimerを破棄する');
@@ -33538,6 +33538,43 @@ test('r904 断交後の非同期処遇はリザルトから次の会話、また
     assert.ok(scope.includes('result.capturedHostageRecords.length > 0'), '捕虜のAI処遇を介す場合も候補にする');
     assert.ok(scope.includes('result.atMercyPrincesses.length > 0'), '最初の姫だけの同期予測に頼らない');
     assert.ok(scope.includes('() =>\n                this.resolveBreakAllianceConsequences(result).catch('), '実処理のPromiseを結果画面へ返す');
+});
+
+// r911: 後続の会話を待って結果画面を維持する間、二度目の「閉じる」は新しい閉鎖を開始しない。
+test('r911 結果画面の連打は引継ぎ中の会話待機・戦後進行を破壊しない', async () => {
+    const ctx = createContext({document: {getElementById: () => null}});
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const ui = Object.create(UI.prototype);
+    const classes = new Set();
+    ui.resultModal = {classList: {contains: key => classes.has(key), add: key => classes.add(key)}};
+    ui.resultFollowupDialogHandoff = true;
+    ui.restoreAIGuard = () => {};
+    ui.resumeBackgroundUpdates = () => {};
+    let checkActions = 0;
+    let redundantClose = 0;
+    ui.game = {checkAllActionsDone() {checkActions++;}};
+    ui.closeCoveredViewAfterRecovery = (_el, opts) => {
+        redundantClose++;
+        opts.recoverUnderCover?.();
+        classes.add('hidden');
+        opts.afterHide?.();
+        return Promise.resolve(true);
+    };
+    let finish;
+    const pending = new Promise(resolve => {finish = resolve;});
+    let actions = 0;
+    ui.onResultModalClose = () => {actions++; return pending;};
+    ui.closeResultModal();
+    assert.ok(!classes.has('hidden'), '次の会話を待つ間は結果画面を保持する');
+    ui.closeResultModal(); // 現実の同じ確認ボタンの素早い連打
+    assert.ok(!classes.has('hidden'), '2回目の押下で旧結果画面を先に消さない');
+    assert.strictEqual(redundantClose, 0, '別系統の通常閉鎖を開始しない');
+    assert.strictEqual(checkActions, 0, '戦後の月進行を先行実行しない');
+    assert.strictEqual(actions, 1, '後続の処遇を二重開始しない');
+    finish();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    assert.ok(classes.has('hidden'), '後続処理完了時には通常どおり閉じる');
 });
 
 test('r903 出陣確認は開戦準備の非同期完了を共通暗幕へ引き渡す', async () => {

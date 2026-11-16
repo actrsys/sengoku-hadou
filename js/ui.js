@@ -36,6 +36,8 @@ class UIManager {
         this.quantityConfirmBtn = document.getElementById('quantity-confirm-btn');
         this.mapGuide = document.getElementById('map-guide'); 
         this.resultModal = document.getElementById('result-modal');
+        // 結果画面の終了は一度だけ受け付ける。会話への引継ぎ中も旧画面は可視のため、可視判定だけでは連打を防げない。
+        this._resultModalClosing = false;
         this.resultBody = document.getElementById('result-body'); 
         this.charityTypeSelector = document.getElementById('charity-type-selector');
         this.aiGuard = document.getElementById('ai-guard');
@@ -2433,6 +2435,7 @@ class UIManager {
         this._cancelDialogHandoffClose();
         this._dialogHandoffHoldCount = 0;
         this._visualHandoffCloseFn = null;
+        this._resultModalClosing = false;
         if (this._dialogAutoCloseTimer) {
             clearTimeout(this._dialogAutoCloseTimer);
             this._dialogAutoCloseTimer = null;
@@ -2600,6 +2603,8 @@ class UIManager {
     }
 
     showResultModal(msg, onClose = null, customFooterHtml = null, updateBehindCover = null, options = {}) { 
+        // 新しい結果表示は新しい終了契約を持つ。前回の終了中状態を引き継がない。
+        this._resultModalClosing = false;
         this.hideAIGuardTemporarily(); 
         
         if (this.resultBody) {
@@ -2643,7 +2648,10 @@ class UIManager {
     }
     
     closeResultModal() {
-        if (!this.resultModal || this.resultModal.classList.contains('hidden')) return;
+        // 会話への引継ぎ中は旧結果画面が可視のままになる。
+        // 連打を通常の閉鎖として再処理すると、戦後進行や背景復旧が先に実行される。
+        if (!this.resultModal || this.resultModal.classList.contains('hidden') || this._resultModalClosing) return;
+        this._resultModalClosing = true;
 
         const cb = this.onResultModalClose;
         this.onResultModalClose = null;
@@ -2651,6 +2659,7 @@ class UIManager {
         this.resultFollowupDialogHandoff = false;
 
         const finishClose = () => {
+            this._resultModalClosing = false;
             this.restoreAIGuard();
             // 外交BGMは次の会話または背景が可視になってから平時へ戻す。
             if (window.AudioManager && window.AudioManager.currentBgmName === 'SC_ex_Scene3_Odyssey.ogg') {
