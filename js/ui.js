@@ -2464,6 +2464,15 @@ class UIManager {
         return true;
     }
 
+    // 迎撃／籠城の固定ボタンは、攻守の武将・拠点・戦争継続callbackを閉包に保持する。
+    // 迎撃中の子選択から確認へ戻る間は維持し、最終確定か強制終了時にだけ解除する。
+    releaseInterceptConfirmActions() {
+        const interceptBtn = document.getElementById('btn-intercept');
+        const siegeBtn = document.getElementById('btn-siege');
+        if (interceptBtn) interceptBtn.onclick = null;
+        if (siegeBtn) siegeBtn.onclick = null;
+    }
+
     forceResetModals(options = {}) {
         this._clearModalHandoffBackdrop();
         // 専用戦争リザルトの旧クリック・観戦自動終了を失効させる。
@@ -2489,6 +2498,11 @@ class UIManager {
         this._dialogHandoffHoldCount = 0;
         this._visualHandoffCloseFn = null;
         this._resultModalClosing = false;
+        // 強制タイトル復帰では結果画面の確認操作自体が取り消される。
+        // 旧外交・戦後処理を閉包に保持したcallbackを実行せず破棄し、
+        // 会話への引継ぎ指定も次のシナリオに持ち越さない。
+        this.onResultModalClose = null;
+        this.resultFollowupDialogHandoff = false;
         if (this._dialogAutoCloseTimer) {
             clearTimeout(this._dialogAutoCloseTimer);
             this._dialogAutoCloseTimer = null;
@@ -2507,10 +2521,6 @@ class UIManager {
         }
         this._currentEventClickHandler = null;
 
-        // 強制終了で部隊分割の遅延描画だけが次画面へ残らないよう、専門Managerへ破棄を依頼する。
-        if (this.slider && typeof this.slider.cancelUnitDivideDeferredUpdates === 'function') {
-            this.slider.cancelUnitDivideDeferredUpdates();
-        }
         // 戦闘途中のタイトル復帰・強制終了でも、スマホ地図を display:none のまま持ち越さない。
         const battleState = this._battleSuspendState;
         if (battleState && battleState.scroll) battleState.scroll.style.display = battleState.oldDisplay;
@@ -2539,6 +2549,17 @@ class UIManager {
             m.classList.add('hidden');
             m.style.display = '';
         });
+        // 迎撃確認は通常の一覧モーダルと異なり固定ボタンに戦争状態を保持する。
+        // 全モーダルを隠した後に解放し、旧戦争のクリック処理を残さない。
+        this.releaseInterceptConfirmActions();
+        // 大名確認の固定ボタンと旧顔画像も、タイトル復帰で情報Viewの正規終了へ委譲する。
+        // bodyの名前非表示classを解除し、次シナリオの大名名札を隠したままにしない。
+        if (this.info && typeof this.info.releaseDaimyoConfirmState === 'function') {
+            this.info.releaseDaimyoConfirmState();
+        }
+        // 強制タイトル復帰では大名選択専用の地図レイアウトも持ち越さない。
+        // 通常の「戻る」は同じ選択画面を続けるため、ここだけで解除する。
+        document.body.classList.remove('daimyo-select-mode');
         // 強制遷移は全モーダルを隠した後に、共通一覧の正規終了処理を使って
         // 旧一覧DOM・画像・選択履歴・描画予約を解放する。背景は既に復帰または
         // 破棄済みなので、通常の2paint待ちや新たな暗幕は発生させない。
@@ -2549,6 +2570,12 @@ class UIManager {
         // 抱えたボタンDOMとタブ操作を解放する（旧読込の世代失効を含む）。
         if (this.saveLoadView && typeof this.saveLoadView.close === 'function') {
             this.saveLoadView.close();
+        }
+        // 数量指定・部隊分割も、非表示にした後で専門Viewの旧操作参照と
+        // スライダーDOMを解放する。旧描画予約の失効は同じViewに委譲する。
+        if (this.slider) {
+            this.slider.releaseQuantityModalState();
+            this.slider.releaseUnitDivideModalState();
         }
         // 面談・評定の専門Viewも旧人物参照と編集中データを保持する。
         // 全モーダルはすでに非表示なので、通常の背景復帰待ちを挟まず正規終了する。

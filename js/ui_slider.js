@@ -8,6 +8,34 @@ class UISliderManager {
         this.game = game;
         this._unitDivideUiRaf = 0;
         this._unitDivideScrollbarRaf = 0;
+        this._quantityUiCancel = null;
+    }
+
+    // 表示が終わった数量画面のDOMと操作参照を、通常終了・強制終了で同じように解放する。
+    // スライダーの保留描画もここで失効させ、後発画面を古い入力から更新しない。
+    releaseQuantityModalState() {
+        if (this._quantityUiCancel) this._quantityUiCancel();
+        this._quantityUiCancel = null;
+        if (this.ui.quantityConfirmBtn) this.ui.quantityConfirmBtn.onclick = null;
+        const cancelBtn = this.ui.quantityModal && this.ui.quantityModal.querySelector('.btn-secondary');
+        if (cancelBtn) cancelBtn.onclick = null;
+        if (this.ui.quantityContainer) this.ui.quantityContainer.innerHTML = '';
+        if (this.ui.tradeTypeInfo) this.ui.tradeTypeInfo.innerHTML = '';
+    }
+
+    // 部隊分割の固定ボタンには旧武将配列を閉じ込めたcallbackが残り得る。
+    // 一覧DOMとともに一度解放し、次回公開で新しい画面だけを構築する。
+    releaseUnitDivideModalState() {
+        this.cancelUnitDivideDeferredUpdates();
+        const modal = this.ui.unitDivideModal || document.getElementById('unit-divide-modal');
+        const confirmBtn = document.getElementById('divide-confirm-btn');
+        const cancelBtn = modal && modal.querySelector('.btn-secondary');
+        if (confirmBtn) confirmBtn.onclick = null;
+        if (cancelBtn) cancelBtn.onclick = null;
+        const listEl = document.getElementById('divide-list');
+        if (listEl) listEl.innerHTML = '';
+        const stock = document.getElementById('divide-stock-container');
+        if (stock) stock.innerHTML = '';
     }
 
     // 相場説明は装飾タグだけを固定で生成し、取引上限などの保存値は表示用テキストにする。
@@ -38,6 +66,7 @@ class UISliderManager {
     // ==========================================
     openQuantitySelector(type, data, targetId, extraData = null) {
         if (!this.ui.quantityModal) return;
+        this.releaseQuantityModalState();
 
         // 武将選択の子として開く数量画面では、親一覧を状態ごと一時退避します。
         // 子から戻る時は再生成せずそのまま復帰し、確定時だけ親の選択セッションを終了します。
@@ -241,7 +270,8 @@ class UISliderManager {
             else clearTimeout(quantityUiRaf);
             quantityUiRaf = 0;
         };
-        
+        this._quantityUiCancel = cancelQuantityUIUpdate;
+
         const createSlider = (label, id, max, currentVal, minVal = 0, isTransport = false, targetCurrent = 0, targetMaxLimit = GameConfig.Limits.CastleStock) => {
             // スライダー枠内の文字と入力属性はすべてHTML生成の境界で保護する。
             // 正規の数値・入力制約・数量計算は変えず、改変セーブの文字列が属性を増やす事故を防ぐ。
@@ -601,6 +631,7 @@ class UISliderManager {
                 this.ui.quantityConfirmBtn.disabled = false;
                 this.ui.quantityConfirmBtn.style.opacity = 1.0;
             }
+            this.releaseQuantityModalState();
         };
 
         const closeQuantityModal = () => {
@@ -685,8 +716,8 @@ class UISliderManager {
     // ★部隊分割（スライダー）の魔法です！
     // ==========================================
     showUnitDivideModal(bushos, totalSoldiers, totalHorses, totalGuns, onConfirm, onCancel = null) {
-        // 援軍→本隊など部隊分割画面を連続して開く場合、前画面の遅延描画を次画面へ持ち越さない。
-        this.cancelUnitDivideDeferredUpdates();
+        // 援軍→本隊など部隊分割画面を連続して開く場合も旧DOMと遅延描画を持ち越さない。
+        this.releaseUnitDivideModalState();
         const modal = document.getElementById('unit-divide-modal');
         const listEl = document.getElementById('divide-list');
         const confirmBtn = document.getElementById('divide-confirm-btn');
@@ -706,10 +737,10 @@ class UISliderManager {
         const cancelBtn = modal.querySelector('.btn-secondary');
         if (cancelBtn) {
             cancelBtn.onclick = () => {
-                this.cancelUnitDivideDeferredUpdates();
                 modal.classList.add('hidden');
+                this.releaseUnitDivideModalState();
                 this.ui.restoreAIGuard();
-                if (onCancel) onCancel(); 
+                if (onCancel) onCancel();
             };
         }
 
@@ -1139,9 +1170,9 @@ class UISliderManager {
                 return;
             }
             
-            this.cancelUnitDivideDeferredUpdates();
             modal.classList.add('hidden');
-            this.ui.restoreAIGuard(); 
+            this.releaseUnitDivideModalState();
+            this.ui.restoreAIGuard();
             onConfirm(finalAssignments);
         };
     }

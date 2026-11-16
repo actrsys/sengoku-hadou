@@ -287,17 +287,32 @@ class EventManager {
     }
 
     /**
+     * 新規シナリオの初期能力計算より前に、月初前登録の常駐効果だけを同期します。
+     * 通常の月初イベント本編は実行せず、開始時点の生死・設定を同じ状態遷移窓口で評価します。
+     * phase が game になる前のため、GameManager のシナリオ読込寿命をそのまま受け取ります。
+     */
+    async applyScenarioStartResidentEvents(isScenarioLoadLatest) {
+        if (typeof isScenarioLoadLatest !== 'function' || !isScenarioLoadLatest()) return false;
+        const isHistoricalOff = !!(window.UserSettings && window.UserSettings.historicalEvent === false);
+        return this.processResidentEvents('startMonth_before', null, isHistoricalOff, undefined, isScenarioLoadLatest);
+    }
+
+    /**
      * 常駐イベントの状態変化だけを監視します。
      * false -> true で onEnter、true -> false で onExit を1回だけ実行します。
      * 状態は game.flags に保存してセーブ/ロード後も復元します。
      * 歴史イベントをOFFにした場合、historical_ 常駐イベントは条件を評価せず false へ遷移させ、
      * 適用中の常駐効果を onExit で解除します。再ON後は次の登録タイミングで条件を再評価します。
      */
-    async processResidentEvents(timing, context = null, isHistoricalOff = false, flowGeneration = undefined) {
+    async processResidentEvents(timing, context = null, isHistoricalOff = false, flowGeneration = undefined, scenarioStartGuard = null) {
         const targetEvents = this.residentEvents[timing];
         if (!targetEvents || targetEvents.length === 0) return true;
         const generation = flowGeneration === undefined ? window.EventFlowGuard.capture(this.game) : flowGeneration;
-        const isCurrentFlow = () => window.EventFlowGuard.isCurrent(this.game, generation);
+        // 新規シナリオ準備中だけは phase==='game' ではないため、読込元の世代・操作権ガードを使う。
+        // 通常の月次・戦闘イベントは従来のEventFlowGuardから変更しない。
+        const isCurrentFlow = typeof scenarioStartGuard === 'function'
+            ? scenarioStartGuard
+            : () => window.EventFlowGuard.isCurrent(this.game, generation);
         if (!isCurrentFlow()) return false;
 
         this.game.flags = this.game.flags || {};

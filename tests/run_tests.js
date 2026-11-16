@@ -7333,6 +7333,79 @@ test('三好長慶の寿命補正は historical_event 側が条件・対象・�
     assert.ok(!life.includes('三好長慶'), 'LifeSystem に三好固有知識を持たせない');
 });
 
+test('1560開始前に常駐寿命イベントを同期し、長慶の初期能力・ON/OFF・義興死亡を一貫して扱う', async () => {
+    const gameSource = read('js/game.js');
+    const loadStart = gameSource.indexOf('async loadScenario(folder, options = {})');
+    const startResident = gameSource.indexOf('await this.eventManager.applyScenarioStartResidentEvents(isScenarioLoadLatest)', loadStart);
+    const initialStats = gameSource.indexOf('this.lifeSystem.updateAllBushosAge();', loadStart);
+    const initialBattleDeath = gameSource.indexOf('this.lifeSystem.initializeBattleDeathLifespans(this.year);', loadStart);
+    assert.ok(startResident > initialBattleDeath && startResident < initialStats,
+        '開始前の常駐効果は討死延命初期化後、最初の能力再計算より前に同期する');
+
+    const ctx = createContext();
+    ctx.window.LifeStatusRules = { isPresent: b => b.status === 'active', isUnborn: b => b.status === 'unborn' };
+    loadScript(ctx, 'js/event/historical_event.js');
+    loadScript(ctx, 'js/life_system.js');
+    loadScript(ctx, 'js/event_manager.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const EventManager = vm.runInContext('EventManager', ctx);
+    const { common } = getRuntimeData('1560_okehazama');
+    const masters = new Map(common.warriorsMaster.map(b => [Number(b.id), b]));
+    const id = 'historical_miyoshi_nagayoshi_yoshioki_lifespan';
+
+    const createScenario = (historicalEvent, yoshiokiAlive = true) => {
+        const nagayoshiMaster = masters.get(1020005);
+        const nagayoshi = {
+            id: 1020005, birthYear: nagayoshiMaster.birthYear, originalEndYear: nagayoshiMaster.endYear,
+            endYear: nagayoshiMaster.endYear, status: 'active', isNotBorn: false,
+            baseLeadership: nagayoshiMaster.leadership, baseStrength: nagayoshiMaster.strength,
+            basePolitics: nagayoshiMaster.politics, baseDiplomacy: nagayoshiMaster.diplomacy,
+            baseIntelligence: nagayoshiMaster.intelligence, lifespanModifiers: {}
+        };
+        const yoshioki = { id: 1020006, status: yoshiokiAlive ? 'active' : 'dead' };
+        const game = {
+            year: 1560, month: 4, phase: 'title', bushos: [nagayoshi, yoshioki], flags: {},
+            getBusho: id => [nagayoshi, yoshioki].find(b => b.id === Number(id)) || null,
+            writeSystemDiagnostic() {}
+        };
+        game.lifeSystem = new LifeSystem(game);
+        ctx.window.UserSettings = { historicalEvent };
+        const manager = new EventManager(game);
+        return { game, manager, nagayoshi, yoshioki };
+    };
+
+    const active = createScenario(true);
+    active.game.lifeSystem.recalculateBushoAgeStats(active.nagayoshi);
+    const originalLeadership = active.nagayoshi.leadership;
+    assert.strictEqual(active.nagayoshi.endYear, 1564, '添付共通データの本来の没年');
+    assert.strictEqual(await active.manager.applyScenarioStartResidentEvents(() => true), true);
+    assert.strictEqual(active.nagayoshi.endYear, 1569, '1560年4月開始時点から没年を5年延長する');
+    assert.strictEqual(active.nagayoshi.lifespanModifiers[id], 5);
+    assert.strictEqual(active.game.flags.__residentEventStates[id].active, true);
+    assert.ok(active.nagayoshi.leadership > originalLeadership,
+        '1560年4月の初期能力から寿命前低下が解消される');
+    const correctedLeadership = active.nagayoshi.leadership;
+    await active.manager.processResidentEvents('startMonth_before', null, false, undefined, () => true);
+    assert.strictEqual(active.nagayoshi.endYear, 1569, '翌月の同期で二重延長しない');
+    assert.strictEqual(active.nagayoshi.leadership, correctedLeadership);
+
+    active.yoshioki.status = 'dead';
+    await active.manager.processResidentEvents('endMonth_before', null, false, undefined, () => true);
+    assert.strictEqual(active.nagayoshi.endYear, 1564, '義興死亡後は元の没年へ戻す');
+    assert.strictEqual(active.nagayoshi.leadership, originalLeadership);
+    assert.strictEqual(active.game.flags.__residentEventStates[id].active, false);
+
+    const disabled = createScenario(false);
+    await disabled.manager.applyScenarioStartResidentEvents(() => true);
+    assert.strictEqual(disabled.nagayoshi.endYear, 1564, '歴史イベントOFFの新規開始は延命しない');
+    const absentSon = createScenario(true, false);
+    await absentSon.manager.applyScenarioStartResidentEvents(() => true);
+    assert.strictEqual(absentSon.nagayoshi.endYear, 1564, '義興死亡の開始状態では延命しない');
+    const outdated = createScenario(true);
+    assert.strictEqual(await outdated.manager.applyScenarioStartResidentEvents(() => false), false);
+    assert.strictEqual(outdated.nagayoshi.endYear, 1564, '失効したシナリオの初期化は実行しない');
+});
+
 test('歴史イベントOFFでロードした場合も保存済みの歴史常駐効果を復元後に解除する', () => {
     const save = read('js/save_manager.js');
     assert.ok(save.includes("window.UserSettings.historicalEvent === false"));
@@ -14704,11 +14777,11 @@ test('部隊分割は確定・取消・強制終了前に遅延UI更新を破棄
     const slider = read('js/ui_slider.js');
     const ui = read('js/ui.js');
     assert.ok(slider.includes('cancelUnitDivideDeferredUpdates() {'), '部隊分割専用の遅延更新破棄窓口を持つ');
-    assert.ok(slider.includes("this.cancelUnitDivideDeferredUpdates();\n        const modal = document.getElementById('unit-divide-modal')"), '次の部隊分割開始前に旧画面の更新を破棄する');
+    assert.ok(slider.includes("this.releaseUnitDivideModalState();\n        const modal = document.getElementById('unit-divide-modal')"), '次の部隊分割開始前に旧画面の遅延更新と参照を破棄する');
     assert.ok(slider.includes('this._unitDivideUiRaf = raf(() => {'), '残数・確定可否更新のRAFを画面寿命へ紐付ける');
     assert.ok(slider.includes('this._unitDivideScrollbarRaf = raf(() => {'), 'スクロールバー更新のRAFも画面寿命へ紐付ける');
-    assert.ok(slider.includes("this.cancelUnitDivideDeferredUpdates();\n            modal.classList.add('hidden');"), '画面を隠す前に遅延更新を止める');
-    assert.ok(ui.includes("typeof this.slider.cancelUnitDivideDeferredUpdates === 'function'"), '強制モーダルリセットでも遅延更新を破棄する');
+    assert.ok(slider.includes("modal.classList.add('hidden');\n                this.releaseUnitDivideModalState();"), '画面を隠した直後に遅延更新と旧参照を解放する');
+    assert.ok(ui.includes('this.slider.releaseUnitDivideModalState();'), '強制モーダルリセットでも専門Viewの旧描画予約と操作参照を解放する');
 });
 
 
@@ -43427,6 +43500,7 @@ test('r924 強制画面リセットは隠した旧共通一覧の実データと
     }});
     vm.runInContext('class ResetUI {' + uiSource.slice(start, end) + '} this.ResetUI=ResetUI;', ctx);
     const ui = new ctx.ResetUI();
+    ui.releaseInterceptConfirmActions = () => {};
     const events = [];
     ui._battleSuspendOwners = new Set();
     ui._clearModalHandoffBackdrop = () => events.push('clear-backdrop');
@@ -43505,6 +43579,7 @@ test('r925 強制タイトル復帰で面談と国主評定の一時状態・旧
     council.editingPolicy = { allowOffense: false };
     council.editingTouched = new Set(['allowOffense']);
     const ui = new ctx.ResetUI();
+    ui.releaseInterceptConfirmActions = () => {};
     ui._battleSuspendOwners = new Set();
     ui._clearModalHandoffBackdrop = () => {};
     ui._cancelDialogHandoffClose = () => {};
@@ -43656,6 +43731,7 @@ test('r926 強制リセットもセーブ一覧の専門終了を通し、デー
     }});
     vm.runInContext('class ResetUI {' + source.slice(start, end) + '} this.ResetUI=ResetUI;', ctx);
     const ui = new ctx.ResetUI();
+    ui.releaseInterceptConfirmActions = () => {};
     ui._battleSuspendOwners = new Set();
     ui._clearModalHandoffBackdrop = () => {};
     ui._cancelDialogHandoffClose = () => {};
@@ -43673,6 +43749,297 @@ test('r926 強制リセットもセーブ一覧の専門終了を通し、デー
     };
     ui.forceResetModals({ skipBackgroundRecovery: true });
     assert.strictEqual(closed, 1, '強制リセットからも正規のcloseを一度だけ利用する');
+});
+
+
+// r928: 実製品の数量・部隊分割公開処理から生成したボタンの寿命を検査する。
+// 通常終了でも強制タイトル復帰でも旧武将配列・コマンドcallbackを固定DOMに保持しない。
+test('r928 数量指定・部隊分割の閉鎖と強制画面リセットで旧操作・DOMを解放する', () => {
+    class ModalClasses extends FakeClassList {
+        toggle(name, force) {
+            const enabled = force === undefined ? !this.contains(name) : Boolean(force);
+            enabled ? this.add(name) : this.remove(name);
+            return enabled;
+        }
+    }
+    const node = id => ({
+        id, classList: new ModalClasses(),
+        style: { opacity: '', setProperty() {}, removeProperty() {} },
+        dataset: {}, innerHTML: '', textContent: '', onclick: null, disabled: false,
+        querySelector() { return null; }, appendChild() {}
+    });
+    const elements = new Map();
+    for (const id of ['quantity-modal', 'quantity-confirm-btn', 'quantity-container',
+        'charity-type-selector', 'trade-type-info', 'quantity-title', 'unit-divide-modal',
+        'divide-list', 'divide-confirm-btn', 'divide-stock-container']) elements.set(id, node(id));
+    const quantityCancel = node('quantity-cancel');
+    const divideCancel = node('divide-cancel');
+    elements.get('quantity-modal').querySelector = selector => selector === '.btn-secondary' ? quantityCancel : null;
+    elements.get('unit-divide-modal').querySelector = selector => selector === '.btn-secondary' ? divideCancel : null;
+    const rafCancelled = [];
+    const document = {
+        body: { classList: new ModalClasses() },
+        getElementById(id) { return elements.get(id) || null; },
+        querySelectorAll(selector) {
+            return selector === '.modal' ? [elements.get('quantity-modal'), elements.get('unit-divide-modal')] : [];
+        }
+    };
+    const ctx = createContext({ document, requestAnimationFrame() { return 23; },
+        cancelAnimationFrame(handle) { rafCancelled.push(handle); } });
+    loadScript(ctx, 'js/ui_slider.js');
+    const Slider = vm.runInContext('UISliderManager', ctx);
+    const ui = {
+        quantityModal: elements.get('quantity-modal'),
+        quantityConfirmBtn: elements.get('quantity-confirm-btn'),
+        quantityContainer: elements.get('quantity-container'),
+        charityTypeSelector: elements.get('charity-type-selector'),
+        tradeTypeInfo: elements.get('trade-type-info'),
+        currentCastle: { ownerClan: 1, gold: 500 },
+        hideAIGuardTemporarily() {}, restoreAIGuard() {},
+        prepareCoveredViewForOpen(modal) { modal.classList.remove('hidden'); }
+    };
+    let quantityConfirmCount = 0;
+    const game = { playerClanId: 1, getClanDaimyo: () => ({}), getBusho: () => ({}),
+        getClanGunshi: () => ({}), commandSystem: { handleQuantitySelection() { quantityConfirmCount++; } },
+        warManager: { state: { isSeaBattle: false }, autoDivideSoldiers: () => [] } };
+    const slider = new Slider(ui, game);
+    ui.slider = slider;
+    slider.openQuantitySelector('charity', Array.from({ length: 1600 }, (_, id) => id), 1);
+    assert.strictEqual(typeof ui.quantityConfirmBtn.onclick, 'function');
+    assert.ok(ui.quantityContainer.innerHTML.includes('1600'));
+    quantityCancel.onclick();
+    assert.strictEqual(ui.quantityConfirmBtn.onclick, null, '通常取消後に旧コマンド参照を残さない');
+    assert.strictEqual(quantityCancel.onclick, null, '通常取消後に旧戻る参照を残さない');
+    assert.strictEqual(ui.quantityContainer.innerHTML, '', '旧一覧の内容を解放');
+    slider.openQuantitySelector('charity', [1, 2], 1);
+    ui.quantityConfirmBtn.onclick();
+    assert.strictEqual(quantityConfirmCount, 1, '再公開後の確定は一度だけ実行');
+    assert.strictEqual(ui.quantityConfirmBtn.onclick, null, '確定後の操作を解放');
+    let divideCancelled = 0;
+    slider.showUnitDivideModal([], 0, 0, 0, () => {}, () => { divideCancelled++; });
+    assert.strictEqual(typeof elements.get('divide-confirm-btn').onclick, 'function');
+    divideCancel.onclick();
+    assert.strictEqual(divideCancelled, 1);
+    assert.strictEqual(elements.get('divide-confirm-btn').onclick, null);
+    assert.strictEqual(divideCancel.onclick, null);
+    slider.openQuantitySelector('charity', [1, 2, 3], 1);
+    slider.showUnitDivideModal([], 0, 0, 0, () => {}, () => {});
+    const source = read('js/ui.js');
+    const begin = source.indexOf('    forceResetModals(options = {}) {');
+    const end = source.indexOf('\n    log(msg, historyOptions = null)', begin);
+    vm.runInContext('class ResetUI {' + source.slice(begin, end) + '} this.ResetUI=ResetUI;', ctx);
+    const reset = new ctx.ResetUI();
+    reset.releaseInterceptConfirmActions = () => {};
+    reset.slider = slider;
+    reset._battleSuspendOwners = new Set();
+    reset._clearModalHandoffBackdrop = () => {};
+    reset._cancelDialogHandoffClose = () => {};
+    reset._cancelProcessingStatusReveal = () => {};
+    reset._cancelEmptyCardAnimation = () => {};
+    reset.hideContextMenu = () => {};
+    reset.forceResetModals({ skipBackgroundRecovery: true });
+    assert.ok(elements.get('quantity-modal').classList.contains('hidden'));
+    assert.ok(elements.get('unit-divide-modal').classList.contains('hidden'));
+    assert.strictEqual(ui.quantityConfirmBtn.onclick, null);
+    assert.strictEqual(quantityCancel.onclick, null);
+    assert.strictEqual(ui.quantityContainer.innerHTML, '');
+    assert.strictEqual(elements.get('divide-confirm-btn').onclick, null);
+    assert.strictEqual(divideCancel.onclick, null);
+    assert.strictEqual(slider._quantityUiCancel, null, '旧数量画面のRAF取消クロージャを保持しない');
+    assert.ok(rafCancelled.includes(23), '部隊分割の旧スクロールバー更新予約を取消');
+});
+
+
+
+// r929: 迎撃確認の固定ボタンは戦闘中の武将・拠点・後続処理を閉包に保持する。
+// 迎撃→武将選択→取消→迎撃に戻る間は維持し、選択確定/強制終了後だけ外す。
+test('r929 迎撃確認の旧クリック処理は戦闘確定と強制タイトル復帰で解放される', () => {
+    const source = read('js/ui.js');
+    const war = read('js/war_effort.js');
+    const methodStart = source.indexOf('    releaseInterceptConfirmActions() {');
+    const resetStart = source.indexOf('    forceResetModals(options = {}) {');
+    const resetEnd = source.indexOf('\n    log(msg, historyOptions = null)', resetStart);
+    assert.ok(methodStart > 0 && methodStart < resetStart && resetEnd > resetStart, 'UIの専門解放窓口を持つ');
+    const intercept = { onclick: null };
+    const siege = { onclick: null };
+    const modal = { id: 'intercept-confirm-modal', classList: new FakeClassList(), style: {} };
+    const elements = { 'btn-intercept': intercept, 'btn-siege': siege, 'intercept-confirm-modal': modal };
+    const ctx = createContext({ document: {
+        body: { classList: new FakeClassList() },
+        getElementById: id => elements[id] || null,
+        querySelectorAll: selector => selector === '.modal' ? [modal] : []
+    }});
+    vm.runInContext('class ResetUI {' + source.slice(methodStart, resetEnd) + '} this.ResetUI=ResetUI;', ctx);
+    const ui = new ctx.ResetUI();
+    let oldAction = 0;
+    intercept.onclick = () => oldAction++;
+    siege.onclick = () => oldAction++;
+    // 迎撃を選んで武将候補に進み、キャンセルして確認に戻る間はまだ操作を使う。
+    modal.classList.add('hidden');
+    assert.strictEqual(typeof intercept.onclick, 'function', '子選択へ進んだだけでは操作を解放しない');
+    modal.classList.remove('hidden');
+    ui.releaseInterceptConfirmActions();
+    assert.strictEqual(intercept.onclick, null, '確定後の迎撃操作を解放');
+    assert.strictEqual(siege.onclick, null, '確定後の籠城操作を解放');
+    intercept.onclick = () => oldAction++;
+    siege.onclick = () => oldAction++;
+    ui._battleSuspendOwners = new Set();
+    ui._clearModalHandoffBackdrop = () => {};
+    ui._cancelDialogHandoffClose = () => {};
+    ui._cancelProcessingStatusReveal = () => {};
+    ui._cancelEmptyCardAnimation = () => {};
+    ui.hideContextMenu = () => {};
+    ui.forceResetModals({ skipBackgroundRecovery: true });
+    assert.ok(modal.classList.contains('hidden'));
+    assert.strictEqual(intercept.onclick, null, '強制リセットで迎撃処理を解放');
+    assert.strictEqual(siege.onclick, null, '強制リセットで籠城処理を解放');
+    assert.strictEqual(oldAction, 0, '終了処理で古い戦闘アクションは実行しない');
+    const start = war.indexOf("const modal = document.getElementById('intercept-confirm-modal')");
+    const end = war.indexOf('} else onResult(\'siege\');', start);
+    const block = war.slice(start, end);
+    assert.ok(start >= 0 && end > start, '製品の迎撃確定経路を取得');
+    assert.ok((block.match(/this\.game\.ui\.releaseInterceptConfirmActions\(\)/g) || []).length >= 3,
+        '新しい迎撃公開・籠城確定・部隊確定の3経路で同じ解放窓口を使用');
+});
+
+
+// r931: 大名選択からゲームを開始しても、固定ボタンの旧シナリオ開始callbackを保持しない。
+// 強制タイトル復帰ではhide-daimyo-labelsが残ると、次の大名選択で勢力名が消える。
+test('大名確認の開始・戻る・強制タイトル復帰で旧操作と名前非表示状態を解放する', () => {
+    const uiSource = read('js/ui.js');
+    const methodStart = uiSource.indexOf('    releaseInterceptConfirmActions() {');
+    const methodEnd = uiSource.indexOf('    log(msg, historyOptions = null)', methodStart);
+    assert.ok(methodStart >= 0 && methodEnd > methodStart, '既存のUI強制リセットを対象とする');
+    const elements = new Map();
+    const make = id => {
+        const element = fakeElement(id);
+        elements.set(id, element);
+        return element;
+    };
+    const confirmModal = make('daimyo-confirm-modal');
+    confirmModal.classList.add('modal', 'hidden');
+    const confirmBody = make('daimyo-confirm-body');
+    const buttons = make('daimyo-confirm-buttons');
+    buttons.classList.add('hidden');
+    const start = make('daimyo-confirm-start-btn');
+    const back = make('daimyo-confirm-back-btn');
+    make('map-guide');
+    make('btn-back-to-scenario');
+    const bodyClasses = new FakeClassList();
+    const ctx = createContext({
+        document: {
+            body: {classList: bodyClasses},
+            getElementById: id => elements.get(id) || null,
+            querySelector: selector => selector === '.daimyo-confirm-buttons' ? buttons : null,
+            querySelectorAll: selector => selector === '.modal' ? [confirmModal] : []
+        },
+        LifeStatusRules: { isPresent: () => true }
+    });
+    loadScript(ctx, 'js/ui_info.js');
+    vm.runInContext('class ResetUI {' + uiSource.slice(methodStart, methodEnd) + '} this.ResetUI=ResetUI;', ctx);
+    const ui = new ctx.ResetUI();
+    const Info = vm.runInContext('UIInfoManager', ctx);
+    const info = Object.create(Info.prototype);
+    ui.daimyoConfirmModal = confirmModal;
+    ui.daimyoConfirmBody = confirmBody;
+    ui.updateCastleGlows = () => {};
+    ui.renderMap = () => {};
+    info.ui = ui;
+    info.game = {
+        getClanCastles: () => [], getClanBushos: () => [],
+        getClan: () => ({yomi: '', princessIds: []})
+    };
+    info._bindImageFallbacks = () => {};
+    info.closeCommonModal = () => {};
+    ui.info = info;
+    ui._battleSuspendOwners = new Set();
+    ui._clearModalHandoffBackdrop = () => {};
+    ui._cancelDialogHandoffClose = () => {};
+    ui._cancelProcessingStatusReveal = () => {};
+    ui._cancelEmptyCardAnimation = () => {};
+    ui.hideContextMenu = () => {};
+    let launched = 0;
+    const open = () => info.showDaimyoConfirmModal(1, '試験家', 100, {name: '武将'}, () => { launched++; });
+
+    open();
+    bodyClasses.add('daimyo-select-mode');
+    assert.strictEqual(typeof start.onclick, 'function', '確認画面の開始操作が有効');
+    assert.strictEqual(typeof back.onclick, 'function', '確認画面の戻る操作が有効');
+    assert.ok(bodyClasses.contains('hide-daimyo-labels'), '確認中は勢力名を隠す');
+    ui.forceResetModals({ skipBackgroundRecovery: true });
+    assert.strictEqual(start.onclick, null, 'タイトル強制復帰では旧開始callbackを解放');
+    assert.strictEqual(back.onclick, null, 'タイトル強制復帰では旧戻るcallbackを解放');
+    assert.strictEqual(confirmBody.innerHTML, '', '旧顔画像・勢力詳細のDOMを解放');
+    assert.ok(!bodyClasses.contains('hide-daimyo-labels'), '次のシナリオで勢力名が消えない');
+    assert.ok(!bodyClasses.contains('daimyo-select-mode'), '新しいゲームまで旧選択画面の地図レイアウトを保持しない');
+    assert.ok(buttons.classList.contains('hidden'), '次画面に旧確認ボタンを残さない');
+    assert.strictEqual(launched, 0, 'リセットは旧ゲーム開始処理を起動しない');
+
+    open();
+    bodyClasses.add('daimyo-select-mode');
+    back.onclick();
+    assert.strictEqual(start.onclick, null, '戻るでも旧開始callbackを解放');
+    assert.strictEqual(back.onclick, null, '戻るの旧callbackも解放');
+    assert.ok(!bodyClasses.contains('hide-daimyo-labels'), '通常の戻るで勢力名を再表示');
+    assert.strictEqual(launched, 0);
+    assert.ok(bodyClasses.contains('daimyo-select-mode'), '通常の戻るは大名選択モードを維持');
+
+    open();
+    start.onclick();
+    assert.strictEqual(launched, 1, '通常の決定ではゲーム開始が一度だけ実行される');
+    assert.strictEqual(start.onclick, null, '開始後も旧シナリオのcallbackを保持しない');
+    assert.strictEqual(back.onclick, null);
+    assert.strictEqual(confirmBody.innerHTML, '');
+});
+
+
+// r932: 結果画面の途中で他タブへ操作権が移ることは、通常プレイでも起こる。
+// リザルトの後続処理は旧シナリオの人物・外交結果を閉包に保持するため、
+// タイトル強制復帰では実行せず参照だけ解放し、次の結果表示を妨げない。
+test('r932 結果画面を開いたまま強制タイトル復帰しても旧結果callbackを保持しない', () => {
+    const ctx = createContext({ document: {
+        body: {classList: new FakeClassList()},
+        querySelectorAll(selector) { return selector === '.modal' ? [resultModal] : []; },
+        getElementById(id) { return id === 'result-footer' ? footer : null; }
+    }});
+    const resultModal = {id:'result-modal',classList:new FakeClassList(['hidden']),style:{}};
+    const footer = {innerHTML:'', querySelector() { return {addEventListener() {}}; }};
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const ui = Object.create(UI.prototype);
+    ui.resultModal = resultModal;
+    ui.resultBody = {scrollTop:0};
+    ui._renderPlainMessage = () => {};
+    ui.hideAIGuardTemporarily = () => {};
+    ui.completeVisualHandoff = () => {};
+    ui.completeDialogToViewHandoff = () => {};
+    ui.pauseBackgroundUpdates = () => {};
+    ui._clearModalHandoffBackdrop = () => {};
+    ui._cancelDialogHandoffClose = () => {};
+    ui._cancelProcessingStatusReveal = () => {};
+    ui._cancelEmptyCardAnimation = () => {};
+    ui.hideContextMenu = () => {};
+    ui.clearCommandMenu = () => {};
+    ui._battleSuspendOwners = new Set();
+    ui.game = {phase:'game'};
+    ui.info = {closeCommonModal() {}};
+    let obsoleteActions = 0;
+    const oldResult = {clanId: 17, records: Array(20).fill('旧シナリオ')};
+    ui.showResultModal('旧外交結果', () => {obsoleteActions++; return oldResult;}, null, null, {handoffToNextDialog:true});
+    assert.strictEqual(resultModal.classList.contains('hidden'), false, '旧結果画面が表示されている');
+    assert.strictEqual(typeof ui.onResultModalClose, 'function', '旧結果の後処理が保持されている');
+    assert.strictEqual(ui.resultFollowupDialogHandoff, true, '会話への引継ぎ状態が存在する');
+    ui.forceResetModals({skipBackgroundRecovery:true});
+    assert.strictEqual(resultModal.classList.contains('hidden'), true, '強制復帰時に旧結果を隠す');
+    assert.strictEqual(ui.onResultModalClose, null, '旧シナリオのcallbackと閉包を解放する');
+    assert.strictEqual(ui.resultFollowupDialogHandoff, false, '旧結果の会話引継ぎ状態を解放する');
+    assert.strictEqual(obsoleteActions, 0, '強制復帰で旧外交処理を実行しない');
+    let newActions = 0;
+    ui.showResultModal('次ゲームの結果', () => {newActions++;});
+    assert.strictEqual(typeof ui.onResultModalClose, 'function', '新しい結果の終了処理を登録できる');
+    assert.strictEqual(ui.resultFollowupDialogHandoff, false, '次ゲームへ旧会話引継ぎを持ち込まない');
+    assert.strictEqual(obsoleteActions, 0);
+    assert.strictEqual(newActions, 0);
 });
 
 Promise.all(pendingTests).then(() => {

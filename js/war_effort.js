@@ -1092,6 +1092,8 @@ Object.assign(WarManager.prototype, {
                                 // 迎撃確認は共通会話ではなく専用モーダルなので、内容を先に準備し、
                                 // 可視化の直前だけ自分でAIガードを引き渡す。
                                 document.getElementById('intercept-msg').innerText = `${atkArmyName}の${atkBushos[0].name}が攻めてきました！\n敵軍: ${totalAtkSoldiers} 対 自軍: ${totalDefSoldiers}\n迎撃（野戦）しますか？籠城しますか？`;
+                                // 前回の戦争が固定ボタンへ残した処理は新しい確認の前に解放する。
+                                this.game.ui.releaseInterceptConfirmActions();
                                 this.game.ui.hideAIGuardTemporarily();
                                 this.game.ui.prepareCoveredViewForOpen(modal);
                                 
@@ -1138,6 +1140,8 @@ Object.assign(WarManager.prototype, {
                                                             finalAtkAssignments = finalAtkAssignments.concat(this.autoDivideSoldiers(sr.bushos, sr.soldiers, sr.horses, sr.guns));
                                                         }
 
+                                                        // この時点で迎撃は確定。武将選択からの取消復帰はもうない。
+                                                        this.game.ui.releaseInterceptConfirmActions();
                                                         onResult('field', finalDefAssignments, interceptRice, finalAtkAssignments, interceptHorses, interceptGuns);
                                                     },
                                                     () => { this.game.ui.prepareCoveredViewForOpen(modal); }
@@ -1149,10 +1153,11 @@ Object.assign(WarManager.prototype, {
                                         onCancel: () => { this.game.ui.prepareCoveredViewForOpen(modal); }
                                     });
                                 };
-                                document.getElementById('btn-siege').onclick = () => { 
-                                    modal.classList.add('hidden'); 
-                                    this.game.ui.restoreAIGuard(); 
-                                    onResult('siege'); 
+                                document.getElementById('btn-siege').onclick = () => {
+                                    modal.classList.add('hidden');
+                                    this.game.ui.releaseInterceptConfirmActions();
+                                    this.game.ui.restoreAIGuard();
+                                    onResult('siege');
                                 };
                             } else onResult('siege');
                         }

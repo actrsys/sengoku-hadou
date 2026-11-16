@@ -2608,6 +2608,21 @@ class UIInfoManager {
         }
     }
     
+    // 大名確認は固定ボタンにシナリオ開始callbackを保持する。
+    // 開始・戻る・強制タイトル復帰で同じ終了窓口を通し、旧勢力への参照と顔画像DOMを解放する。
+    releaseDaimyoConfirmState() {
+        if (this.ui && this.ui.daimyoConfirmModal) this.ui.daimyoConfirmModal.classList.add('hidden');
+        const buttons = document.querySelector('.daimyo-confirm-buttons');
+        if (buttons) buttons.classList.add('hidden');
+        const startBtn = document.getElementById('daimyo-confirm-start-btn');
+        const backBtn = document.getElementById('daimyo-confirm-back-btn');
+        if (startBtn) startBtn.onclick = null;
+        if (backBtn) backBtn.onclick = null;
+        if (this.ui && this.ui.daimyoConfirmBody) this.ui.daimyoConfirmBody.innerHTML = '';
+        if (this.ui) this.ui.selectedDaimyoId = null;
+        document.body.classList.remove('hide-daimyo-labels');
+    }
+
     // ==========================================
     // ★ここから追加：大名選択の確認画面の魔法！
     // ==========================================
@@ -2745,21 +2760,16 @@ class UIInfoManager {
                     window.AudioManager.playBGM('SC_ex_Town2_Fortress.ogg');
                 }
 
-                this.ui.daimyoConfirmModal.classList.add('hidden');
-                if (confirmButtons) confirmButtons.classList.add('hidden'); // 分離したボタンも隠す
-                
-                this.ui.selectedDaimyoId = null; 
-                document.body.classList.remove('daimyo-select-mode'); 
-                document.body.classList.remove('hide-daimyo-labels'); 
+                this.releaseDaimyoConfirmState();
+                document.body.classList.remove('daimyo-select-mode');
                 onStart();
             };
         }
         const backBtn = document.getElementById('daimyo-confirm-back-btn');
         if (backBtn) {
             backBtn.onclick = () => {
-                this.ui.selectedDaimyoId = null; 
-                this.ui.updateCastleGlows();     
-                document.body.classList.remove('hide-daimyo-labels'); 
+                this.releaseDaimyoConfirmState();
+                this.ui.updateCastleGlows();
                 this.ui.renderMap(); 
             };
         }

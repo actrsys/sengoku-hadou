@@ -478,7 +478,15 @@ class GameManager {
             
             // ★ここを書き足し！：諸勢力の頭領がいないかチェックして、いなければ自動で作ってもらいます！
             this.kunishuSystem.generateMissingLeaders();
-            
+
+            // 月初を迎える前でも、開始時点に成立している常駐効果を初期能力へ反映する。
+            // 判定条件・補正量は歴史イベント、数値変更はLifeSystemを正本とする。
+            // タイトル／大名選択への公開前なので通常イベント本編は走らせない。
+            if (this.eventManager) {
+                await this.eventManager.applyScenarioStartResidentEvents(isScenarioLoadLatest);
+                if (!isScenarioLoadLatest()) return;
+            }
+
             // ★ここを書き足し！：ゲーム開始の瞬間に、全員の年齢による能力値変動を計算します！
             this.lifeSystem.updateAllBushosAge();
 
