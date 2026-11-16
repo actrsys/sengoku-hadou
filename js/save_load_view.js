@@ -36,6 +36,14 @@ class SaveLoadView {
         this.invalidatePendingRenders();
         const modal = document.getElementById('saveload-modal');
         if (modal) modal.classList.add('hidden');
+        // 保存済み全ゲーム状態と縮小地図はスロットボタンのクリック処理からも参照される。
+        // 表示を終えた後は一覧とタブの旧操作を解放し、次回openで改めて構築する。
+        const list = document.getElementById('saveload-list');
+        if (list) list.innerHTML = '';
+        const manualTab = document.getElementById('saveload-tab-manual');
+        const autoTab = document.getElementById('saveload-tab-auto');
+        if (manualTab) manualTab.onclick = null;
+        if (autoTab) autoTab.onclick = null;
     }
 
     async open(mode) {

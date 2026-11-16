@@ -2507,10 +2507,6 @@ class UIManager {
         }
         this._currentEventClickHandler = null;
 
-        // セーブ／ロードの非同期読込は、画面を強制終了した時点で古い世代として無効化します。
-        if (this.saveLoadView && typeof this.saveLoadView.invalidatePendingRenders === 'function') {
-            this.saveLoadView.invalidatePendingRenders();
-        }
         // 強制終了で部隊分割の遅延描画だけが次画面へ残らないよう、専門Managerへ破棄を依頼する。
         if (this.slider && typeof this.slider.cancelUnitDivideDeferredUpdates === 'function') {
             this.slider.cancelUnitDivideDeferredUpdates();
@@ -2548,6 +2544,11 @@ class UIManager {
         // 破棄済みなので、通常の2paint待ちや新たな暗幕は発生させない。
         if (this.info && typeof this.info.closeCommonModal === 'function') {
             this.info.closeCommonModal();
+        }
+        // セーブ／ロードも専門Viewの正規終了を通し、復号済みの保存データを
+        // 抱えたボタンDOMとタブ操作を解放する（旧読込の世代失効を含む）。
+        if (this.saveLoadView && typeof this.saveLoadView.close === 'function') {
+            this.saveLoadView.close();
         }
         // 面談・評定の専門Viewも旧人物参照と編集中データを保持する。
         // 全モーダルはすでに非表示なので、通常の背景復帰待ちを挟まず正規終了する。

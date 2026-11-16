@@ -14876,7 +14876,7 @@ test('セーブ・ロードの非同期タブ描画は世代tokenで古い結果
     assert.ok(source.includes('this.close();'), 'スロット確定時もViewのclose経路で世代を無効化する');
     assert.ok(bootstrap.includes("getGame()?.ui?.saveLoadView?.close()"), '固定閉じるボタンもSaveLoadViewへ委譲する');
     assert.ok(!bootstrap.includes("hide('saveload-modal')"), '固定DOMを直接隠す旧close経路を残さない');
-    assert.ok(ui.includes("this.saveLoadView.invalidatePendingRenders()"), 'forceResetでも保留中の読込を無効化する');
+    assert.ok(ui.includes("this.saveLoadView.close()"), 'forceResetでも正規終了から保留読込と表示参照を解放する');
 });
 
 test('具体名のシナリオ選択戻りボタンもPC右クリックのcancel意味を持つ', () => {
@@ -43581,6 +43581,98 @@ test('r920 同じDOMの再公開と強制世代失効では旧終了後処理を
     while(frames.length)frames.shift()();
     assert.strictEqual(await old2,false,'タイトル復帰相当の世代失効はcloseしない');
     assert.strictEqual(releases,0);
+});
+
+
+// r926: セーブ一覧は復号済みの全ゲーム状態や地図サムネイルをボタンの
+// クリッククロージャで保持するため、画面終了時は見た目だけでなくDOMも解放する。
+test('r926 保存一覧の通常終了と再公開は旧セーブのDOM・タブ操作参照を保持しない', async () => {
+    const elements = new Map();
+    const makeElement = id => ({
+        id, classList: new FakeClassList(), style: {}, disabled: false, children: [],
+        set innerHTML(value) { this._html = value; this.children = []; },
+        get innerHTML() { return this._html || ''; },
+        appendChild(child) { this.children.push(child); },
+        set innerText(value) { this._text = value; }
+    });
+    for (const id of ['saveload-modal', 'saveload-title', 'saveload-list',
+        'saveload-tabs', 'saveload-tab-manual', 'saveload-tab-auto']) elements.set(id, makeElement(id));
+    const ctx = createContext({
+        document: {
+            body: { classList: new FakeClassList(['is-pc']) },
+            getElementById(id) { return elements.get(id) || null; },
+            createElement() { return makeElement('row'); }
+        },
+        requestAnimationFrame(callback) { callback(); return 1; },
+        setTimeout(callback) { callback(); return 1; }
+    });
+    loadScript(ctx, 'js/save_load_view.js');
+    const snapshot = {
+        year: 1560, month: 5, gameStartYear: 1560, scenarioName: '1560年 桶狭間',
+        saveTime: '2026/11/16', clans: [{ id: 1, name: '織田' }], playerClanId: 1,
+        mapThumbnail: 'data:image/png;base64,AAAA', bushos: new Array(4000).fill({})
+    };
+    let first = true;
+    const view = new ctx.SaveLoadView({
+        updateCustomScrollbars() {},
+        prepareCoveredViewForOpen(modal) { modal.classList.remove('hidden'); }
+    }, { phase: 'title', saveManager: {
+        async readSaveSlots(prefix) { return Array.from({ length: 5 }, (_, index) => ({
+            originalSlotNo: index + 1,
+            data: first && prefix === 'sengoku_save_slot' && index === 0 ? snapshot : null,
+            hasData: first && prefix === 'sengoku_save_slot' && index === 0,
+            saveTimestamp: first && prefix === 'sengoku_save_slot' && index === 0 ? 1234 : 0
+        })); }
+    }});
+    const list = elements.get('saveload-list');
+    await view.open('load');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(list.children.length, 5);
+    assert.ok(list.children[0].innerHTML.includes('data:image/png;base64,AAAA'));
+    assert.strictEqual(typeof list.children[0].onclick, 'function');
+    assert.strictEqual(typeof elements.get('saveload-tab-auto').onclick, 'function');
+    view.close();
+    assert.ok(elements.get('saveload-modal').classList.contains('hidden'));
+    assert.strictEqual(list.children.length, 0, '閉じた後にサムネイルと保存データ参照を含むDOMを保持しない');
+    assert.strictEqual(elements.get('saveload-tab-manual').onclick, null, '旧タブ切替callbackを破棄');
+    assert.strictEqual(elements.get('saveload-tab-auto').onclick, null, '旧renderSlotsのクロージャを破棄');
+    first = false;
+    await view.open('load');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(list.children.length, 5, '新しい一覧を通常どおり再作成できる');
+    assert.ok(list.children.every(button => button.innerHTML.includes('NO DATA')));
+});
+
+test('r926 強制リセットもセーブ一覧の専門終了を通し、データ・操作参照を解放する', () => {
+    const source = read('js/ui.js');
+    const start = source.indexOf('    forceResetModals(options = {}) {');
+    const end = source.indexOf('\n    log(msg, historyOptions = null)', start);
+    assert.ok(start >= 0 && end > start);
+    const modal = { id: 'saveload-modal', classList: new FakeClassList(), style: {} };
+    const ctx = createContext({ document: {
+        body: { classList: new FakeClassList() },
+        querySelectorAll(selector) { return selector === '.modal' ? [modal] : []; },
+        getElementById() { return null; }
+    }});
+    vm.runInContext('class ResetUI {' + source.slice(start, end) + '} this.ResetUI=ResetUI;', ctx);
+    const ui = new ctx.ResetUI();
+    ui._battleSuspendOwners = new Set();
+    ui._clearModalHandoffBackdrop = () => {};
+    ui._cancelDialogHandoffClose = () => {};
+    ui._cancelProcessingStatusReveal = () => {};
+    ui._cancelEmptyCardAnimation = () => {};
+    ui.hideContextMenu = () => {};
+    ui.info = { closeCommonModal() {} };
+    let closed = 0;
+    ui.saveLoadView = {
+        close() {
+            assert.ok(modal.classList.contains('hidden'), '非表示後に専門Viewの内容を解放');
+            closed++;
+        },
+        invalidatePendingRenders() { /* 旧方式は読込予約のみを無効化する */ }
+    };
+    ui.forceResetModals({ skipBackgroundRecovery: true });
+    assert.strictEqual(closed, 1, '強制リセットからも正規のcloseを一度だけ利用する');
 });
 
 Promise.all(pendingTests).then(() => {
