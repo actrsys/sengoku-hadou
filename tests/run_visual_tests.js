@@ -2330,6 +2330,64 @@ async function validateListGaugeColors(cdp) {
     console.log('✓ 外交・大名一覧 威信/友好度ゲージの色と幅 PC/スマホ visual regression');
 }
 
+// r910: 実DOMの選択肢を開き、背景タップを第一選択肢の押下と誤認しない。
+async function validateDialogChoiceBackdrop(cdp) {
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const html = `<!doctype html><html><head><style>.hidden{display:none!important}</style></head><body>
+        <div id="game-screen"><div id="dialog-modal" class="modal hidden">
+        <div class="modal-content"><div id="dialog-message"></div>
+        <div><div id="dialog-left-face"></div><div id="dialog-left-name"></div></div>
+        <div><div id="dialog-right-face"></div><div id="dialog-right-name"></div></div></div>
+        <div class="modal-footer"><button id="dialog-btn-ok">閉じる</button></div></div></div>
+        </body></html>`;
+    for (const isPc of [true, false]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', {width:isPc?1280:360,height:isPc?720:640,deviceScaleFactor:1,mobile:!isPc});
+        const result=await cdp.call('Runtime.evaluate',{
+            expression:`(async()=>{
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc',${isPc});
+                for(const key of ['UIInfoManager','UISliderManager','GuideView','SaveLoadView','LegionCouncilView','InterviewView'])window[key]=class{constructor(){}};
+                const UI=(new Function(${JSON.stringify(uiSource+'\nreturn UIManager;')}))();
+                UI.prototype.initMapDrag=function(){};UI.prototype.initContextMenu=function(){};
+                const ui=new UI({phase:'game',isWatchMode:false});
+                ui._prepareDialogFaces=()=>Promise.resolve({leftImg:null,rightImg:null});
+                ui.hideAIGuardTemporarily=()=>{};ui.restoreAIGuard=()=>{};
+                const actions=[];
+                ui.showDialog('選択をお願いします',false,null,null,{isEvent:true,choices:[
+                    {label:'承諾',onClick:()=>actions.push('accept')},
+                    {label:'拒否',onClick:()=>actions.push('reject')}
+                ]});
+                await new Promise(r=>setTimeout(r,20));
+                const modal=document.getElementById('dialog-modal');
+                const initialButtons=[...modal.querySelectorAll('.modal-footer button')].map(b=>b.textContent);
+                modal.click();
+                const afterBackdrop=actions.slice();
+                if(actions.length===0)modal.querySelectorAll('.modal-footer button')[1].click();
+                const afterSecond=actions.slice();
+                // 選択肢のないイベント会話は、従来どおり背景タップ1回で次へ進む。
+                ui.showDialog('次の台詞',false,()=>actions.push('advance'),null,{isEvent:true});
+                await new Promise(r=>setTimeout(r,20));
+                modal.click();
+                const afterPlainEvent=actions.slice();
+                // 二択確認の背景も［はい］扱いにしてはならない。
+                ui.showDialog('確認しますか',true,()=>actions.push('yes'),()=>actions.push('no'),{isEvent:true});
+                await new Promise(r=>setTimeout(r,20));
+                modal.click();
+                const afterConfirmBackdrop=actions.slice();
+                return {initialButtons,afterBackdrop,afterSecond,afterPlainEvent,afterConfirmBackdrop};
+            })()`,returnByValue:true,awaitPromise:true
+        });
+        if(result.exceptionDetails)throw Error(result.exceptionDetails.text+' '+JSON.stringify(result.exceptionDetails.exception));
+        const d=result.result?.value;
+        assert.deepStrictEqual(d.initialButtons,['承諾','拒否'],'会話選択肢を本番UIで生成する');
+        assert.deepStrictEqual(d.afterBackdrop,[],`${isPc?'PC':'スマホ'}: 背景タップで決定しない ${JSON.stringify(d)}`);
+        assert.deepStrictEqual(d.afterSecond,['reject'],`${isPc?'PC':'スマホ'}: 正しい選択肢のみ実行する`);
+        assert.deepStrictEqual(d.afterPlainEvent,['reject','advance'],`${isPc?'PC':'スマホ'}: 選択肢なしの背景タップは1回だけ進む`);
+        assert.deepStrictEqual(d.afterConfirmBackdrop,['reject','advance'],`${isPc?'PC':'スマホ'}: 確認の背景タップも無効`);
+    }
+    console.log('✓ r910 会話の選択肢はPC/スマホとも背景タップで誤決定しない（実ブラウザ）');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -2411,6 +2469,7 @@ async function main() {
         await validateDiplomacyQuantityHandoff(cdp);
         await validateBreakAllianceResultTransition(cdp);
         await validateTerminalDialogCoveredPaint(cdp);
+        await validateDialogChoiceBackdrop(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

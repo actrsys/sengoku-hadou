@@ -71,8 +71,9 @@ class WarPreparationController {
             if (this.game.writeSystemDiagnostic) this.game.writeSystemDiagnostic('war_prepare:ally_reinforcement_scan:done', atkCastle);
 
             if (allyForceCandidates.length === 0) {
-                this.game.warManager.startWar(atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, null, selfReinfData);
-                return;
+                // 開戦前イベント・画面準備が終わるまでは確認画面の共通暗幕を保持する。
+                // 戦争そのものの進行は従来どおりWarManagerに委譲する。
+                return this.game.warManager.startWar(atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, null, selfReinfData);
             }
 
             const allyCastles = [...new Set(allyForceCandidates.map(fc => fc.castle))];
@@ -82,9 +83,7 @@ class WarPreparationController {
                     () => {
                         this.game.ui.showReinforcementSelector(allyCastles, atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, selfReinfData);
                     },
-                    () => {
-                        this.game.warManager.startWar(atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, null, selfReinfData);
-                    },
+                    () => this.game.warManager.startWar(atkCastle, targetCastle, currentAtkBushos, currentSVal, rVal, hVal, gVal, null, selfReinfData),
                     { okText: '要請する', cancelText: '要請しない', closeBeforeOk: true, closeBeforeCancel: true }
                 );
             } else {
@@ -104,9 +103,7 @@ class WarPreparationController {
             if (myClanId === pid && !atkCastle.isDelegated) {
                 const confirmMsg = targetCastle.isKunishu ? `${targetCastle.name}を鎮圧しますか？\n今月の命令は終了となります` : `${targetCastle.name}に攻め込みますか？\n今月の命令は終了となります`;
                 this.game.ui.showDialog(confirmMsg, true, 
-                    async () => {
-                        proceedToAlly(selfReinfData, atkBushos, sVal);
-                    },
+                    () => proceedToAlly(selfReinfData, atkBushos, sVal),
                     () => {
                         // キャンセルした時
                         if (selfReinfData) {
@@ -300,7 +297,7 @@ class WarPreparationController {
                     
                     // ★メッセージ係にお任せします！
                     this.game.warManager.reinfMsgHelper.showRefusal(this.game, nameStr, decision.blockedByHeavySnow, () => {
-                        this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
+                        return this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
                     });
                 } else {
                     this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
@@ -325,7 +322,7 @@ class WarPreparationController {
                 
                 // ★メッセージ係にお任せします！
                 this.game.warManager.reinfMsgHelper.showAcceptance(this.game, nameStr, true, atkCastle.isDelegated, false, () => {
-                    this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+                    return this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
                 });
             } else {
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
@@ -365,7 +362,7 @@ class WarPreparationController {
             this.game.warManager.reinfMsgHelper.showRequest(this.game, myClanName, targetInfoStr, gold, isBoss, true, startSelection, () => {
                 this.game.diplomacyManager.updateSentiment(myClanId, helperClanId, -10);
                 this.game.ui.showDialog(`援軍要請を断りました。`, false, () => {
-                    this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
+                    return this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
                 }, null, { closeBeforeOk: true });
             });
             return;
@@ -391,7 +388,7 @@ class WarPreparationController {
                 
                 // ★メッセージ係にお任せします！
                 this.game.warManager.reinfMsgHelper.showRefusal(this.game, nameStr, decision.blockedByHeavySnow, () => {
-                    this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
+                    return this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
                 });
             } else {
                 this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, null, selfReinfData);
@@ -419,7 +416,7 @@ class WarPreparationController {
             
             // ★メッセージ係にお任せします！
             this.game.warManager.reinfMsgHelper.showAcceptance(this.game, nameStr, false, atkCastle.isDelegated, false, () => {
-                this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+                return this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
             });
         } else {
             this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
@@ -467,8 +464,8 @@ class WarPreparationController {
         
         // ★修正：手動で友軍を出した時の「出発しました！」のお返事を復活させます！
         this.game.ui.showDialog(`自軍の同盟援軍が出発しました！\n共に${targetCastle.name}へ侵攻します！`, false, () => {
-            this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
-        });
+            return this.game.warManager.startWar(atkCastle, targetCastle, atkBushos, sVal, rVal, hVal, gVal, reinforcementData, selfReinfData);
+        }, null, { closeBeforeOk: true });
     }
     
 

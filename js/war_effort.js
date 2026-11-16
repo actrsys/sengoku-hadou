@@ -2704,7 +2704,7 @@ Object.assign(WarManager.prototype, {
         });
         const nextStep = this._guardPrisonerPhaseCallback(async () => {
              this.pendingPrisoners.splice(index, 1);
-             this.startHirePhaseIntro();
+             return this.startHirePhaseIntro();
         });
 
         if (action === 'hire') {
@@ -2801,8 +2801,7 @@ Object.assign(WarManager.prototype, {
         if (!this._isPrisonerPhaseCurrent()) return;
         // ②登用フェーズ
         if (this.pendingPrisoners.length === 0) {
-            this.finishPrisonerPhase();
-            return;
+            return this.finishPrisonerPhase();
         }
         this.game.ui.showDialog("登用する武将を選択してください。", false, this._guardPrisonerPhaseCallback(() => {
             this.openHireSelector();
@@ -2815,7 +2814,7 @@ Object.assign(WarManager.prototype, {
         if (selectableCount === 0) {
             // ★変更：0人の時は終了確認をせず、メッセージを出して次の処断フェーズへ進みます
             this.game.ui.showDialog("登用できる武将がいないため、次の処遇へ進みます。", false, this._guardPrisonerPhaseCallback(() => {
-                this.startKillPhaseIntro();
+                return this.startKillPhaseIntro();
             }));
             return;
         }
@@ -2833,7 +2832,7 @@ Object.assign(WarManager.prototype, {
     checkFinishHirePhase() {
         if (!this._isPrisonerPhaseCurrent()) return;
         this.game.ui.showDialog("登用を終了しますか？", true, 
-            this._guardPrisonerPhaseCallback(() => { this.startKillPhaseIntro(); }), // 終了する：次のフェーズへ
+            this._guardPrisonerPhaseCallback(() => this.startKillPhaseIntro()), // 終了する：次のフェーズへ
             this._guardPrisonerPhaseCallback(() => { this.openHireSelector(); }), // 続ける：リストへ戻る
             { okText: '終了する', cancelText: '続ける', closeBeforeOk: true, closeBeforeCancel: true }
         );
@@ -2914,8 +2913,7 @@ Object.assign(WarManager.prototype, {
         if (!this._isPrisonerPhaseCurrent()) return;
         // ③処断フェーズ
         if (this.pendingPrisoners.length === 0) {
-            this.finishPrisonerPhase();
-            return;
+            return this.finishPrisonerPhase();
         }
         // 処断する予定の人のリストを用意します
         this.pendingKills = [];
@@ -2929,7 +2927,7 @@ Object.assign(WarManager.prototype, {
         if (this.pendingPrisoners.length === 0) {
             // ★変更：0人の時は終了確認をせず、メッセージを出して捕虜処遇を完了させます
             this.game.ui.showDialog("処断できる武将がいないため、捕虜の処遇を終了します。", false, this._guardPrisonerPhaseCallback(() => {
-                this.finishPrisonerPhase();
+                return this.finishPrisonerPhase();
             }));
             return;
         }
@@ -2947,7 +2945,7 @@ Object.assign(WarManager.prototype, {
     checkFinishKillPhase() {
         if (!this._isPrisonerPhaseCurrent()) return;
         this.game.ui.showDialog("処断を終了しますか？", true, 
-            this._guardPrisonerPhaseCallback(() => { this.finishPrisonerPhase(); }), // 終了する：全員の処遇を確定させます
+            this._guardPrisonerPhaseCallback(() => this.finishPrisonerPhase()), // 終了する：全員の処遇を確定させます
             this._guardPrisonerPhaseCallback(() => { this.openKillSelector(); }), // 続ける：リストへ戻る
             { okText: '終了する', cancelText: '続ける', closeBeforeOk: true, closeBeforeCancel: true }
         );

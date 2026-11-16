@@ -10871,16 +10871,17 @@ test('結果画面との引き渡しは結果を先に表示し背景復帰も�
     assert.ok(closeBlock.includes('this.closeCoveredViewAfterRecovery(this.resultModal'), '結果画面自身を背景復帰中のcoverとして保持する');
     assert.ok(closeBlock.includes('recoverUnderCover: () => this.resumeBackgroundUpdates()'), '結果画面の下で背景復帰を開始する');
     assert.ok(closeBlock.includes('afterHide: finishClose'), '通常の結果終了は実paint後にだけ後処理へ進む');
-    assert.ok(closeBlock.includes('this.beginVisualHandoff(() => {'), '断交の後続会話へだけ結果画面をhandoffできる');
+    assert.ok(closeBlock.includes('this.beginVisualHandoff(closeResultOnHandoff)'), '断交の後続会話へだけ結果画面をhandoffできる');
 });
 
 
-test('r604 断交後の人質・姫の即時会話だけ結果画面を引き継ぎ、他の外交は従来のpaint復帰を維持', () => {
+test('r904 断交後の人質・姫の非同期後処理はPromiseで引継ぎ、その他の結果は従来のpaint復帰を維持', () => {
     const dip = read('js/diplomacy.js');
     const ui = read('js/ui.js');
-    assert.ok(dip.includes('result.escapedHostageRecords.some(record =>'), '実際の脱走人質レコードから後続会話の有無を判定');
-    assert.ok(dip.includes('firstPrincess && Number(firstPrincess.currentClanId) === playerId'), '直ちにプレイヤーへ処遇選択を出す姫だけ該当');
-    assert.ok(dip.includes('{ handoffToNextDialog: !!(escapedFollowup || princessFollowup) }'), '断交結果以外へhandoffを広げない');
+    assert.ok(dip.includes('result.escapedHostageRecords.length > 0'), '実際に脱走人質が存在する場合を対象にする');
+    assert.ok(dip.includes('result.capturedHostageRecords.length > 0'), '途中に捕虜処遇が入る場合も対象にする');
+    assert.ok(dip.includes('result.atMercyPrincesses.length > 0'), '姫の処遇が非同期で続く場合も対象にする');
+    assert.ok(dip.includes('{ handoffToNextDialog: !!hasFollowup }'), '断交の後処理以外へ不要に引継ぎを広げない');
     assert.ok(ui.includes('this.resultFollowupDialogHandoff = options.handoffToNextDialog === true'), '共通結果画面は明示された場合だけ引継ぎ');
     assert.ok(ui.includes('recoverUnderCover: () => this.resumeBackgroundUpdates()'), '通常の終了時は従来どおり地図復帰paint待ち');
 });
@@ -33490,6 +33491,103 @@ test('r899 戦域点滅は攻城戦画面の復帰完了後に開始し、元の
     assert.ok(!effort.slice(start,blink).includes('setTimeout('),'固定msで画面を間に合わせない');
 });
 
+test('r904 断交後の非同期処遇はリザルトから次の会話、または後処理完了へ一度だけ引き継ぐ', async () => {
+    const ctx = createContext({document: {getElementById: () => null}});
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const make = () => {
+        const ui = Object.create(UI.prototype);
+        const classes = new Set();
+        ui.resultModal = { classList: { contains: value => classes.has(value), add: value => classes.add(value) } };
+        ui.resultFollowupDialogHandoff = true;
+        ui.restoreAIGuard = () => {};
+        ui.resumeBackgroundUpdates = () => {};
+        ui._modalBackdrop = null;
+        return {ui, classes};
+    };
+    // AI側が姫や人質を処理し、結果画面の確認直後にはまだ次の会話が存在しない場合。
+    let finishProcessing;
+    const processing = new Promise(resolve => {finishProcessing = resolve;});
+    const first = make();
+    first.ui.onResultModalClose = () => processing;
+    first.ui.closeResultModal();
+    assert.ok(!first.classes.has('hidden'), '後続処理中は前の結果画面を維持する');
+    finishProcessing();
+    for (let i=0; i<6; i++) await Promise.resolve();
+    assert.ok(first.classes.has('hidden'), '会話が発生しない場合は処理完了で閉じる');
+    assert.strictEqual(first.ui._visualHandoffCloseFn, null, '古い引き渡しを残さない');
+
+    // 次の会話が開けば、長い後処理の完了を待たず、公開された会話へ引き渡す。
+    let finishDialogue;
+    const ongoing = new Promise(resolve => {finishDialogue = resolve;});
+    const second = make();
+    second.ui.onResultModalClose = () => ongoing;
+    second.ui.closeResultModal();
+    assert.ok(!second.classes.has('hidden'));
+    second.ui.completeVisualHandoff(); // 本番のprocessDialogQueueが次の顔画像を公開した場面
+    assert.ok(second.classes.has('hidden'), '次の会話が見えてから旧結果画面を閉じる');
+    let unrelatedClosed = 0;
+    second.ui.beginVisualHandoff(() => {unrelatedClosed++;});
+    finishDialogue();
+    for (let i=0; i<6; i++) await Promise.resolve();
+    assert.strictEqual(unrelatedClosed, 0, '前処理の遅延完了が新しい引き渡しを閉じない');
+
+    const diplomacy = read('js/diplomacy.js');
+    const start = diplomacy.indexOf("} else if (type === 'break_alliance') {", diplomacy.indexOf('showDiplomacyResult('));
+    const scope = diplomacy.slice(start, diplomacy.indexOf("} else if (type === 'subordinate') {", start));
+    assert.ok(scope.includes('result.capturedHostageRecords.length > 0'), '捕虜のAI処遇を介す場合も候補にする');
+    assert.ok(scope.includes('result.atMercyPrincesses.length > 0'), '最初の姫だけの同期予測に頼らない');
+    assert.ok(scope.includes('() =>\n                this.resolveBreakAllianceConsequences(result).catch('), '実処理のPromiseを結果画面へ返す');
+});
+
+test('r903 出陣確認は開戦準備の非同期完了を共通暗幕へ引き渡す', async () => {
+    // プレイヤーが援軍候補なしで出陣する、通常プレイ可能な経路を実メソッドで検証。
+    let finishWarStart;
+    const warStart = new Promise(resolve => { finishWarStart = resolve; });
+    const prompts = [];
+    let starts = 0;
+    const attacker = { id: 1, ownerClan: 1, soldiers: 2000, isDelegated: false };
+    const target = { id: 2, name: '対象拠点', ownerClan: 2, isKunishu: false };
+    const game = {
+        playerClanId: 1,
+        getCastle: id => id === 2 ? target : null,
+        mapGraph: { getOwnedConnectedIds: () => [] },
+        diplomacyManager: { findAvailableReinforcements: () => [] },
+        warManager: { state: {}, startWar: () => { starts++; return warStart; } },
+        ui: { showDialog: (...args) => prompts.push(args) }
+    };
+    const context = createContext({
+        MapGraphService: { isSeaRoute: () => false },
+        TroopAllocationService: { clampArmySoldiers: value => value }
+    });
+    loadScript(context, 'js/war_preparation_controller.js');
+    const Controller = vm.runInContext('WarPreparationController', context);
+    new Controller(game).checkReinforcementAndStartWar(attacker, 2, [{ id: 10 }], 1000, 200, 0, 0);
+    assert.strictEqual(prompts.length, 1, '初回の出陣確認を表示');
+    assert.strictEqual(prompts[0][4].closeBeforeOk, true, '出陣時は先に旧確認を閉じる');
+    const action = prompts[0][2]();
+    assert.strictEqual(starts, 1, '開戦は一度だけ実行');
+    assert.strictEqual(action, warStart, 'UIへは開戦準備中の実Promiseを返し、先に解放しない');
+    finishWarStart();
+    await action;
+
+    // 援軍要請を断ってそのまま開戦する選択肢も同じく非同期準備を引き継ぐ。
+    const allyPrompts = [];
+    const allyGame = {
+        ...game,
+        diplomacyManager: {
+            findAvailableReinforcements: isSelf => isSelf ? [] : [{ castle: { id: 3 } }]
+        },
+        ui: { showDialog: (...args) => allyPrompts.push(args) }
+    };
+    new Controller(allyGame).checkReinforcementAndStartWar(attacker, 2, [{ id: 10 }], 1000, 200, 0, 0);
+    assert.strictEqual(allyPrompts.length, 1);
+    allyPrompts[0][2]();
+    assert.strictEqual(allyPrompts.length, 2, '援軍要請確認を表示');
+    const refuseAlly = allyPrompts[1][3]();
+    assert.strictEqual(refuseAlly, warStart, '援軍を要請しない場合も開戦準備Promiseを返す');
+});
+
 test('r902 外交の非同期分岐中は会話を固定時間で閉じず、選択肢の公開へ引き継ぐ', async () => {
     const ctx = createContext();
     loadScript(ctx, 'js/ui.js');
@@ -42522,6 +42620,311 @@ test('r891 野戦の初回カメラは即時スクロール、後続の通常追
     assert.strictEqual(moves[0].behavior, 'smooth');
 });
 
+
+// r905: 兵科や戦闘以外の通常コマンドも、確認画面の後続イベント待機中に
+// 入力画面のhandoffが先行終了しないよう、完了Promiseを共通UIに返す。
+test('r905 コマンドの最終確認は家中婚姻・継承・追放・臣従の後続PromiseをUIへ返す', async () => {
+    const context = createContext({ COMMAND_SPECS: {} });
+    loadScript(context, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', context);
+    const currentCastle = { id: 19 };
+    const subject = { id: 12, name: '担当武将' };
+    const bride = { id: 13, name: '姫' };
+    let confirm = null;
+    const actions = [];
+    const task = Promise.resolve('complete');
+    const info = { arrangeMarriageBushoId: 12, closeCommonModal() {} };
+    const game = {
+        year: 1560, month: 5, currentIndex: 0, turnQueue: [currentCastle],
+        playerClanId: 1,
+        ui: { info, showDialog(_text, _isConfirm, onOk) { confirm = onOk; }, beginVisualHandoff() {} },
+        getBusho: () => subject,
+        getPrincess: () => bride
+    };
+    const command = new Command(game);
+    command.executeWithEvent = type => { actions.push(type); return task; };
+    const confirmNext = (type, makeDialog) => {
+        confirm = null;
+        makeDialog();
+        assert.strictEqual(typeof confirm, 'function', `${type}: 実際の確認ダイアログが作られる`);
+        assert.strictEqual(confirm(), task, `${type}: イベント完了のPromiseを共通UIへ返す`);
+        assert.strictEqual(actions[actions.length - 1], type);
+    };
+    confirmNext('arrange_marriage', () => command.handleBushoSelection('marriage_princess', [bride.id], null, {}));
+    assert.strictEqual(info.arrangeMarriageBushoId, null, '姫選択セッションの後始末を維持');
+    confirmNext('succession', () => command.handleBushoSelection('succession_target', [subject.id], null, {}));
+    confirmNext('adopt_son', () => command.handleBushoSelection('adopt_son_target', [subject.id], null, {}));
+    confirmNext('banish', () => command.handleBushoSelection('banish', [subject.id], null, {}));
+    confirmNext('vassalage', () => command.handleBushoSelection('diplomacy_doer', [subject.id], 30, { subAction: 'vassalage' }));
+    confirm = null;
+    command._showCommandConfirmation('確定しますか？', () => task);
+    const oldConfirm = confirm;
+    const previousCount = actions.length;
+    game.month = 6;
+    assert.strictEqual(oldConfirm(), undefined, '古いターンの確認操作は無効');
+    assert.strictEqual(actions.length, previousCount, '失効時に後続イベントを実行しない');
+    await task;
+});
+
+// r906: 軍師助言［実行］の内部イベント待機も、ダイアログの共通handoffが完了まで保持できるよう
+// GunshiSystem→CommandSystem→UIManager の実際の操作経路でPromiseを欠落させない。
+test('r906 軍師助言の実行は非同期外交コマンドの完了PromiseをUIに返す', async () => {
+    const context = createContext({ COMMAND_SPECS: {} });
+    loadScript(context, 'js/command_system.js');
+    loadScript(context, 'js/gunshi_system.js');
+    const Command = vm.runInContext('CommandSystem', context);
+    const Gunshi = vm.runInContext('GunshiSystem', context);
+    const turnCastle = { id: 19 };
+    const gunshi = { id: 21, faceIcon: 'advice.webp', name: '軍師' };
+    const calls = [];
+    let confirm;
+    let releaseBefore;
+    const beforeCommand = new Promise(resolve => { releaseBefore = resolve; });
+    const game = {
+        playerClanId: 1, year: 1560, month: 7, currentIndex: 0, turnQueue: [turnCastle],
+        warManager: { state: { active: false } },
+        getClanGunshi: () => gunshi,
+        eventManager: { processEvents: type => {
+            calls.push(type);
+            return type === 'before_command' ? beforeCommand : Promise.resolve();
+        } },
+        ui: {
+            openGunshiModal: (_gunshi, _message, callback) => { confirm = callback; },
+            beginVisualHandoff: () => { calls.push('handoff'); },
+            beginDialogHandoffHold: () => { calls.push('hold'); },
+            completeVisualHandoff: () => { calls.push('end-visual'); },
+            endDialogHandoffHold: () => { calls.push('end-hold'); }
+        }
+    };
+    const command = new Command(game);
+    game.commandSystem = command;
+    command.getSpecs = () => ({ alliance: { hasAdvice: true } });
+    const adviser = new Gunshi(game);
+    adviser.getAdviceMessage = () => '外交助言';
+    game.gunshiSystem = adviser;
+    command.showAdviceAndExecute('alliance', async () => { calls.push('execute'); },
+        { trueProb: 0.7 }, { beforeConfirm: () => { calls.push('handoff'); } });
+    assert.strictEqual(typeof confirm, 'function', '軍師助言の実際の実行ボタンが用意された');
+    const action = confirm();
+    assert.ok(action && typeof action.then === 'function', '後続イベント待機のPromiseをUIへ返す');
+    assert.deepStrictEqual(calls.slice(0, 3), ['handoff', 'hold', 'before_command']);
+    assert.ok(!calls.includes('execute'), 'before_commandが未完了なら実行を開始しない');
+    releaseBefore();
+    await action;
+    assert.deepStrictEqual(calls, ['handoff', 'hold', 'before_command', 'execute', 'after_command', 'end-visual', 'end-hold']);
+});
+
+test('他勢力援軍の拒否・承諾通知から開戦する際、全実到達経路でPromiseをUIへ返す', () => {
+    const runtime = {
+        window: { DiplomacyRules: { isAllianceOrVassal: () => true }, GameConstants: { DiplomacyStatus: { DOMINANT: 'dominant' } } },
+        TroopAllocationService: { clampArmySoldiers: value => value },
+        MapGraphService: { isSeaRoute: () => false },
+        console
+    };
+    vm.runInNewContext(read('js/war_preparation_controller.js'), runtime, { filename: 'js/war_preparation_controller.js' });
+    const Controller = runtime.window.WarPreparationController;
+    let notification = null;
+    let dialog = null;
+    let accepted = false;
+    const pendingStart = new Promise(() => {}); // 実際の before_war が未完了の状態
+    const game = {
+        playerClanId: 1,
+        getProvince: () => ({ province: '近江' }),
+        getBusho: () => ({ name: '援軍長' }),
+        getClan: () => ({ name: '大名家' }),
+        getClanDaimyo: () => ({ duty: 75 }),
+        getRelation: () => ({ status: 'ally' }),
+        ui: { showDialog: (message, isConfirm, onOk, onCancel, options) => { dialog = { message, onOk, options }; } },
+        warManager: {
+            startWar: () => pendingStart,
+            applyWarHostility: () => {},
+            reinfMsgHelper: {
+                showRefusal: (_g, _n, _h, cb) => { notification = cb; },
+                showAcceptance: (_g, _n, _k, _d, _e, cb) => { notification = cb; },
+                showRequest: (_g, _n, _t, _cost, _boss, _attacker, _accept, decline) => { notification = decline; }
+            }
+        },
+        diplomacyManager: {
+            checkAIReinforcementAcceptance: () => ({ accepted, blockedByHeavySnow: false }),
+            updateSentiment: () => {}
+        },
+        reinforcementService: {
+            createAutoKunishuReinforcement: () => ({ soldiers: 10 }),
+            createAutoClanReinforcement: () => ({ soldiers: 20 }),
+            createManualCastleReinforcement: () => ({ soldiers: 30 }),
+            payAcceptedOffer: () => {}
+        },
+        kunishuSystem: {
+            getKunishu: () => ({ id: 5, leaderId: 99, getName: () => '諸勢力', getRelation: () => 70 }),
+            setRelation: () => {}
+        }
+    };
+    const controller = new Controller(game);
+    const attack = { id: 1, ownerClan: 1, provinceId: 1 };
+    const target = { id: 2, ownerClan: 3, provinceId: 1, soldiers: 500, name: '敵拠点' };
+    const helper = { id: 3, ownerClan: 4, provinceId: 1 };
+    const args = [50, helper, null, attack, target, [{ id: 10 }], 100, 200, 0, 0, null];
+    for (const force of [{ id: 5, isKunishu: true }, { id: 4, isKunishu: false }]) {
+        for (const isAccepted of [false, true]) {
+            accepted = isAccepted;
+            notification = null;
+            controller.executeReinforcementRequest(...[...args.slice(0, 2), force, ...args.slice(3)]);
+            assert.strictEqual(typeof notification, 'function', '通知の確定操作が登録される');
+            assert.strictEqual(notification(), pendingStart,
+                `${force.isKunishu ? '諸勢力' : '大名家'}の${isAccepted ? '承諾' : '拒否'}でも開戦Promiseを返す`);
+        }
+    }
+    // プレイヤーが援軍側にいる他家からの要請を拒否する分岐。
+    const foreignAttack = { ...attack, ownerClan: 2 };
+    const playerHelper = { ...helper, ownerClan: 1 };
+    notification = null;
+    dialog = null;
+    controller.executeReinforcementRequest(...[50, playerHelper, { id: 1, isKunishu: false }, foreignAttack, target, [{ id: 10 }], 100, 200, 0, 0, null]);
+    assert.strictEqual(typeof notification, 'function', '援軍要請の拒否操作がある');
+    notification();
+    assert.ok(dialog && dialog.options?.closeBeforeOk, '拒否結果から開戦する際、会話を先に閉じる');
+    assert.strictEqual(dialog.onOk(), pendingStart, '拒否結果の開戦PromiseもUIへ返す');
+
+    // 手動援軍が出発した通知から戦場へ移る際も、別画面へ進む契約と戻り値を守る。
+    dialog = null;
+    controller._applyManualAtkReinforcement(helper, attack, target, [{ id: 10 }], 100, 200, 0, 0, [{ id: 20 }], 30, 60, 0, 0, null);
+    assert.ok(dialog && dialog.message.includes('援軍が出発'), '手動援軍の出発通知を表示する');
+    assert.strictEqual(dialog.options?.closeBeforeOk, true, '戦場へ移る選択は先に会話を閉じる');
+    assert.strictEqual(dialog.onOk(), pendingStart, '出発通知から開戦Promiseを返す');
+});
+
+// r908: 捕虜処遇の確認で非同期死亡/滅亡処理のPromiseを落とさない。
+// 後続画面の公開前に共通暗幕を解除しないため、実行コールバックの戻り値を確認する。
+test('r908 捕虜処遇の終端確認は死亡処理から戦後完了までのPromiseをUIへ返す', async () => {
+    const ctx = createContext({ WarManager: class WarManager {} });
+    loadScript(ctx, 'js/war_effort.js');
+    const war = new ctx.WarManager();
+    const calls = [];
+    const prisoner = { id: 812, name: '対象武将' };
+    let releaseDeath;
+    let finished = 0;
+    const deathPending = new Promise(resolve => { releaseDeath = resolve; });
+    war._prisonerPhaseFlow = { finishing: false };
+    war._isPrisonerPhaseCurrent = (session = war._prisonerPhaseFlow) => !!session && war._prisonerPhaseFlow === session;
+    war.pendingPrisoners = [];
+    war.pendingKills = [prisoner];
+    war._prisonerPhaseContext = null;
+    war.state = { isTotalTakeoverExecuted: false, attacker: { ownerClan: 1 }, oldDefClanId: 2 };
+    war.isTotalTakeoverPending = () => false;
+    war.registerNemesisForExecuted = () => {};
+    war.checkTotalTakeover = async () => {};
+    war.game = {
+        playerClanId: 1,
+        ui: { showDialog(...args) { calls.push(args); } },
+        lifeSystem: {
+            executeDeath() { return deathPending; },
+            async checkClanExtinction() {}
+        },
+        updateAllClanPrestige() {},
+        finishTurn() { finished++; }
+    };
+
+    war.checkFinishKillPhase();
+    const last = calls.at(-1);
+    assert.strictEqual(last[0], '処断を終了しますか？');
+    assert.strictEqual(last[4].closeBeforeOk, true);
+    const completion = last[2]();
+    assert.ok(completion && typeof completion.then === 'function', '確認UIへ非同期完了を渡す');
+    await Promise.resolve();
+    assert.strictEqual(finished, 0, '処断の非同期待機中に戦後を完了しない');
+    releaseDeath();
+    await completion;
+    assert.strictEqual(finished, 1, '全死亡処理が終了したあと一度だけ戦後へ進む');
+    assert.strictEqual(war.pendingKills.length, 0);
+
+    // 捕虜がなくなった結果、自動で戦後処理に入る分岐も同じ戻り値を保つ。
+    const pending = Promise.resolve('end');
+    war._prisonerPhaseFlow = { finishing: false };
+    war.finishPrisonerPhase = () => pending;
+    war.pendingPrisoners = [];
+    assert.strictEqual(war.startHirePhaseIntro(), pending, '登用対象なし');
+    assert.strictEqual(war.startKillPhaseIntro(), pending, '処断対象なし');
+    war.checkFinishHirePhase();
+    assert.strictEqual(calls.at(-1)[2](), pending, '登用終了の確認');
+    war.openKillSelector();
+    assert.strictEqual(calls.at(-1)[2](), pending, '処断候補なしの通知');
+    war.openHireSelector();
+    assert.strictEqual(calls.at(-1)[2](), pending, '登用可能者なしの通知');
+});
+
+// r909: 終戦・タイトル復帰へ進む確認は、画面を閉じた直後に共通暗幕を解除せず、
+// 実際の非同期終端処理の完了PromiseをUIManagerへ引き継ぐ。
+test('r909 攻城戦の兵糧切れ通知は攻守双方で終戦PromiseをUIへ返す', () => {
+    const context = createContext();
+    loadScript(context, 'js/war.js');
+    const WarManagerCtor = vm.runInContext('WarManager', context);
+    for (const side of ['attacker', 'defender']) {
+        const war = Object.create(WarManagerCtor.prototype);
+        const dialogs = [];
+        const pendingEnd = new Promise(() => {});
+        let result = null;
+        war.endWar = won => { result = won; return pendingEnd; };
+        war.game = {
+            month: 5,
+            ui: {
+                log() {},
+                updateWarWeatherUI() {},
+                showDialog(...args) { dialogs.push(args); }
+            }
+        };
+        war.state = {
+            active: true, phase: 'init', isPlayerInvolved: true,
+            attacker: { rice: side === 'attacker' ? 0 : 20, soldiers: 100, morale: 50 },
+            defender: { rice: side === 'defender' ? 0 : 20, soldiers: 100, morale: 50, defense: 1000 }
+        };
+        war.processWarRound();
+        assert.strictEqual(dialogs.length, 1, `${side} 兵糧切れ通知を一度だけ表示`);
+        assert.strictEqual(dialogs[0][4].closeBeforeOk, true, '画面遷移前に入力用会話を閉じる');
+        assert.strictEqual(dialogs[0][2](), pendingEnd, `${side} の非同期終戦をUIへ伝播する`);
+        assert.strictEqual(result, side === 'defender', '勝敗結果は変更しない');
+    }
+});
+
+test('r909 シナリオ一覧の読込失敗通知はタイトル復帰PromiseをUIへ返す', async () => {
+    const runtime = createContext({
+        EventManager: class EventManager {},
+        addEventListener() {}, // VMではブラウザ起動イベントを登録しない
+        DataManager: { async loadScenarioDefinitions() { throw new Error('一覧取得失敗を再現'); } }
+    });
+    loadScript(runtime, 'js/game.js');
+    const GameManagerCtor = vm.runInContext('GameManager', runtime);
+    const pendingTitle = new Promise(() => {});
+    let dialog = null;
+    const game = {
+        tabSession: { claim: () => true, isOwner: () => true },
+        turnManager: { abortForScenarioTransition() {}, captureTurnFlowGeneration: () => 1, isTurnFlowGenerationLatest: () => true },
+        warManager: { abortForScenarioTransition() {}, state: {} },
+        fieldWarManager: { abortForScenarioTransition() {} },
+        releaseScenarioMapResources() {},
+        aiOperationManager: { resetAllState() {} },
+        aiStaffing: { resetCaches() {} },
+        historySystem: { clear() {} },
+        ui: {
+            forceResetModals() {}, clearWarLog() {}, resetMapViewState() {},
+            showDialog(...args) { dialog = args; },
+            returnToTitle: () => pendingTitle
+        }
+    };
+    const originalError = runtime.console;
+    runtime.console = { ...console, error() {} };
+    try {
+        await GameManagerCtor.prototype.startNewGame.call(game);
+    } finally {
+        runtime.console = originalError;
+    }
+    assert.ok(dialog && dialog[0].includes('シナリオ一覧の読み込みに失敗'), '実際のエラー通知が表示される');
+    assert.strictEqual(dialog[4].closeBeforeOk, true, '復帰前に通知の入力画面を閉じる');
+    assert.strictEqual(dialog[2](), pendingTitle, 'タイトル復帰の完了PromiseをUIへ返す');
+    const source = read('js/game.js');
+    assert.ok(source.includes('this.ui.showDialog("シナリオデータの読み込みに失敗しました。", false, () => {\n                    return this.ui.returnToTitle();'), 'シナリオ本体の読込失敗でも同じ完了契約を守る');
+});
+
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);
@@ -42530,5 +42933,6 @@ Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     process.exit(1);
 });
+
 
 

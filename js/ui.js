@@ -79,32 +79,6 @@ class UIManager {
 
         this.onResultModalClose = null;
 
-        // イベント中のメッセージ送りだけは、外側を押して進められるように残します
-        const dialogModal = document.getElementById('dialog-modal');
-        if (dialogModal) {
-            dialogModal.addEventListener('click', (e) => {
-                // ウインドウの外側（黒い背景）を押したか確認します
-                if (e.target === dialogModal) {
-                    // ★ここが重要です：イベント中かどうかを判定して、イベントの時だけ動かします
-                    if (dialogModal.classList.contains('event-dialog-modal')) {
-                        const cancelBtn = document.getElementById('dialog-btn-cancel');
-                        // 選択肢がない単なるメッセージの時だけ進めます
-                        if (!cancelBtn || cancelBtn.classList.contains('hidden')) {
-                            const okBtn = document.getElementById('dialog-btn-ok');
-                            if (okBtn) {
-                                // イベント中の選択音を鳴らします
-                                if (window.AudioManager) {
-                                    window.AudioManager.playSE('choice.ogg');
-                                }
-                                okBtn.click();
-                            }
-                        }
-                    }
-                    // イベント以外（普通のメッセージ等）の場合は何もしません＝ボタンを押すまで閉じません
-                }
-            });
-        }
-        
         if (this.mapZoomInBtn) {
             this.mapZoomInBtn.onclick = (e) => { e.stopPropagation(); this.changeMapZoom(1); };
         }
@@ -2698,12 +2672,25 @@ class UIManager {
             // この分岐は、呼出元がこの同期コールバック内で次の会話を必ず開始する場合に限る。
             // 背景の復旧を結果画面の下で行い、次の会話を先に表示した後に結果画面を閉じる。
             this.resumeBackgroundUpdates();
-            this.beginVisualHandoff(() => {
+            const closeResultOnHandoff = () => {
                 this.resultModal.classList.add('hidden');
                 finishClose();
-            });
+            };
+            this.beginVisualHandoff(closeResultOnHandoff);
             try {
-                cb();
+                const action = cb();
+                // 後続が非同期処理だけで終わる場合は、次の会話の公開を待ち続けない。
+                // 会話を公開した場合は prepareCoveredViewForOpen() が先に旧結果画面を閉じる。
+                // 結果画面の引き継ぎを開始した本人だけが、完了時に解放できる。
+                if (action && typeof action.then === 'function') {
+                    const closeWhenDone = () => {
+                        if (this._visualHandoffCloseFn === closeResultOnHandoff) this.completeVisualHandoff();
+                    };
+                    Promise.resolve(action).then(closeWhenDone, error => {
+                        closeWhenDone();
+                        console.error('結果画面後の外交処理に失敗しました:', error);
+                    });
+                }
             } catch (error) {
                 this.completeVisualHandoff();
                 throw error;

@@ -922,8 +922,9 @@ class CommandSystem {
                 this._showCommandConfirmation(msg, 
                     () => {
                         this.game.ui.info.closeCommonModal();
-                        this.executeWithEvent('arrange_marriage', () => this.executeArrangeMarriage(busho, princess));
+                        const action = this.executeWithEvent('arrange_marriage', () => this.executeArrangeMarriage(busho, princess));
                         this.game.ui.info.arrangeMarriageBushoId = null; // リセット
+                        return action;
                     },
                     null,
                     { okText: '嫁がせる', cancelText: '戻る', closeBeforeCancel: true }
@@ -1005,7 +1006,7 @@ class CommandSystem {
                 this._showCommandConfirmation(`本当に臣従しますか？\n当家は滅亡し、全ての領地を明け渡します。`, 
                     () => {
                         beginDiplomacySelectorHandoff();
-                        this.executeWithEvent('vassalage', () => this.game.diplomacyManager.executeVassalage(firstId, targetId));
+                        return this.executeWithEvent('vassalage', () => this.game.diplomacyManager.executeVassalage(firstId, targetId));
                     },
                     null,
                     { okText: '臣従する', okClass: 'btn-danger', cancelText: '戻る', closeBeforeCancel: true }
@@ -1165,7 +1166,7 @@ class CommandSystem {
                 () => {
                     // 確定時だけ候補一覧を正式終了。［戻る］なら背後の候補一覧へ戻ります。
                     if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
-                    this.executeWithEvent('succession', () => this.executeSuccession(firstId));
+                    return this.executeWithEvent('succession', () => this.executeSuccession(firstId));
                 },
                 null,
                 { okText: '家督を譲る', okClass: 'btn-danger', cancelText: '戻る', closeBeforeCancel: true }
@@ -1179,7 +1180,7 @@ class CommandSystem {
                 () => {
                     // 確定時だけ候補一覧を正式終了。［戻る］なら背後の候補一覧へ戻ります。
                     if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
-                    this.executeWithEvent('adopt_son', () => this.executeAdoptSon(firstId));
+                    return this.executeWithEvent('adopt_son', () => this.executeAdoptSon(firstId));
                 },
                 null,
                 { okText: '養子にする', cancelText: '戻る', closeBeforeCancel: true }
@@ -1199,7 +1200,7 @@ class CommandSystem {
             // 確定時だけ一覧を閉じて before/after_command を実行します。
             this._showCommandConfirmation(`本当に${busho.name}を追放しますか？`, () => {
                 if (this.game.ui.info && typeof this.game.ui.info.closeCommonModal === 'function') this.game.ui.info.closeCommonModal();
-                this.executeWithEvent('banish', () => this.executeCommand('banish', selectedIds, targetId));
+                return this.executeWithEvent('banish', () => this.executeCommand('banish', selectedIds, targetId));
             }, null, { cancelText: '戻る', closeBeforeCancel: true });
             return;
         }
@@ -1345,7 +1346,7 @@ class CommandSystem {
         const context = this._captureCommandTurnContext();
         this.game.ui.showDialog(message, true, () => {
             if (!this._isCommandTurnCurrent(context)) return;
-            if (typeof onConfirm === 'function') onConfirm();
+            if (typeof onConfirm === 'function') return onConfirm();
         }, onCancel, options);
     }
 
@@ -1400,7 +1401,7 @@ class CommandSystem {
             // 候補一覧の上に軍師助言を重ねている経路は、助言を了承した時だけ次画面へhandoffします。
             // ［戻る］で助言を取り消した場合は何も閉じず、背後の候補一覧へそのまま戻せます。
             if (uiFlow && typeof uiFlow.beforeConfirm === 'function') uiFlow.beforeConfirm();
-            this.executeWithEvent(actionType, executeCallback, extraContext);
+            return this.executeWithEvent(actionType, executeCallback, extraContext);
         });
     }
 

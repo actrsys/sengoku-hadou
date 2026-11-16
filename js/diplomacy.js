@@ -2405,17 +2405,19 @@ class DiplomacyManager {
             if (result.isBreakDomination) msg += `\n家臣団の中でも動揺が広がっているようです……`;
             
             doer.isActionDone = true;
-            // 敵対化した断交で、最初の処遇画面が同期的に表示開始される場合だけ
-            // 結果画面を次の会話まで保持する。AI側の処遇待ちなど表示開始が保証されない経路では使わない。
-            const playerId = Number(this.game.playerClanId);
-            const escapedFollowup = result.becameHostile && result.escapedHostageRecords.some(record =>
-                record?.busho && (Number(record.originClanId) === playerId || Number(record.captorClanId) === playerId));
-            const firstPrincess = result.atMercyPrincesses?.[0];
-            const princessFollowup = result.becameHostile && !escapedFollowup
-                && firstPrincess && Number(firstPrincess.currentClanId) === playerId;
-            this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, "", () => {
-                this.resolveBreakAllianceConsequences(result).catch(e => console.error('断交後処遇の実行に失敗しました:', e));
-            }, [doer.clan, targetClanId], { handoffToNextDialog: !!(escapedFollowup || princessFollowup) });
+            // 戦後の人質・姫の処遇はAI判断や捕虜処理をawaitする場合もある。
+            // 最初の対象者だけから次の画面の有無を推測せず、実処理のPromiseをUIへ返す。
+            // 次の会話が開けば旧リザルトを引き渡し、会話が不要なら処遇完了時に閉じる。
+            const hasFollowup = result.becameHostile && (
+                result.escapedHostageRecords.length > 0
+                || result.capturedHostageRecords.length > 0
+                || result.atMercyPrincesses.length > 0
+            );
+            this.showDiplomacyResult(doer.clan, isPlayerInvolved, msg, logMsg, "", () =>
+                this.resolveBreakAllianceConsequences(result).catch(e => {
+                    console.error('断交後処遇の実行に失敗しました:', e);
+                }),
+            [doer.clan, targetClanId], { handoffToNextDialog: !!hasFollowup });
             return;
             
         } else if (type === 'subordinate') {

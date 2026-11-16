@@ -362,7 +362,7 @@ class GameManager {
             console.error(error);
             if (this.ui) {
                 this.ui.showDialog("シナリオ一覧の読み込みに失敗しました。", false, () => {
-                    this.ui.returnToTitle();
+                    return this.ui.returnToTitle();
                 }, null, { closeBeforeOk: true });
             }
             return;
@@ -631,7 +631,7 @@ class GameManager {
             console.error(e);
             if (this.ui) {
                 this.ui.showDialog("シナリオデータの読み込みに失敗しました。", false, () => {
-                    this.ui.returnToTitle();
+                    return this.ui.returnToTitle();
                 }, null, { closeBeforeOk: true });
             } else {
                 this.returnToTitle();
