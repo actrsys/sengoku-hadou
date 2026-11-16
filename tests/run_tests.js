@@ -10975,6 +10975,68 @@ test('イベント専用地図は通常地図を復帰・paintしてから暗幕
     assert.ok(restoreAt >= 0 && finalPaintAt > restoreAt && removeAt > finalPaintAt, '通常地図compositorの復帰paintを暗幕で覆った後にだけremoveする');
 });
 
+test('国主評定の確定から結果画面への引継ぎで旧評定を即時終了し背景を不要に復帰しない', () => {
+    const context = createContext();
+    loadScript(context, 'js/legion_council_view.js');
+    const View = vm.runInContext('LegionCouncilView', context);
+    const view = Object.create(View.prototype);
+    const modal = { classList: new FakeClassList() };
+    const orderModal = { classList: new FakeClassList() };
+    const calls = [];
+    view.modal = modal;
+    view.orderModal = orderModal;
+    view.game = { playerClanId: 1, legionPolicySystem: { commitPolicies: () => 1 } };
+    view.draft = { 1: { allowOffense: true } };
+    view.members = [{ legionNo: 1 }];
+    view.editingTouched = new Set(['allowOffense']);
+    view.ui = {
+        showDialog(_msg, _confirm, onOk, _onCancel, opts) {
+            assert.strictEqual(opts.closeBeforeOk, true);
+            onOk();
+        },
+        beginVisualHandoff(fn) { this.finishHandoff = fn; },
+        showResultModal(msg) {
+            assert.ok(msg.includes('1軍団の方針を変更しました'));
+            calls.push('result-visible');
+            this.finishHandoff();
+            assert.strictEqual(modal.classList.contains('hidden'), true, '結果が公開された同期処理中に旧評定を外す');
+            assert.strictEqual(calls.includes('resume-map'), false, '後続結果が地図を覆う間に背景を復帰させない');
+            assert.strictEqual(calls.includes('schedule-covered-close'), false, '2paintの旧画面残留予約を作らない');
+        },
+        resumeBackgroundUpdates() { calls.push('resume-map'); },
+        closeCoveredViewAfterRecovery() { calls.push('schedule-covered-close'); },
+        renderCommandMenu() {}
+    };
+    view.confirmFinish();
+    assert.deepStrictEqual(calls, ['result-visible']);
+    assert.strictEqual(view.members.length, 0);
+    assert.strictEqual(Object.keys(view.draft).length, 0);
+    assert.strictEqual(view.editingTouched.size, 0);
+    assert.strictEqual(orderModal.classList.contains('hidden'), true);
+
+    // 通常の単独終了は旧画面をcoverにして背景復帰後に閉じる従来契約を保つ。
+    const normal = Object.create(View.prototype);
+    normal.modal = { classList: new FakeClassList() };
+    normal.orderModal = { classList: new FakeClassList() };
+    normal.editingTouched = new Set();
+    normal.draft = { 1: {} };
+    normal.members = [{ legionNo: 1 }];
+    normal.ui = {
+        closeCoveredViewAfterRecovery(cover, options) {
+            assert.strictEqual(cover.classList.contains('hidden'), false);
+            options.recoverUnderCover();
+            assert.strictEqual(cover.classList.contains('hidden'), false);
+            cover.classList.add('hidden');
+            options.afterHide();
+        },
+        resumeBackgroundUpdates() { calls.push('normal-resume-map'); }
+    };
+    normal.close();
+    assert.strictEqual(calls.filter(v => v === 'normal-resume-map').length, 1);
+    assert.strictEqual(normal.modal.classList.contains('hidden'), true);
+    assert.strictEqual(normal.members.length, 0);
+});
+
 test('会話・コマンド・評定から結果へ進む時は重い背景更新や元画面終了を結果画面の下で行う', () => {
     const diplomacy = read('js/diplomacy.js');
     const command = read('js/command_system.js');
@@ -11002,7 +11064,7 @@ test('会話・コマンド・評定から結果へ進む時は重い背景更�
     const councilStart = council.indexOf('confirmFinish()');
     const councilEnd = council.indexOf('\n    }\n}', councilStart);
     const councilBlock = council.slice(councilStart, councilEnd);
-    assert.ok(councilBlock.indexOf('this.ui.beginVisualHandoff(() => this.close())') < councilBlock.indexOf('this.ui.showResultModal('), '評定は結果画面を引き渡し先として元画面を保持する');
+    assert.ok(councilBlock.indexOf('this.ui.beginVisualHandoff(() => this.close({ coveredByResult: true }))') < councilBlock.indexOf('this.ui.showResultModal('), '評定は結果画面を引き渡し先として元画面を保持する');
 });
 
 
@@ -43345,13 +43407,129 @@ test('r919 後続モーダルがあれば旧一覧は即解放し、旧終了待
     testUI.prepareCoveredViewForOpen(visible);
     assert.strictEqual(visible.inert,false,'再公開した一覧が入力不能にならない');
     assert.deepStrictEqual(events.slice(-2),['cancel-close','show'],'古い閉鎖予約を取消してから公開');
-    assert.ok(uiSource.includes('if (selectorModal && selectorModal.inert)')
-        && uiSource.includes('this.info.selectorView.close()'), '強制リセットは失効した一覧を解放');
+    assert.ok(uiSource.includes("typeof this.info.closeCommonModal === 'function'")
+        && uiSource.includes('this.info.closeCommonModal()'), '強制リセットは専門Viewの正規終了処理で一覧を解放');
 });
 
 
 // r920: 背景復旧のpaintを待つ旧一覧から、次の固定モーダルへ実際に進む時は
 // 次画面公開と同じJSタスクで旧画面を非表示にしてDOMを解放する。
+test('r924 強制画面リセットは隠した旧共通一覧の実データとイベント参照も解放する', () => {
+    const uiSource = read('js/ui.js');
+    const start = uiSource.indexOf('    forceResetModals(options = {}) {');
+    const end = uiSource.indexOf('\n    log(msg, historyOptions = null)', start);
+    assert.ok(start >= 0 && end > start, '強制リセットの正本を取得');
+    const selector = { id: 'selector-modal', inert: true, classList: new FakeClassList(), style: {} };
+    const ctx = createContext({ document: {
+        body: { classList: new FakeClassList() },
+        querySelectorAll(selectorText) { return selectorText === '.modal' ? [selector] : []; },
+        getElementById(id) { return id === 'selector-modal' ? selector : null; }
+    }});
+    vm.runInContext('class ResetUI {' + uiSource.slice(start, end) + '} this.ResetUI=ResetUI;', ctx);
+    const ui = new ctx.ResetUI();
+    const events = [];
+    ui._battleSuspendOwners = new Set();
+    ui._clearModalHandoffBackdrop = () => events.push('clear-backdrop');
+    ui._cancelDialogHandoffClose = () => {};
+    ui._cancelProcessingStatusReveal = () => {};
+    ui.hideContextMenu = () => {};
+    ui._cancelEmptyCardAnimation = () => {};
+    ui.game = { phase: 'game' };
+    ui.info = { closeCommonModal() {
+        assert.strictEqual(selector.classList.contains('hidden'), true, '一覧を表示したまま中身だけ消さない');
+        events.push('release-list');
+    }, selectorView: { close() { events.push('release-selector-fallback'); } } };
+    ui.forceResetModals({ skipBackgroundRecovery: true });
+    assert.deepStrictEqual(events.filter(x => x === 'release-list'), ['release-list'], '強制終了の度に専門Viewの正規後始末を一度だけ実行');
+    assert.ok(!events.includes('release-selector-fallback'), '旧inert専用後始末の二重実行を残さない');
+    assert.strictEqual(selector.inert, false, '再公開時の入力不能状態を持ち越さない');
+});
+
+test('r925 強制タイトル復帰で面談と国主評定の一時状態・旧操作参照を破棄する', () => {
+    const uiSource = read('js/ui.js');
+    const start = uiSource.indexOf('    forceResetModals(options = {}) {');
+    const end = uiSource.indexOf('\n    log(msg, historyOptions = null)', start);
+    assert.ok(start >= 0 && end > start);
+    const classList = () => {
+        const classes = new FakeClassList();
+        classes.toggle = (name, force) => {
+            if (force === undefined ? !classes.contains(name) : force) classes.add(name);
+            else classes.remove(name);
+        };
+        return classes;
+    };
+    const panel = id => ({ id, classList: classList(), style: {} });
+    const interviewModal = panel('interview-modal');
+    const councilModal = panel('legion-council-modal');
+    const orderModal = panel('legion-council-order-modal');
+    const selector = { ...panel('selector-modal'), inert: false };
+    const removed = [];
+    interviewModal.removeEventListener = (type, handler) => removed.push([type, handler]);
+    const ctx = createContext({ document: {
+        body: { classList: new FakeClassList() },
+        querySelectorAll(selectorText) {
+            if (selectorText === '.modal') return [interviewModal, councilModal, orderModal, selector];
+            return [];
+        },
+        getElementById(id) { return id === 'selector-modal' ? selector : null; }
+    }});
+    vm.runInContext('class ResetUI {' + uiSource.slice(start, end) + '} this.ResetUI=ResetUI;', ctx);
+    vm.runInContext(read('js/interview_view.js'), ctx);
+    vm.runInContext(read('js/legion_council_view.js'), ctx);
+    const interview = Object.create(ctx.InterviewView.prototype);
+    const council = Object.create(ctx.LegionCouncilView.prototype);
+    interview.modal = interviewModal;
+    interview.pageItems = [{ id: 123 }];
+    interview.onPageItemSelect = () => {};
+    interview.currentSpeaker = { id: 123 };
+    const oldAdvance = () => {};
+    interview._messageAdvanceHandler = oldAdvance;
+    let releasedFaces = 0;
+    interview.summaryPanel = { classList: classList() };
+    interview.name = { textContent: '旧武将' };
+    interview.meta = { replaceChildren() { releasedFaces++; } };
+    interview.stats = { replaceChildren() { releasedFaces++; } };
+    interview.body = { replaceChildren() {} };
+    interview.inlineActions = { replaceChildren() {}, classList: classList() };
+    interview.footer = { replaceChildren() {}, classList: classList() };
+    interview.pager = { classList: classList() };
+    council.modal = councilModal;
+    council.orderModal = orderModal;
+    let clearedSeatPanels = 0;
+    council.leftSeats = { replaceChildren() { clearedSeatPanels++; } };
+    council.rightSeats = { replaceChildren() { clearedSeatPanels++; } };
+    council.orderBody = { replaceChildren() { clearedSeatPanels++; } };
+    council.draft = { 1: { allowOffense: true } };
+    council.members = [{ legionNo: 1, commander: { id: 123 } }];
+    council.editingMode = 'one';
+    council.editingPolicy = { allowOffense: false };
+    council.editingTouched = new Set(['allowOffense']);
+    const ui = new ctx.ResetUI();
+    ui._battleSuspendOwners = new Set();
+    ui._clearModalHandoffBackdrop = () => {};
+    ui._cancelDialogHandoffClose = () => {};
+    ui._cancelProcessingStatusReveal = () => {};
+    ui._cancelEmptyCardAnimation = () => {};
+    ui.hideContextMenu = () => {};
+    ui.game = { phase: 'game' };
+    ui.info = { closeCommonModal() {} };
+    ui.interviewView = interview;
+    ui.legionCouncilView = council;
+    ui.forceResetModals({ skipBackgroundRecovery: true });
+    assert.strictEqual(interview.pageItems.length, 0, '面談の武将配列を保持しない');
+    assert.strictEqual(interview.currentSpeaker, null, '面談の旧話者参照を解放');
+    assert.strictEqual(releasedFaces, 2, '旧話者の顔と表示用情報DOMを解放');
+    assert.strictEqual(interview.onPageItemSelect, null, '面談の選択callbackを解放');
+    assert.strictEqual(interview._messageAdvanceHandler, null, '面談のメッセージ送りhandlerを解放');
+    assert.ok(removed.some(([type, fn]) => type === 'click' && fn === oldAdvance), '旧listenerを固定DOMから解除');
+    assert.strictEqual(council.members.length, 0, '評定の旧武将参照を保持しない');
+    assert.strictEqual(Object.keys(council.draft).length, 0, '評定の確定前編集を破棄');
+    assert.strictEqual(council.editingMode, null, '評定の旧編集モードを破棄');
+    assert.strictEqual(council.editingTouched.size, 0, '評定の旧変更箇所を破棄');
+    assert.strictEqual(clearedSeatPanels, 3, '評定席・命令編集の旧画像とDOM操作参照を解放');
+    assert.ok(interviewModal.classList.contains('hidden') && councilModal.classList.contains('hidden'));
+});
+
 test('r920 背景復旧中に次画面が公開されたら旧coverを一回だけ終え、重複フレームを残さない', async () => {
     const source = read('js/ui.js');
     const start = source.indexOf('    waitForCoveredMapPaint() {');

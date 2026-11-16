@@ -56,7 +56,14 @@ class InterviewView {
         if (typeof this.ui.pauseBackgroundUpdates === 'function') this.ui.pauseBackgroundUpdates();
     }
 
-    close() {
+    close({ forceReset = false } = {}) {
+        // タイトル復帰では共通UIがすでに全モーダルを隠している。
+        // 背景を再描画せず、通常終了と同じ面談内の一時参照だけを破棄する。
+        if (forceReset) {
+            if (this.modal) this.modal.classList.add('hidden');
+            this._clearView();
+            return;
+        }
         if (!this.modal || this.modal.classList.contains('hidden')) return;
         this._clearMessageAdvance();
         if (this.ui && typeof this.ui.closeCoveredViewAfterRecovery === 'function') {
@@ -86,6 +93,8 @@ class InterviewView {
         }
         if (this.pager) this.pager.classList.add('hidden');
         this._setConversationVisible(false);
+        // 非表示になった面談の顔画像・情報DOMも解放し、次のシナリオまで保持しない。
+        this._setSpeaker(null);
         this.pageItems = [];
         this.page = 0;
         this.pageSize = 0;
@@ -94,7 +103,6 @@ class InterviewView {
         this.listSortAsc = false;
         this.listQuery = '';
         this.onPageItemSelect = null;
-        this.currentSpeaker = null;
         this._listGrid = null;
         this._listCount = null;
         this._listDirection = null;

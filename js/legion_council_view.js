@@ -89,9 +89,14 @@ class LegionCouncilView {
         if (typeof this.ui.pauseBackgroundUpdates === 'function') this.ui.pauseBackgroundUpdates();
     }
 
-    close() {
+    close({ coveredByResult = false, forceReset = false } = {}) {
         this.closeOrderEditor();
         const resetState = () => {
+            // 画面を隠した後、席と命令編集のDOMも破棄する。
+            // 顔画像と各席の旧操作ハンドラを次のゲームへ持ち越さない。
+            if (this.leftSeats) this.leftSeats.replaceChildren();
+            if (this.rightSeats) this.rightSeats.replaceChildren();
+            if (this.orderBody) this.orderBody.replaceChildren();
             this.draft = {};
             this.members = [];
             this.editingMode = null;
@@ -99,6 +104,13 @@ class LegionCouncilView {
             this.editingPolicy = null;
             this.editingTouched.clear();
         };
+        // 結果公開時と強制タイトル復帰時は、旧評定がすでに覆われている。
+        // 地図復帰を重ねず、即時に隠して一時状態を解放する。
+        if (coveredByResult || forceReset) {
+            if (this.modal) this.modal.classList.add('hidden');
+            resetState();
+            return;
+        }
         if (this.modal && !this.modal.classList.contains('hidden') && this.ui && typeof this.ui.closeCoveredViewAfterRecovery === 'function') {
             this.ui.closeCoveredViewAfterRecovery(this.modal, {
                 recoverUnderCover: () => {
@@ -319,7 +331,7 @@ class LegionCouncilView {
         this.ui.showDialog('この内容で国主への命令を確定し、評定を終えますか？', true, () => {
             const changed = this.system.commitPolicies(this.game.playerClanId, this.draft);
             // 評定画面は結果画面が可視化されるまで保持し、背景だけが露出する瞬間を作らない。
-            this.ui.beginVisualHandoff(() => this.close());
+            this.ui.beginVisualHandoff(() => this.close({ coveredByResult: true }));
             this.ui.showResultModal(
                 `評定を終えました。\n${changed > 0 ? `${changed}軍団の方針を変更しました。` : '方針の変更はありません。'}`,
                 null,

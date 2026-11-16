@@ -2543,13 +2543,18 @@ class UIManager {
             m.classList.add('hidden');
             m.style.display = '';
         });
-        // 背景paint待ちの旧一覧がタイトル復帰で失効した場合も、
-        // afterHideが走らないまま一覧DOM・顔画像を持ち越さない。
-        const selectorModal = document.getElementById('selector-modal');
-        if (selectorModal && selectorModal.inert) {
-            if (this.info && this.info.selectorView) this.info.selectorView.close();
-            selectorModal.inert = false;
+        // 強制遷移は全モーダルを隠した後に、共通一覧の正規終了処理を使って
+        // 旧一覧DOM・画像・選択履歴・描画予約を解放する。背景は既に復帰または
+        // 破棄済みなので、通常の2paint待ちや新たな暗幕は発生させない。
+        if (this.info && typeof this.info.closeCommonModal === 'function') {
+            this.info.closeCommonModal();
         }
+        // 面談・評定の専門Viewも旧人物参照と編集中データを保持する。
+        // 全モーダルはすでに非表示なので、通常の背景復帰待ちを挟まず正規終了する。
+        if (this.interviewView) this.interviewView.close({ forceReset: true });
+        if (this.legionCouncilView) this.legionCouncilView.close({ forceReset: true });
+        const selectorModal = document.getElementById('selector-modal');
+        if (selectorModal) selectorModal.inert = false;
         if(this.cutinOverlay) this.cutinOverlay.classList.add('hidden');
         if(this.warModal) this.warModal.classList.add('hidden');
         if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
