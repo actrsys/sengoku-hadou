@@ -1070,16 +1070,15 @@ class UIManager {
             backdrop.style.background = style.background;
         }
         backdrop.classList.remove('hidden');
-        this._releaseModalHandoffBackdropAfterPaint(160);
+        this._releaseModalHandoffBackdropAfterPaint();
     }
 
-    _releaseModalHandoffBackdropAfterPaint(delay = 0) {
+    _releaseModalHandoffBackdropAfterPaint() {
         if (!this._modalBackdrop || this._modalBackdrop.classList.contains('hidden')) return;
         const epoch = Number(this._modalBackdropEpoch || 0) + 1;
         this._modalBackdropEpoch = epoch;
         const finish = async () => {
-            if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-            // 会話の顔画像decodeなどが進行中なら、固定時間で暗幕を剥がさない。
+            // 会話の顔画像decodeなどが進行中なら、完了前に暗幕を剥がさない。
             // 次画面公開・会話完了・強制画面失効のいずれかで待機を終了する。
             while (epoch === this._modalBackdropEpoch && this._modalBackdropHolds === 0
                 && (this.isDialogShowing || (this.dialogQueue && this.dialogQueue.length > 0)
@@ -1140,6 +1139,12 @@ class UIManager {
     // hold中は閉じる予約だけ保持し、次の画面が実際に用意されるまで見た目を残します。
     beginDialogHandoffHold() {
         this._dialogHandoffHoldCount = (this._dialogHandoffHoldCount || 0) + 1;
+        // 表示の終了猶予が既に始まっていた場合も、明示的な次画面の準備が
+        // 始まった時点で固定時間による閉鎖を止める。閉鎖の予約自体は保持する。
+        if (this._dialogHandoffPending && this._dialogHandoffTimer) {
+            clearTimeout(this._dialogHandoffTimer);
+            this._dialogHandoffTimer = null;
+        }
     }
 
     endDialogHandoffHold() {
@@ -1147,6 +1152,16 @@ class UIManager {
         if (this._dialogHandoffHoldCount === 0 && this._dialogHandoffPending) {
             this._closePendingDialogHandoffNow();
         }
+    }
+
+    // 次の画面が実際に公開された時だけ旧会話を閉じる共通窓口。
+    // 結果モーダル・通常モーダル・災害地図のいずれからも同じ契約を使う。
+    completeDialogToViewHandoff() {
+        if (typeof this._closeDialogForViewHandoff === 'function') {
+            this._closeDialogForViewHandoff();
+            return true;
+        }
+        return this._closePendingDialogHandoffNow(true);
     }
 
     _closePendingDialogHandoffNow(immediate = false) {
@@ -1274,8 +1289,8 @@ class UIManager {
     async processDialogQueue() {
         // ★Round19：猶予中に次のダイアログが来た場合、旧画面を隠す予定だけ取り消します。
         if (this._dialogHandoffPending) this._cancelDialogHandoffClose();
-        // 次の会話がキューを取得した時点で、前の会話の結果画面向け閉鎖権を失効させる。
-        this._closeDialogForResultHandoff = null;
+        // 次の会話がキューを取得した時点で、旧会話の異種画面向け閉鎖権を失効させる。
+        this._closeDialogForViewHandoff = null;
         if (this.dialogQueue.length === 0) {
             this.isDialogShowing = false;
             return;
@@ -1433,11 +1448,11 @@ class UIManager {
                 currentContent.style.cursor = '';
             }
 
-            let closedForResultHandoff = false;
+            let closedForViewHandoff = false;
             const closeCompletely = (immediate = false) => {
                 const finishClose = () => {
-                    if (this._closeDialogForResultHandoff === closeForResultHandoff) {
-                        this._closeDialogForResultHandoff = null;
+                    if (this._closeDialogForViewHandoff === closeForViewHandoff) {
+                        this._closeDialogForViewHandoff = null;
                     }
                     if (leftFaceEl) leftFaceEl.replaceChildren();
                     if (rightFaceEl) rightFaceEl.replaceChildren();
@@ -1459,18 +1474,18 @@ class UIManager {
                 }
             };
 
-            // 結果モーダルは会話より低いz-indexなので、結果が用意された同一描画単位で
+            // 別モーダルは会話より低いz-indexもあり得るので、次画面が用意された同一描画単位で
             // 会話を即座に外す。通常の会話→会話の画像decode待ち・猶予は維持する。
-            const closeForResultHandoff = () => {
-                if (closedForResultHandoff) return;
-                closedForResultHandoff = true;
+            const closeForViewHandoff = () => {
+                if (closedForViewHandoff) return;
+                closedForViewHandoff = true;
                 this._cancelDialogHandoffClose();
                 closeCompletely(true);
             };
-            this._closeDialogForResultHandoff = closeForResultHandoff;
+            this._closeDialogForViewHandoff = closeForViewHandoff;
 
             const continueOrClose = (pendingAction = null) => {
-                if (closedForResultHandoff) return;
+                if (closedForViewHandoff) return;
                 if (this.dialogQueue.length > 0) {
                     // 次の画像の decode 中も今の会話画面を保持し、準備完了時に中身だけ交換します。
                     this.isDialogShowing = true;
@@ -1529,7 +1544,7 @@ class UIManager {
                     releaseActionBackdrop();
                 }
             }
-            if (!closeBeforeAction && !closedForResultHandoff) scheduleHandoff(callbackResult);
+            if (!closeBeforeAction && !closedForViewHandoff) scheduleHandoff(callbackResult);
         };
         
         // ★修正：okBtnが見つからなくても、安全にフッター（ボタンの置き場）を見つける魔法です！
@@ -2328,6 +2343,9 @@ class UIManager {
         if (!coverEl) return;
         this.cancelCoveredClose(coverEl);
         coverEl.classList.remove('hidden');
+        // 別の固定モーダルが公開された場合、閉鎖待ちの旧会話を同じ描画単位で
+        // 引き渡す。会話→会話はprocessDialogQueueが別途管理するため触れない。
+        if (coverEl.id !== 'dialog-modal') this.completeDialogToViewHandoff();
     }
 
     closeCoveredViewAfterRecovery(coverEl, options = {}) {
@@ -2450,7 +2468,7 @@ class UIManager {
             this._cancelEmptyCardAnimation(card);
         });
         this._cancelDialogHandoffClose();
-        this._closeDialogForResultHandoff = null;
+        this._closeDialogForViewHandoff = null;
         this._dialogHandoffHoldCount = 0;
         this._visualHandoffCloseFn = null;
         this._resultModalClosing = false;
@@ -2647,11 +2665,6 @@ class UIManager {
         this.completeVisualHandoff();
         // 既に終了操作を受けた会話は、次会話向けの猶予/paint待ちを使わず、
         // 結果を公開したこの同期処理中に閉じる。別階層のモーダルを重ねて描かない。
-        if (typeof this._closeDialogForResultHandoff === 'function') {
-            this._closeDialogForResultHandoff();
-        } else {
-            this._closePendingDialogHandoffNow(true);
-        }
 
         // 結果へ遷移する直前に地図・ヘッダー・コマンドを更新すると、巨大Canvasの再合成が
         // 旧会話や旧モーダルの最終フレームへ重なり、低速端末でちらついて見えることがある。

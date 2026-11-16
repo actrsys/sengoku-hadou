@@ -3470,7 +3470,8 @@ test('選択画面の標準ボタンは実際の戻り先に合わせて［戻�
     });
     loadScript(ctx, 'js/ui_info.js');
     vm.runInContext('this.UIInfoManager = UIInfoManager;', ctx);
-    const manager = new ctx.UIInfoManager({ pauseBackgroundUpdates() {}, resumeBackgroundUpdates() {} }, { phase: 'title' });
+    const manager = new ctx.UIInfoManager({ pauseBackgroundUpdates() {}, resumeBackgroundUpdates() {},
+        prepareCoveredViewForOpen: modal => modal.classList.remove('hidden') }, { phase: 'title' });
     let opened = null;
     manager.selectorView = {
         open(options) { opened = options; return null; },
@@ -3577,7 +3578,7 @@ test('武将選択の子数量画面は戻る時に親一覧状態をそのま�
     });
     loadScript(ctx, 'js/ui_info.js');
     vm.runInContext('this.UIInfoManager = UIInfoManager;', ctx);
-    const manager = new ctx.UIInfoManager({ pauseBackgroundUpdates() {}, resumeBackgroundUpdates() {} }, { phase: 'title' });
+    const manager = new ctx.UIInfoManager({ pauseBackgroundUpdates() {}, resumeBackgroundUpdates() {}, prepareCoveredViewForOpen: modal => modal.classList.remove('hidden') }, { phase: 'title' });
     const classes = new Set();
     const modal = { classList: {
         contains: (name) => classes.has(name),
@@ -8206,6 +8207,8 @@ test('最終coverは背景復旧後の2フレームまで維持し、先行す�
     const methods = source.slice(functionStart, functionEnd);
     vm.runInContext('class TestUI {' + methods + '} this.TestUI = TestUI;', ctx);
     const ui = new ctx.TestUI();
+    // この検査は背景復旧後の閉鎖に限定し、画面間引継ぎは別の実UI検査が担当する。
+    ui.completeDialogToViewHandoff = () => false;
     const cover = { classList: new FakeClassList() };
     let recovered = 0;
     const closed = ui.closeCoveredViewAfterRecovery(cover, { recoverUnderCover: () => { recovered++; } });
@@ -10862,8 +10865,9 @@ test('結果画面との引き渡しは結果を先に表示し背景復帰も�
     const showStart = ui.indexOf('showResultModal(msg');
     const closeStart = ui.indexOf('\n    closeResultModal() {', showStart);
     const showBlock = ui.slice(showStart, closeStart);
-    assert.ok(showBlock.indexOf('this.prepareCoveredViewForOpen(this.resultModal)') < showBlock.indexOf('this._closeDialogForResultHandoff()'), '結果画面を可視化してから旧会話を同じ描画単位で閉じる');
-    assert.ok(showBlock.indexOf('this._closeDialogForResultHandoff()') < showBlock.indexOf("typeof updateBehindCover === 'function'"), '旧会話を結果へ引き渡してから背景更新へ進む');
+    const openBlock = ui.slice(ui.indexOf('prepareCoveredViewForOpen(coverEl) {'), ui.indexOf('    closeCoveredViewAfterRecovery(coverEl'));
+    assert.ok(openBlock.indexOf("coverEl.classList.remove('hidden');") < openBlock.indexOf('this.completeDialogToViewHandoff()'), '新モーダルの公開後に共通窓口で旧会話を閉じる');
+    assert.ok(showBlock.indexOf('this.prepareCoveredViewForOpen(this.resultModal)') < showBlock.indexOf("typeof updateBehindCover === 'function'"), '結果公開と旧会話引継ぎ後に背景更新する');
     assert.ok(showBlock.indexOf("typeof updateBehindCover === 'function'") < showBlock.indexOf('this.pauseBackgroundUpdates()'), '背景更新は結果画面の覆いの下・背景停止前に行う');
 
     const closeEnd = ui.indexOf('\n    closeSelector() {', closeStart);
@@ -17895,7 +17899,7 @@ test('r443 セーブ一覧は外部保存データのHTMLと画像属性の混�
         requestAnimationFrame: callback => { callback(); return 1; }
     });
     loadScript(ctx, 'js/save_load_view.js');
-    const ui = { updateCustomScrollbars() {} };
+    const ui = { updateCustomScrollbars() {}, prepareCoveredViewForOpen(modal) { modal.classList.remove('hidden'); } };
     const game = { phase: 'title', saveManager: { async readSaveSlots(prefix) {
         return Array.from({length: 5}, (_, i) => ({
             originalSlotNo: i + 1,
@@ -18594,7 +18598,7 @@ test('r448 保存画面は読込失敗スロットを上書き不能にする', 
         requestAnimationFrame: cb => { cb(); return 1; }
     });
     loadScript(ctx, 'js/save_load_view.js');
-    const view = new ctx.SaveLoadView({ updateCustomScrollbars() {} }, {
+    const view = new ctx.SaveLoadView({ updateCustomScrollbars() {}, prepareCoveredViewForOpen: modal => modal.classList.remove('hidden') }, {
         phase: 'game', saveManager: { readSaveSlots: async prefix =>
             Array.from({ length: 5 }, (_, index) => ({
                 originalSlotNo: index + 1, hasData: false, saveTimestamp: 0,
@@ -18641,7 +18645,7 @@ test('r449 非対応スロットの上書き前に喪失警告を表示する', 
     }, setTimeout: cb => { cb(); return 1; }, requestAnimationFrame: cb => { cb(); return 1; } });
     loadScript(ctx, 'js/save_load_view.js');
     let confirmation = null;
-    const view = new ctx.SaveLoadView({ showDialog(message){confirmation=message;}, updateCustomScrollbars(){} }, {
+    const view = new ctx.SaveLoadView({ showDialog(message){confirmation=message;}, updateCustomScrollbars(){}, prepareCoveredViewForOpen: modal => modal.classList.remove('hidden') }, {
         phase:'game',saveManager:{ readSaveSlots: async prefix => Array.from({length:5},(_,index)=>({
             originalSlotNo:index+1, hasData:false, saveTimestamp:0, data:null, readError:false,
             invalidData: prefix === 'sengoku_save_slot' && index===0
@@ -23538,6 +23542,7 @@ function makeR524SlotSelection(mode) {
     let confirm = null;
     const ui = {
         updateCustomScrollbars() {},
+        prepareCoveredViewForOpen: modal => modal.classList.remove('hidden'),
         showDialog(message, isConfirm, onOk) { confirm = onOk; }
     };
     const view = new ctx.SaveLoadView(ui, game);
@@ -23594,7 +23599,8 @@ test('r684 ロード一覧の表示とタブ切替は保存検査完了後に固
             }
         }
     };
-    const view = new ctx.SaveLoadView({updateCustomScrollbars() {}}, game);
+    const view = new ctx.SaveLoadView({updateCustomScrollbars() {},
+        prepareCoveredViewForOpen: modal => modal.classList.remove('hidden')}, game);
     const list = elements.get('saveload-list');
     const finishMicrotasks = async () => {
         for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -33862,6 +33868,7 @@ test('r898 結果リザルトは閉じるまで進行せず、閉じる操作は
     vm.runInContext('class UIManager {}; this.UIManager = UIManager;', ctx);
     loadScript(ctx, 'js/ui_war_result.js');
     const ui = new ctx.UIManager();
+    ui.prepareCoveredViewForOpen = modal => modal.classList.remove('hidden');
     let called = 0;
     const data={title:'勝利',tone:'victory',target:'A城',attacker:'甲',defender:'乙',attackerLeader:'丙',defenderLeader:'丁',description:'確定結果'};
     ui.showWarResult(data,()=>called++);
@@ -34651,21 +34658,25 @@ test('イベント地図を閉じる時は通常地図の2フレーム復旧完�
         waitForCoveredMapPaint: () => new Promise(resolve => frames.push(() => frames.push(resolve)))
     };
     const scroll = { style: { display: 'none' } };
+    const canvas = { width: 600, height: 400 };
+    const img = { src: 'data:image/png;base64,old' };
     const overlay = {
         parentNode: parent,
-        querySelectorAll: () => [],
-        _eventMapRestoreState: { ui, scroll, oldDisplay: '', isPC: false, pausedByUs: true }
+        querySelectorAll: selector => selector === 'canvas' ? [canvas] : (selector === 'img' ? [img] : []),
+        _eventMapRestoreState: { ui, scroll, oldDisplay: '', isPC: false, pausedByUs: true, hidMainMap: true }
     };
     const pending = ctx.cleanupOverlay(overlay);
     const tick = async () => { assert.ok(frames.length > 0, '次の描画境界を待つ'); frames.shift()(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); };
-    await tick(); // イベントの巨大canvas解放後の描画
     assert.strictEqual(resumeCount, 1);
-    assert.strictEqual(parent.removed, false);
+    assert.strictEqual(canvas.width, 600, '背景復旧前にイベント地図の絵を消さない');
     await tick(); // 背景復旧の第1rAF
     assert.strictEqual(parent.removed, false, '背景compositor未復帰の時点で暗幕を除去しない');
+    assert.strictEqual(canvas.width, 600, '第1paint中もイベント地図を空白にしない');
     await tick(); // 背景復旧の第2rAF
     await pending;
     assert.strictEqual(parent.removed, true);
+    assert.strictEqual(canvas.width, 1, '取り外したCanvasのGPU backing storeを解放');
+    assert.strictEqual(img.src, '', '取り外した画像参照を解放');
     assert.strictEqual(scroll.style.display, '');
 });
 
@@ -43045,10 +43056,11 @@ test('r916 会話から結果への同期・非同期引渡しは2画面を同�
     ui.restoreAIGuard = () => events.push('guard-release');
     ui.pauseBackgroundUpdates = () => events.push('background-paused');
     ui.waitForCoveredMapPaint = () => { events.push('unwanted-wait'); return Promise.resolve(); };
-    const originalShow = ui.prepareCoveredViewForOpen.bind(ui);
-    ui.prepareCoveredViewForOpen = modal => {
-        originalShow(modal);
-        if (modal === result) events.push('result-visible');
+    // 公開した同じJS処理単位で旧会話を閉じるので、公開そのものを観測する。
+    const originalRemove = result.classList.remove.bind(result.classList);
+    result.classList.remove = (...names) => {
+        originalRemove(...names);
+        if (names.includes('hidden')) events.push('result-visible');
     };
     const originalDialogHide = dialog.classList.add.bind(dialog.classList);
     dialog.classList.add = (...names) => {
@@ -43096,6 +43108,126 @@ test('r916 セーブ確認は保存バリアを表示する前に元ダイアロ
     assert.ok(block.includes('closeBeforeCancel: true'), '保存取り消しも先に閉じる');
     const guard = read('css/style.css');
     assert.ok(guard.includes('#save-guard {'), '保存中の入力遮断は既存共通レイヤーを利用する');
+});
+
+
+// r917: 会話→災害地図は「地図公開」と「旧会話閉鎖」を同じ描画単位で行う。
+// 実イベントと同じ EventMapEffects.createOverlay を最小DOMで実行し、
+// 地図の準備が遅れた正常系、失敗時、失効世代の後始末を確認する。
+test('r917 災害地図は準備完了前の会話を保持し、公開と同時に一度だけ閉じる', async () => {
+    const source = read('js/event/common_events.js');
+    const start = source.indexOf('    const createOverlay = async (game, options = {}) => {');
+    const end = source.indexOf('    const getRenderScale =', start);
+    assert.ok(start >= 0 && end > start);
+    for (const isPC of [true, false]) {
+        const events = [];
+        let finishSuspend = null;
+        let finishImage = null;
+        const makeNode = () => ({style:{}, appendChild() {}, querySelectorAll:()=>[]});
+        const ui = {
+            _dialogGeneration: 4,
+            beginDialogHandoffHold() { events.push('hold'); },
+            endDialogHandoffHold() { events.push('release'); },
+            completeDialogToViewHandoff() { events.push('close-dialog'); }
+        };
+        const body = {classList:{contains:()=>isPC}, appendChild(node) {events.push('attach-shell'); this.shell=node;}};
+        const context = vm.createContext({
+            console, Image: function() {return makeNode();},
+            document: {body, createElement:makeNode},
+            WHITE_MAP_SRC:'dummy.png',
+            suspendMainMapForOverlay:() => new Promise(resolve=>{finishSuspend=resolve;}),
+            publishOverlay:(shell)=>{ events.push('publish-map');shell.style.visibility='visible'; const finish=shell._eventMapFinishHandoff; shell._eventMapFinishHandoff=null; if(finish) finish(); },
+            createLightweightBaseCanvas:()=>makeNode(),
+            waitForImage:()=>new Promise(resolve=>{finishImage=resolve;}),
+            cleanupOverlay:async()=>events.push('restore-map'),
+            writeDiag:()=>{}
+        });
+        vm.runInContext(source.slice(start,end)+'\nthis.createOverlay=createOverlay;',context);
+        const promise = context.createOverlay({ui});
+        assert.ok(finishSuspend,'地図の準備が本当に待機中');
+        assert.strictEqual(body.shell.style.visibility,'hidden');
+        assert.deepStrictEqual(events,['hold','attach-shell'],'旧会話の閉鎖は始めない');
+        finishSuspend();
+        for (let i=0;i<8;i++) await Promise.resolve();
+        if (isPC) { assert.ok(finishImage); assert.strictEqual(body.shell.style.visibility,'hidden'); finishImage(true); }
+        const result = await promise;
+        assert.strictEqual(result.mapOverlay,body.shell);
+        assert.strictEqual(body.shell.style.visibility,'visible');
+        assert.deepStrictEqual(events.slice(-2),['close-dialog','release']);
+        assert.strictEqual(events.filter(x=>x==='close-dialog').length,1);
+    }
+});
+
+test('r917 災害地図は新地図完成まで旧地図を残し、公開時にだけ背面合成から外す', async () => {
+    const source = read('js/event/common_events.js');
+    const start = source.indexOf('    const suspendMainMapForOverlay = async (game, mapOverlay, diagPrefix = null) => {');
+    const end = source.indexOf('    // Round22:', start);
+    assert.ok(start >= 0 && end > start);
+    for (const isPC of [true, false]) {
+        const scroll = {style:{display:'block'}};
+        const ui = {isBackgroundPaused:false,_mapPresentationNeedsFullRecovery:false,
+            pauseBackgroundUpdates(){this.isBackgroundPaused=true;}};
+        const ctx = vm.createContext({document:{body:{classList:{contains:()=>isPC}},getElementById:()=>scroll},writeDiag:()=>{},console});
+        vm.runInContext(source.slice(start,end)+'\nthis.suspendMap=suspendMainMapForOverlay;this.conceal=concealMainMapUnderReadyOverlay;',ctx);
+        const shell={};
+        await ctx.suspendMap({ui},shell);
+        assert.strictEqual(scroll.style.display,'block','準備中は通常地図を維持する');
+        assert.strictEqual(ui.isBackgroundPaused,true,'地図更新は停止する');
+        ctx.conceal(shell);
+        assert.strictEqual(scroll.style.display,isPC?'block':'none','新地図公開時だけスマホ通常地図を非表示にする');
+        assert.strictEqual(shell._eventMapRestoreState.hidMainMap,!isPC);
+        ctx.conceal(shell);
+        assert.strictEqual(scroll.style.display,isPC?'block':'none','2度の公開予約で再非表示を重ねない');
+    }
+});
+
+test('r917 災害地図はハイライトCanvasまで完成してから公開し、公開・終了は共通窓口を使う', () => {
+    const src=read('js/event/common_events.js');
+    const typhoon=read('js/event/typhoon_event.js');
+    assert.ok(src.includes('deferPublish: true,') && src.includes('fx.publishOverlay(mapOverlay);'),
+        '共通災害はエフェクトCanvas描画後に地図公開する');
+    assert.ok(typhoon.includes('deferPublish: true') && typhoon.includes('fx.publishOverlay(mapOverlay);'),
+        '台風も同じ公開契約を使用する');
+    const start=src.indexOf('    const publishOverlay = (mapOverlay) => {');
+    const end=src.indexOf('    const createOverlay =',start);
+    const events=[];
+    const ctx=vm.createContext({concealMainMapUnderReadyOverlay:()=>events.push('conceal'),console});
+    vm.runInContext(src.slice(start,end)+'\nthis.publishOverlay=publishOverlay;',ctx);
+    const map={parentNode:{},style:{visibility:'hidden'},_eventMapFinishHandoff:()=>events.push('close-dialog')};
+    assert.strictEqual(ctx.publishOverlay(map),true);
+    assert.strictEqual(map.style.visibility,'visible');
+    assert.deepStrictEqual(events,['conceal','close-dialog']);
+    assert.strictEqual(ctx.publishOverlay(map),false,'二度の公開で古いイベントを実行しない');
+    assert.strictEqual(map._eventMapFinishHandoff,null,'公開後は旧コールバックを保持しない');
+});
+
+test('r917 災害地図の生成失敗は元地図を復元後、旧会話holdを一度だけ解放する', async () => {
+    const source = read('js/event/common_events.js');
+    const start = source.indexOf('    const createOverlay = async (game, options = {}) => {');
+    const end = source.indexOf('    const getRenderScale =', start);
+    const events=[];
+    const ui={_dialogGeneration:2,beginDialogHandoffHold:()=>events.push('hold'),endDialogHandoffHold:()=>events.push('release'),completeDialogToViewHandoff:()=>events.push('close')};
+    const ctx=vm.createContext({console,document:{body:{classList:{contains:()=>false},appendChild:()=>events.push('shell')},createElement:()=>({style:{},appendChild(){}})},
+        suspendMainMapForOverlay:async()=>{throw Error('suspend failed');},cleanupOverlay:async()=>events.push('restored'),writeDiag:()=>{}});
+    vm.runInContext(source.slice(start,end)+'\nthis.createOverlay=createOverlay;',ctx);
+    await assert.rejects(()=>ctx.createOverlay({ui}),/suspend failed/);
+    assert.deepStrictEqual(events,['hold','shell','restored','close','release']);
+    // タイトル復帰中の旧イベントは新世代の会話を触れない。
+    events.length=0;
+    ctx.suspendMainMapForOverlay=async()=>{ui._dialogGeneration=3;throw Error('stale');};
+    await assert.rejects(()=>ctx.createOverlay({ui}),/stale/);
+    assert.deepStrictEqual(events,['hold','shell','restored']);
+});
+
+test('r917 共通モーダル暗幕は一律160ms保持せず、背景のpaintと明示holdで寿命管理する', () => {
+    const ui=read('js/ui.js');
+    const sync=ui.slice(ui.indexOf('    _syncModalHandoffBackdrop() {'),ui.indexOf('    beginModalHandoff() {'));
+    assert.ok(sync.includes('this._releaseModalHandoffBackdropAfterPaint();'));
+    assert.ok(!sync.includes('160'), '画面準備とは無関係な固定待機を復活させない');
+    assert.ok(sync.includes('await this.waitForCoveredMapPaint()'), '地図のpaintまで解放しない');
+    const events=read('js/event/common_events.js');
+    const cleanup=events.slice(events.indexOf('    const cleanupOverlay = async (mapOverlay) => {'),events.indexOf('\n    return {',events.indexOf('    const cleanupOverlay = async (mapOverlay) => {')));
+    assert.ok(cleanup.indexOf('removeChild(mapOverlay)')<cleanup.indexOf('canvas.width = 1'), 'イベント地図は画面から外してから素材を解放');
 });
 
 Promise.all(pendingTests).then(() => {

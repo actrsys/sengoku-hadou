@@ -98,7 +98,7 @@ window.GameEvents.push({
 
         writeDiag('overlay_shell');
         const overlayParts = fx && typeof fx.createOverlay === 'function'
-            ? await fx.createOverlay(game, { diagPrefix })
+            ? await fx.createOverlay(game, { diagPrefix, deferPublish: true })
             : null;
         if (!overlayParts) {
             // common_events.js より先に呼ばれる構成は通常ありませんが、安全側で中止します。
@@ -345,6 +345,7 @@ window.GameEvents.push({
                     }
 
                     mapContainer.appendChild(canvas);
+                    fx.publishOverlay(mapOverlay);
                     writeDiag('visual_done');
                     if (isMobileWatch) {
                         // 共通災害と同じく、古いスマホのAI観戦では大型Canvasの連続opacity合成を避けます。

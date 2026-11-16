@@ -2486,6 +2486,64 @@ async function validateDialogToResultNoOverlap(cdp) {
     console.log('✓ r916 会話→外交結果の同期/非同期引渡し PC/スマホ paint監視 (同時可視0、空白0)');
 }
 
+
+// r917: 実イベントの地図shellを使い、会話→地図の公開/閉鎖をPC・スマホで実paint監視。
+async function validateDisasterMapHandoff(cdp) {
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const eventSource = fs.readFileSync(path.join(ROOT, 'js', 'event', 'common_events.js'), 'utf8');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css.replace(/<\/style/gi, '<\\/style')}</style></head><body>
+       <div id="game-screen" style="position:absolute;inset:0"><div id="map-scroll-container" style="position:absolute;inset:0;background:#334c33"></div>
+       <div id="dialog-modal" class="modal hidden"><div class="modal-content modal-small"><div id="dialog-message" class="message-area"></div>
+       <div id="dialog-left-name" class="hidden"></div><div id="dialog-left-face"></div>
+       <div id="dialog-right-name" class="hidden"></div><div id="dialog-right-face"></div>
+       <div class="modal-footer"><button id="dialog-btn-ok">閉じる</button></div></div></div></div></body></html>`;
+    const mapSvg = 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><rect width="120" height="80" fill="#c8d8cb"/></svg>');
+    for (const [width, height, pc] of [[1280,720,true],[390,844,false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', {width,height,deviceScaleFactor:1,mobile:!pc});
+        await cdp.call('Runtime.evaluate', {expression:`document.open();document.write(${JSON.stringify(html)});document.close();document.body.classList.toggle('is-pc',${pc});window.GameEvents=[];window.Image=function(){return document.createElement('img');};
+            window.__r917UI=(new Function(${JSON.stringify(uiSource+'\nreturn UIManager;')}))();
+            (new Function(${JSON.stringify(eventSource)}))();true`,returnByValue:true});
+        const r=await cdp.call('Runtime.evaluate', {expression:`(async()=>{
+            const ui=Object.create(window.__r917UI.prototype);
+            const game={ui,phase:'game',isWatchMode:false};ui.game=game;ui.dialogQueue=[];ui.isDialogShowing=false;ui._dialogGeneration=0;
+            ui._dialogGuardHeld=false;ui.hideAIGuardTemporarily=()=>{};ui.restoreAIGuard=()=>{};
+            ui._prepareDialogFaces=()=>Promise.resolve({leftImg:null,rightImg:null});
+            ui.pauseBackgroundUpdates=()=>{ui.isBackgroundPaused=true;};
+            ui.resumeBackgroundUpdates=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{ui.isBackgroundPaused=false;resolve();})));
+            ui.waitForCoveredMapPaint=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+            const dialog=document.getElementById('dialog-modal');let overlap=0,gaps=0,total=0,watch=false;
+            let overlay=null,completed=false;
+            const sample=()=>{if(watch){const d=!dialog.classList.contains('hidden'), v=!!overlay&&overlay.style.visibility==='visible'&&overlay.isConnected;
+                if(d&&v)overlap++;if(!d&&!v)gaps++;total++;}if(!completed)requestAnimationFrame(sample);};requestAnimationFrame(sample);
+            const ready=new Promise((resolve,reject)=>{
+                ui.showDialog('災害の知らせ',false,()=>{
+                    const task=window.EventMapEffects.createOverlay(game,{forceImageBase:true,mapSrc:${JSON.stringify(mapSvg)}});
+                    overlay=document.querySelector('.event-map-overlay');
+                    task.then(resolve,reject);return task;
+                });
+            });
+            await new Promise(resolve=>setTimeout(resolve,60));
+            if(dialog.classList.contains('hidden'))throw Error('会話が表示されていない');
+            watch=true;document.getElementById('dialog-btn-ok').click();
+            const rendered=await ready;
+            await new Promise(resolve=>requestAnimationFrame(resolve));
+            watch=false;
+            const before={overlap,gaps,total,dialogClosed:dialog.classList.contains('hidden'),overlayReady:rendered.mapOverlay.style.visibility==='visible'};
+            await window.EventMapEffects.cleanupOverlay(rendered.mapOverlay);
+            completed=true;
+            return {...before,removed:!rendered.mapOverlay.isConnected,scrollVisible:document.getElementById('map-scroll-container').style.display!=='none',holdCount:ui._dialogHandoffHoldCount};
+        })()`,returnByValue:true,awaitPromise:true});
+        if(r.exceptionDetails) throw Error(r.exceptionDetails.text+' '+JSON.stringify(r.exceptionDetails.exception));
+        const data=r.result?.value;
+        assert.ok(data&&data.total>=1,`地図表示のpaintを取得 (${pc?'PC':'スマホ'})`);
+        assert.strictEqual(data.overlap,0,`災害地図と旧会話の同時表示禁止: ${JSON.stringify(data)}`);
+        assert.strictEqual(data.gaps,0,`会話→地図の空白フレーム禁止: ${JSON.stringify(data)}`);
+        assert.ok(data.dialogClosed&&data.overlayReady&&data.removed&&data.scrollVisible&&data.holdCount===0,`後始末と背景復帰: ${JSON.stringify(data)}`);
+    }
+    console.log('✓ r917 災害イベント地図 PC/スマホ 会話→地図公開・旧会話閉鎖・復帰/DOM解放 paint監視');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -2570,6 +2628,7 @@ async function main() {
         await validateDialogChoiceBackdrop(cdp);
         await validateResultModalDoubleClose(cdp);
         await validateDialogToResultNoOverlap(cdp);
+        await validateDisasterMapHandoff(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

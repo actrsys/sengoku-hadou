@@ -50,7 +50,7 @@ class UIInfoManager {
         const elements = this.selectorView ? this.selectorView.getElements() : null;
         this._commonModalSuspendedForChild = false;
         if (!this.currentModalInfo || !elements || !elements.modal) return false;
-        elements.modal.classList.remove('hidden');
+        this.ui.prepareCoveredViewForOpen(elements.modal);
         return true;
     }
 
@@ -1656,7 +1656,7 @@ class UIInfoManager {
                 : '変更は次回起動時に反映されます。';
         }
         modal.dataset.openedFromTitle = openedFromTitle ? 'true' : 'false';
-        modal.classList.remove('hidden');
+        this.ui.prepareCoveredViewForOpen(modal);
     }
 
     // ==========================================

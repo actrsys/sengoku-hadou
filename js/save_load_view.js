@@ -364,7 +364,9 @@ class SaveLoadView {
         if (this.ui && typeof this.ui.updateCustomScrollbars === 'function') {
             this.ui.updateCustomScrollbars(list);
         }
-        modal.classList.remove('hidden');
+        // セーブ・ロード一覧も共通モーダルの公開窓口を通し、直前の会話が
+        // 閉じる前に別画面だけ先行する重複表示を防ぐ。
+        this.ui.prepareCoveredViewForOpen(modal);
         // display:none が解除された次フレームで実寸を取り直します。
         requestAnimationFrame(() => {
             if (!isOpenCurrent()) return;

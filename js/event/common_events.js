@@ -82,7 +82,8 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             pausedByUs: false,
             scroll,
             oldDisplay: scroll ? scroll.style.display : '',
-            isPC
+            isPC,
+            hidMainMap: false
         };
 
         // 暗幕生成途中で例外になってもcleanupOverlay()が復帰情報を拾えるよう、
@@ -94,18 +95,20 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             ui.pauseBackgroundUpdates();
         }
 
-        // PCは余裕があるため従来表示を維持。スマホだけ巨大マップを一時的に外します。
-        if (!isPC && scroll) {
-            // display:noneをまたぐ復帰はcompositor-only白抜けの危険境界。通常モーダルと区別して
-            // 次のresumeで一度だけ正規の全復旧／静的層再提示を行う。
-            if (ui) ui._mapPresentationNeedsFullRecovery = true;
-            scroll.style.display = 'none';
-        }
+        // 地図の準備中は旧地図も保持する。新地図の準備が遅れたときに
+        // 元地図だけ先に消してしまうと、会話背景が黒く抜けるため。
         if (diagPrefix) writeDiag(game, `${diagPrefix}:main_map_suspended`);
-
-        // display:none をcompositorへ反映してからイベント地図を作ります。
-        if (!isPC) await nextPaint();
         return state;
+    };
+
+    // 公開するイベント地図が完成した同一処理単位でのみ、スマホの通常地図を
+    // 背面合成から外す。画面が空の状態を1paintも作らない。
+    const concealMainMapUnderReadyOverlay = (mapOverlay) => {
+        const state = mapOverlay && mapOverlay._eventMapRestoreState;
+        if (!state || state.isPC || !state.scroll || state.hidMainMap) return;
+        if (state.ui) state.ui._mapPresentationNeedsFullRecovery = true;
+        state.scroll.style.display = 'none';
+        state.hidMainMap = true;
     };
 
     // Round22: スマホの軽量地図でも「海岸線・国境線」がはっきり読めるようにします。
@@ -253,9 +256,38 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         }
     };
 
+    // 地図の生成と画面への公開は別の責務。効果Canvasも含めて完成した時点で
+    // 呼び出し元が公開する。旧会話と通常地図はそれまで表示したままにする。
+    const publishOverlay = (mapOverlay) => {
+        if (!mapOverlay || mapOverlay.style.visibility === 'visible' || !mapOverlay.parentNode) return false;
+        concealMainMapUnderReadyOverlay(mapOverlay);
+        mapOverlay.style.visibility = 'visible';
+        const finish = mapOverlay._eventMapFinishHandoff;
+        mapOverlay._eventMapFinishHandoff = null;
+        if (typeof finish === 'function') finish();
+        return true;
+    };
+
     const createOverlay = async (game, options = {}) => {
         const diagPrefix = options.diagPrefix || null;
         const isPC = document.body.classList.contains('is-pc');
+        const ui = game && game.ui;
+        // 会話→災害地図は画像読込・Canvas生成をまたぐ。旧会話の固定時間閉鎖を
+        // 一時停止し、地図の準備完了まで旧会話を表示したままにする。
+        const dialogGeneration = ui ? Number(ui._dialogGeneration || 0) : 0;
+        const holdsDialog = !!(ui && typeof ui.beginDialogHandoffHold === 'function'
+            && typeof ui.endDialogHandoffHold === 'function');
+        if (holdsDialog) ui.beginDialogHandoffHold();
+        let handedOff = false;
+        const finishHandoff = () => {
+            if (handedOff) return;
+            handedOff = true;
+            // リセット後の旧イベントが、次のシナリオの会話を閉じたりholdを解放しない。
+            if (ui && Number(ui._dialogGeneration || 0) === dialogGeneration) {
+                if (typeof ui.completeDialogToViewHandoff === 'function') ui.completeDialogToViewHandoff();
+                if (holdsDialog) ui.endDialogHandoffHold();
+            }
+        };
 
         // まず軽い暗幕だけを置きます。スマホは完全不透明にして裏の巨大マップを合成不要にします。
         const mapOverlay = document.createElement('div');
@@ -268,8 +300,12 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         mapOverlay.style.backgroundColor = options.overlayColor || (isPC ? 'rgba(0,0,0,0.85)' : '#000');
         mapOverlay.style.zIndex = String(options.zIndex || 7500);
         mapOverlay.style.display = 'flex';
+        // 先に空の暗幕だけ出すと、災害地図が完成するまで黒一色の切れ目になる。
+        // 背面で地図を構築し、公開と旧会話の閉鎖を同じJSタスクで行う。
+        mapOverlay.style.visibility = 'hidden';
         mapOverlay.style.justifyContent = 'center';
         mapOverlay.style.alignItems = 'center';
+        mapOverlay._eventMapFinishHandoff = finishHandoff;
         try {
             document.body.appendChild(mapOverlay);
             if (diagPrefix) writeDiag(game, `${diagPrefix}:overlay_dom`);
@@ -317,10 +353,15 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             mapOverlay.appendChild(mapContainer);
 
             if (whiteMapImg) {
-                await waitForImage(whiteMapImg, options.imageTimeoutMs || 1000);
+                const imageReady = await waitForImage(whiteMapImg, options.imageTimeoutMs || 1000);
+                if (!imageReady) throw new Error('イベント地図の背景画像を表示できませんでした');
                 if (diagPrefix) writeDiag(game, `${diagPrefix}:base_image_done`);
             }
 
+            // 下地と効果Canvasの配置は後続処理でも従来どおり行う。
+            // ここでは空の暗幕ではなく、少なくとも白地図／軽量地図が揃った時点を
+            // 画面公開の境界とする。
+            if (!options.deferPublish) publishOverlay(mapOverlay);
             if (diagPrefix) writeDiag(game, `${diagPrefix}:overlay_ready`);
             return {
                 mapOverlay,
@@ -333,6 +374,9 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             // 呼び出し側へ暗幕参照を返す前の失敗なので、ここで通常地図まで戻す。
             try { await cleanupOverlay(mapOverlay); } catch (cleanupError) {
                 console.warn('イベント地図shell失敗後の後始末にも失敗しました:', cleanupError);
+            } finally {
+                // エラー時は元の地図を復旧してから旧会話の操作を完了する。
+                finishHandoff();
             }
             throw error;
         }
@@ -566,24 +610,15 @@ window.EventMapEffects = window.EventMapEffects || (() => {
 
     const cleanupOverlay = async (mapOverlay) => {
         const restoreState = mapOverlay ? mapOverlay._eventMapRestoreState : null;
-        if (mapOverlay) {
-            // 巨大Canvas/Imageだけを先に解放し、全画面の暗幕shellは残す。
-            // 先にoverlay自体をremoveしてからpaintすると、スマホでは通常地図もdisplay:noneのままなので
-            // その1フレームが黒/白抜けとして露出する。
-            mapOverlay.querySelectorAll('canvas').forEach(c => {
-                try { c.width = 1; c.height = 1; } catch (e) {}
-            });
-            mapOverlay.querySelectorAll('img').forEach(img => {
-                try { img.src = ''; } catch (e) {}
-            });
-        }
-        // イベント専用の巨大RGBAキャッシュは持たず、共有IDマップはゲーム本体側で継続利用します。
-
-        // 重いイベント地図の解放を暗幕の下で1回paintしてから通常マップを戻す。
-        if (mapOverlay && mapOverlay.parentNode) await nextPaint();
+        // イベント地図の映像は背景の復旧が実際に描画されるまで保つ。
+        // 先にCanvasを1pxへ縮めたりimg.srcを空にすると、復旧待ちの2フレームに
+        // 色のない空の枠だけが露出してしまう。素材の解放はshellの取り外し後に行う。
+        const canvases = mapOverlay ? Array.from(mapOverlay.querySelectorAll('canvas')) : [];
+        const images = mapOverlay ? Array.from(mapOverlay.querySelectorAll('img')) : [];
+        // 共有IDマップはゲーム本体側で継続利用し、イベント専用の巨大RGBAキャッシュは作らない。
         let backgroundRecovery = null;
         if (restoreState) {
-            if (!restoreState.isPC && restoreState.scroll) {
+            if (restoreState.hidMainMap && restoreState.scroll) {
                 restoreState.scroll.style.display = restoreState.oldDisplay;
             }
             if (restoreState.pausedByUs && restoreState.ui && typeof restoreState.ui.resumeBackgroundUpdates === 'function') {
@@ -605,13 +640,31 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             }
             if (mapOverlay.parentNode) mapOverlay.parentNode.removeChild(mapOverlay);
         }
-        await new Promise(resolve => setTimeout(resolve, 0));
+        // 公開前の異常終了でも古いholdと会話の閉鎖予約を残さない。
+        if (mapOverlay && typeof mapOverlay._eventMapFinishHandoff === 'function') {
+            const finish = mapOverlay._eventMapFinishHandoff;
+            mapOverlay._eventMapFinishHandoff = null;
+            finish();
+        }
+        // 画面から外した後なら、キャンバス解放・画像デコード参照の解除で
+        // 黒い空地図がフレームとして表示されることはない。
+        canvases.forEach(canvas => {
+            try { canvas.width = 1; canvas.height = 1; } catch (e) {}
+        });
+        images.forEach(img => {
+            try { img.src = ''; } catch (e) {}
+        });
+        if (mapOverlay) {
+            mapOverlay._eventMapRestoreState = null;
+            mapOverlay._eventMapFinishHandoff = null;
+        }
     };
 
     return {
         writeDiag,
         waitForImage,
         createOverlay,
+        publishOverlay,
         createLightweightBaseCanvas,
         drawProvinceBoundaries,
         getRenderScale,
@@ -669,6 +722,7 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         const effectColor = { r: drawR, g: drawG, b: drawB, a: 180 };
         const overlayParts = await fx.createOverlay(game, {
             diagPrefix,
+            deferPublish: true,
             // r299: 実機でmask_mobile_watch_static停止がr290/r296の両方で再現したため、
             // スマホAI観戦ではベース地図と災害色を1枚の軽量Canvasへ事前合成します。
             // 通常/PCは従来どおり別effect Canvasを使い、点滅表現も維持します。
@@ -678,6 +732,7 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         const mapContainer = overlayParts && overlayParts.mapContainer;
 
         if (isMobileWatch && overlayParts && overlayParts.effectPrecomposited && mapContainer) {
+            fx.publishOverlay(mapOverlay);
             // 2枚目の600x400級Canvasを作らないので、古いWebViewのcompositor/GPU面ピークを抑えます。
             fx.writeDiag(game, `${diagPrefix}:mask_mobile_watch_single_canvas`);
             fx.writeDiag(game, `${diagPrefix}:mask_mobile_watch_static`);
@@ -700,6 +755,7 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
                 console.warn(`${eventType}の地図演出を省略しました。`);
             } else {
                 mapContainer.appendChild(canvas);
+                fx.publishOverlay(mapOverlay);
                 fx.writeDiag(game, `${diagPrefix}:mask_done`);
 
                 if (isMobileWatch) {

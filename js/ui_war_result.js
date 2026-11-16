@@ -26,7 +26,7 @@ Object.assign(UIManager.prototype, {
         setText('war-result-description', data.description);
         modal.classList.toggle('is-defeat', data.tone === 'defeat');
         modal.classList.toggle('is-retreat', data.tone === 'retreat');
-        modal.classList.remove('hidden');
+        this.prepareCoveredViewForOpen(modal);
         const generation = Number(this._warResultGeneration || 0) + 1;
         this._warResultGeneration = generation;
         const finish = () => {
