@@ -2216,8 +2216,8 @@ class WarManager {
                         else if (isDefPlayer) msg = "拠点の防衛に成功し、敵軍は撤退しました。";
                         
                         this.game.ui.showDialog(msg, false, () => {
-                            this.endWar(false);
-                        });
+                            return this.endWar(false);
+                        }, null, { closeBeforeOk: true });
                     } else {
                         this.endWar(false); 
                     }

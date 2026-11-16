@@ -2438,6 +2438,54 @@ async function validateResultModalDoubleClose(cdp) {
     console.log('✓ r911 結果画面の連打はPC/スマホとも会話引継ぎを壊さない（実ブラウザ）');
 }
 
+// r916: 通常会話から別レイヤーの結果モーダルへ移る際、旧ダイアログを同時描画しない。
+// 同期コールバックと非同期結果の両方で、実ブラウザの各paintを監視する。
+async function validateDialogToResultNoOverlap(cdp) {
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css.replace(/<\/style/gi, '<\\/style')}</style></head><body>
+       <div id="dialog-modal" class="modal hidden"><div class="modal-content modal-small"><div class="dialog-body-container">
+       <div class="dialog-face-column"><div id="dialog-left-name" class="dialog-name-label hidden"></div><div id="dialog-left-face" class="dialog-face-space"></div></div>
+       <div id="dialog-message" class="message-area"></div>
+       <div class="dialog-face-column"><div id="dialog-right-name" class="dialog-name-label hidden"></div><div id="dialog-right-face" class="dialog-face-space"></div></div>
+       </div><div class="modal-footer"><button id="dialog-btn-ok">閉じる</button></div></div></div>
+       <div id="result-modal" class="modal hidden"><div class="modal-content"><div id="result-body"></div><div class="modal-footer" id="result-footer"></div></div></div>
+       </body></html>`;
+    for (const [width, height, pc] of [[1280,720,true], [390,844,false]]) {
+        for (const deferred of [false, true]) {
+            await cdp.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor:1, mobile:!pc});
+            await cdp.call('Runtime.evaluate', {expression:`document.open();document.write(${JSON.stringify(html)});document.close();document.body.classList.toggle('is-pc', ${pc});window.__r916UI=(new Function(${JSON.stringify(uiSource+'\nreturn UIManager;')}))();true`, returnByValue:true});
+            const res = await cdp.call('Runtime.evaluate', {expression:`(async()=>{
+                const ui=Object.create(window.__r916UI.prototype);
+                ui.game={isWatchMode:false};ui.dialogQueue=[];ui.isDialogShowing=false;ui._dialogGeneration=0;
+                ui._dialogGuardHeld=false;ui.hideAIGuardTemporarily=()=>{};ui.restoreAIGuard=()=>{};ui.pauseBackgroundUpdates=()=>{};
+                ui._prepareDialogFaces=()=>Promise.resolve({leftImg:null,rightImg:null});
+                ui.resultBody=document.getElementById('result-body');ui.resultModal=document.getElementById('result-modal');
+                const dialog=document.getElementById('dialog-modal'),result=document.getElementById('result-modal');
+                let overlap=0, gaps=0, total=0, watch=true, started=false;
+                const sample=()=>{if(!watch)return;if(started){const d=!dialog.classList.contains('hidden'),r=!result.classList.contains('hidden');if(d&&r)overlap++;if(!d&&!r)gaps++;total++;}requestAnimationFrame(sample);};requestAnimationFrame(sample);
+                ui.showDialog('外交交渉中',false,()=>${deferred}
+                  ? new Promise(resolve=>setTimeout(()=>{ui.showResultModal('外交結果');resolve();},120))
+                  : ui.showResultModal('外交結果'));
+                await new Promise(resolve=>setTimeout(resolve,70));
+                if(dialog.classList.contains('hidden'))throw Error('先行会話が開かない');
+                started=true;
+                document.getElementById('dialog-btn-ok').click();
+                await new Promise(resolve=>setTimeout(resolve,${deferred?310:150}));
+                watch=false;
+                return {overlap,gaps,total,dialogHidden:dialog.classList.contains('hidden'),resultVisible:!result.classList.contains('hidden')};
+            })()`, returnByValue:true, awaitPromise:true});
+            if (res.exceptionDetails) throw Error(res.exceptionDetails.text+' '+JSON.stringify(res.exceptionDetails.exception));
+            const data = res.result?.value;
+            assert.ok(data && data.total > 3, '会話→結果の描画境界を取得');
+            assert.strictEqual(data.overlap, 0, `結果と旧会話の同時可視は禁止 (${pc?'PC':'スマホ'}/${deferred?'非同期':'同期'}): ${JSON.stringify(data)}`);
+            assert.strictEqual(data.gaps, 0, '結果までに無モーダルの描画境界を作らない');
+            assert.ok(data.dialogHidden && data.resultVisible, '結果が残り、会話は閉じる');
+        }
+    }
+    console.log('✓ r916 会話→外交結果の同期/非同期引渡し PC/スマホ paint監視 (同時可視0、空白0)');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -2521,6 +2569,7 @@ async function main() {
         await validateTerminalDialogCoveredPaint(cdp);
         await validateDialogChoiceBackdrop(cdp);
         await validateResultModalDoubleClose(cdp);
+        await validateDialogToResultNoOverlap(cdp);
     } finally {
         if (cdp) cdp.close();
         child.kill('SIGTERM');

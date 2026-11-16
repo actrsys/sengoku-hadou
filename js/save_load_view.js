@@ -297,6 +297,7 @@ class SaveLoadView {
                             okText: 'セーブする',
                             okClass: 'btn-primary',
                             cancelText: '戻る',
+                            closeBeforeOk: true,
                             closeBeforeCancel: true
                         });
                     } else {

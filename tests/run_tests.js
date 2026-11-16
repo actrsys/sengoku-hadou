@@ -10862,8 +10862,8 @@ test('結果画面との引き渡しは結果を先に表示し背景復帰も�
     const showStart = ui.indexOf('showResultModal(msg');
     const closeStart = ui.indexOf('\n    closeResultModal() {', showStart);
     const showBlock = ui.slice(showStart, closeStart);
-    assert.ok(showBlock.indexOf("this.resultModal.classList.remove('hidden')") < showBlock.indexOf('this._closePendingDialogHandoffNow()'), '結果画面を可視化してから旧会話を閉じる');
-    assert.ok(showBlock.indexOf('this._closePendingDialogHandoffNow()') < showBlock.indexOf("typeof updateBehindCover === 'function'"), '旧会話を結果へ引き渡してから背景更新へ進む');
+    assert.ok(showBlock.indexOf('this.prepareCoveredViewForOpen(this.resultModal)') < showBlock.indexOf('this._closeDialogForResultHandoff()'), '結果画面を可視化してから旧会話を同じ描画単位で閉じる');
+    assert.ok(showBlock.indexOf('this._closeDialogForResultHandoff()') < showBlock.indexOf("typeof updateBehindCover === 'function'"), '旧会話を結果へ引き渡してから背景更新へ進む');
     assert.ok(showBlock.indexOf("typeof updateBehindCover === 'function'") < showBlock.indexOf('this.pauseBackgroundUpdates()'), '背景更新は結果画面の覆いの下・背景停止前に行う');
 
     const closeEnd = ui.indexOf('\n    closeSelector() {', closeStart);
@@ -42889,6 +42889,44 @@ test('r908 捕虜処遇の終端確認は死亡処理から戦後完了までの
     assert.strictEqual(calls.at(-1)[2](), pending, '登用可能者なしの通知');
 });
 
+// r915: 通常の攻城戦が上限15ラウンドに達した場合も、
+// 他の終戦通知と同じく入力画面を先に閉じ、終戦Promiseを共通UIへ返す。
+test('r915 攻城戦のラウンド上限通知は終戦完了をUIへ引き渡す', () => {
+    const context = createContext();
+    context.WarParams = { Military: { WarMaxRounds: 15 } };
+    loadScript(context, 'js/war.js');
+    const WarManagerCtor = vm.runInContext('WarManager', context);
+    for (const player of [true, false]) {
+        const war = Object.create(WarManagerCtor.prototype);
+        const dialogs = [];
+        const pendingEnd = new Promise(() => {});
+        const results = [];
+        war.endWar = won => { results.push(won); return pendingEnd; };
+        war.game = { month: 5, playerClanId: 1, ui: {
+            showDialog(...args) { dialogs.push(args); },
+            addWarDetailLog() {}
+        } };
+        war.state = {
+            active: true, phase: 'action', isPlayerInvolved: player,
+            round: 15, actionQueue: [], plannedActions: {},
+            isHeavySnow: false, weather: 'sunny',
+            attacker: { ownerClan: 1, rice: 2000, soldiers: 100, morale: 50 },
+            defender: { ownerClan: 2, rice: 2000, soldiers: 100, morale: 50, defense: 1000 }
+        };
+        war.processWarRound();
+        assert.strictEqual(war.state.round, 16, 'ラウンドの上限判定は従来どおり');
+        if (player) {
+            assert.strictEqual(dialogs.length, 1, 'プレイヤーに時間切れ撤退を知らせる');
+            assert.ok(dialogs[0][0].includes('攻城戦が長引いた'), '従来メッセージを維持');
+            assert.strictEqual(dialogs[0][4]?.closeBeforeOk, true, '戦後画面へ遷移する前に入力会話を閉じる');
+            assert.strictEqual(dialogs[0][2](), pendingEnd, '非同期終戦の完了を共通UIへ渡す');
+        } else {
+            assert.strictEqual(dialogs.length, 0, 'AI戦の通知画面は増やさない');
+        }
+        assert.deepStrictEqual(results, [false], 'ラウンド上限は攻撃軍撤退で不変');
+    }
+});
+
 // r909: 終戦・タイトル復帰へ進む確認は、画面を閉じた直後に共通暗幕を解除せず、
 // 実際の非同期終端処理の完了PromiseをUIManagerへ引き継ぐ。
 test('r909 攻城戦の兵糧切れ通知は攻守双方で終戦PromiseをUIへ返す', () => {
@@ -42961,6 +42999,104 @@ test('r909 シナリオ一覧の読込失敗通知はタイトル復帰Promise�
     assert.ok(source.includes('this.ui.showDialog("シナリオデータの読み込みに失敗しました。", false, () => {\n                    return this.ui.returnToTitle();'), 'シナリオ本体の読込失敗でも同じ完了契約を守る');
 });
 
+
+// r916: 外交結果/通常コマンド結果への遷移は、会話→会話の猶予を適用しない。
+// 画像decodeなしで実際のUIManagerの確認クリック→結果表示を動かし、同時可視を検出する。
+test('r916 会話から結果への同期・非同期引渡しは2画面を同時描画せず、背景更新も結果の下で行う', async () => {
+    for (const deferResult of [false, true]) {
+    const events = [];
+    const elements = new Map();
+    const createEl = id => ({
+        id, classList: new FakeClassList(['hidden']), style: {}, textContent: '', innerHTML: '',
+        addEventListener() {}, removeEventListener() {}, replaceChildren() {},
+        querySelector() { return null; }, appendChild() {},
+    });
+    const dialog = createEl('dialog-modal');
+    const result = createEl('result-modal');
+    const footer = createEl('dialog-footer');
+    const content = createEl('dialog-content');
+    footer.children = [];
+    footer.appendChild = button => { footer.children.push(button); };
+    dialog.querySelector = selector => selector === '.modal-footer' ? footer : (selector === '.modal-content' ? content : null);
+    const resultFooter = createEl('result-footer');
+    resultFooter.querySelector = () => ({addEventListener() {}});
+    for (const [id, el] of [['dialog-modal', dialog], ['result-modal', result], ['dialog-message', createEl('dialog-message')], ['result-footer', resultFooter]]) elements.set(id, el);
+    const doc = {
+        body: {classList: {contains(name) {return name === 'is-pc';}}},
+        getElementById(id) {
+            if (id === 'dialog-btn-ok') return footer.children.find(button => button.id === id) || null;
+            return elements.get(id) || null;
+        },
+        createElement: tag => createEl(tag),
+        createTextNode: text => ({textContent: text})
+    };
+    const ctx = createContext({document: doc});
+    loadScript(ctx, 'js/ui.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const ui = Object.create(UI.prototype);
+    ui.game = {};
+    ui.dialogQueue = [];
+    ui._dialogGeneration = 0;
+    ui._dialogHandoffPending = false;
+    ui._dialogHandoffHoldCount = 0;
+    ui.resultModal = result;
+    ui.resultBody = createEl('result-body');
+    ui.hideAIGuardTemporarily = () => events.push('guard-hold');
+    ui.restoreAIGuard = () => events.push('guard-release');
+    ui.pauseBackgroundUpdates = () => events.push('background-paused');
+    ui.waitForCoveredMapPaint = () => { events.push('unwanted-wait'); return Promise.resolve(); };
+    const originalShow = ui.prepareCoveredViewForOpen.bind(ui);
+    ui.prepareCoveredViewForOpen = modal => {
+        originalShow(modal);
+        if (modal === result) events.push('result-visible');
+    };
+    const originalDialogHide = dialog.classList.add.bind(dialog.classList);
+    dialog.classList.add = (...names) => {
+        originalDialogHide(...names);
+        if (names.includes('hidden')) events.push('dialog-hidden');
+    };
+    let signalResult;
+    const resultShown = new Promise(resolve => { signalResult = resolve; });
+    const showResult = () => {
+        ui.showResultModal('外交結果', null, null, () => {
+            assert.ok(dialog.classList.contains('hidden'), '背景更新時には旧ダイアログが閉じている');
+            events.push('map-refresh');
+        });
+        signalResult();
+    };
+    ui.dialogQueue.push({
+        msg: '外交交渉', isConfirm: false, autoCloseTime: 0, customOpts: null,
+        faceLoadPromise: Promise.resolve({leftImg: null, rightImg: null}),
+        onOk: deferResult ? async () => {
+            await new Promise(resolve => setTimeout(resolve, 0));
+            showResult();
+        } : showResult
+    });
+    await ui.processDialogQueue();
+    assert.ok(!dialog.classList.contains('hidden'), '確認前は会話を表示する');
+    const ok = footer.children.find(button => button.id === 'dialog-btn-ok');
+    assert.ok(ok && typeof ok.onclick === 'function');
+    ok.onclick({stopPropagation() {}});
+    await resultShown;
+    assert.strictEqual(result.classList.contains('hidden'), false, '結果が見える');
+    assert.strictEqual(dialog.classList.contains('hidden'), true, '同じイベント中に会話は消える');
+    assert.ok(events.indexOf('result-visible') < events.indexOf('dialog-hidden'), '先に結果を公開する');
+    assert.ok(events.indexOf('dialog-hidden') < events.indexOf('map-refresh'), '背面更新は旧画面を閉じた後');
+    assert.ok(!events.includes('unwanted-wait'), '会話→結果には背景paint待ちを挟まない');
+    assert.strictEqual(ui._dialogHandoffPending, false, '会話向け猶予が残らない');
+    }
+});
+
+test('r916 セーブ確認は保存バリアを表示する前に元ダイアログを閉じる', () => {
+    const src = read('js/save_load_view.js');
+    const start = src.indexOf("okText: 'セーブする'");
+    assert.ok(start >= 0, '実ゲームのスロット保存確認を対象とする');
+    const block = src.slice(start, start + 260);
+    assert.ok(block.includes('closeBeforeOk: true'), '保存開始前に会話の表示を閉じる');
+    assert.ok(block.includes('closeBeforeCancel: true'), '保存取り消しも先に閉じる');
+    const guard = read('css/style.css');
+    assert.ok(guard.includes('#save-guard {'), '保存中の入力遮断は既存共通レイヤーを利用する');
+});
 
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
