@@ -1924,8 +1924,7 @@ body.daimyo-select-mode #top-info-bar { display: none !important; } /* ★外側
 body:not(.is-pc).daimyo-select-mode #map-wrapper { margin-bottom: 0 !important; height: 100% !important; flex: 1 !important; }
 
 /* ★ padding: 0 !important; と box-sizing を追加して、ボタンが押し出されないように枠をカッチリ固定します */
-#daimyo-confirm-modal { position: absolute !important; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; padding: 0 !important; box-sizing: border-box !important; background: transparent !important; pointer-events: none; z-index: 4000; display: block; }
-#daimyo-confirm-modal.hidden { display: none !important; }
+#daimyo-confirm-modal { position: absolute !important; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; padding: 0 !important; box-sizing: border-box !important; background: transparent !important; pointer-events: none; display: block; }
 #daimyo-confirm-modal .modal-content { position: absolute; margin: 0; width: auto; max-width: 90%; height: auto; max-height: 80%; background: linear-gradient(to bottom, #254a2e 0%, #1b3822 100%); border: 2px solid #d4af37; box-shadow: 0 10px 25px rgba(0,0,0,0.5); pointer-events: auto; overflow-y: auto; padding: 10px; border-radius: 8px; }
 #daimyo-confirm-modal p { font-size: 1.1rem; margin: 10px 0; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 
@@ -3091,7 +3090,8 @@ body:not(.is-pc) .fw-opening-versus { font-size: 0.93rem; }
 .fw-controls { height: 10vh; min-height: 50px; background: #000; display: flex; justify-content: flex-end; align-items: center; padding: 0 20px; flex-shrink: 0; border-top: 2px solid #111; }
 .fw-menu-group { display: flex; gap: 15px; height: 100%; align-items: center; }
 .fw-menu-group button { height: 60%; min-height: 30px; min-width: 100px; font-size: 1.1rem; border-radius: 8px; font-weight: bold; display: flex; justify-content: center; align-items: center; padding: 0; margin: 0; line-height: 1; }
-#fw-map { position: relative; margin: 0; background-color: transparent; overflow: hidden; transition: transform 0.3s; }
+/* 最上段の兵科・兵数はマップ外側の予約余白に描く。クリッピングはスクロール画面が担当する。 */
+#fw-map { position: relative; margin: 0; background-color: transparent; overflow: visible; transition: transform 0.3s; }
 
 /* 野戦HEXは数百枚並ぶため、各マスをGPUレイヤー化せず静的描画を基本にします。 */
 .fw-hex { width: 30px; height: 26px; background-color: #7fa65f; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); position: absolute; box-sizing: border-box; display: flex; justify-content: center; align-items: center; color: rgba(0,0,0,0.3); font-size: 8px; font-weight: bold; transition: filter 0.16s; user-select: none; transform: scale(1.02); }

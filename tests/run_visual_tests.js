@@ -1177,6 +1177,64 @@ async function validateFieldWarTroopOverlay(cdp) {
     console.log('✓ 野戦兵科・兵数 PC/スマホ 6方向固定/プレビュー visual/layout regression');
 }
 
+async function validateFieldWarTopEdge(cdp) {
+    // 実際のFieldWarManagerに最上段の部隊を描画させ、クリップとカメラ座標を検査する。
+    const fieldSource = fs.readFileSync(path.join(ROOT, 'js', 'field_war.js'), 'utf8');
+    const html = fixtureHtml('field_war_top_edge.html')
+        .replace('<script src="../../js/field_war.js"></script>', `<script>${fieldSource.replace(/<\/script/gi, '<\\/script')}</script>`);
+    for (const cfg of [
+        { label: 'PC', width: 1280, height: 720, mobile: false, isPc: true },
+        { label: 'mobile', width: 360, height: 640, mobile: true, isPc: false }
+    ]) {
+        for (const zoom of ['out', 'in']) {
+            await cdp.call('Emulation.setDeviceMetricsOverride', {width:cfg.width,height:cfg.height,deviceScaleFactor:1,mobile:cfg.mobile});
+            const result = await cdp.call('Runtime.evaluate', {
+                expression: `(() => {
+                    document.open(); document.write(${JSON.stringify(html)}); document.close();
+                    const war = window.createTopEdgeFixture(${cfg.isPc}, ${JSON.stringify(zoom)});
+                    war.mapEl.style.transition='none';
+                    war.scrollToUnit(war.units[0], {instant:true,force:true});
+                    const scroll=document.getElementById('fw-map-scroll');
+                    const unit=document.getElementById('fw-unit-el-1');
+                    const preview=document.getElementById('fw-preview-unit');
+                    preview.style.cssText=unit.style.cssText;
+                    preview.className='fw-unit preview attacker';
+                    preview.querySelector('.fw-troop-icon').dataset.type=war.units[0].troopType;
+                    preview.querySelector('.fw-unit-soldiers').textContent=String(war.units[0].soldiers);
+                    const r=el=>{const v=el.getBoundingClientRect();return {top:v.top,bottom:v.bottom,left:v.left,right:v.right};};
+                    const initial={scroll:r(scroll),unit:r(unit),overlay:r(unit.querySelector('.fw-unit-status-wrap')),
+                        preview:r(preview.querySelector('.fw-unit-status-wrap')), scale:war.currentMapScale};
+                    war.scrollToUnit({x:10,y:12},{instant:true,force:true});
+                    const expectedY=(12*war.hexH/2+war.hexH/2+20)*war.currentMapScale;
+                    initial.follow={scrollTop:scroll.scrollTop,expectedScrollTop:Math.max(0,Math.min(scroll.scrollHeight-scroll.clientHeight,expectedY-scroll.clientHeight/2))};
+                    // フィールド地図から独立した兵科・兵数の見た目を動かさず、ズーム中心を保持する。
+                    const midX=scroll.clientWidth/2, midY=scroll.clientHeight/2;
+                    const logicalY=(scroll.scrollTop+midY-20*war.currentMapScale)/war.currentMapScale;
+                    war.changeFwMapZoom(${zoom==='in'?-1:1},midX,midY+scroll.getBoundingClientRect().top);
+                    const nextY=logicalY*war.currentMapScale+20*war.currentMapScale-scroll.scrollTop;
+                    const targetTop=logicalY*war.currentMapScale+20*war.currentMapScale-midY;
+                    // マップ全高が画面より小さい倍率ではスクロールできず、中心固定は物理的に不可能。
+                    const maxScroll=Math.max(0,scroll.scrollHeight-scroll.clientHeight);
+                    initial.zoomFocalDelta=(targetTop>=0 && targetTop<=maxScroll) ? Math.abs(nextY-midY) : null;
+                    return initial;
+                })()`, returnByValue:true, awaitPromise:true
+            });
+            const state = result.result.value;
+            assert.ok(state.overlay.top >= state.scroll.top - 0.7,
+                `${cfg.label}/${zoom}: 最上段の兵科と兵数がマップ上端で見切れています (${state.overlay.top} < ${state.scroll.top})`);
+            assert.ok(state.preview.top >= state.scroll.top - 0.7,
+                `${cfg.label}/${zoom}: 移動プレビューの兵科と兵数が見切れています`);
+            assert.ok(state.unit.top >= state.scroll.top - 0.7,
+                `${cfg.label}/${zoom}: 凸本体が上端で欠けています`);
+            assert.ok(Math.abs(state.follow.scrollTop-state.follow.expectedScrollTop) < 1.5,
+                `${cfg.label}/${zoom}: 上余白を含むカメラ追従の中央配置がずれています`);
+            assert.ok(state.zoomFocalDelta === null || state.zoomFocalDelta <= 2.0,
+                `${cfg.label}/${zoom}: ズーム中心の保存がずれています (${state.zoomFocalDelta}px)`);
+        }
+    }
+    console.log('✓ 野戦最上段 兵科・兵数・凸／プレビュー／カメラ追従／ズーム PC・スマホ visual regression');
+}
+
 async function validateFieldWarCombatLayering(cdp) {
     // 交戦点滅で親のfilterがstacking contextを作り、他部隊の凸が兵科の前に出ないか実ブラウザで検査。
     const animationCss = fs.readFileSync(path.join(ROOT, 'css', 'animation.css'), 'utf8');
@@ -2487,6 +2545,209 @@ async function validateDialogToResultNoOverlap(cdp) {
 }
 
 
+// r918: 守備側援軍会話→迎撃専用モーダル、および武将一覧→迎撃への戻り。
+// 旧来の直接公開ではダイアログ(9900)が迎撃(6000)より前面に残ることを同じfixtureで確認する。
+async function validateInterceptModalHandoff(cdp) {
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const infoSource = fs.readFileSync(path.join(ROOT, 'js', 'ui_info.js'), 'utf8');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css.replace(/<\/style/gi, '<\\/style')}</style></head><body>
+        <div id="game-screen" style="position:absolute;inset:0;background:#405944">
+        <div id="modal-handoff-backdrop" class="hidden"></div>
+        <div id="dialog-modal" class="modal hidden"><div class="modal-content modal-small">
+        <div id="dialog-left-name" class="hidden"></div><div id="dialog-left-face"></div>
+        <div id="dialog-message" class="message-area"></div><div id="dialog-right-name" class="hidden"></div>
+        <div id="dialog-right-face"></div><div class="modal-footer"><button id="dialog-btn-ok">進む</button></div></div></div>
+        <div id="selector-modal" class="modal hidden"><div class="modal-content"><button>戻る</button></div></div>
+        <div id="intercept-confirm-modal" class="modal hidden"><div class="modal-content"><div id="intercept-msg">迎撃しますか？</div></div></div>
+        </div></body></html>`;
+    for (const [width, height, pc] of [[1280, 720, true], [390, 844, false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !pc });
+        for (const legacyOpen of [true, false]) {
+            await cdp.call('Runtime.evaluate', { expression: `document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc',${pc});
+                window.__r918UI=(new Function(${JSON.stringify(uiSource+'\nreturn UIManager;')}))(); true`, returnByValue: true });
+            const result = await cdp.call('Runtime.evaluate', { expression: `(async()=>{
+                const ui=Object.create(window.__r918UI.prototype);
+                ui.game={isWatchMode:false,phase:'game'};ui.dialogQueue=[];ui.isDialogShowing=false;ui._dialogGeneration=0;
+                ui._dialogGuardHeld=false;ui.hideAIGuardTemporarily=()=>{};ui.restoreAIGuard=()=>{};
+                ui._prepareDialogFaces=()=>Promise.resolve({leftImg:null,rightImg:null});
+                ui._initModalHandoffBackdrop();
+                const dialog=document.getElementById('dialog-modal'),target=document.getElementById('intercept-confirm-modal');
+                const action=ui.showDialogAsync('援軍が到着しました');
+                await new Promise(resolve=>setTimeout(resolve,50));
+                if(dialog.classList.contains('hidden'))throw Error('援軍会話の表示に失敗');
+                let overlap=0,gaps=0,total=0,watch=true;
+                const sample=()=>{if(!watch)return;const d=!dialog.classList.contains('hidden'),t=!target.classList.contains('hidden');
+                    if(d&&t)overlap++;if(!d&&!t)gaps++;total++;requestAnimationFrame(sample);};
+                requestAnimationFrame(sample);
+                document.getElementById('dialog-btn-ok').click();await action;
+                if(${legacyOpen})target.classList.remove('hidden');else ui.prepareCoveredViewForOpen(target);
+                await new Promise(resolve=>setTimeout(resolve,190));watch=false;
+                return {overlap,gaps,total,targetVisible:!target.classList.contains('hidden'),dialogClosed:dialog.classList.contains('hidden')};
+            })()`, returnByValue: true, awaitPromise: true });
+            if (result.exceptionDetails) throw Error(result.exceptionDetails.text + ' ' + JSON.stringify(result.exceptionDetails.exception));
+            const d = result.result?.value;
+            assert.ok(d && d.total > 3 && d.targetVisible, 'PC/スマホの迎撃表示paintを取得');
+            if (legacyOpen) {
+                assert.ok(d.overlap > 0, `旧来の直接公開は会話との重なりを再現 (${pc?'PC':'スマホ'}): ${JSON.stringify(d)}`);
+            } else {
+                assert.strictEqual(d.overlap, 0, `共通公開なら会話との重なりなし (${pc?'PC':'スマホ'}): ${JSON.stringify(d)}`);
+                assert.strictEqual(d.gaps, 0, '会話→迎撃で無モーダルフレームなし');
+                assert.ok(d.dialogClosed, '旧会話の完全閉鎖');
+            }
+        }
+        await cdp.call('Runtime.evaluate', { expression: `document.open();document.write(${JSON.stringify(html)});document.close();
+            document.body.classList.toggle('is-pc',${pc});
+            window.__r918UI=(new Function(${JSON.stringify(uiSource+'\nreturn UIManager;')}))();
+            window.__r918Info=(new Function(${JSON.stringify(infoSource+'\nreturn UIInfoManager;')}))();true`, returnByValue: true });
+        const returned = await cdp.call('Runtime.evaluate', { expression: `(async()=>{
+            const ui=Object.create(window.__r918UI.prototype);ui._initModalHandoffBackdrop();
+            ui.resumeBackgroundUpdates=()=>{};
+            const selector=document.getElementById('selector-modal'),target=document.getElementById('intercept-confirm-modal');
+            selector.classList.remove('hidden');
+            const info=Object.create(window.__r918Info.prototype);
+            info.ui=ui;info.game={phase:'title'};info._commonModalOwnsAIGuardHide=false;
+            info._cancelDeferredModalTransition=()=>{};info._stopActiveListRendering=()=>{};
+            info.selectorView={getElements:()=>({modal:selector}),close:({hide})=>{if(hide)selector.classList.add('hidden');}};
+            let overlap=0,gaps=0,total=0,watch=true;
+            const sample=()=>{if(!watch)return;const a=!selector.classList.contains('hidden'),b=!target.classList.contains('hidden');
+                if(a&&b)overlap++;if(!a&&!b)gaps++;total++;requestAnimationFrame(sample);};requestAnimationFrame(sample);
+            ui.prepareCoveredViewForOpen(target);info.closeCommonModal();
+            await new Promise(resolve=>setTimeout(resolve,100));watch=false;
+            return {overlap,gaps,total,selectorClosed:selector.classList.contains('hidden'),targetVisible:!target.classList.contains('hidden')};
+        })()`, returnByValue: true, awaitPromise: true });
+        if (returned.exceptionDetails) throw Error(returned.exceptionDetails.text + ' ' + JSON.stringify(returned.exceptionDetails.exception));
+        const d = returned.result?.value;
+        assert.ok(d && d.total>3 && d.selectorClosed && d.targetVisible, '迎撃復帰のDOM状態');
+        assert.strictEqual(d.overlap, 0, `迎撃復帰で空の武将一覧を重ねない (${pc?'PC':'スマホ'}): ${JSON.stringify(d)}`);
+        assert.strictEqual(d.gaps, 0, '武将一覧→迎撃の空白フレームなし');
+    }
+    console.log('✓ r918 PC/スマホ 迎撃確認の旧会話重複再現→解消、武将一覧復帰の重複/空白0paint');
+}
+
+// r919: 一覧を閉じる際の「空の外枠」描画をPC/スマホでpaint単位で観測。
+async function validateSelectorCloseContentHandoff(cdp) {
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const infoSource = fs.readFileSync(path.join(ROOT, 'js', 'ui_info.js'), 'utf8');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+        .hidden{display:none!important}
+        #game-screen{position:absolute;inset:0;background:#385444}
+        #selector-modal{position:absolute;inset:15%;z-index:10;background:#f4e3c2;border:4px solid #64452b}
+        #selector-list{padding:30px;color:#281d12}
+    </style></head><body><div id="game-screen"><div id="map-background">復帰後の全国地図</div>
+        <div id="selector-modal"><div id="selector-tabs">自国／全国</div>
+        <div id="selector-list">武将一覧／旧画面の表示内容</div></div></div></body></html>`;
+    for (const [width, height, pc] of [[1280, 720, true], [390, 844, false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !pc });
+        for (const legacy of [true, false]) {
+            await cdp.call('Runtime.evaluate', { expression: `document.open();document.write(${JSON.stringify(html)});document.close();
+                window.__r919UI=(new Function(${JSON.stringify(uiSource+'\nreturn UIManager;')}))();
+                window.__r919Info=(new Function(${JSON.stringify(infoSource+'\nreturn UIInfoManager;')}))();true`, returnByValue: true });
+            const answer = await cdp.call('Runtime.evaluate', { expression: `(async()=>{
+                const modal=document.getElementById('selector-modal');
+                const content=document.getElementById('selector-list');
+                const tabs=document.getElementById('selector-tabs');
+                const ui=Object.create(window.__r919UI.prototype);
+                ui._modalBackdropModals=[modal];
+                let resumed=0, released=0;
+                ui.resumeBackgroundUpdates=()=>{resumed++};
+                const selectorView={getElements:()=>({modal}),close:({hide}={})=>{
+                    if(hide!==false)modal.classList.add('hidden');
+                    content.textContent='';tabs.textContent='';released++;
+                }};
+                const info=Object.create(window.__r919Info.prototype);
+                Object.assign(info,{ui,game:{phase:'title'},selectorView,
+                    _cancelDeferredModalTransition:()=>{},_stopActiveListRendering:()=>{},
+                    _releaseCommonModalAIGuardHide:()=>{}});
+                let visibleEmpty=0,visibleFull=0,hidden=0,total=0,watch=true;
+                function sample(){if(!watch)return;
+                    if(modal.classList.contains('hidden')) hidden++;
+                    else if(content.textContent.trim())visibleFull++;else visibleEmpty++;
+                    total++;requestAnimationFrame(sample);
+                }
+                requestAnimationFrame(sample);
+                if(${legacy}){
+                    // r918の旧順序：先に内容だけ消してから、共通の背景復帰paintを待つ。
+                    selectorView.close({hide:false});
+                    await ui.closeCoveredViewAfterRecovery(modal,{recoverUnderCover:()=>ui.resumeBackgroundUpdates()});
+                }else{
+                    const result=info.closeCommonModal();
+                    if(result&&typeof result.then==='function')await result;
+                }
+                await new Promise(resolve=>setTimeout(resolve,75));watch=false;
+                return {visibleEmpty,visibleFull,hidden,total,resumed,released,
+                    isHidden:modal.classList.contains('hidden'),isEmpty:!content.textContent.trim(),inert:modal.inert};
+            })()`, returnByValue: true, awaitPromise: true });
+            if (answer.exceptionDetails) throw Error(answer.exceptionDetails.text + ' ' + JSON.stringify(answer.exceptionDetails.exception));
+            const result = answer.result?.value;
+            assert.ok(result && result.total >= 2 && result.isHidden && result.isEmpty && result.released === 1,
+                `一覧終了を完了しDOMを解放 (${pc?'PC':'スマホ'}): ${JSON.stringify(result)}`);
+            assert.strictEqual(result.resumed, 1, '背景復旧は一度だけ');
+            if (legacy) assert.ok(result.visibleEmpty > 0,
+                `旧方式の空枠を実paintで再現 (${pc?'PC':'スマホ'}): ${JSON.stringify(result)}`);
+            else {
+                assert.strictEqual(result.visibleEmpty, 0,
+                    `新方式で空の枠は一切描画しない (${pc?'PC':'スマホ'}): ${JSON.stringify(result)}`);
+                assert.ok(result.visibleFull > 0, '新方式は次の地図が復帰するまで旧内容を維持');
+                assert.strictEqual(result.inert, false, '終了後に入力遮断を残さない');
+            }
+        }
+    }
+    console.log('✓ r919 PC/スマホ 共通一覧の旧空枠paint再現→修正後0paint、DOM解放とinert復旧');
+}
+
+// r920: 一覧を閉じた直後に別の専用画面を開く際、旧coverが2paint重ならないことを検査。
+async function validateCoveredCloseSuccessorHandoff(cdp) {
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+        .hidden{display:none!important}
+        #game-screen{position:absolute;inset:0;background:#334b38}
+        .modal{position:absolute;inset:15%;background:#e2c8a3}
+        #selector-modal{z-index:20;border:5px solid #523f31}
+        #quantity-modal{z-index:10;border:5px solid #274a6c}
+    </style></head><body><div id="game-screen">
+        <div id="selector-modal" class="modal"><div id="old-content">旧一覧の内容</div></div>
+        <div id="quantity-modal" class="modal hidden"><div>後続の数量選択</div></div>
+    </div></body></html>`;
+    for (const [width,height,pc] of [[1280,720,true],[390,844,false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:!pc});
+        for (const legacy of [true,false]) {
+            await cdp.call('Runtime.evaluate',{expression:`document.open();document.write(${JSON.stringify(html)});document.close();
+                window.__r920UI=(new Function(${JSON.stringify(uiSource+'\nreturn UIManager;')}))();true`,returnByValue:true});
+            const answer=await cdp.call('Runtime.evaluate',{expression:`(async()=>{
+                const ui=Object.create(window.__r920UI.prototype);
+                ui.completeDialogToViewHandoff=()=>false;
+                const old=document.getElementById('selector-modal'),next=document.getElementById('quantity-modal');
+                const content=document.getElementById('old-content');old.inert=true;
+                let released=0,overlap=0,gaps=0,frames=0,watch=true;
+                const sample=()=>{if(!watch)return;
+                    const a=!old.classList.contains('hidden'),b=!next.classList.contains('hidden');
+                    if(a&&b)overlap++;if(!a&&!b)gaps++;frames++;requestAnimationFrame(sample);
+                };requestAnimationFrame(sample);
+                const closing=ui.closeCoveredViewAfterRecovery(old,{recoverUnderCover:()=>{},afterHide:()=>{
+                    released++;content.textContent='';old.inert=false;
+                }});
+                if(${legacy})next.classList.remove('hidden');
+                else ui.prepareCoveredViewForOpen(next);
+                const result=await closing;
+                await new Promise(resolve=>setTimeout(resolve,70));watch=false;
+                return {result,released,overlap,gaps,frames,hidden:old.classList.contains('hidden'),
+                    newVisible:!next.classList.contains('hidden'),empty:!content.textContent,inert:old.inert,
+                    pending:ui._coveredClosePending?.size||0};
+            })()`,returnByValue:true,awaitPromise:true});
+            if(answer.exceptionDetails)throw Error(answer.exceptionDetails.text+' '+JSON.stringify(answer.exceptionDetails.exception));
+            const d=answer.result?.value;
+            assert.ok(d&&d.frames>=2&&d.hidden&&d.newVisible&&d.empty&&d.released===1&&d.inert===false&&d.pending===0,
+                `r920 画面遷移と解放 (${pc?'PC':'スマホ'}): ${JSON.stringify(d)}`);
+            assert.strictEqual(d.gaps,0,'後続画面が開く際に切れ目を見せない');
+            if(legacy)assert.ok(d.overlap>=1,`従来の旧一覧の重なりを再現 (${pc?'PC':'スマホ'}): ${JSON.stringify(d)}`);
+            else assert.strictEqual(d.overlap,0,`共通引継ぎ後の重複0paint (${pc?'PC':'スマホ'}): ${JSON.stringify(d)}`);
+        }
+    }
+    console.log('✓ r920 PC/スマホ 旧一覧の重複paint再現→共通引継ぎ後0paint、0空白、終了後参照解放');
+}
+
 // r917: 実イベントの地図shellを使い、会話→地図の公開/閉鎖をPC・スマホで実paint監視。
 async function validateDisasterMapHandoff(cdp) {
     const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
@@ -2542,6 +2803,37 @@ async function validateDisasterMapHandoff(cdp) {
         assert.ok(data.dialogClosed&&data.overlayReady&&data.removed&&data.scrollVisible&&data.holdCount===0,`後始末と背景復帰: ${JSON.stringify(data)}`);
     }
     console.log('✓ r917 災害イベント地図 PC/スマホ 会話→地図公開・旧会話閉鎖・復帰/DOM解放 paint監視');
+}
+
+// 共通モーダルの階層値は前段の宣言を後段で打ち消さない。
+// 大名確認は選択地図の上、共通引継ぎ暗幕の上にあり、より上位の操作ダイアログには譲る。
+async function validateDaimyoConfirmStacking(cdp) {
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head>
+        <body class="is-pc daimyo-select-mode"><div id="game-screen">
+        <div id="modal-handoff-backdrop"></div>
+        <div id="daimyo-confirm-modal" class="modal"><div class="modal-content"><h3>勢力情報</h3></div>
+        <div class="daimyo-confirm-buttons"><button id="daimyo-confirm-start-btn">この勢力で開始</button></div></div>
+        </div></body></html>`;
+    for (const device of [{ name: 'PC', w: 1280, h: 720, pc: true }, { name: 'スマホ', w: 390, h: 844, pc: false }]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width: device.w, height: device.h, deviceScaleFactor: 1, mobile: !device.pc });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc',${device.pc});
+                const modal = document.getElementById('daimyo-confirm-modal');
+                const backdrop = document.getElementById('modal-handoff-backdrop');
+                const btn = document.getElementById('daimyo-confirm-start-btn');
+                const r = btn.getBoundingClientRect();
+                const atop = document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+                return { modal: Number(getComputedStyle(modal).zIndex), backdrop: Number(getComputedStyle(backdrop).zIndex), hit: atop && atop.id };
+            })()`, returnByValue: true
+        });
+        if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
+        const v = result.result?.value;
+        assert.ok(v && v.modal > v.backdrop && v.hit === 'daimyo-confirm-start-btn',
+            `${device.name}: 大名確認が共通暗幕の後ろへ落ちない: ${JSON.stringify(v)}`);
+    }
+    console.log('✓ r922 大名確認モーダルの階層は共通暗幕より上（PC/スマホ・CSS計算値/ヒットテスト）');
 }
 
 async function main() {
@@ -2607,11 +2899,13 @@ async function main() {
         await validateGuideLayout(cdp);
         await validateWarAptitudeLayout(cdp);
         await validateDialogConfirmPlacement(cdp);
+        await validateDaimyoConfirmStacking(cdp);
         await validateBushoBiographyLayout(cdp);
         await validateSettingsTabsLayout(cdp);
         await validateLowMemoryPagerLayout(cdp);
         await validateFieldWarFullscreen(cdp);
         await validateFieldWarTroopOverlay(cdp);
+        await validateFieldWarTopEdge(cdp);
         await validateFieldWarCombatLayering(cdp);
         await validateFieldWarDamagePopup(cdp);
         await validateFieldTerrainLayout(cdp);
@@ -2628,6 +2922,9 @@ async function main() {
         await validateDialogChoiceBackdrop(cdp);
         await validateResultModalDoubleClose(cdp);
         await validateDialogToResultNoOverlap(cdp);
+        await validateInterceptModalHandoff(cdp);
+        await validateSelectorCloseContentHandoff(cdp);
+        await validateCoveredCloseSuccessorHandoff(cdp);
         await validateDisasterMapHandoff(cdp);
     } finally {
         if (cdp) cdp.close();

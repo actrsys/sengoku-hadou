@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style><!-- APP_CSS --></style><style>
+html,body{margin:0;width:100%;height:100%;background:#111;overflow:hidden}
+#game-screen{position:absolute;inset:0;overflow:hidden;background:#203b28}
+#field-war-modal{display:flex!important;opacity:1!important;pointer-events:auto!important;position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
+#field-war-modal .fw-main-area{min-height:0}
+</style></head><body class="is-pc">
+<div id="game-screen"><div id="field-war-modal" class="modal"><div class="modal-content fw-fullscreen-content">
+<div class="fw-top-bar"><span>1560年 5月</span><span>☀ 晴れ</span><span>残りターン 20</span></div>
+<div id="fw-main-area" class="fw-main-area"><div id="fw-map-scroll" class="fw-map-scroll"><div id="fw-map"></div></div></div>
+<div class="fw-controls"><div class="fw-menu-group"><button>情報</button></div></div>
+</div></div></div>
+<script src="../../js/field_war.js"></script><script>
+window.createTopEdgeFixture = (isPc = true, zoom = 'in') => {
+    document.body.classList.toggle('is-pc', isPc);
+    const war = new FieldWarManager({});
+    window.fieldTest = war;
+    const top = {id:1, x:4, y:0, direction:0, soldiers:6000, troopType:'ashigaru', isAttacker:true, isGeneral:true};
+    const second = {id:2, x:7, y:1, direction:2, soldiers:1500, troopType:'kiba', isAttacker:false};
+    war.units=[top,second]; war.turnQueue=[top]; war.grid=null;
+    war.isPlayerTurn=()=>false;
+    war.mapEl=document.getElementById('fw-map');
+    war.mapEl.style.width=((war.cols-1)*war.hexW*.75+war.hexW)+'px';
+    war.mapEl.style.height=((war.rows*2-1)*war.hexH/2+war.hexH)+'px';
+    war.initMapElements(); war.updateMap();
+    war.fwZoomLevel=undefined; war.adjustMapScale();
+    war.fwZoomLevel=zoom==='in'?1:0;war.applyMapScale();
+    // A real top-row unit can be visible at the hard scroll boundary.
+    const scroll=document.getElementById('fw-map-scroll');
+    scroll.scrollTop=0;scroll.scrollLeft=0;
+    return war;
+};
+</script></body></html>

@@ -1,4 +1,8 @@
 
+// 最上段の部隊に付く兵科・兵数はHEX上端より最大約19px上へ伸びる。
+// 地形と部隊の相対位置を変えず、倍率に応じてマップ外側に確保する上余白。
+const FIELD_WAR_TOP_LABEL_INSET = 20;
+
 // 野戦の経路探索・向き計算で共用する固定HEX方向。毎回の配列生成を避ける。
 const FIELD_WAR_HEX_DIRECTIONS = [
     {dx: 0, dy: -2, dir: 0}, {dx: 1, dy: -1, dir: 1}, {dx: 1, dy: 1, dir: 2},
@@ -244,6 +248,7 @@ class FieldWarManager {
 
         let oldScale = this.currentMapScale || scale;
         this.currentMapScale = scale;
+        const topInset = FIELD_WAR_TOP_LABEL_INSET * scale;
 
         if (cx !== undefined && cy !== undefined) {
             const rect = scrollArea.getBoundingClientRect();
@@ -251,18 +256,18 @@ class FieldWarManager {
             const clientY = cy - rect.top;
 
             const logicalX = (scrollArea.scrollLeft + clientX) / oldScale;
-            const logicalY = (scrollArea.scrollTop + clientY) / oldScale;
+            const logicalY = (scrollArea.scrollTop + clientY - FIELD_WAR_TOP_LABEL_INSET * oldScale) / oldScale;
 
             mapArea.style.transformOrigin = 'top left';
             mapArea.style.transform = `scale(${scale})`;
-            mapArea.style.margin = '0';
+            mapArea.style.margin = `${topInset}px 0 0`;
 
             scrollArea.scrollLeft = logicalX * scale - clientX;
-            scrollArea.scrollTop = logicalY * scale - clientY;
+            scrollArea.scrollTop = logicalY * scale + topInset - clientY;
         } else {
             mapArea.style.transformOrigin = 'top left';
             mapArea.style.transform = `scale(${scale})`;
-            mapArea.style.margin = '0';
+            mapArea.style.margin = `${topInset}px 0 0`;
         }
     }
 
@@ -1091,7 +1096,7 @@ class FieldWarManager {
         const containerH = scrollEl.clientHeight;
         const toPixel = (x, y) => ({
             x: (x * (this.hexW * 0.75) + this.hexW / 2) * scale,
-            y: (y * (this.hexH / 2) + this.hexH / 2) * scale
+            y: (y * (this.hexH / 2) + this.hexH / 2 + FIELD_WAR_TOP_LABEL_INSET) * scale
         });
         const p1 = toPixel(x1, y1);
         const p2 = toPixel(x2, y2);
@@ -1135,7 +1140,7 @@ class FieldWarManager {
         
         // 拡大率を掛け算して、本当のピクセル位置を計算します
         const px = (unit.x * (this.hexW * 0.75) + this.hexW / 2) * scale;
-        const py = (unit.y * (this.hexH / 2) + this.hexH / 2) * scale;
+        const py = (unit.y * (this.hexH / 2) + this.hexH / 2 + FIELD_WAR_TOP_LABEL_INSET) * scale;
 
         const containerW = scrollEl.clientWidth;
         const containerH = scrollEl.clientHeight;
@@ -1595,9 +1600,9 @@ class FieldWarManager {
             // スクロール量を差し引いて、表示エリア（fw-main-area）の左上を(0,0)とした場合の座標を計算します
             // これにより、画面の黒帯（外側のオフセット）を完全に無視できます
             const iconRightEdge = (uLeft + uWidth) * scale - scrollEl.scrollLeft;
-            const iconBottomEdge = (uTop + uHeight) * scale - scrollEl.scrollTop;
+            const iconBottomEdge = (uTop + uHeight + FIELD_WAR_TOP_LABEL_INSET) * scale - scrollEl.scrollTop;
             const iconLeftEdge = uLeft * scale - scrollEl.scrollLeft;
-            const iconTopEdge = uTop * scale - scrollEl.scrollTop;
+            const iconTopEdge = (uTop + FIELD_WAR_TOP_LABEL_INSET) * scale - scrollEl.scrollTop;
 
             // ポップアップ自体のサイズと、表示可能エリアのサイズ
             const infoW = infoEl.offsetWidth;

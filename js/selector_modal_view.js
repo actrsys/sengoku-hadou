@@ -288,10 +288,9 @@ class SelectorModalView {
         const { modal, contextEl, tabsEl, pagerEl, confirmBtn, assistBtn, backBtn } = elements;
         if (options.hide !== false) modal.classList.add('hidden');
 
-        // 非表示にするだけだと、仮想スクロールのクロージャや画像DOMが大量データへの参照を
-        // 保持したままになります。通常地図を復帰する前に画面内容を解放し、古いスマホの
-        // 一時メモリピークを下げます。見た目が必要な間は close() 自体が呼ばれないため、
-        // handoff 中の表示は従来どおり維持されます。
+        // 非表示だけでは仮想スクロールや画像DOMが古いデータを保持するため、
+        // 最終的に閉じる時に内容と操作ハンドラを解放します。通常の閉鎖では背景の
+        // 復帰が描画され、外枠が隠れた後にここへ来るため、空の枠を見せません。
         this.releaseListContent({ resetScroll: true });
         if (contextEl) contextEl.innerHTML = '';
         if (tabsEl) tabsEl.innerHTML = '';

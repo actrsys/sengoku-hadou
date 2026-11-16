@@ -713,7 +713,7 @@ class UISliderManager {
             };
         }
 
-        modal.classList.remove('hidden');
+        this.ui.prepareCoveredViewForOpen(modal);
         listEl.innerHTML = '';
 
         if (stockContainer) {

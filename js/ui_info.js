@@ -85,13 +85,26 @@ class UIInfoManager {
         const canDiagnose = this.game && this.game.phase !== 'title' && typeof this.game.writeSystemDiagnostic === 'function';
         const selectorElements = this.selectorView && typeof this.selectorView.getElements === 'function' ? this.selectorView.getElements() : null;
         const selectorModal = selectorElements ? selectorElements.modal : null;
-        const canCoverRecovery = !!(selectorModal && !selectorModal.classList.contains('hidden') && !wasSuspendedForChild);
+        // すでに次の固定モーダルが表示されている場合、旧一覧の空の枠を
+        // 背景復旧の2paint間だけ重ねて残さない。次画面のない通常終了だけcoverを保持する。
+        const successorVisible = (this.ui && this.ui._modalBackdropModals || []).some(modal =>
+            modal !== selectorModal && !modal.classList.contains('hidden') && modal.style.display !== 'none');
+        const canCoverRecovery = !!(selectorModal && !selectorModal.classList.contains('hidden')
+            && !wasSuspendedForChild && !successorVisible);
         let coveredCloseTask = null;
         if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:start');
 
-        // 一覧DOMは通常地図の復帰前に解放してメモリピークを抑えるが、全画面のmodal backdropは
-        // 1paintだけ残す。巨大Canvasの再合成中に地図そのものを露出させない。
-        if (this.selectorView) this.selectorView.close({ hide: !canCoverRecovery });
+        // 背景復旧待ちの間に一覧DOMを消すと、旧モーダルの中身が空のまま
+        // 2paintだけ残る。入力とスクロール監視は先に止め、描画内容は覆いを
+        // 外す瞬間まで維持する。非表示にしてから参照を解放し、複製は作らない。
+        const deferVisibleContentRelease = canCoverRecovery
+            && this.ui && typeof this.ui.closeCoveredViewAfterRecovery === 'function'
+            && typeof this.ui.resumeBackgroundUpdates === 'function';
+        if (deferVisibleContentRelease) {
+            selectorModal.inert = true;
+        } else if (this.selectorView) {
+            this.selectorView.close({ hide: !canCoverRecovery });
+        }
         this._releaseCommonModalAIGuardHide();
         if (canDiagnose) this.game.writeSystemDiagnostic('ui:modal_close:selector_done');
         
@@ -104,6 +117,16 @@ class UIInfoManager {
                 coveredCloseTask = this.ui.closeCoveredViewAfterRecovery(selectorModal, {
                     recoverUnderCover: () => this.ui.resumeBackgroundUpdates('ui:modal_close'),
                     afterHide: () => {
+                        // 旧一覧を隠した後だけ、顔画像・一覧DOM・操作ハンドラを解放する。
+                        // 再公開時は共通公開窓口が旧終了予約を失効させるため、
+                        // 新しい一覧の内容をここから破棄することはない。
+                        if (deferVisibleContentRelease) {
+                            try {
+                                if (this.selectorView) this.selectorView.close();
+                            } finally {
+                                selectorModal.inert = false;
+                            }
+                        }
                         if (canDiagnose && this.game && this.game.phase !== 'title' && typeof this.game.writeSystemDiagnostic === 'function') {
                             this.game.writeSystemDiagnostic('ui:modal_close:recovery_done');
                         }

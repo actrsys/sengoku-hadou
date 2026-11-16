@@ -1093,7 +1093,7 @@ Object.assign(WarManager.prototype, {
                                 // 可視化の直前だけ自分でAIガードを引き渡す。
                                 document.getElementById('intercept-msg').innerText = `${atkArmyName}の${atkBushos[0].name}が攻めてきました！\n敵軍: ${totalAtkSoldiers} 対 自軍: ${totalDefSoldiers}\n迎撃（野戦）しますか？籠城しますか？`;
                                 this.game.ui.hideAIGuardTemporarily();
-                                modal.classList.remove('hidden');
+                                this.game.ui.prepareCoveredViewForOpen(modal);
                                 
                                 document.getElementById('btn-intercept').onclick = async () => { 
                                     modal.classList.add('hidden'); 
@@ -1140,13 +1140,13 @@ Object.assign(WarManager.prototype, {
 
                                                         onResult('field', finalDefAssignments, interceptRice, finalAtkAssignments, interceptHorses, interceptGuns);
                                                     },
-                                                    () => { modal.classList.remove('hidden'); }
+                                                    () => { this.game.ui.prepareCoveredViewForOpen(modal); }
                                                     );
                                                 },
                                                 returnToParentSelector: true
                                             });
                                         },
-                                        onCancel: () => { modal.classList.remove('hidden'); }
+                                        onCancel: () => { this.game.ui.prepareCoveredViewForOpen(modal); }
                                     });
                                 };
                                 document.getElementById('btn-siege').onclick = () => { 

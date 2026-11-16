@@ -10770,8 +10770,51 @@ test('戦争準備の連続画面はAIガードを遷移先UIだけが所有し�
     assert.ok(!/if \(defClan === pid\)\s*\{\s*this\.game\.ui\.hideAIGuardTemporarily\(\);\s*\}/.test(interceptBlock), '援軍確認より前の包括的な先行解除を置かない');
     const msgAt = interceptBlock.indexOf("document.getElementById('intercept-msg').innerText");
     const guardAt = interceptBlock.indexOf('this.game.ui.hideAIGuardTemporarily();', msgAt);
-    const visibleAt = interceptBlock.indexOf("modal.classList.remove('hidden');", guardAt);
+    const visibleAt = interceptBlock.indexOf("this.game.ui.prepareCoveredViewForOpen(modal);", guardAt);
     assert.ok(msgAt >= 0 && guardAt > msgAt && visibleAt > guardAt, '専用迎撃モーダルは内容準備後・可視化直前だけAIガードを引き渡す');
+});
+
+test('r918 迎撃確認と部隊分割は共通公開窓口を使い、取消復帰も旧会話を重ねない', () => {
+    const effort = read('js/war_effort.js');
+    const block = effort.slice(effort.indexOf('const showInterceptDialog = async (onResult) => {'),
+        effort.indexOf('// ★追加：籠城戦に入った時のメッセージ'));
+    assert.strictEqual((block.match(/this\.game\.ui\.prepareCoveredViewForOpen\(modal\)/g) || []).length, 3,
+        '迎撃初回と武将選択・数量選択の取消復帰は同じ公開窓口を使う');
+    assert.ok(!block.includes("modal.classList.remove('hidden')"), '旧来の直接公開を残さない');
+    const slider = read('js/ui_slider.js');
+    const unitDivide = slider.slice(slider.indexOf('showUnitDivideModal(bushos, totalSoldiers'), slider.indexOf('showUnitDivideModal(bushos, totalSoldiers') + 3000);
+    assert.ok(unitDivide.includes('this.ui.prepareCoveredViewForOpen(modal)'), '部隊分割も共通公開窓口を利用');
+});
+
+test('r918 別モーダルが公開済みなら旧共通一覧の空枠をpaint待ちで残さない', () => {
+    const ctx = createContext({ SelectorModalView: class {} });
+    loadScript(ctx, 'js/ui_info.js');
+    const Info = vm.runInContext('UIInfoManager', ctx);
+    const exercise = successorVisible => {
+        const selector = { classList: new FakeClassList(), style: { display: '' } };
+        const successor = { classList: new FakeClassList(successorVisible ? [] : ['hidden']), style: { display: '' } };
+        const counts = { waited: 0, immediate: null, resumed: 0 };
+        const info = Object.create(Info.prototype);
+        info.game = { phase: 'title' };
+        info.ui = {
+            _modalBackdropModals: [selector, successor],
+            resumeBackgroundUpdates() { counts.resumed++; },
+            closeCoveredViewAfterRecovery() { counts.waited++; return Promise.resolve(true); }
+        };
+        info.selectorView = {
+            getElements() { return { modal: selector }; },
+            close({ hide }) { counts.immediate = !!hide; if (hide) selector.classList.add('hidden'); }
+        };
+        info._cancelDeferredModalTransition = () => {};
+        info._stopActiveListRendering = () => {};
+        info._commonModalOwnsAIGuardHide = false;
+        info.closeCommonModal();
+        return { ...counts, hidden: selector.classList.contains('hidden'), inert: !!selector.inert };
+    };
+    assert.deepStrictEqual(exercise(true), { waited: 0, immediate: true, resumed: 1, hidden: true, inert: false },
+        '行先の迎撃モーダルが開いていれば旧一覧を即時閉鎖');
+    assert.deepStrictEqual(exercise(false), { waited: 1, immediate: null, resumed: 0, hidden: false, inert: true },
+        '通常の一覧終了では背景復帰paintまで旧モーダルを保持');
 });
 
 test('UIInfoManagerの起動初期化で未定義変数を参照せず、coveredCloseTaskは正しいスコープから返す', async () => {
@@ -42660,7 +42703,7 @@ test('r891 野戦の初回カメラは即時スクロール、後続の通常追
     const unit = { x: 13, y: 11 };
     field.scrollToUnit(unit, { instant: true, force: true });
     assert.strictEqual(scroll.scrollLeft, (13 * 22.5 + 15) * 2 - 60);
-    assert.strictEqual(scroll.scrollTop, (11 * 13 + 13) * 2 - 50);
+    assert.strictEqual(scroll.scrollTop, (11 * 13 + 13 + 20) * 2 - 50, '最上段ラベル用の上余白を含めて初期カメラ座標を計算する');
     assert.strictEqual(moves.length, 0, '開始準備時にはsmooth scroll APIを使わない');
     scroll.scrollLeft = 0; scroll.scrollTop = 0;
     field.scrollToUnit(unit);
@@ -43228,6 +43271,138 @@ test('r917 共通モーダル暗幕は一律160ms保持せず、背景のpaint�
     const events=read('js/event/common_events.js');
     const cleanup=events.slice(events.indexOf('    const cleanupOverlay = async (mapOverlay) => {'),events.indexOf('\n    return {',events.indexOf('    const cleanupOverlay = async (mapOverlay) => {')));
     assert.ok(cleanup.indexOf('removeChild(mapOverlay)')<cleanup.indexOf('canvas.width = 1'), 'イベント地図は画面から外してから素材を解放');
+});
+
+
+// r919: 通常の一覧終了でも、背景復旧の2paint中に空のモーダル枠を残さない。
+// DOMは表示が終了するまで保持するが、スクロール監視は先に止め、入力を遮断する。
+test('r919 一覧の通常終了は旧内容を2paint保持し、非表示後に一度だけ解放する', () => {
+    const source = read('js/ui_info.js');
+    const context = vm.createContext({ console, SelectorModalView: class {} });
+    vm.runInContext(source + '\nthis.Info = UIInfoManager;', context);
+    const events = [];
+    const modal = { id: 'selector-modal', inert: false, classList: {
+        hidden: false,
+        contains(v) { return v === 'hidden' ? this.hidden : false; },
+        add(v) { if (v === 'hidden') this.hidden = true; }
+    }, style: {}, visibleText: '旧武将一覧' };
+    let pendingClose = null;
+    const ui = { _modalBackdropModals: [modal],
+        resumeBackgroundUpdates: () => events.push('map-resume'),
+        closeCoveredViewAfterRecovery(_modal, options) {
+            pendingClose = options;
+            options.recoverUnderCover();
+            return Promise.resolve(true);
+        }
+    };
+    const info = Object.create(context.Info.prototype);
+    Object.assign(info, {
+        ui, game: { phase: 'title' }, _commonModalSuspendedForChild: false,
+        _cancelDeferredModalTransition: () => events.push('cancel-old-render'),
+        _stopActiveListRendering: () => events.push('stop-list-scroll'),
+        _releaseCommonModalAIGuardHide: () => events.push('release-guard'),
+        selectorView: {
+            getElements: () => ({ modal }),
+            close() { events.push('release-content'); modal.visibleText = ''; modal.classList.add('hidden'); }
+        }
+    });
+    info.closeCommonModal();
+    assert.ok(pendingClose, '背景復旧までcoverを保持する');
+    assert.strictEqual(modal.visibleText, '旧武将一覧', '復旧待ち中に一覧だけ消さない');
+    assert.strictEqual(modal.inert, true, '終了待ちの旧一覧では入力を遮断する');
+    assert.ok(events.indexOf('stop-list-scroll') < events.indexOf('map-resume'), '旧監視は背景復旧より先に停止');
+    assert.ok(!events.includes('release-content'), '内容解放はpaint後');
+    modal.classList.add('hidden');
+    pendingClose.afterHide();
+    assert.strictEqual(modal.visibleText, '', '非表示後に旧DOMを解放');
+    assert.strictEqual(modal.inert, false, '入力遮断を残さない');
+    assert.strictEqual(events.filter(e => e === 'release-content').length, 1, '旧内容は一回だけ破棄');
+});
+
+test('r919 後続モーダルがあれば旧一覧は即解放し、旧終了待ちの再公開は入力を復旧する', () => {
+    const src = read('js/ui_info.js');
+    const context = vm.createContext({console, SelectorModalView: class {}});
+    vm.runInContext(src + '\nthis.Info = UIInfoManager;', context);
+    const modal = {id:'selector-modal', inert:false, classList:{hidden:false, contains(v){return v==='hidden'&&this.hidden;}, add(v){if(v==='hidden')this.hidden=true;}},style:{}};
+    const next = {id:'quantity-modal', classList:{contains:()=>false},style:{}};
+    const events=[];
+    const ui={_modalBackdropModals:[modal,next], resumeBackgroundUpdates:()=>events.push('resume'),
+        closeCoveredViewAfterRecovery:()=>{throw Error('後続ありではpaint待ちしない');}};
+    const info=Object.create(context.Info.prototype);
+    Object.assign(info,{ui,game:{phase:'title'},_cancelDeferredModalTransition:()=>{},_stopActiveListRendering:()=>{},
+        _releaseCommonModalAIGuardHide:()=>{},selectorView:{getElements:()=>({modal}),close(){events.push('release');modal.classList.add('hidden');}}});
+    info.closeCommonModal();
+    assert.deepStrictEqual(events,['release','resume'],'後続モーダルがある時だけ旧内容を同期解放する');
+    assert.strictEqual(modal.inert,false,'同期解放ではinert不要');
+
+    const uiSource=read('js/ui.js');
+    const ctx=vm.createContext({console});
+    vm.runInContext(uiSource+'\nthis.UI = UIManager;',ctx);
+    const testUI=Object.create(ctx.UI.prototype);
+    const visible={id:'selector-modal',inert:true,classList:{remove(v){events.push('show');}},style:{}};
+    testUI.cancelCoveredClose=()=>events.push('cancel-close');
+    testUI.completeDialogToViewHandoff=()=>{};
+    testUI.prepareCoveredViewForOpen(visible);
+    assert.strictEqual(visible.inert,false,'再公開した一覧が入力不能にならない');
+    assert.deepStrictEqual(events.slice(-2),['cancel-close','show'],'古い閉鎖予約を取消してから公開');
+    assert.ok(uiSource.includes('if (selectorModal && selectorModal.inert)')
+        && uiSource.includes('this.info.selectorView.close()'), '強制リセットは失効した一覧を解放');
+});
+
+
+// r920: 背景復旧のpaintを待つ旧一覧から、次の固定モーダルへ実際に進む時は
+// 次画面公開と同じJSタスクで旧画面を非表示にしてDOMを解放する。
+test('r920 背景復旧中に次画面が公開されたら旧coverを一回だけ終え、重複フレームを残さない', async () => {
+    const source = read('js/ui.js');
+    const start = source.indexOf('    waitForCoveredMapPaint() {');
+    const end = source.indexOf('    hideLoadingScreen()', start);
+    const frames = [];
+    const ctx = createContext({ requestAnimationFrame(fn) { frames.push(fn); return frames.length; } });
+    vm.runInContext('class TestUI {' + source.slice(start, end) + '} this.TestUI=TestUI;', ctx);
+    const ui = new ctx.TestUI();
+    ui.completeDialogToViewHandoff = () => false;
+    const old = { id:'selector-modal', inert:true, classList:new FakeClassList(), style:{} };
+    const next = { id:'quantity-modal', classList:new FakeClassList(['hidden']), style:{} };
+    const events=[];
+    const closing = ui.closeCoveredViewAfterRecovery(old, {
+        recoverUnderCover: () => events.push('recover-map'),
+        afterHide: () => { events.push('release-old-content'); old.inert=false; }
+    });
+    assert.strictEqual(old.classList.contains('hidden'), false, '単独の閉鎖ではpaint待ちのcoverを保持');
+    ui.prepareCoveredViewForOpen(next);
+    assert.strictEqual(next.classList.contains('hidden'), false, '次の専用モーダルを公開');
+    assert.strictEqual(old.classList.contains('hidden'), true, '旧一覧は次画面と同じJSタスクで終了');
+    assert.deepStrictEqual(events, ['recover-map','release-old-content'], '旧一覧の内容を1回だけ解放');
+    assert.strictEqual(old.inert, false, '入力遮断が残らない');
+    while (frames.length) { const fn=frames.shift(); fn(); if (frames.length===0) break; }
+    assert.strictEqual(await closing, true, '後続画面への先行完了もclose成功として扱う');
+    assert.strictEqual(events.filter(x => x==='release-old-content').length, 1, '旧2paint後に二重解放しない');
+    assert.strictEqual(ui._coveredClosePending?.size, 0, '終了した予約の参照を残さない');
+});
+
+test('r920 同じDOMの再公開と強制世代失効では旧終了後処理を走らせない', async () => {
+    const source=read('js/ui.js');
+    const start=source.indexOf('    waitForCoveredMapPaint() {');
+    const end=source.indexOf('    hideLoadingScreen()', start);
+    const frames=[];
+    const ctx=createContext({ requestAnimationFrame(fn) { frames.push(fn); return frames.length; } });
+    vm.runInContext('class TestUI {' + source.slice(start,end) + '} this.TestUI=TestUI;',ctx);
+    const ui=new ctx.TestUI(); ui.completeDialogToViewHandoff=()=>false;
+    const modal={id:'selector-modal',inert:true,classList:new FakeClassList(),style:{}};
+    let releases=0;
+    const old=ui.closeCoveredViewAfterRecovery(modal,{waitForPaint:true,afterHide:()=>{releases++;}});
+    ui.prepareCoveredViewForOpen(modal);
+    while(frames.length)frames.shift()();
+    assert.strictEqual(await old,false,'同じDOMを再使用する場合は旧終了を無効化');
+    assert.strictEqual(releases,0,'後発一覧の内容を旧終了予約から破棄しない');
+    assert.strictEqual(modal.classList.contains('hidden'),false);
+    assert.strictEqual(modal.inert,false);
+    const old2=ui.closeCoveredViewAfterRecovery(modal,{waitForPaint:true,afterHide:()=>{releases++;}});
+    ui._coveredCloseEpoch=Number(ui._coveredCloseEpoch||0)+1;
+    ui._coveredClosePending=new Map();
+    while(frames.length)frames.shift()();
+    assert.strictEqual(await old2,false,'タイトル復帰相当の世代失効はcloseしない');
+    assert.strictEqual(releases,0);
 });
 
 Promise.all(pendingTests).then(() => {

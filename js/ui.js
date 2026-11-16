@@ -351,7 +351,7 @@ class UIManager {
         // compositor反映が間に合わないことがあるため、coverごとに遅延closeを管理する。
         this._coveredCloseEpoch = 0;
         this._coveredCloseTokens = new WeakMap();
-        this._coveredClosePromises = new WeakMap();
+        this._coveredClosePending = new Map();
         // 会話・選択・結果など異種モーダルの表示切替は、暗幕の連続性をここで共通管理する。
         this._initModalHandoffBackdrop();
         // 月初／月末の処理ラベルは、会話が閉じた直後に即復帰すると
@@ -2336,13 +2336,23 @@ class UIManager {
         if (!coverEl) return;
         const tokens = this._coveredCloseTokens || (this._coveredCloseTokens = new WeakMap());
         tokens.set(coverEl, Number(tokens.get(coverEl) || 0) + 1);
-        if (this._coveredClosePromises) this._coveredClosePromises.delete(coverEl);
+        if (this._coveredClosePending) this._coveredClosePending.delete(coverEl);
     }
 
     prepareCoveredViewForOpen(coverEl) {
         if (!coverEl) return;
         this.cancelCoveredClose(coverEl);
+        // 先に次画面を公開してから、背景復帰待ちの旧画面を同じJSタスクで閉じる。
+        // 旧画面を通常の2paint終了まで残すと、直後に別画面が開いた場合に重なってしまう。
+        // すでに公開した次画面がcoverとなるので、旧画面の待機はここで完了できる。
+        if (coverEl.id === 'selector-modal') coverEl.inert = false;
         coverEl.classList.remove('hidden');
+        const pending = this._coveredClosePending;
+        if (pending) {
+            for (const [oldCover, entry] of pending) {
+                if (oldCover !== coverEl && entry && typeof entry.finish === 'function') entry.finish();
+            }
+        }
         // 別の固定モーダルが公開された場合、閉鎖待ちの旧会話を同じ描画単位で
         // 引き渡す。会話→会話はprocessDialogQueueが別途管理するため触れない。
         if (coverEl.id !== 'dialog-modal') this.completeDialogToViewHandoff();
@@ -2350,9 +2360,11 @@ class UIManager {
 
     closeCoveredViewAfterRecovery(coverEl, options = {}) {
         if (!coverEl) return Promise.resolve(false);
-        const promises = this._coveredClosePromises || (this._coveredClosePromises = new WeakMap());
-        const existing = promises.get(coverEl);
-        if (existing) return existing;
+        // 一画面の終了予約は一つだけ。旧版のPromise専用WeakMapは廃し、
+        // 「復帰paintで終了」「次画面公開時に先行終了」を同じfinalizerで確定する。
+        const pending = this._coveredClosePending || (this._coveredClosePending = new Map());
+        const existing = pending.get(coverEl);
+        if (existing) return existing.task;
 
         const tokens = this._coveredCloseTokens || (this._coveredCloseTokens = new WeakMap());
         const token = Number(tokens.get(coverEl) || 0) + 1;
@@ -2362,6 +2374,24 @@ class UIManager {
         const beforeRecovery = typeof options.beforeRecovery === 'function' ? options.beforeRecovery : null;
         const afterHide = typeof options.afterHide === 'function' ? options.afterHide : null;
         const waitForPaint = options.waitForPaint === true || (options.waitForPaint !== false && !!recoverUnderCover);
+        let finished = false;
+        const finish = () => {
+            if (finished) return true;
+            // タイトル復帰・同じDOMの再公開に失効した古い終了は何もしない。
+            if (epoch !== Number(this._coveredCloseEpoch || 0)) return false;
+            if (Number(tokens.get(coverEl) || 0) !== token) return false;
+            finished = true;
+            coverEl.classList.add('hidden');
+            try {
+                if (afterHide) afterHide();
+            } catch (e) {
+                console.error('画面終了後処理に失敗しました:', e);
+            } finally {
+                // 次画面が公開された時点で解放し、旧paint予約の参照を保持しない。
+                if (pending.get(coverEl)?.finish === finish) pending.delete(coverEl);
+            }
+            return true;
+        };
 
         let task = null;
         task = (async () => {
@@ -2371,25 +2401,12 @@ class UIManager {
             } catch (e) {
                 console.error('画面復帰中の背景更新に失敗しました:', e);
             }
-
             if (waitForPaint) await this.waitForCoveredMapPaint();
-
-            // タイトル復帰・ロード・同じ固定DOMの再表示が先に来た場合は、
-            // 古いclose予約から新しい画面を消さない。
-            if (epoch !== Number(this._coveredCloseEpoch || 0)) return false;
-            if (Number(tokens.get(coverEl) || 0) !== token) return false;
-
-            coverEl.classList.add('hidden');
-            try {
-                if (afterHide) afterHide();
-            } catch (e) {
-                console.error('画面終了後処理に失敗しました:', e);
-            }
-            return true;
+            return finish();
         })().finally(() => {
-            if (promises.get(coverEl) === task) promises.delete(coverEl);
+            if (pending.get(coverEl)?.task === task) pending.delete(coverEl);
         });
-        promises.set(coverEl, task);
+        pending.set(coverEl, { task, finish });
         return task;
     }
 
@@ -2455,7 +2472,7 @@ class UIManager {
         // 新しい固定DOMを隠したり、旧結果callbackを走らせないよう世代ごと破棄する。
         this._coveredCloseEpoch = Number(this._coveredCloseEpoch || 0) + 1;
         this._coveredCloseTokens = new WeakMap();
-        this._coveredClosePromises = new WeakMap();
+        this._coveredClosePending = new Map();
         // 監視はUIManager初期化時に一度だけ登録済み。強制リセットでは
         // 既存監視を使い続け、旧遷移を世代失効させたまま新しい幕を作らない。
         // 共通会話も固定DOMを共有する非同期Viewとして扱う。顔画像decode・handoff・自動閉じを
@@ -2524,8 +2541,15 @@ class UIManager {
         const modals = document.querySelectorAll('.modal');
         modals.forEach(m => {
             m.classList.add('hidden');
-            m.style.display = ''; 
+            m.style.display = '';
         });
+        // 背景paint待ちの旧一覧がタイトル復帰で失効した場合も、
+        // afterHideが走らないまま一覧DOM・顔画像を持ち越さない。
+        const selectorModal = document.getElementById('selector-modal');
+        if (selectorModal && selectorModal.inert) {
+            if (this.info && this.info.selectorView) this.info.selectorView.close();
+            selectorModal.inert = false;
+        }
         if(this.cutinOverlay) this.cutinOverlay.classList.add('hidden');
         if(this.warModal) this.warModal.classList.add('hidden');
         if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
