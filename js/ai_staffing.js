@@ -845,7 +845,7 @@ class AIStaffing {
     }
 
     // お城のターンが来た時に、武将をお引越しさせるか決めます
-    planMoveAction(castle, availableBushos, reachableMyCastles) {
+    planMoveAction(castle, availableBushos) {
         this.clearCacheIfNeeded();
         const clanId = castle.ownerClan;
         
@@ -875,6 +875,9 @@ class AIStaffing {
 
         const currentRoleData = castleRoles.get(castle.id);
         if (!currentRoleData) return null;
+        // 作戦データはこの同期計画中に変化しない。候補武将×到達拠点の内側で再検索しない。
+        const clanOps = this.game.aiOperationManager.operations[clanId];
+        const myOp = clanOps ? clanOps[castle.legionId] : null;
 
         // 繋がっているお城の中だけで、全体の人数や大きさを計算するようにします
         let totalBushosInNetwork = 0;
@@ -999,8 +1002,6 @@ class AIStaffing {
                 }
 
                 // 6. 攻撃作戦の準備拠点・援軍拠点ならプラス
-                const clanOps = this.game.aiOperationManager.operations[clanId];
-                const myOp = clanOps ? clanOps[castle.legionId] : null;
                 if (clanGoal === '攻撃準備' && myOp) {
                     if (bType !== '無能型') {
                         if (myOp.stagingBase === target.id) {

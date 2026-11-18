@@ -2321,10 +2321,9 @@ class AIEngine {
             // 新しい人事部（AIStaffing）の戦略的な指示に従います！
             // ★追加：大雪なら移動しません！
             if (this.game.aiStaffing && !isSrcHeavySnow) {
-                // ★追加：移動先として大雪の城を除外したリストを渡します！
-                const validReachableCastles = reachableMyCastles.filter(c => !heavySnowProvIds.has(c.provinceId));
+                // 移動候補と大雪通行制限はAIStaffingの地図共通探索で確定する。
                 if (this.game.writeAIDiagnostic) this.game.writeAIDiagnostic(castle, 'internal:plan_move');
-                const moveActions = this.game.aiStaffing.planMoveAction(castle, availableBushos, validReachableCastles);
+                const moveActions = this.game.aiStaffing.planMoveAction(castle, availableBushos);
                 if (moveActions && moveActions.length > 0) {
                     // 何人もの移動リストを、そのまま全部行動の候補に追加します！
                     actions.push(...moveActions);

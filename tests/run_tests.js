@@ -15828,12 +15828,29 @@ test('AI武将移動計画は拠点人数を短命Mapで一度だけ集計する
     assert.ok(countBlock.includes('window.LifeStatusRules.isPresent(b)'), '未登場・死亡除外の従来集合を維持する');
     assert.ok(countBlock.includes('window.BushoStatusRules.isActive(b)'), '活動中条件を維持する');
 
-    const planAt = staffing.indexOf('planMoveAction(castle, availableBushos, reachableMyCastles)');
+    const planAt = staffing.indexOf('planMoveAction(castle, availableBushos)');
     const planEnd = staffing.indexOf('/** 四半期の全国AI人事。', planAt);
     const planBlock = staffing.slice(planAt, planEnd);
     assert.ok(planBlock.includes('const activeClanBushoCountByCastleId = new Map();'), '1計画内だけの人数Mapを作る');
     assert.ok(planBlock.includes('const getActiveClanBushoCount = (c) => activeClanBushoCountByCastleId.get('), '候補評価は短命Mapを読む');
     assert.ok(!planBlock.includes('this._getActiveClanBushoCount(target, clanId)'), '候補武将×移動先ごとの再集計をしない');
+});
+
+test('r941 AI内政の移動先フィルタは唯一の地図共通探索へ委譲し未使用引数を持たない', () => {
+    const ai = read('js/ai.js');
+    const staffing = read('js/ai_staffing.js');
+    const start = ai.indexOf('if (this.game.aiStaffing && !isSrcHeavySnow) {');
+    const end = ai.indexOf('// ★11. 登用', start);
+    assert.ok(start >= 0 && end > start);
+    const moveBlock = ai.slice(start, end);
+    assert.ok(moveBlock.includes('this.game.aiStaffing.planMoveAction(castle, availableBushos)'), '呼出側の移動先候補は人事Systemで一元判定する');
+    assert.ok(!moveBlock.includes('validReachableCastles'), '読み取られない候補配列を毎行動生成しない');
+    const plan = staffing.slice(staffing.indexOf('planMoveAction(castle, availableBushos)'), staffing.indexOf('/** 四半期の全国AI人事。'));
+    assert.ok(plan.startsWith('planMoveAction(castle, availableBushos) {'), '未使用の第3引数を残さない');
+    assert.ok(plan.includes('this._getReachableOwnCastles(castle, clanId)'), '通行可否と順序はMapGraphServiceを参照');
+    assert.strictEqual((plan.match(/const clanOps = this\.game\.aiOperationManager\.operations\[clanId\]/g) || []).length, 1,
+        '変更されない作戦参照は同期移動計画1回で取得し候補武将×拠点で再検索しない');
+    assert.ok(plan.includes("!this.game.getProvince?.(c.provinceId)?.statusEffects?.includes('heavySnow')"), '大雪条件は実際に使う候補の共通判定で保持');
 });
 
 test('四半期AI人事は実機停止位置を勢力単位で診断する', () => {
@@ -29305,14 +29322,13 @@ test('r619 大雪中の信濃へAI通常配置換えを計画せず、雪がな�
     const source = castleMap.get(9); // 甲斐・躑躅ヶ崎館
     const available = game.getCastleBushos(9).filter(b => b.clan === 3 && b.status === 'active' && !b.isCastellan && !b.isDaimyo);
     assert.ok(available.length > 0, '1560年に活動できる配置換え候補がいる');
-    const before = staffing.planMoveAction(source, available, game.getClanCastles(3));
+    const before = staffing.planMoveAction(source, available);
     assert.ok(before.some(action => action.targetId === 88), '雪がなければ信濃・高遠城が通常の配置換え候補になる');
     assert.strictEqual(winter.checkCondition(game), true);
     await winter.execute(game);
     assert.strictEqual(game.getProvince(9).statusEffects.includes('heavySnow'), false, '甲斐は大雪ではない');
     assert.strictEqual(game.getProvince(10).statusEffects.includes('heavySnow'), true, '信濃は通常の冬イベントで大雪になる');
-    const passable = game.getClanCastles(3).filter(c => !game.getProvince(c.provinceId).statusEffects.includes('heavySnow'));
-    const during = staffing.planMoveAction(source, available, passable);
+    const during = staffing.planMoveAction(source, available);
     assert.ok(!during.some(action => game.getProvince(game.getCastle(action.targetId).provinceId).statusEffects.includes('heavySnow')),
         'AI計画の再探索後も大雪の拠点は移動対象とならない');
 });
@@ -31489,7 +31505,7 @@ test('r654 AIの居城移転と通常配置換えは地図の共通通行探索�
     const sourceText = read('js/ai_staffing.js');
     const fromRelocate = sourceText.slice(sourceText.indexOf('relocateDaimyo(castle, castellan)'),
         sourceText.indexOf('    constructor(game)'));
-    const fromPlan = sourceText.slice(sourceText.indexOf('planMoveAction(castle, availableBushos, reachableMyCastles)'),
+    const fromPlan = sourceText.slice(sourceText.indexOf('planMoveAction(castle, availableBushos)'),
         sourceText.indexOf('    // 完成した複数の移動リストを、そのまま返します！'));
     assert.ok(fromRelocate.includes('this._getReachableOwnCastles(castle, clanId)'));
     assert.ok(fromPlan.includes('this._getReachableOwnCastles(castle, clanId)'));
@@ -31540,7 +31556,7 @@ test('r654 AIの居城移転と通常配置換えは地図の共通通行探索�
     friendly.staffing.evaluateBushos = () => new Map();
     friendly.staffing.evaluateCastles = () => new Map();
     friendly.staffing.determineClanGoal = () => '内政';
-    assert.strictEqual(friendly.staffing.planMoveAction(friendly.from, [], []), null);
+    assert.strictEqual(friendly.staffing.planMoveAction(friendly.from, []), null);
     assert.strictEqual(friendly.calls(), beforePlan + 1, '配置換え側もMapGraphを再利用する');
     const hostile = fixture('敵対');
     assert.strictEqual(hostile.staffing.relocateDaimyo(hostile.from, hostile.leader), false);
