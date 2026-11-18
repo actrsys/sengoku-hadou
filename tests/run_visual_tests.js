@@ -2286,6 +2286,93 @@ async function validateDialogPortraitReuse(cdp) {
 }
 
 
+// r943: 端末負荷で年初の各段階が長引いても、通知の表示開始までに全件を
+// 既存UIキューへ登録し、会話と会話の間に背景の空白フレームを出さない。
+async function validateAnnualNotificationBatchHandoff(cdp) {
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const lifeSource = fs.readFileSync(path.join(ROOT, 'js', 'life_system.js'), 'utf8');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css.replace(/<\/style/gi, '<\\/style')}</style></head><body>
+        <div id="dialog-modal" class="modal hidden"><div class="modal-content modal-small"><div class="dialog-body-container">
+            <div class="dialog-face-column"><div id="dialog-left-name" class="dialog-name-label hidden"></div><div id="dialog-left-face" class="dialog-face-space"></div></div>
+            <div id="dialog-message" class="message-area"></div>
+            <div class="dialog-face-column"><div id="dialog-right-name" class="dialog-name-label hidden"></div><div id="dialog-right-face" class="dialog-face-space"></div>
+        </div></div><div class="modal-footer"><button id="dialog-btn-ok">閉じる</button></div></div></div>
+        </body></html>`;
+    for (const [width, height, pc] of [[1280, 720, true], [390, 844, false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !pc });
+        const loaded = await cdp.call('Runtime.evaluate', {
+            expression: `document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc', ${pc});
+                (()=>{ ${uiSource}\n${lifeSource}\nwindow.AnnualBatchTestClasses={UIManager,LifeSystem}; })(); true`, returnByValue: true
+        });
+        if (loaded.exceptionDetails) throw new Error('年初通知fixture読み込み失敗: '+JSON.stringify(loaded.exceptionDetails));
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(async () => {
+                const ui=Object.create(window.AnnualBatchTestClasses.UIManager.prototype);
+                ui.dialogQueue=[];ui.isDialogShowing=false;ui._dialogGeneration=0;
+                ui._dialogGuardHeld=false;
+                ui.hideAIGuardTemporarily=()=>{};ui.restoreAIGuard=()=>{};
+                ui.completeVisualHandoff=()=>{};
+                ui.prepareCoveredViewForOpen=modal=>modal.classList.remove('hidden');
+                ui._prepareDialogFaces=()=>Promise.resolve({leftImg:null,rightImg:null});
+                const game={phase:'game',year:1560,month:1,ui,bushos:[],princesses:[],isWatchMode:false,
+                    turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationCurrent:n=>n===1}};
+                ui.game=game;
+                const life=new window.AnnualBatchTestClasses.LifeSystem(game);
+                const trace=[];
+                life.updateAllBushosAgeCooperatively=async()=>{};
+                life._yieldToBrowserForLife=()=>new Promise(resolve=>setTimeout(resolve,350));
+                life.checkBirth=async queue=>{trace.push('birth');queue.push('元服のお知らせ');};
+                life.checkNameChange=async queue=>{trace.push('rename');queue.push('改名のお知らせ');};
+                life.checkFaceChange=()=>{};
+                life.checkRandomPrincessAppearance=async queue=>{trace.push('princess');queue.push('姫誕生のお知らせ');};
+                const run=life.processStartMonth();
+                const modal=document.getElementById('dialog-modal');
+                const text=document.getElementById('dialog-message');
+                const frames=[];
+                let record=false;
+                const sample=()=>{
+                    if(!record)return;
+                    frames.push({visible:!modal.classList.contains('hidden'), text:text.textContent});
+                    requestAnimationFrame(sample);
+                };
+                const waitFor=async expected=>{
+                    for(let i=0;i<350;i++){
+                        if(!modal.classList.contains('hidden') && text.textContent===expected)return true;
+                        await new Promise(resolve=>setTimeout(resolve,10));
+                    }
+                    return false;
+                };
+                const names=['元服のお知らせ','改名のお知らせ','姫誕生のお知らせ'];
+                const seen=[];
+                if(!await waitFor(names[0]))return {error:'最初の年初通知が表示されない',trace};
+                record=true;requestAnimationFrame(sample);
+                for(let i=0;i<names.length;i++){
+                    // 各通知を実際に少なくとも1フレーム表示し、空白paint監視を空集合にしない。
+                    await new Promise(resolve=>requestAnimationFrame(resolve));
+                    seen.push(text.textContent);
+                    const btn=document.getElementById('dialog-btn-ok');
+                    if(!btn) return {error:'会話操作ボタン欠落',trace};
+                    btn.click();
+                    if(i+1<names.length && !await waitFor(names[i+1]))return {error:'次の年初通知が表示されない',trace};
+                }
+                record=false;
+                await run;
+                return {trace,seen,gapFrames:frames.filter(f=>!f.visible).length,frames:frames.length};
+            })()`, returnByValue: true, awaitPromise: true
+        });
+        if (result.exceptionDetails) throw new Error(result.exceptionDetails.text + ' ' + JSON.stringify(result.exceptionDetails.exception));
+        const r = result.result?.value;
+        assert.ok(r && !r.error, `年初通知 ${pc?'PC':'スマホ'}: ${JSON.stringify(r)}`);
+        assert.deepStrictEqual(r.trace, ['birth','rename','princess'], '年初判定順序');
+        assert.deepStrictEqual(r.seen, ['元服のお知らせ','改名のお知らせ','姫誕生のお知らせ'], '通知の文字列と順序');
+        assert.strictEqual(r.gapFrames, 0, `${pc?'PC':'スマホ'}: 年初通知間の空白paint`);
+        assert.ok(r.frames >= 3, '各通知中の実paintを最低3フレーム監視する');
+    }
+    console.log('✓ r943 年初の処理待機700msでも元服→改名→姫誕生の会話間0空白paint (PC/スマホ)');
+}
+
 async function validateDiplomacyQuantityHandoff(cdp) {
     const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
     const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
@@ -3204,6 +3291,7 @@ async function main() {
         await validateCastleIconLoading(cdp);
         await validateDomImageDecode(cdp);
         await validateDialogPortraitReuse(cdp);
+        await validateAnnualNotificationBatchHandoff(cdp);
         await validateDiplomacyQuantityHandoff(cdp);
         await validateBreakAllianceResultTransition(cdp);
         await validateTerminalDialogCoveredPaint(cdp);

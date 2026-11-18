@@ -247,12 +247,17 @@ class LifeSystem {
                 this._syncPreBirthStatus(p, currentYear);
             }
 
-            await this.checkBirth();
+            // 年初の結果通知は計算・所属更新から分離して確定時の文章を保存し、
+            // 全ての年初処理が終わってから既存UIの会話キューへ一括登録する。
+            // 先の通知へのOK待機を挟まずに計算を終えるため、次の通知待ちで
+            // 会話枠が途切れたり、固定msの引継ぎ猶予に依存したりしない。
+            const annualNotices = [];
+            await this.checkBirth(annualNotices);
             if (!isCurrentFlow()) return;
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:birth_done');
             await this._yieldToBrowserForLife();
             if (!isCurrentFlow()) return;
-            await this.checkNameChange();
+            await this.checkNameChange(annualNotices);
             if (!isCurrentFlow()) return;
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:name_done');
             this.checkFaceChange();
@@ -260,10 +265,30 @@ class LifeSystem {
             await this._yieldToBrowserForLife();
             if (!isCurrentFlow()) return;
 
-            // ★追加：毎年1月に、ランダムで新しい姫が登場するかチェックします！
-            await this.checkRandomPrincessAppearance();
+            await this.checkRandomPrincessAppearance(annualNotices);
             if (!isCurrentFlow()) return;
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') this.game.writeSystemDiagnostic('month_start:life:princess_done');
+
+            // ここで全通知を同期して積む。1件ずつawaitで登録すると、
+            // 間の計算・イベントループ復帰が重い端末で会話枠の隙間となる。
+            // 描画順・閉じる操作・観戦時自動送りは従来のUIManagerが一元管理する。
+            if (annualNotices.length) {
+                const shown = annualNotices.map(msg => this.game.ui.showDialogAsync(msg, false, 0));
+                // UIの強制リセット時は旧会話のPromiseが破棄される。既存の
+                // EventFlowGuardのTurnManager世代待機で年次処理を正常に中断する。
+                const guard = typeof window !== 'undefined' ? window.EventFlowGuard : null;
+                if (guard && typeof guard._awaitWithAbort === 'function') {
+                    try {
+                        await guard._awaitWithAbort(this.game, flowContext.generation, Promise.all(shown));
+                    } catch (error) {
+                        if (!isCurrentFlow() && guard.isAbortError(error)) return;
+                        throw error;
+                    }
+                } else {
+                    await Promise.all(shown);
+                }
+                if (!isCurrentFlow()) return;
+            }
 
             // ★高速化：派閥再編は、この直後に GameManager → factionSystem.processStartMonth() から
             // 必ず1回実行されるため、1月だけ同じ全国再編を二重実行するのをやめます。
@@ -399,7 +424,7 @@ class LifeSystem {
     }
     
     // ★ 改名のチェック（毎年1月に行います）
-    async checkNameChange() {
+    async checkNameChange(annualNotices = null) {
         const flowContext = this._captureLifeFlowContext();
         const isCurrentFlow = () => this._isLifeFlowCurrent(flowContext);
         if (!isCurrentFlow()) return;
@@ -460,22 +485,17 @@ class LifeSystem {
                                     }
                                 }
                                 
-                                // ==========================================
-                                // ★ここから追加：名前が変わって画面がパニック（フリーズ）になるのを防ぐため、
-                                // メッセージを出す前に一瞬だけ息継ぎ（お休み）をさせます！
-                                await new Promise(resolve => setTimeout(resolve, 50));
-                                if (!isCurrentFlow()) return;
-
-                                // ★すべての裏処理が終わってから、メッセージを出して待ちます！
+                                // 名称変更と家名更新を確定した時点で通知内容だけ保存する。
+                                // 年初では最後に一括表示し、単独呼出しでは従来どおり表示する。
                                 this.game.ui.log(msg, { clanIds: Number(b.clan) > 0 ? [Number(b.clan)] : [], category: 'family', inferCurrentTurn: false });
                                 if (b.clan === this.game.playerClanId || b.isDaimyo) {
-                                    await this.game.ui.showDialogAsync(msg);
+                                    await this._announceAnnualLifeEvent(msg, annualNotices);
                                     if (!isCurrentFlow()) return;
                                 }
                                 
                                 if (clanMsg !== "") {
                                     this.game.ui.log(clanMsg, { clanIds: Number(b.clan) > 0 ? [Number(b.clan)] : [], category: 'family', inferCurrentTurn: false });
-                                    await this.game.ui.showDialogAsync(clanMsg);
+                                    await this._announceAnnualLifeEvent(clanMsg, annualNotices);
                                     if (!isCurrentFlow()) return;
                                 }
                                 // ==========================================
@@ -529,8 +549,15 @@ class LifeSystem {
         this.game.historySystem.record(text, { clanIds, category: 'appearance', inferCurrentTurn: false });
     }
 
+    // 通知文の確定時点を記録する。年初の一括表示と、単独呼出しの即時表示で
+    // 同じ表示契約を使い、UIキューや画面DOMをLifeSystemに複製しない。
+    async _announceAnnualLifeEvent(message, annualNotices = null) {
+        if (annualNotices) annualNotices.push(message);
+        else await this.game.ui.showDialogAsync(message, false, 0);
+    }
+
     // ★ 登場のチェック（毎年1月に行います）
-    async checkBirth() {
+    async checkBirth(annualNotices = null) {
         const flowContext = this._captureLifeFlowContext();
         const isCurrentFlow = () => this._isLifeFlowCurrent(flowContext);
         if (!isCurrentFlow()) return;
@@ -539,7 +566,7 @@ class LifeSystem {
         // まだ登場していない（statusが'unborn'）武将の中で、登場年を迎えた人を探します
         const unbornBushos = this.game.bushos.filter(b => window.LifeStatusRules.isUnborn(b) && b.startYear <= currentYear);
         
-        // ★変更：メッセージをためる箱（配列）は使わず、一つずつ順番に出すために「for...of」という魔法の繰り返しを使います！
+        // 武将の登場・所属処理は従来の順番で確定し、通知だけ後から連続表示する。
         for (const b of unbornBushos) {
             if (!isCurrentFlow()) return;
             // ★変更：大名家に所属しておらず、諸勢力でもない場合は「浪人」になります
@@ -578,7 +605,7 @@ class LifeSystem {
                         const msg = `${bushoName}が${kunishuName}の頭領に就任しました。`;
                         
                         this.game.ui.log(`【頭領交代】${msg}`);
-                        await this.game.ui.showDialogAsync(msg, false, 0);
+                        await this._announceAnnualLifeEvent(msg, annualNotices);
                         if (!isCurrentFlow()) return;
                     }
                 } else {
@@ -622,7 +649,7 @@ class LifeSystem {
                             const nameStr = b.fullName;
                             const msg = `${nameStr}が元服し、当家に加わりました！`;
                             this.game.ui.log(msg, { history: false });
-                            await this.game.ui.showDialogAsync(msg, false, 0);
+                            await this._announceAnnualLifeEvent(msg, annualNotices);
                             if (!isCurrentFlow()) return;
                         }
                     } else {
@@ -703,9 +730,9 @@ class LifeSystem {
                         } else {
                             msg = `${nameStr}が当家に仕官しました！`;
                         }
-                        // ★変更：リストに溜め込まず、ここで直接画面に出して「OK」を押すまで待ちます！
+                        // 登場順の通知文を確定する。年初一括表示ではUI操作待ちを挟まない。
                         this.game.ui.log(msg, { history: false });
-                        await this.game.ui.showDialogAsync(msg, false, 0);
+                        await this._announceAnnualLifeEvent(msg, annualNotices);
                         if (!isCurrentFlow()) return;
                     }
                 } else {
@@ -723,7 +750,7 @@ class LifeSystem {
         // ★ここから追加：姫の登場チェックを書き足します！
         const unbornPrincesses = this.game.princesses.filter(p => window.LifeStatusRules.isUnborn(p) && p.startYear <= currentYear);
 
-        // ★変更：ここも「for...of」の魔法の繰り返しに変えて、一つずつ待ちます！
+        // 姫も出生判定の順番を保って確定し、通知だけ年初末尾へ渡す。
         for (const p of unbornPrincesses) {
             if (!isCurrentFlow()) return;
             let targetClanId = 0;
@@ -788,9 +815,9 @@ class LifeSystem {
                     } else {
                         msg = `${p.name}が誕生しました！`;
                     }
-                    // ★変更：リストに溜め込まず、ここで直接画面に出して「OK」を押すまで待ちます！
+                    // 当該時点の父・姫名を記録し、年初末尾の通知列へ渡す。
                     this.game.ui.log(msg, { clanIds: [targetClanId], category: 'family', inferCurrentTurn: false });
-                    await this.game.ui.showDialogAsync(msg, false, 0);
+                    await this._announceAnnualLifeEvent(msg, annualNotices);
                     if (!isCurrentFlow()) return;
                 }
             }
@@ -2162,7 +2189,7 @@ class LifeSystem {
     }
 
     // ③ 毎年1月にランダムで新しい姫を登場させる機能です
-    async checkRandomPrincessAppearance() {
+    async checkRandomPrincessAppearance(annualNotices = null) {
         const flowContext = this._captureLifeFlowContext();
         const isCurrentFlow = () => this._isLifeFlowCurrent(flowContext);
         if (!isCurrentFlow()) return;
@@ -2202,7 +2229,7 @@ class LifeSystem {
                         const msg = `${fatherName}の息女、${newPrincess.name}が誕生しました！`;
                         
                         this.game.ui.log(msg, { clanIds: [clan.id], category: 'family', inferCurrentTurn: false });
-                        await this.game.ui.showDialogAsync(msg, false, 0);
+                        await this._announceAnnualLifeEvent(msg, annualNotices);
                         if (!isCurrentFlow()) return;
                     }
                 }
@@ -2229,7 +2256,7 @@ class LifeSystem {
                             const msg = `${fatherName}のご息女、${newPrincess.name}が誕生しました！`;
                             
                             this.game.ui.log(msg, { clanIds: [clan.id], category: 'family', inferCurrentTurn: false });
-                            await this.game.ui.showDialogAsync(msg, false, 0);
+                            await this._announceAnnualLifeEvent(msg, annualNotices);
                             if (!isCurrentFlow()) return;
                         }
                     }

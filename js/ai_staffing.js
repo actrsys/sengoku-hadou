@@ -891,7 +891,8 @@ class AIStaffing {
         const avgBushos = Math.max(1, totalBushosInNetwork / Math.max(1, sameLegionCastles.length));
         const avgScale = Math.max(1, totalScale / Math.max(1, sameLegionCastles.length));
 
-        // お引越しの候補者を入れる箱を用意します
+        // 候補武将がいない場合は拠点側の事前計算自体を行わない。
+        let scoringTargets = null;
         let candidates = [];
 
         // 今のお城にいる武将たちを順番に見ていきます
@@ -901,87 +902,77 @@ class AIStaffing {
             const bTypeInfo = bushoTypes.get(busho.id);
             if (!bTypeInfo) continue;
 
+            if (!scoringTargets) {
+                // 拠点だけで決まる評価値は、同期した1回の配置計画内で一度だけ計算する。
+                // 各武将の能力補正と加点順序は下の候補評価に残す。
+                scoringTargets = sameLegionCastles.map(target => {
+                    const targetScale = target.maxKokudaka + target.maxCommerce;
+                    const castleCapacity = Math.max(2, Math.floor(avgBushos * (targetScale / avgScale)));
+                    const targetBushoCount = getActiveClanBushoCount(target);
+                    let countScore = 0;
+                    if (targetBushoCount === 0) {
+                        countScore += 200;
+                    } else {
+                        const diff = castleCapacity - targetBushoCount;
+                        if (diff > 0) countScore += diff * 20;
+                        else countScore += diff * 30;
+                    }
+
+                    const devRoom = targetScale - (target.kokudaka + target.commerce);
+                    let devTier = 0;
+                    if (targetScale > 0 && devRoom > 0) {
+                        const devRatio = devRoom / targetScale;
+                        if (devRatio > 0.3 && devRoom > 300) devTier = 2;
+                        else if (devRatio > 0.1 && devRoom > 100) devTier = 1;
+                    }
+
+                    let defenseBase = null;
+                    if (target.defense < target.maxDefense) {
+                        const defScore = target.defense <= target.maxDefense / 4 ? 30 : 15;
+                        const defRatio = Math.min(2.5, 1000 / Math.max(1, target.maxDefense));
+                        defenseBase = defScore * defRatio;
+                    }
+                    let loyaltyScore = null;
+                    if (target.peoplesLoyalty < 100) {
+                        loyaltyScore = target.peoplesLoyalty <= 70 ? 50 : 100 - target.peoplesLoyalty;
+                    }
+                    return { target, roleData: castleRoles.get(target.id), countScore, devTier, defenseBase, loyaltyScore };
+                });
+            }
+
             const bType = bTypeInfo.mainType;
             let currentCastleScore = 0;
             let bestTargetScore = 0;
             let targetForThisBusho = null;
 
             // 自領のすべてのお城（今の城を含む）に、この武将にとっての「魅力点数」をつけていきます
-            for (let target of sameLegionCastles) {
-                const tRoleData = castleRoles.get(target.id);
+            for (const { target, roleData: tRoleData, countScore, devTier, defenseBase, loyaltyScore } of scoringTargets) {
                 if (!tRoleData) continue;
 
                 let score = 0;
 
-                // 1. お城の基本ステータス（総合評価）が高いとプラス
+                // 1. 拠点の基本評価
                 score += tRoleData.totalScore / 5;
 
-                // 2. お城の大きさと全体の人数に合わせた、適正人数による点数調整！
-                const targetScale = target.maxKokudaka + target.maxCommerce;
-                const scaleRatio = targetScale / avgScale;
-                const castleCapacity = Math.max(2, Math.floor(avgBushos * scaleRatio));
-
-                let countScore = 0;
-                
-                const targetBushoCount = getActiveClanBushoCount(target);
-                if (targetBushoCount === 0) {
-                    countScore += 200; 
-                } else {
-                    const diff = castleCapacity - targetBushoCount;
-                    if (diff > 0) {
-                        countScore += diff * 20;
-                    } else {
-                        countScore += diff * 30;
-                    }
-                }
+                // 2. 拠点の収容人数に応じた点数
                 score += countScore;
 
-                // 3. 開発の余地ボーナス（固定の数字ではなく、どれくらい開発できる割合が残っているかで見ます）
-                const maxDev = target.maxKokudaka + target.maxCommerce;
-                const currentDev = target.kokudaka + target.commerce;
-                const devRoom = maxDev - currentDev;
-                
-                // 最大値がとても小さいお城には、あまりボーナスをあげすぎないようにします
-                if (maxDev > 0 && devRoom > 0) {
-                    const devRatio = devRoom / maxDev; // 開発できる割合（0.0〜1.0）
-                    // たくさん開発する余地があって、なおかつ開発できる量（数値）もそこそこある場合に点数をあげます
-                    if (devRatio > 0.3 && devRoom > 300) {
-                        score += 20;
-                        if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 40;
-                    } else if (devRatio > 0.1 && devRoom > 100) {
-                        score += 10;
-                        if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 20;
-                    }
+                // 3. 開発余地。武将の適性による加点は従来どおり別計算する。
+                if (devTier === 2) {
+                    score += 20;
+                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 40;
+                } else if (devTier === 1) {
+                    score += 10;
+                    if (bTypeInfo.isSpecialist && busho.politics >= 70) score += 20;
                 }
 
-                // 3.5. 城壁の修復や民忠回復が必要な城への内政官派遣ボーナス
-                // 政治や魅力が高い武将ほど、困っているお城を助けに行きたがるようにします
+                // 3.5. 防御力・民忠の不足と担当武将の適性
                 if (busho.politics >= 60 || busho.charm >= 60) {
-                    // 城の防御力が減っている時の評価（政治力が高い武将ほど評価アップ）
-                    if (target.defense < target.maxDefense) {
-                        let defScore = 0;
-                        if (target.defense <= target.maxDefense / 4) {
-                            defScore = 30; // 1/4以下なら緊急事態なので点数を高くします
-                        } else {
-                            defScore = 15; // 少し壊れているだけなら少し点数をあげます
-                        }
-                        
-                        // 最大防御力が低いお城ほど重要度を上げますが、高くなりすぎないよう最大「2.5倍」までに制限します
-                        const defRatio = Math.min(2.5, 1000 / Math.max(1, target.maxDefense));
+                    if (defenseBase !== null) {
                         const polBonus = busho.politics / 100;
-                        
-                        score += Math.floor(defScore * defRatio * polBonus);
+                        score += Math.floor(defenseBase * polBonus);
                     }
-
-                    // 民忠が下がっている時の評価（魅力が高い武将ほど評価アップ）
-                    if (target.peoplesLoyalty < 100) {
-                        let loyaltyScore = 0;
-                        if (target.peoplesLoyalty <= 70) {
-                            loyaltyScore = 50; // 民忠が70以下なら不満が溜まっているので点数を高くします
-                        } else {
-                            loyaltyScore = (100 - target.peoplesLoyalty); // それ以外は下がっている分だけ点数にします
-                        }
-                        
+                    if (loyaltyScore !== null) {
                         const charmBonus = busho.charm / 100;
                         score += Math.floor(loyaltyScore * charmBonus);
                     }

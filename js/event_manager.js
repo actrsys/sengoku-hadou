@@ -458,6 +458,17 @@ class EventManager {
         const isCurrentFlow = () => window.EventFlowGuard.isCurrent(this.game, flowGeneration);
         if (!isCurrentFlow()) return;
 
+        // 月初・月末の複数イベント通知を一つの描画引継ぎ区間とする。
+        // 固定の80/220msに依存すると、イベント判定・画面更新の負荷次第で
+        // 会話の間に背景が1フレーム見える。既存UIのholdを使い、閉鎖の判断は
+        // イベント群の完了時に一度だけ行う。戦闘等の別種イベントには適用しない。
+        const ui = this.game && this.game.ui;
+        const holdMonthlyDialogs = (timing === 'startMonth_before' || timing === 'startMonth_after'
+            || timing === 'endMonth_before' || timing === 'endMonth_after')
+            && ui && typeof ui.beginDialogHandoffHold === 'function'
+            && typeof ui.endDialogHandoffHold === 'function';
+        if (holdMonthlyDialogs) ui.beginDialogHandoffHold();
+        try {
         // ゲームのセーブデータに残る「スタンプ帳（flags）」を準備します
         this.game.flags = this.game.flags || {};
 
@@ -582,6 +593,10 @@ class EventManager {
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic(`event:${timing}:refresh_done`);
             }
+        }
+        } finally {
+            // タイトル復帰などで失効した旧イベントは、新世代のholdに触れない。
+            if (holdMonthlyDialogs && isCurrentFlow()) ui.endDialogHandoffHold();
         }
     }
 }

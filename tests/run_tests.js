@@ -12928,7 +12928,7 @@ test('落城・国主継承・大名継承の城主任命は城内全員では�
 
 test('未登場武将が一門を頼る時は諸勢力ではなく通常の大名家所属者だけを候補にする', () => {
     const life = read('js/life_system.js');
-    const at = life.indexOf('async checkBirth()');
+    const at = life.indexOf('async checkBirth(annualNotices = null)');
     const block = life.slice(at, at + 10500);
     const clanChecks = block.match(/Number\(other\.clan\) > 0/g) || [];
     const kunishuChecks = block.match(/Number\(other\.belongKunishuId \|\| 0\) === 0/g) || [];
@@ -13879,7 +13879,7 @@ test('姫生成の年次文脈集計は旧===条件・候補順を維持し文�
 test('姫生成は勢力ごとの全国filterを繰り返さず安全な年次文脈を共用する', () => {
     const life = read('js/life_system.js');
     const initialAt = life.indexOf('distributeInitialPrincesses()');
-    const yearlyAt = life.indexOf('async checkRandomPrincessAppearance()');
+    const yearlyAt = life.indexOf('async checkRandomPrincessAppearance(annualNotices = null)');
     const initialBlock = life.slice(initialAt, yearlyAt);
     const yearlyBlock = life.slice(yearlyAt, yearlyAt + 6500);
     assert.ok(initialBlock.includes('const princessContext = this._buildPrincessAppearanceContext();'));
@@ -13892,7 +13892,7 @@ test('姫生成は勢力ごとの全国filterを繰り返さず安全な年次�
     assert.ok(!yearlyBlock.includes('this.game.bushos.filter('));
 
     // 登場処理は先に登場した一門が後続武将の候補になり得るため、固定文脈へ狭めない。
-    const birthAt = life.indexOf('async checkBirth()');
+    const birthAt = life.indexOf('async checkBirth(annualNotices = null)');
     const birthBlock = life.slice(birthAt, birthAt + 10500);
     assert.ok((birthBlock.match(/this\.game\.bushos\.filter\(other =>/g) || []).length >= 2);
 });
@@ -15851,6 +15851,62 @@ test('r941 AI内政の移動先フィルタは唯一の地図共通探索へ委�
     assert.strictEqual((plan.match(/const clanOps = this\.game\.aiOperationManager\.operations\[clanId\]/g) || []).length, 1,
         '変更されない作戦参照は同期移動計画1回で取得し候補武将×拠点で再検索しない');
     assert.ok(plan.includes("!this.game.getProvince?.(c.provinceId)?.statusEffects?.includes('heavySnow')"), '大雪条件は実際に使う候補の共通判定で保持');
+});
+
+test('r942 AI通常配置換えは拠点固有の評価値を一計画内で共有し、次計画では最新値を読む', () => {
+    const source = read('js/ai_staffing.js');
+    const plan = source.slice(source.indexOf('planMoveAction(castle, availableBushos)'), source.indexOf('/** 四半期の全国AI人事。'));
+    assert.ok(plan.includes('scoringTargets = sameLegionCastles.map(target => {'), '移動先ごとの不変値を一計画内で集約する');
+    assert.ok(plan.includes('for (const { target, roleData: tRoleData, countScore, devTier, defenseBase, loyaltyScore } of scoringTargets)'), '武将ごとの評価は同一候補順を維持する');
+
+    const ctx = createContext();
+    loadScript(ctx, 'js/ai_staffing.js');
+    const Staffing = vm.runInContext('AIStaffing', ctx);
+    const makeCastle = (id, count, totalScore, values = {}) => ({
+        id, ownerClan: 1, legionId: 0, provinceId: 1, count, totalScore,
+        maxKokudaka: 1000, maxCommerce: 1000, kokudaka: 400, commerce: 400,
+        maxDefense: 400, defense: 100, peoplesLoyalty: 50, castellanId: 0,
+        ...values
+    });
+    const sourceCastle = makeCastle(1, 8, 0);
+    const targetCastle = makeCastle(2, 0, 800);
+    const castles = [sourceCastle, targetCastle];
+    const bushos = Array.from({ length: 7 }, (_, i) => ({
+        id: i + 100, politics: 75, charm: 75, isCommander: false
+    }));
+    const game = { month: 1, playerClanId: 9, aiOperationManager: { operations: { 1: { 0: {} } } },
+        getProvince: () => ({ statusEffects: [] }) };
+    const staffing = new Staffing(game);
+    staffing._getReachableOwnCastles = () => castles;
+    staffing._getActiveClanBushoCount = c => c.count;
+    staffing.evaluateBushos = () => new Map(bushos.map(b => [b.id, { mainType: '万能型', isSpecialist: true }]));
+    staffing.evaluateCastles = () => new Map(castles.map(c => [c.id, {
+        totalScore: c.totalScore, role: '後方拠点', isBase: false, receiverScore: 0
+    }]));
+    staffing.determineClanGoal = () => '内政';
+
+    let scaleReads = 0;
+    const originalScale = targetCastle.maxKokudaka;
+    Object.defineProperty(targetCastle, 'maxKokudaka', {
+        configurable: true,
+        get() { scaleReads++; return originalScale; }
+    });
+    const first = staffing.planMoveAction(sourceCastle, bushos);
+    assert.ok(first && first.length > 0 && first[0].targetId === 2, '実際の移動候補が成立する条件で確認する');
+    assert.ok(scaleReads < bushos.length, '移動先の規模を武将ごとに再計算しない');
+
+    const readsBeforeNoCandidate = scaleReads;
+    const noCandidate = staffing.planMoveAction(sourceCastle, [{ id: sourceCastle.castellanId, isCommander: false }]);
+    assert.ok(!noCandidate || noCandidate.length === 0, '城主しか候補にいないとき通常の移動計画はない');
+    assert.strictEqual(scaleReads - readsBeforeNoCandidate, 1, '評価対象がいないとき拠点固有値の事前集計を作らない');
+
+    // 同期計画の外には評価キャッシュを持ち越さない。
+    const originalScore = first[0].score;
+    Object.defineProperty(targetCastle, 'maxKokudaka', { value: 3000, writable: true, configurable: true });
+    targetCastle.count = 3;
+    const second = staffing.planMoveAction(sourceCastle, bushos);
+    assert.ok(second && second.length > 0 && second[0].targetId === 2);
+    assert.notStrictEqual(second[0].score, originalScore, '次の配置計画では変化した拠点値を評価する');
 });
 
 test('四半期AI人事は実機停止位置を勢力単位で診断する', () => {
@@ -44389,6 +44445,171 @@ test('r940 AI内政の敵勢力兵力集計は同じ候補評価内だけ共有�
     assert.deepStrictEqual(run({...castle, adjacentCastleIds: [7]}),
         {hasEnemy: true, maxEnemyTotalSoldiers: 0, maxEnemyMaxCastleSoldiers: 0});
     assert.deepStrictEqual(lookups, []);
+});
+
+// r943: 通知文を年初の確定処理中に保存し、すべて揃ってから既存UIキューへ積む。
+test('r943 元服・改名・姫誕生は結果確定後に元の順番のまま一括表示する', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/life_system.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const timeline = [], completes = [];
+    const game = {month:1, year:1560, bushos:[], princesses:[], ui:{
+        showDialogAsync(message) {
+            timeline.push(`show:${message}`);
+            return new Promise(resolve => completes.push(resolve));
+        }
+    }, turnManager:{captureTurnFlowGeneration:()=>1, isTurnFlowGenerationCurrent:n=>n===1}};
+    const life = new LifeSystem(game);
+    life.updateAllBushosAgeCooperatively = async () => timeline.push('age');
+    life._yieldToBrowserForLife = async () => timeline.push('yield');
+    life.checkBirth = async notices => {timeline.push('birth'); notices.push('元服A'); notices.push('元服B');};
+    life.checkNameChange = async notices => {timeline.push('name'); notices.push('改名C');};
+    life.checkFaceChange = () => timeline.push('face');
+    life.checkRandomPrincessAppearance = async notices => {timeline.push('princess'); notices.push('姫D');};
+    const pending = life.processStartMonth();
+    for (let i=0; i<100 && completes.length<4; i++) await Promise.resolve();
+    assert.deepStrictEqual(timeline, ['age','birth','yield','name','face','yield','princess',
+        'show:元服A','show:元服B','show:改名C','show:姫D'],
+        '通知1件ごとの計算待ちをなくし、表示前に全件が登録される');
+    assert.strictEqual(completes.length, 4);
+    completes.forEach(resolve => resolve());
+    await pending;
+});
+
+test('r943 実改名結果と文言・履歴は全件確定後に旧順で表示する', async () => {
+    const ctx = createContext({BushoStatusRules:{isActive:()=>true,isRonin:()=>false}});
+    loadScript(ctx, 'js/life_system.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const displayed = [], logged = [];
+    const people = [1,2].map(id=>({id,clan:1,name:`旧名${id}`,nameChange:`1560:新名${id}:しんめい`,
+        isDaimyo:false,applyNameChangeData(newName){this.name=newName;}}));
+    const game = {year:1560,month:1,playerClanId:1,princesses:[],bushos:people,
+        getClan:()=>({name:'某家'}),ui:{log:msg=>logged.push(msg),showDialogAsync:msg=>{
+            assert.deepStrictEqual(people.map(b=>b.name),['新名1','新名2'],
+                '初回表示より前に全員の改名が確定している');
+            displayed.push(msg); return Promise.resolve();
+        }},turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationCurrent:n=>n===1}};
+    const life = new LifeSystem(game);
+    life.updateAllBushosAgeCooperatively=async()=>{};
+    life._yieldToBrowserForLife=async()=>{};
+    life.checkBirth=async()=>{};life.checkFaceChange=()=>{};life.checkRandomPrincessAppearance=async()=>{};
+    await life.processStartMonth();
+    assert.deepStrictEqual(displayed,[
+        '某家の旧名1は「新名1」に改名しました。',
+        '某家の旧名2は「新名2」に改名しました。'
+    ]);
+    assert.deepStrictEqual(logged,displayed,'履歴の文章・順序も維持');
+});
+
+test('r943 月初月末イベント通知は共通引継ぎを保ち、他イベントには適用しない', async () => {
+    const ctx = createContext({EventAction: {refreshScreen: async () => {} }});
+    loadScript(ctx, 'js/ui.js');
+    loadScript(ctx, 'js/event_manager.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const EventManager = vm.runInContext('EventManager', ctx);
+    const ui = Object.create(UI.prototype);
+    ui._dialogHandoffHoldCount = 0;
+    ui._dialogHandoffPending = false;
+    ui._dialogHandoffToken = 0;
+    const hidden = [];
+    const publish = label => {
+        ui._cancelDialogHandoffClose();
+        ui._scheduleDialogHandoffClose(() => hidden.push(label), 220);
+    };
+    const game = {ui, phase:'game', flags:{}, turnManager:{
+        captureTurnFlowGeneration: () => 1,
+        isTurnFlowGenerationCurrent: n => n === 1
+    }};
+    const manager = new EventManager(game);
+    manager.processResidentEvents = async () => true;
+    const makeEvents = prefix => [1, 2].map(i => ({
+        id: `${prefix}${i}`,
+        checkCondition: () => true,
+        factionRefreshMode:'none',
+        async execute() {
+            if (i === 2) assert.deepStrictEqual(hidden, [], 'イベント間で旧メッセージを隠さない');
+            publish(`${prefix}${i}`);
+            assert.strictEqual(ui._dialogHandoffTimer, undefined, '月次イベントは時計で閉じない');
+        }
+    }));
+    for (const timing of ['startMonth_before', 'startMonth_after', 'endMonth_before', 'endMonth_after']) {
+        hidden.length = 0;
+        manager.events[timing] = makeEvents(timing);
+        await manager.processEvents(timing);
+        assert.deepStrictEqual(hidden, [`${timing}2`], `${timing} の末尾だけ閉じる`);
+        assert.strictEqual(ui._dialogHandoffHoldCount, 0);
+    }
+    let heldCount = 0;
+    ui.beginDialogHandoffHold = () => {heldCount++;};
+    ui.endDialogHandoffHold = () => {heldCount--;};
+    manager.events.before_command = [{id:'test', checkCondition:()=>true, factionRefreshMode:'none', execute:async()=>{}}];
+    await manager.processEvents('before_command');
+    assert.strictEqual(heldCount, 0, '通常のコマンドイベントは引継ぎ範囲を広げない');
+});
+
+test('r943 失効した月次イベントの終了処理は新世代の会話holdを解除しない', async () => {
+    const ctx=createContext();
+    loadScript(ctx,'js/event_manager.js');
+    const EventManager=vm.runInContext('EventManager', ctx);
+    let generation=1, resume, count=0;
+    const ui={beginDialogHandoffHold:()=>{count++;},endDialogHandoffHold:()=>{count--;}};
+    const game={ui,phase:'game',flags:{},turnManager:{
+        captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:n=>n===generation
+    }};
+    const manager=new EventManager(game);
+    manager.processResidentEvents=()=>new Promise(resolve=>{resume=resolve;});
+    const pending=manager.processEvents('startMonth_before');
+    assert.strictEqual(count,1,'旧イベント群の画面holdは同期開始する');
+    generation=2;count=1; // 強制切替が旧holdを破棄し、新シナリオが新holdを取得した状態
+    resume(true);
+    await pending;
+    assert.strictEqual(count,1,'旧finallyから新しい画面のholdを解除しない');
+});
+
+test('r943 年初通知を全件キュー投入後に中断しても旧処理が残留しない', async () => {
+    const ctx = createContext();
+    loadScript(ctx,'js/life_system.js');
+    loadScript(ctx,'js/event_manager.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    let generation=1, cancel;
+    const displayed=[];
+    const game={month:1,year:1560,bushos:[],princesses:[],phase:'game',ui:{
+        showDialogAsync:msg=>{displayed.push(msg);return new Promise(()=>{});}
+    },turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:n=>n===generation,
+        subscribeTurnFlowAbort:(g,cb)=>{cancel=cb;return()=>{cancel=null;};}}};
+    const life=new LifeSystem(game);
+    life.updateAllBushosAgeCooperatively=async()=>{};
+    life._yieldToBrowserForLife=async()=>{};
+    life.checkBirth=async queue=>queue.push('旧元服');
+    life.checkNameChange=async queue=>queue.push('旧改名');
+    life.checkFaceChange=()=>{};
+    life.checkRandomPrincessAppearance=async()=>{};
+    const pending=life.processStartMonth();
+    for(let i=0;i<100 && !cancel;i++) await Promise.resolve();
+    assert.deepStrictEqual(displayed,['旧元服','旧改名']);
+    assert.strictEqual(typeof cancel,'function');
+    const stop=cancel;
+    generation=2;stop();
+    await pending;
+    assert.strictEqual(cancel,null,'旧フローの解除通知は購読解除された');
+});
+
+test('r943 年初の途中で世代が変わった場合は旧通知を一件も表示しない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/life_system.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    let generation = 1;
+    const displayed = [];
+    const game = {month:1,year:1560,bushos:[],princesses:[], ui:{
+        showDialogAsync(message) {displayed.push(message);return Promise.resolve();}
+    },turnManager:{captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:n=>n===generation}};
+    const life = new LifeSystem(game);
+    life.updateAllBushosAgeCooperatively = async () => {};
+    life._yieldToBrowserForLife = async () => {};
+    life.checkBirth = async notices => {notices.push('旧シナリオ'); generation=2;};
+    life.checkNameChange = async () => {throw new Error('失効済みの改名を実行してはならない');};
+    await life.processStartMonth();
+    assert.deepStrictEqual(displayed, [], '失効した年初の通知は新シナリオに出さない');
 });
 
 Promise.all(pendingTests).then(() => {
