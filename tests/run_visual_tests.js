@@ -2373,6 +2373,83 @@ async function validateAnnualNotificationBatchHandoff(cdp) {
     console.log('✓ r943 年初の処理待機700msでも元服→改名→姫誕生の会話間0空白paint (PC/スマホ)');
 }
 
+async function validateMonthEndDeathDialogHandoff(cdp) {
+    // 月末の死亡は後継者選定・史実イベントを挟むため先行一括計算しない。
+    // 通知の間に350msの処理があっても会話枠を見せたまま後続へ引き渡す。
+    const html = fixtureHtml('dialog_confirm.html');
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const lifeSource = fs.readFileSync(path.join(ROOT, 'js', 'life_system.js'), 'utf8');
+    for (const [width, height, pc] of [[1280, 720, true], [390, 844, false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor:1, mobile:!pc});
+        const loaded = await cdp.call('Runtime.evaluate', {expression:`document.open();document.write(${JSON.stringify(html)});document.close();
+            document.body.classList.toggle('is-pc', ${pc});
+            document.getElementById('dialog-modal').classList.add('hidden');
+            (()=>{ ${uiSource}\n${lifeSource}\nwindow.MonthEndTestClasses={UIManager,LifeSystem}; })(); true`, returnByValue:true});
+        if (loaded.exceptionDetails) throw new Error('月末通知fixture読み込み失敗: '+JSON.stringify(loaded.exceptionDetails));
+        const result = await cdp.call('Runtime.evaluate', {expression:`(async () => {
+            const ui=Object.create(window.MonthEndTestClasses.UIManager.prototype);
+            ui.dialogQueue=[];ui.isDialogShowing=false;ui._dialogGeneration=0;ui._dialogGuardHeld=false;
+            ui.hideAIGuardTemporarily=()=>{};ui.restoreAIGuard=()=>{};
+            ui.completeVisualHandoff=()=>{};
+            ui.prepareCoveredViewForOpen=modal=>modal.classList.remove('hidden');
+            ui._prepareDialogFaces=()=>Promise.resolve({leftImg:null,rightImg:null});
+            const game={phase:'game',year:1575,month:12,ui,isWatchMode:false,
+                turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationCurrent:n=>n===1}};
+            ui.game=game;
+            const life=new window.MonthEndTestClasses.LifeSystem(game);
+            const trace=[];
+            life.checkDeath=async()=>{
+                trace.push('deathA');
+                await ui.showDialogAsync('武将Aが死亡しました');
+                trace.push('succession-and-event');
+                await new Promise(resolve=>setTimeout(resolve,350));
+                trace.push('deathB');
+                await ui.showDialogAsync('武将Bが死亡しました');
+            };
+            const run=life.processEndMonth();
+            const modal=document.getElementById('dialog-modal');
+            const body=document.getElementById('dialog-message');
+            const waitFor=async label=>{
+                for(let i=0;i<350;i++){
+                    if(!modal.classList.contains('hidden')&&body.textContent===label)return true;
+                    await new Promise(resolve=>setTimeout(resolve,10));
+                }
+                return false;
+            };
+            if(!await waitFor('武将Aが死亡しました'))return {error:'最初の死亡通知が出ない',trace};
+            const frames=[];
+            let recording=true;
+            const sample=()=>{
+                if(!recording)return;
+                frames.push({visible:!modal.classList.contains('hidden'),text:body.textContent});
+                requestAnimationFrame(sample);
+            };
+            requestAnimationFrame(sample);
+            await new Promise(resolve=>requestAnimationFrame(resolve));
+            const first=document.getElementById('dialog-btn-ok');
+            if(!first)return {error:'最初の決定ボタンがない',trace};
+            first.click();
+            if(!await waitFor('武将Bが死亡しました'))return {error:'後続の死亡通知が出ない',trace};
+            await new Promise(resolve=>requestAnimationFrame(resolve));
+            recording=false;
+            const holdCountBeforeFinalClick=ui._dialogHandoffHoldCount;
+            document.getElementById('dialog-btn-ok').click();
+            await run;
+            return {trace,frames:frames.length,gapFrames:frames.filter(x=>!x.visible).length,
+                holdCountBeforeFinalClick,holdCountFinal:ui._dialogHandoffHoldCount};
+        })()`,returnByValue:true,awaitPromise:true});
+        if (result.exceptionDetails) throw new Error(result.exceptionDetails.text+' '+JSON.stringify(result.exceptionDetails.exception));
+        const r=result.result?.value;
+        assert.ok(r && !r.error, `月末死亡通知 ${pc?'PC':'スマホ'}: ${JSON.stringify(r)}`);
+        assert.deepStrictEqual(r.trace,['deathA','succession-and-event','deathB'],'死亡・後続判定の実行順序');
+        assert.strictEqual(r.gapFrames,0,`${pc?'PC':'スマホ'}: 月末死亡通知間の空白paint`);
+        assert.ok(r.frames>=8,`通知間350msの実paintを監視した: ${r.frames}`);
+        assert.strictEqual(r.holdCountBeforeFinalClick,1);
+        assert.strictEqual(r.holdCountFinal,0);
+    }
+    console.log('✓ r944 月末の死亡2通知間に350msの後続処理があっても空白paint 0 (PC/スマホ)');
+}
+
 async function validateDiplomacyQuantityHandoff(cdp) {
     const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
     const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
@@ -3292,6 +3369,7 @@ async function main() {
         await validateDomImageDecode(cdp);
         await validateDialogPortraitReuse(cdp);
         await validateAnnualNotificationBatchHandoff(cdp);
+        await validateMonthEndDeathDialogHandoff(cdp);
         await validateDiplomacyQuantityHandoff(cdp);
         await validateBreakAllianceResultTransition(cdp);
         await validateTerminalDialogCoveredPaint(cdp);

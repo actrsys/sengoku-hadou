@@ -44612,6 +44612,80 @@ test('r943 年初の途中で世代が変わった場合は旧通知を一件も
     assert.deepStrictEqual(displayed, [], '失効した年初の通知は新シナリオに出さない');
 });
 
+
+// r944: 月末の死亡処理は後継者・婚姻・イベント判定を先行確定できない。
+// 複数の通知の間に重い計算が入っても既存会話UIのholdが隙間を閉じる。
+test('r944 月末死亡通知は判定順を変えず共通handoffを月末処理全体で保持する', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ui.js');
+    loadScript(ctx, 'js/life_system.js');
+    const UI = vm.runInContext('UIManager', ctx);
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const ui = Object.create(UI.prototype);
+    ui._dialogHandoffHoldCount = 0;
+    ui._dialogHandoffPending = false;
+    ui._dialogHandoffToken = 0;
+    const hidden = [], order = [];
+    let resumeSecondDeath;
+    const game = { year: 1575, month: 12, ui, turnManager:{
+        captureTurnFlowGeneration: () => 1,
+        isTurnFlowGenerationCurrent: n => n === 1
+    }};
+    const life = new LifeSystem(game);
+    life.checkDeath = async () => {
+        order.push('first-death');
+        ui._scheduleDialogHandoffClose(() => hidden.push('first-death'), 20);
+        assert.strictEqual(ui._dialogHandoffTimer, undefined, '次の死亡計算を待つ間、固定timerで閉じない');
+        await new Promise(resolve => { resumeSecondDeath = resolve; });
+        assert.deepStrictEqual(hidden, [], '次の死亡通知が出る前に旧枠を隠さない');
+        order.push('second-death');
+        ui._cancelDialogHandoffClose(); // 実会話UIの次通知開始と同じ
+        ui._scheduleDialogHandoffClose(() => hidden.push('second-death'), 20);
+    };
+    const run = life.processEndMonth();
+    assert.strictEqual(ui._dialogHandoffHoldCount, 1, '死亡処理を開始する前にholdを取得');
+    assert.deepStrictEqual(order, ['first-death'], '死亡処理順序は従来どおり');
+    resumeSecondDeath();
+    await run;
+    assert.deepStrictEqual(order, ['first-death', 'second-death']);
+    assert.deepStrictEqual(hidden, ['second-death'], '最後の通知だけを後処理完了時に閉じる');
+    assert.strictEqual(ui._dialogHandoffHoldCount, 0, '正常終了時にholdを解放');
+});
+
+test('r944 月末死亡処理が失敗しても現行holdを解放する', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/life_system.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    const calls = [];
+    const game = {year: 1575, month: 12, ui:{
+        beginDialogHandoffHold: () => calls.push('begin'),
+        endDialogHandoffHold: () => calls.push('end')
+    },turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationCurrent:n=>n===1}};
+    const life = new LifeSystem(game);
+    life.checkDeath = async () => {calls.push('death');throw new Error('death-phase-error');};
+    await assert.rejects(life.processEndMonth(),/death-phase-error/);
+    assert.deepStrictEqual(calls,['begin','death','end']);
+});
+
+test('r944 失効した月末死亡処理は後発シナリオの会話holdを解除しない', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/life_system.js');
+    const LifeSystem = vm.runInContext('LifeSystem', ctx);
+    let generation=1, resume, count=0;
+    const ui={beginDialogHandoffHold:()=>{count++;},endDialogHandoffHold:()=>{count--;}};
+    const game={year:1575,month:12,ui,turnManager:{
+        captureTurnFlowGeneration:()=>generation,isTurnFlowGenerationCurrent:n=>n===generation
+    }};
+    const life=new LifeSystem(game);
+    life.checkDeath=()=>new Promise(resolve=>{resume=resolve;});
+    const run=life.processEndMonth();
+    assert.strictEqual(count,1);
+    generation=2;count=1; // UI強制リセットで旧holdは破棄済み。新画面がholdを取得した状態。
+    resume();
+    await run;
+    assert.strictEqual(count,1,'旧処理のfinallyは新画面を解除しない');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);

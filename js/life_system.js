@@ -295,9 +295,21 @@ class LifeSystem {
         }
     }
 
-    // 毎月の終わりに「寿命を迎えて亡くなる武将がいないか」をチェックします
+    // 月末の死亡・婚姻解消通知は、その間にも後継者選出や史実イベントの
+    // 結果が変化する。判定を先行してまとめず、既存の会話引継ぎで表示を保持する。
     async processEndMonth() {
-        await this.checkDeath();
+        const flowContext = this._captureLifeFlowContext();
+        const ui = this.game?.ui;
+        const holdDialogs = !!(ui && typeof ui.beginDialogHandoffHold === 'function'
+            && typeof ui.endDialogHandoffHold === 'function');
+        if (holdDialogs) ui.beginDialogHandoffHold();
+        try {
+            await this.checkDeath();
+        } finally {
+            // 強制リセットで旧holdは破棄される。旧月末処理から新しい画面の
+            // holdを解除しないよう、TurnManagerの現行世代と年月を照合する。
+            if (holdDialogs && this._isLifeFlowCurrent(flowContext)) ui.endDialogHandoffHold();
+        }
     }
 
     _shouldDeferMapRefreshForMobileWatch() {
