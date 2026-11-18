@@ -44313,6 +44313,68 @@ test('r933 強制画面リセットは会話の旧ボタン・顔画像DOMと入
     assert.strictEqual(ui._currentEventClickHandler, null, '旧画面イベントも解放');
 });
 
+// r940: 内政AIは隣接する同一家の全軍勢を、1回の同期候補評価内だけ再利用する。
+// 次の行動候補評価へは兵数の変更を持ち越さず、外交保護・無所属・同点時の先着順を保持する。
+test('r940 AI内政の敵勢力兵力集計は同じ候補評価内だけ共有し後続行動で再集計する', () => {
+    const source = read('js/ai.js');
+    const fnStart = source.indexOf('async execInternalAffairs(');
+    const sectionStart = source.indexOf('                    // 同じ敵勢力が複数の隣接拠点に現れても', fnStart);
+    const sectionEnd = source.indexOf('                    // 2. お城にいる諸勢力（国衆）も調べます', sectionStart);
+    assert.ok(fnStart >= 0 && sectionStart > fnStart && sectionEnd > sectionStart,
+        '本番のAI内政にある隣接敵勢力集計を試験する');
+    const block = source.slice(sectionStart, sectionEnd);
+    assert.ok(block.includes('const enemyForcesByClan = new Map();'));
+    assert.ok(block.includes('enemyForcesByClan.set(adj.ownerClan, enemyForce);'));
+    assert.ok(!block.includes('await '), '集計再利用は非同期待機のない区間に限定');
+    const runBlock = new Function('castle', 'window',
+        'let hasEnemy = false; let maxEnemyTotalSoldiers = 0; let maxEnemyMaxCastleSoldiers = 0;\n'
+        + block + '\nreturn { hasEnemy, maxEnemyTotalSoldiers, maxEnemyMaxCastleSoldiers };');
+
+    const castle = {id: 1, ownerClan: 1, adjacentCastleIds: [2, 3, 4, 5, 6, 7, 9]};
+    const castles = [castle,
+        {id: 2, ownerClan: 2, soldiers: 200},
+        {id: 3, ownerClan: 2, soldiers: 500},
+        {id: 9, ownerClan: 2, soldiers: 100},
+        {id: 4, ownerClan: 3, soldiers: 1200},
+        {id: 14, ownerClan: 3, soldiers: 300},
+        {id: 5, ownerClan: 4, soldiers: 7000},
+        {id: 6, ownerClan: 1, soldiers: 500},
+        {id: 7, ownerClan: 0, soldiers: 0}];
+    let lookups = [];
+    const game = {
+        getCastle(id) { return castles.find(c => c.id === id) || null; },
+        getClanCastles(id) {
+            lookups.push(id);
+            return castles.filter(c => c.ownerClan === id);
+        },
+        getRelation(a, b) { return {status: b === 4 ? 'allied' : 'war'}; }
+    };
+    const windowFixture = {DiplomacyRules: {
+        isProtectedFromImmediateAttack: status => status === 'allied'
+    }};
+    const run = currentCastle => runBlock.call({game}, currentCastle, windowFixture);
+    const first = run(castle);
+    assert.deepStrictEqual(first, {hasEnemy: true, maxEnemyTotalSoldiers: 1500, maxEnemyMaxCastleSoldiers: 1200});
+    assert.deepStrictEqual(lookups, [2, 3], '同一家の隣接3拠点を1回の集計で評価し、外交で保護された勢力は集計しない');
+
+    // 次の行動候補評価では敵の兵数を更新しても前回の結果を流用しない。
+    castles.find(c => c.id === 4).soldiers = 700;
+    castles.find(c => c.id === 14).soldiers = 100;
+    lookups = [];
+    assert.deepStrictEqual(run(castle),
+        {hasEnemy: true, maxEnemyTotalSoldiers: 800, maxEnemyMaxCastleSoldiers: 500},
+        '同点の場合は最初に遭遇した敵勢力の最大城兵力を採用する');
+    assert.deepStrictEqual(lookups, [2, 3], '次の候補評価で必ず再集計する');
+
+    // 同盟・自領だけなら敵がなく、空き拠点だけなら敵はいるが通常勢力の集計はない。
+    lookups = [];
+    assert.deepStrictEqual(run({...castle, adjacentCastleIds: [5, 6]}),
+        {hasEnemy: false, maxEnemyTotalSoldiers: 0, maxEnemyMaxCastleSoldiers: 0});
+    assert.deepStrictEqual(run({...castle, adjacentCastleIds: [7]}),
+        {hasEnemy: true, maxEnemyTotalSoldiers: 0, maxEnemyMaxCastleSoldiers: 0});
+    assert.deepStrictEqual(lookups, []);
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);

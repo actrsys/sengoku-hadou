@@ -2153,6 +2153,10 @@ class AIEngine {
                     let maxEnemyTotalSoldiers = 0;
                     let maxEnemyMaxCastleSoldiers = 0;
 
+                    // 同じ敵勢力が複数の隣接拠点に現れても、この候補評価中は一度だけ兵力集計する。
+                    // この範囲にはawaitや資源変更がなく、次の内政行動では必ず集計し直す。
+                    const enemyForcesByClan = new Map();
+
                     // 1. お隣のお城を順番に調べます
                     if (castle.adjacentCastleIds) {
                         for (const adjId of castle.adjacentCastleIds) {
@@ -2173,14 +2177,20 @@ class AIEngine {
                                 hasEnemy = true;
                                 if (adj.ownerClan !== 0) {
                                     // その敵の大名家の、全部の兵士数と一番兵士が多いお城を調べます
-                                    const enemyCastles = this.game.getClanCastles(adj.ownerClan);
-                                    const enemyTotal = enemyCastles.reduce((sum, c) => sum + c.soldiers, 0);
-                                    const enemyMax = enemyCastles.length > 0 ? Math.max(...enemyCastles.map(c => c.soldiers)) : 0;
-                                    
+                                    let enemyForce = enemyForcesByClan.get(adj.ownerClan);
+                                    if (!enemyForce) {
+                                        const enemyCastles = this.game.getClanCastles(adj.ownerClan);
+                                        enemyForce = {
+                                            total: enemyCastles.reduce((sum, c) => sum + c.soldiers, 0),
+                                            max: enemyCastles.length > 0 ? Math.max(...enemyCastles.map(c => c.soldiers)) : 0
+                                        };
+                                        enemyForcesByClan.set(adj.ownerClan, enemyForce);
+                                    }
+
                                     // 一番大きな勢力の情報をメモしておきます
-                                    if (enemyTotal > maxEnemyTotalSoldiers) {
-                                        maxEnemyTotalSoldiers = enemyTotal;
-                                        maxEnemyMaxCastleSoldiers = enemyMax;
+                                    if (enemyForce.total > maxEnemyTotalSoldiers) {
+                                        maxEnemyTotalSoldiers = enemyForce.total;
+                                        maxEnemyMaxCastleSoldiers = enemyForce.max;
                                     }
                                 }
                             }
