@@ -936,6 +936,95 @@ async function validateGuideLayout(cdp) {
 }
 
 
+
+// 正規の部隊分割Viewをブラウザで開き、兵数0の非総大将を手動で増減できるか確認する。
+// 兵数0の部隊は野戦側では登場しないため、UIでも0を表示・再選択できなければならない。
+async function validateUnitDivideZeroAllocation(cdp) {
+    const configSrc = fs.readFileSync(path.join(ROOT, 'js/config.js'), 'utf8');
+    const troopSrc = fs.readFileSync(path.join(ROOT, 'js/troop_allocation.js'), 'utf8');
+    const sliderSrc = fs.readFileSync(path.join(ROOT, 'js/ui_slider.js'), 'utf8');
+    const html = '<!doctype html><html><head><meta charset="utf-8"></head><body><div id="unit-divide-modal" class="modal hidden"><div id="divide-stock-container"></div><div id="divide-list"></div><button id="divide-confirm-btn">決定</button><button class="btn-secondary">戻る</button></div></body></html>';
+    for (const isPc of [true, false]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', {
+            width: isPc ? 1280 : 360, height: isPc ? 720 : 640,
+            deviceScaleFactor: 1, mobile: !isPc
+        });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(async () => {
+                document.open(); document.write(${JSON.stringify(html)}); document.close();
+                document.body.classList.toggle('is-pc', ${isPc});
+                window.SkillManager = { getAptitudeLevel: () => 0 };
+                window.StatPresenter = {
+                    toAptitudeHTML: rank => '<span>' + rank + '</span>',
+                    escapePlainText: value => String(value)
+                };
+                window.eval(${JSON.stringify(configSrc)});
+                window.eval(${JSON.stringify(troopSrc)});
+                window.eval(${JSON.stringify(sliderSrc + '\nwindow.UISliderManager = UISliderManager;')});
+                const bushos = Array.from({length:5}, (_, index) => ({
+                    id: index + 1, name:'武将'+(index+1), leadership: 70, strength:70,
+                    aptAshigaru:'C', aptKiba:'C', aptYumi:'C', aptTeppo:'C'
+                }));
+                const ui = {
+                    unitDivideModal: document.getElementById('unit-divide-modal'),
+                    hideAIGuardTemporarily() {}, restoreAIGuard() {},
+                    prepareCoveredViewForOpen(modal) { modal.classList.remove('hidden'); },
+                    updateCustomScrollbars() {}
+                };
+                const game = {
+                    playerClanId:1, getClanGunshi:() => null, getClanDaimyo:() => null,
+                    warManager:{ state:{isSeaBattle:false},
+                        autoDivideSoldiers:(chosen, total, horses, guns, sea, player) =>
+                            TroopAllocationService.autoDivideSoldiers({bushos:chosen, totalSoldiers:total,
+                                totalHorses:horses,totalGuns:guns,isSeaBattle:sea,isPlayerUI:player}) }
+                };
+                const slider = new UISliderManager(ui, game);
+                let confirmed = null;
+                slider.showUnitDivideModal(bushos, 5, 0, 0, rows => { confirmed=rows.map(r=>r.soldiers); });
+                const row = id => ({
+                    range:document.getElementById('div-range-'+id),
+                    number:document.getElementById('div-num-'+id),
+                    min:document.getElementById('div-btn-min-'+id),
+                    max:document.getElementById('div-btn-max-'+id)
+                });
+                const initial = [row(1),row(2)].map(r => ({
+                    min:r.range.min, max:r.range.max, rangeValue:r.range.value,
+                    numberMin:r.number.min, numberValue:r.number.value
+                }));
+                const input = (id,value) => {
+                    const el=row(id).number;
+                    el.value=String(value); el.dispatchEvent(new Event('input',{bubbles:true}));
+                };
+                const paint = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                input(1,4); await paint();
+                const increaseAvailable = getComputedStyle(row(2).max).display !== 'none' && !row(2).max.disabled;
+                if (increaseAvailable) row(2).max.click();
+                await paint();
+                const afterIncrease = row(2).number.value;
+                document.getElementById('div-btn-half-2').click(); await paint();
+                const afterDecrease = row(2).number.value;
+                input(1,5); await paint();
+                document.getElementById('divide-confirm-btn').click();
+                return {initial,increaseAvailable,afterIncrease,afterDecrease,confirmed};
+            })()`,
+            returnByValue: true, awaitPromise: true
+        });
+        assert.ok(!result.exceptionDetails, `${isPc ? 'PC' : 'スマホ'}: 部隊分割コードが例外を起こした`);
+        const data = result.result.value;
+        const label = isPc ? 'PC' : 'スマホ';
+        assert.strictEqual(data.initial[0].min, '1', `${label}: 総大将の最低兵数は1人`);
+        assert.strictEqual(data.initial[1].min, '0', `${label}: 非総大将の最低兵数は0人`);
+        assert.strictEqual(data.initial[1].numberMin, '0', `${label}: 数値入力も0人を許可`);
+        assert.strictEqual(data.initial[1].rangeValue, '0', `${label}: 初期スライダーと数値の0が一致`);
+        assert.strictEqual(data.initial[1].numberValue, '0', `${label}: 自動配分0人をそのまま表示`);
+        assert.ok(data.increaseAvailable, `${label}: 0→1の際は表示中の最大ボタンを利用できる`);
+        assert.strictEqual(data.afterIncrease, '1', `${label}: 0人から1人へ再配分できる`);
+        assert.strictEqual(data.afterDecrease, '0', `${label}: 1人から0人へ戻せる`);
+        assert.deepStrictEqual(data.confirmed, [5,0,0,0,0], `${label}: 総大将5人/他0人で確定できる`);
+    }
+    console.log('✓ 部隊分割の兵士0人：PC・スマホで値表示・再配分・再確定が一致');
+}
+
 async function validateWarAptitudeLayout(cdp) {
     const html = fixtureHtml('war_aptitude_layout.html');
     for (const cfg of [
@@ -2836,6 +2925,202 @@ async function validateDaimyoConfirmStacking(cdp) {
     console.log('✓ r922 大名確認モーダルの階層は共通暗幕より上（PC/スマホ・CSS計算値/ヒットテスト）');
 }
 
+// r936: 本番の地図ViewとCSSを使い、光彩と軍団マーカーの差分更新・無変更DOMを確認する。
+async function validateCastleGlowDiff(cdp) {
+    const mapSource = fs.readFileSync(path.join(ROOT, 'js', 'ui_map.js'), 'utf8');
+    const css = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+    const html = `<!doctype html><html><head><style>${css.replace(/<\/style/gi, '<\\/style')}</style></head><body>
+        <div id="map-container" style="position:relative;width:1200px;height:800px"></div></body></html>`;
+    for (const isPc of [true, false]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', {
+            width: isPc ? 1280 : 360, height: isPc ? 720 : 640,
+            deviceScaleFactor: 1, mobile: !isPc
+        });
+        const result = await cdp.call('Runtime.evaluate', {
+            expression: `(() => {
+                document.open();document.write(${JSON.stringify(html)});document.close();
+                document.body.classList.toggle('is-pc', ${isPc});
+                window.DiplomacyRules = { isFriendly: status => status === '同盟' };
+                const UI = (new Function(${JSON.stringify('class UIManager {}\n' + mapSource + '\nreturn UIManager;')}))();
+                const mapEl = document.getElementById('map-container');
+                for (let i = 0; i < 125; i++) {
+                    const card = document.createElement('div');
+                    card.className = 'castle-card';
+                    card.dataset.clan = String(i % 5);
+                    card.style.left = ((i % 25) * 45) + 'px';
+                    card.style.top = (Math.floor(i / 25) * 50) + 'px';
+                    if (i % 2 === 0) {
+                        const marker = document.createElement('div');
+                        marker.className = 'legion-marker-base hidden';
+                        card.appendChild(marker);
+                    }
+                    mapEl.appendChild(card);
+                }
+                const cards = [...mapEl.querySelectorAll('.castle-card')];
+                const relations = new Map([[2, '敵対'], [3, '同盟'], [4, '中立']]);
+                let relationCalls = 0;
+                const game = { phase:'game', playerClanId:1,
+                    getRelation(base, clan) { relationCalls++;return { status:relations.get(clan)||'中立' }; } };
+                const ui = Object.create(UI.prototype);
+                ui.mapEl = mapEl;
+                ui.game = game;
+                ui.currentCastle = null;
+                ui.selectedDaimyoId = 0;
+                ui.isBackgroundPaused = false;
+                const info = card => ({
+                    classes:['glow-blue','glow-red','glow-green'].filter(x=>card.classList.contains(x)),
+                    filter:getComputedStyle(card).filter,
+                    hidden:card.querySelector('.legion-marker-base')?.classList.contains('hidden')??null
+                });
+                ui.updateCastleGlows();
+                const initial = cards.slice(0,5).map(info);
+                const initialRelations = relationCalls;
+                const observer = new MutationObserver(() => {});
+                observer.observe(mapEl,{subtree:true,attributes:true,attributeFilter:['class']});
+                for (let i=0;i<20;i++) ui.updateCastleGlows();
+                const noChangeMutations = observer.takeRecords().length;
+                relations.set(2, '同盟');
+                ui.updateCastleGlows();
+                const changed = info(cards[2]);
+                const changedMutations = observer.takeRecords().length;
+                game.phase='daimyo_select';ui.selectedDaimyoId=4;
+                ui.updateCastleGlows();
+                const daimyo = cards.slice(0,5).map(info);
+                const selectMutations=observer.takeRecords().length;
+                for (let i=0;i<20;i++) ui.updateCastleGlows();
+                const selectNoChangeMutations=observer.takeRecords().length;
+                game.phase='game';ui.currentCastle={ownerClan:2};
+                ui.updateCastleGlows();
+                const current = cards.slice(0,5).map(info);
+                observer.disconnect();
+                return {initial,initialRelations,noChangeMutations,changed,changedMutations,daimyo,selectMutations,selectNoChangeMutations,current};
+            })()`, returnByValue: true
+        });
+        if (result.exceptionDetails) throw new Error(result.exceptionDetails.text + ' ' + JSON.stringify(result.exceptionDetails.exception));
+        const v = result.result?.value;
+        const device = isPc ? 'PC' : 'スマホ';
+        assert.deepStrictEqual(v.initial.map(x => x.classes), [[], ['glow-blue'], ['glow-red'], ['glow-green'], []],
+            `${device}: 通常地図の外交別光彩を維持`);
+        assert.notStrictEqual(v.initial[2].filter, 'none', `${device}: 敵対の光彩フィルターを維持`);
+        assert.notStrictEqual(v.initial[2].filter, v.initial[3].filter, `${device}: 敵対と同盟の光彩色を区別`);
+        assert.strictEqual(v.initialRelations, 3, `${device}: 所属勢力単位で外交参照を共用`);
+        assert.strictEqual(v.noChangeMutations, 0, `${device}: 変化しない光彩・軍団マーカーへのDOM書込を省略`);
+        assert.deepStrictEqual(v.changed.classes, ['glow-green'], `${device}: 外交関係変更を即反映`);
+        assert.ok(v.changedMutations > 0, `${device}: 実際の状態変更ではDOM更新`);
+        assert.deepStrictEqual(v.daimyo.map(x => x.classes), [[], [], [], [], ['glow-blue']],
+            `${device}: 大名選択時の光彩`);
+        assert.ok(v.daimyo.every(x => x.hidden !== false), `${device}: 大名選択では軍団を隠す`);
+        assert.ok(v.selectMutations > 0, `${device}: 選択状態の変更を反映`);
+        assert.strictEqual(v.selectNoChangeMutations, 0, `${device}: 大名選択中の無変更DOM書込は0`);
+        assert.deepStrictEqual(v.current[2].classes, ['glow-blue'], `${device}: 選択拠点を基準に戻す`);
+        assert.strictEqual(v.current[2].hidden, false, `${device}: 基準勢力の軍団マーカーを再表示`);
+    }
+    console.log('✓ r936 地図の光彩・軍団マーカーはPC/スマホの表示を維持し、無変更時DOM更新0件');
+}
+
+// 共通一覧の分割追加は新規行だけ文字サイズを合わせる。
+// 仮想一覧と低メモリページ送りは従来どおり、差し替えた表示範囲全体を調整する。
+async function validateIncrementalListTextFit(cdp) {
+    const infoSource = fs.readFileSync(path.join(ROOT, 'js', 'ui_info.js'), 'utf8');
+    const html = `<!doctype html><html><head><style>
+        #selector-list { height:450px;width:600px;overflow:auto; }
+        .select-item { display:flex;height:40px; }
+        .col-name { font-size:18px;width:140px; }
+    </style></head><body><div id="selector-list"></div><div id="pager"></div></body></html>`;
+    for (const [mode, isPc, touch] of [
+        ['normal', true, false], ['normal', false, true],
+        ['virtual', true, false], ['virtual', false, true],
+        ['paged', false, true]
+    ]) {
+        const width = isPc ? 1280 : 390;
+        const height = isPc ? 720 : 844;
+        await cdp.call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !isPc });
+        const expression = `(async () => {
+            document.open();document.write(${JSON.stringify(html)});document.close();
+            document.body.classList.toggle('is-pc', ${isPc});
+            document.body.classList.toggle('is-touch-input', ${touch});
+            window.__mobileLowMemoryMode = ${mode === 'paged'};
+            const Info = new Function(${JSON.stringify(infoSource + '\nreturn UIInfoManager;')})();
+            const info = Object.create(Info.prototype);
+            info._currentListRenderId = 0;
+            info.modalHistory = [];
+            info.ui = { updateCustomScrollbars() {} };
+            info.selectorView = {
+                open() { return { listContainer:document.getElementById('selector-list'), pagerEl:document.getElementById('pager') }; },
+                fitListViewportToWholeRows() { return { itemRows:7, rowStep:40 }; },
+                measureLogicalListRowStep() { return 40; }
+            };
+            const makeRows = count => Array.from({length:count}, (_, i) => ({ cells:[
+                '<span class="col-name">' + '山田'.repeat(i % 8 + 1) + '</span>',
+                '<span class="col-other">' + i + '</span>'
+            ] }));
+            const list = document.getElementById('selector-list');
+            const originalQuery = Element.prototype.querySelectorAll;
+            let fullScanCalls = 0;
+            Element.prototype.querySelectorAll = function(selector) {
+                if (selector === '.select-item') fullScanCalls++;
+                return originalQuery.call(this, selector);
+            };
+            const take = () => Array.from(originalQuery.call(list, '.select-item'))
+                .filter(el => !el.classList.contains('is-placeholder-row'))
+                .map(el => ({ text:el.querySelector('.col-name').textContent,
+                    font:el.querySelector('.col-name').style.fontSize,
+                    index:Number(el.querySelector('.col-other').textContent) }));
+            const target = ${mode === 'normal' ? 149 : 185};
+            info._renderListModal({title:'一覧',items:makeRows(target),
+                headers:['名称','値'],disableRowViewportFit:${mode === 'paged' ? 'false' : 'true'}});
+            await new Promise(resolve => setTimeout(resolve, 240));
+            const first = take();
+            const scanCount = fullScanCalls;
+            let later = null;
+            if ('${mode}' === 'virtual') {
+                list.scrollTop = 1100;
+                list.dispatchEvent(new Event('scroll'));
+                await new Promise(resolve => setTimeout(resolve, 130));
+                later = take();
+            } else if ('${mode}' === 'paged') {
+                document.querySelector('.low-memory-page-next').click();
+                await new Promise(resolve => setTimeout(resolve, 85));
+                later = take();
+            } else {
+                // 旧描画予約が別の一覧へ作用しないことも確認する。
+                info._renderListModal({title:'次の一覧',items:makeRows(4),
+                    headers:['名称','値'],disableRowViewportFit:true});
+                await new Promise(resolve => setTimeout(resolve, 80));
+                later = take();
+            }
+            info._stopActiveListRendering();
+            Element.prototype.querySelectorAll = originalQuery;
+            return {first,later,scanCount};
+        })()`;
+        const result = await cdp.call('Runtime.evaluate', { expression, returnByValue:true, awaitPromise:true });
+        if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
+        const { first, later, scanCount } = result.result.value;
+        const targetLength = mode === 'normal' ? 149 : (mode === 'paged' ? 7 : first.length);
+        assert.strictEqual(first.length, targetLength, `${mode}/${isPc}: 初期表示行数`);
+        const assertFit = (rows, label) => {
+            for (const row of rows) {
+                const len = row.text.length;
+                const expected = len <= 4 ? '' : len === 6 ? 'calc(80%)' : len >= 8 ? 'calc(60%)' : 'calc(90%)';
+                assert.strictEqual(row.font, expected, `${label}: ${row.text} の文字サイズ`);
+            }
+        };
+        assertFit(first, `${mode}/${isPc}: 初期`);
+        assertFit(later, `${mode}/${isPc}: 切替後`);
+        if (mode === 'normal') {
+            assert.ok(scanCount <= 1, '分割追加のたびに既存全行を再走査しない');
+            assert.strictEqual(later.length, 4, '次の一覧への切替後も旧行を持ち越さない');
+        } else if (mode === 'paged') {
+            assert.strictEqual(later.length, 7, '低メモリページ送りの行数を維持');
+            assert.notStrictEqual(first[0].text, later[0].text, '次ページの人物に切り替わる');
+        } else {
+            assert.ok(first.length > 10 && first.length < 100, '仮想一覧は表示窓だけ描画する');
+            assert.notStrictEqual(first[0].index, later[0].index, '仮想スクロールを反映する: '+JSON.stringify({first:first[0],later:later[0]}));
+        }
+    }
+    console.log('✓ r937 共通一覧の文字調整は新規行のみ。PC・スマホ通常/仮想、低メモリページで結果一致');
+}
+
 async function main() {
     const browser = findBrowser();
     if (!browser) throw new Error('Chrome / Chromium / Edge が見つかりません。CHROME_PATH を指定してください。');
@@ -2898,6 +3183,7 @@ async function main() {
         await validateEndingAndWatchStates(cdp);
         await validateGuideLayout(cdp);
         await validateWarAptitudeLayout(cdp);
+        await validateUnitDivideZeroAllocation(cdp);
         await validateDialogConfirmPlacement(cdp);
         await validateDaimyoConfirmStacking(cdp);
         await validateBushoBiographyLayout(cdp);
@@ -2912,6 +3198,8 @@ async function main() {
         await validateSiegeLayout(cdp);
         await validateTitleMenuStability(cdp);
         await validateMapCompositor(cdp);
+        await validateCastleGlowDiff(cdp);
+        await validateIncrementalListTextFit(cdp);
         await validateLoadingPresentation(cdp);
         await validateCastleIconLoading(cdp);
         await validateDomImageDecode(cdp);

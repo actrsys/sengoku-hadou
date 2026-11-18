@@ -1792,13 +1792,13 @@ class UIInfoManager {
         const CHUNK_SIZE = 50;
         const VIRTUALIZE_THRESHOLD = 150; // ★これを超える件数のリストは「仮想スクロール」に切り替えます
 
-        // ★「文字数」を数えて、文字数が多い場合だけ文字を小さくします
-        // （仮想スクロールでは常に「今表示中の行」だけをチェックすれば十分なので引数なしにしました）
-        const adjustTextFit = () => {
-            if (config.skipTextFit) return;
+        // 文字幅の補正は共通の1処理へ集約する。通常一覧の分割追加時は新規行だけを渡し、
+        // 仮想一覧・低メモリページ送りでは差し替えた表示範囲全体を従来どおり調整する。
+        const adjustTextFit = (addedItems = null) => {
+            if (config.skipTextFit || this._currentListRenderId !== currentRenderId) return;
             const listInner = listContainer.querySelector('.list-inner-wrapper');
             if (!listInner) return;
-            const itemEls = listInner.querySelectorAll('.select-item');
+            const itemEls = Array.isArray(addedItems) ? addedItems : listInner.querySelectorAll('.select-item');
 
             itemEls.forEach(itemEl => {
                 const cells = itemEl.children;
@@ -2197,12 +2197,18 @@ class UIInfoManager {
                 }
 
                 const innerWrapper = listContainer.querySelector('.list-inner-wrapper');
-                if (innerWrapper) {
-                    innerWrapper.insertAdjacentHTML('beforeend', chunkParts.join(''));
-                }
+                const firstNewChildIndex = innerWrapper && !config.skipTextFit ? innerWrapper.childElementCount : -1;
+                if (innerWrapper) innerWrapper.insertAdjacentHTML('beforeend', chunkParts.join(''));
                 if (typeof config.onItemsRendered === 'function') config.onItemsRendered();
 
-                if (!config.skipTextFit) requestAnimationFrame(adjustTextFit);
+                if (firstNewChildIndex >= 0) {
+                    const newRows = [];
+                    for (let i = firstNewChildIndex; i < innerWrapper.childElementCount; i++) {
+                        const row = innerWrapper.children[i];
+                        if (row.classList.contains('select-item')) newRows.push(row);
+                    }
+                    if (newRows.length > 0) requestAnimationFrame(() => adjustTextFit(newRows));
+                }
                 currentIndex = endLimit;
 
                 setTimeout(() => {

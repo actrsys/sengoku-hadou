@@ -835,8 +835,8 @@ class UISliderManager {
                     range.value = d.count;
                 }
 
-                const actualMax = parseInt(range.max) || 1;
-                const actualMin = parseInt(range.min) || 1;
+                const actualMax = Number(range.max);
+                const actualMin = Number(range.min);
                 const percent = actualMax > actualMin ? ((d.count - actualMin) / (actualMax - actualMin)) * 100 : 0;
                 range.style.setProperty('--value', percent + '%');
 
@@ -851,7 +851,7 @@ class UISliderManager {
                     equipmentStock,
                     equipmentUsedByOthers
                 });
-                if (maxAllowed < 1) maxAllowed = 1;
+                maxAllowed = Math.max(Number(range.min), maxAllowed);
                 range.max = maxAllowed;
                 num.max = maxAllowed;
 
@@ -859,14 +859,19 @@ class UISliderManager {
                 const btnHalf = ref.btnHalf;
                 const btnMax = ref.btnMax;
                 if (btnMin && btnHalf && btnMax) {
-                    if (maxAllowed <= 1) {
+                    if (maxAllowed <= actualMin) {
                         btnMin.style.display = ''; btnMin.disabled = true; btnMin.style.order = 1;
                         btnHalf.style.display = ''; btnHalf.disabled = true; btnHalf.style.order = 3;
                         btnMax.style.display = 'none';
-                    } else if (d.count <= 1) {
+                    } else if (d.count <= actualMin) {
                         btnMin.style.display = ''; btnMin.disabled = true; btnMin.style.order = 1;
-                        btnHalf.style.display = ''; btnHalf.disabled = false; btnHalf.style.order = 3;
-                        btnMax.style.display = 'none';
+                        // 半分が最低値に丸められる場合は、操作しても変化しないため「最大」を使う。
+                        const halfCount = Math.floor((actualMin + maxAllowed) / 2);
+                        btnHalf.style.display = halfCount > actualMin ? '' : 'none';
+                        btnHalf.disabled = halfCount <= actualMin;
+                        btnHalf.style.order = 3;
+                        btnMax.style.display = halfCount > actualMin ? 'none' : '';
+                        btnMax.disabled = false; btnMax.style.order = 3;
                     } else if (d.count >= maxAllowed) {
                         btnMin.style.display = 'none';
                         btnHalf.style.display = ''; btnHalf.disabled = false; btnHalf.style.order = 1;
@@ -938,6 +943,8 @@ class UISliderManager {
         const myDaimyo = this.game.getClanDaimyo(this.game.playerClanId);
 
         bushos.forEach((b, index) => {
+            // 総大将だけ最低1人。ほかの武将は兵数0で不参加にできる。
+            const minSoldiers = index === 0 ? 1 : 0;
             const div = document.createElement('div');
             div.className = 'qty-row divide-row';
             
@@ -986,9 +993,9 @@ class UISliderManager {
                 <div class="qty-control">
                     <button class="qty-shortcut-btn qty-pos-start" id="div-btn-min-${b.id}">最小</button>
                     <button class="qty-shortcut-btn qty-pos-end" id="div-btn-half-${b.id}">半分</button>
-                    <input class="qty-range-main" type="range" id="div-range-${b.id}" min="1" max="${Math.max(1, TroopAllocationService.getMaxSoldiersPerUnit())}" value="${assignments[index].count}">
+                    <input class="qty-range-main" type="range" id="div-range-${b.id}" min="${minSoldiers}" max="${Math.max(1, TroopAllocationService.getMaxSoldiersPerUnit())}" value="${assignments[index].count}">
                     <button class="qty-shortcut-btn qty-pos-end" id="div-btn-max-${b.id}">最大</button>
-                    <input class="qty-number-end" type="number" id="div-num-${b.id}" min="1" max="${Math.max(1, TroopAllocationService.getMaxSoldiersPerUnit())}" value="${assignments[index].count}">
+                    <input class="qty-number-end" type="number" id="div-num-${b.id}" min="${minSoldiers}" max="${Math.max(1, TroopAllocationService.getMaxSoldiersPerUnit())}" value="${assignments[index].count}">
                 </div>
                 ${isPcDivide ? `<div class="troop-type-selector is-pc-selector ${isSeaBattleForDivide ? 'is-sea-battle' : ''}" id="troop-type-group-${b.id}">${pcTroopSelectorHtml}</div>` : ''}
                 <input type="hidden" id="div-type-${b.id}" value="${myType}">
@@ -1002,6 +1009,7 @@ class UISliderManager {
             // ★修正：第3引数に isChangeEvent を追加して受け取れるようにしました
             const onInput = (val, mode = 'normal', isChangeEvent = false) => {
                 let v = parseInt(val) || 0;
+                const minAllowed = Number(range.min);
                 
                 let otherSum = 0;
                 let otherHorses = 0;
@@ -1026,28 +1034,28 @@ class UISliderManager {
                     equipmentStock,
                     equipmentUsedByOthers
                 });
-                if (maxAllowed < 1) maxAllowed = 1;
+                maxAllowed = Math.max(Number(range.min), maxAllowed);
                 range.max = maxAllowed;
                 num.max = maxAllowed;
 
                 if (mode === 'max') {
                     v = maxAllowed;
                 } else if (mode === 'half') {
-                    v = Math.floor((1 + maxAllowed) / 2);
+                    v = Math.floor((minAllowed + maxAllowed) / 2);
                 } else if (mode === 'range') {
                     // ★変更：ここも指を動かしている最中から常に丸めるように元に戻します
                     if (v > 1 && v < maxAllowed) {
                         if (totalSoldiers <= 999) {
-                            v = Math.round(v / 10) * 10;
+                            v = Math.max(1, Math.round(v / 10) * 10);
                         } else {
-                            v = Math.round(v / 100) * 100;
+                            v = Math.max(1, Math.round(v / 100) * 100);
                         }
                     }
                     if (v > maxAllowed) v = maxAllowed;
-                    if (v < 1) v = 1;
+                    if (v < minAllowed) v = minAllowed;
                 } else {
                     if (v > maxAllowed) v = maxAllowed;
-                    if (v < 1) v = 1;
+                    if (v < minAllowed) v = minAllowed;
                 }
                 
                 range.value = v;
@@ -1068,12 +1076,12 @@ class UISliderManager {
             const btnHalf = div.querySelector(`#div-btn-half-${b.id}`);
             const btnMax = div.querySelector(`#div-btn-max-${b.id}`);
             
-            btnMin.onclick = () => { onInput(1); };
+            btnMin.onclick = () => { onInput(minSoldiers); };
             btnHalf.onclick = () => { onInput(0, 'half'); };
             btnMax.onclick = () => { onInput(0, 'max'); };
             num.onblur = (e) => {
                 if(e.target.value === "" || isNaN(parseInt(e.target.value))) {
-                    onInput(1);
+                    onInput(minSoldiers);
                 }
             };
             

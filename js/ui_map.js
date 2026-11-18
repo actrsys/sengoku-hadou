@@ -2391,70 +2391,51 @@ Object.assign(UIManager.prototype, {
         });
     },
     
-    updateCastleGlows() {
-        if (this.isBackgroundPaused) return;
-        if (!this.mapEl) return;
-        
-        // ★ 修正：大名選択画面では、選んだ大名の城だけを青く光らせます
-        if (this.game.phase === 'daimyo_select') {
-            const cards = this._getCastleCardElements();
-            cards.forEach(card => {
-                card.classList.remove('glow-blue', 'glow-red', 'glow-green');
-                const clanId = parseInt(card.dataset.clan, 10);
-                if (this.selectedDaimyoId && clanId === this.selectedDaimyoId) {
-                    card.classList.add('glow-blue');
-                }
-                // 大名選択時は軍団マーカーを消します
-                const marker = card.querySelector('.legion-marker-base');
-                if (marker) marker.classList.add('hidden');
-            });
-            return;
-        }
+    // 表示は常に現在の外交状態から投影する。クラスの所有者をここにまとめ、
+    // 既に一致するDOMには書き込まない（追加の永続キャッシュは持たない）。
+    _syncCastleGlowCard(card, glowClass, hideLegionMarker) {
+        const classes = card.classList;
+        classes.toggle('glow-blue', glowClass === 'glow-blue');
+        classes.toggle('glow-red', glowClass === 'glow-red');
+        classes.toggle('glow-green', glowClass === 'glow-green');
+        const marker = card.querySelector('.legion-marker-base');
+        if (marker) marker.classList.toggle('hidden', hideLegionMarker);
+    },
 
+    updateCastleGlows() {
+        if (this.isBackgroundPaused || !this.mapEl) return;
+
+        const isDaimyoSelect = this.game.phase === 'daimyo_select';
         let baseClanId = this.game.playerClanId;
-        
-        if (this.currentCastle && this.currentCastle.ownerClan !== 0) {
+        if (!isDaimyoSelect && this.currentCastle && this.currentCastle.ownerClan !== 0) {
             baseClanId = this.currentCastle.ownerClan;
         }
-
-        const cards = this._getCastleCardElements();
-        // 同一勢力の拠点が複数あっても、1回の光彩更新中は同じ外交関係を1度だけ取得する。
-        // キャッシュはこの同期処理のローカルだけなので外交状態の変更を跨がない。
-        const relationByClan = new Map();
-        cards.forEach(card => {
+        // 外交関係は同じ同期描画内だけ共用し、別の月・設定・勢力変更へ持ち越さない。
+        const relationByClan = isDaimyoSelect ? null : new Map();
+        for (const card of this._getCastleCardElements()) {
             const clanId = parseInt(card.dataset.clan, 10);
-            
-            card.classList.remove('glow-blue', 'glow-red', 'glow-green');
-            
-            // ★追加：基準となる勢力（選択中の城の勢力）と同じなら軍団マーカーを表示します
-            const marker = card.querySelector('.legion-marker-base');
-            if (marker) {
-                if (clanId === baseClanId && clanId !== 0) {
-                    marker.classList.remove('hidden');
+            let glowClass = '';
+            if (isDaimyoSelect) {
+                if (this.selectedDaimyoId && clanId === this.selectedDaimyoId) glowClass = 'glow-blue';
+            } else if (clanId !== 0) {
+                if (clanId === baseClanId) {
+                    glowClass = 'glow-blue';
                 } else {
-                    marker.classList.add('hidden');
-                }
-            }
-            
-            if (clanId === 0) return;
-            
-            if (clanId === baseClanId) {
-                card.classList.add('glow-blue');
-            } else {
-                let rel = relationByClan.get(clanId);
-                if (!relationByClan.has(clanId)) {
-                    rel = this.game.getRelation(baseClanId, clanId);
-                    relationByClan.set(clanId, rel || null);
-                }
-                if (rel) {
-                    if (rel.status === '敵対') {
-                        card.classList.add('glow-red');   
-                    } else if (window.DiplomacyRules.isFriendly(rel.status)) {
-                        card.classList.add('glow-green'); 
+                    let rel = relationByClan.get(clanId);
+                    if (!relationByClan.has(clanId)) {
+                        rel = this.game.getRelation(baseClanId, clanId);
+                        relationByClan.set(clanId, rel || null);
+                    }
+                    if (rel) {
+                        if (rel.status === '敵対') glowClass = 'glow-red';
+                        else if (window.DiplomacyRules.isFriendly(rel.status)) glowClass = 'glow-green';
                     }
                 }
             }
-        });
+            // 大名選択ではすべての軍団マーカーを隠す。通常画面は基準勢力だけ表示。
+            this._syncCastleGlowCard(card, glowClass,
+                isDaimyoSelect || clanId === 0 || clanId !== baseClanId);
+        }
     },
 
     // ==========================================

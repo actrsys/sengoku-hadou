@@ -14020,11 +14020,92 @@ test('地図選択UIはvalidTargetsの同じincludesを全拠点・ラベルで�
     assert.ok(!labelBlock.includes('validTargets.includes('));
 });
 
+test('拠点光彩と軍団マーカーは無変更再描画でDOMを書換えず、状態変更時だけ更新する', () => {
+    class TestUIManager {}
+    const context = createContext({ UIManager: TestUIManager, DiplomacyRules: { isFriendly: status => status === '同盟' } });
+    loadScript(context, 'js/ui_map.js');
+
+    const makeClassList = (initial = []) => {
+        const values = new Set(initial);
+        return {
+            values,
+            writes: 0,
+            contains(name) { return values.has(name); },
+            toggle(name, force) {
+                const want = force === undefined ? !values.has(name) : !!force;
+                if (values.has(name) !== want) {
+                    if (want) values.add(name);
+                    else values.delete(name);
+                    this.writes++;
+                }
+                return want;
+            }
+        };
+    };
+    const makeCard = (clan, withMarker = true) => {
+        const marker = withMarker ? { classList: makeClassList(['hidden']) } : null;
+        return {
+            dataset: { clan: String(clan) },
+            classList: makeClassList(),
+            marker,
+            querySelector(selector) {
+                assert.strictEqual(selector, '.legion-marker-base');
+                return marker;
+            }
+        };
+    };
+    const cards = [makeCard(1), makeCard(2), makeCard(3), makeCard(0), makeCard(2, false)];
+    const relations = new Map([[2, { status: '敵対' }], [3, { status: '同盟' }]]);
+    let relationCalls = 0;
+    const ui = Object.create(context.UIManager.prototype);
+    ui.mapEl = {};
+    ui.game = {
+        phase: 'game', playerClanId: 1,
+        getRelation(base, target) { relationCalls++; return relations.get(target) || null; }
+    };
+    ui.currentCastle = null;
+    ui.selectedDaimyoId = null;
+    ui._getCastleCardElements = () => cards;
+    const writes = () => cards.reduce((n, c) => n + c.classList.writes + (c.marker?.classList.writes || 0), 0);
+    const visible = c => ['glow-blue', 'glow-red', 'glow-green'].filter(name => c.classList.contains(name));
+
+    ui.updateCastleGlows();
+    assert.deepStrictEqual(cards.map(visible), [['glow-blue'], ['glow-red'], ['glow-green'], [], ['glow-red']]);
+    assert.ok(!cards[0].marker.classList.contains('hidden'));
+    assert.ok(cards[1].marker.classList.contains('hidden'));
+    assert.strictEqual(relationCalls, 2, '同じ所属勢力の外交関係は描画内で再利用');
+    const firstWrites = writes();
+    ui.updateCastleGlows();
+    assert.strictEqual(writes(), firstWrites, '同じ表示状態でDOM属性を再書換しない');
+
+    relations.set(2, { status: '同盟' });
+    ui.updateCastleGlows();
+    assert.deepStrictEqual(visible(cards[1]), ['glow-green'], '外交関係変化を再描画で即時反映');
+    ui.game.phase = 'daimyo_select';
+    ui.selectedDaimyoId = 2;
+    ui.updateCastleGlows();
+    assert.deepStrictEqual(cards.map(visible), [[], ['glow-blue'], [], [], ['glow-blue']]);
+    assert.ok(cards.filter(c => c.marker).every(c => c.marker.classList.contains('hidden')), '大名選択では軍団マーカー全非表示');
+    const selectWrites = writes();
+    ui.updateCastleGlows();
+    assert.strictEqual(writes(), selectWrites, '大名選択中も無変更再描画を行わない');
+
+    ui.game.phase = 'game';
+    ui.currentCastle = { ownerClan: 2 };
+    ui.updateCastleGlows();
+    assert.ok(!cards[1].marker.classList.contains('hidden'), '選択中の拠点により基準勢力が変わる');
+    assert.ok(cards[0].marker.classList.contains('hidden'));
+    const after = writes();
+    ui.isBackgroundPaused = true;
+    ui.updateCastleGlows();
+    assert.strictEqual(writes(), after, '背景一時停止中はDOMに触れない');
+});
+
 test('拠点光彩更新は同一勢力の外交関係を1回の描画内でだけ再利用する', () => {
     const uiMap = read('js/ui_map.js');
     const at = uiMap.indexOf('    updateCastleGlows() {');
     const block = uiMap.slice(at, at + 3600);
-    assert.ok(block.includes('const relationByClan = new Map();'));
+    assert.ok(block.includes('const relationByClan = isDaimyoSelect ? null : new Map();'), '大名選択中の不要な関係キャッシュ生成は省く');
     assert.ok(block.includes('if (!relationByClan.has(clanId))'));
     assert.ok(block.includes('this.game.getRelation(baseClanId, clanId)'));
 });
@@ -24952,6 +25033,59 @@ test('r544 AI出陣直前も商人勢力の鎮圧可否を専門部署で再確�
     assert.strictEqual(finishes, 1, '出陣準備への引き渡し中にAIターンを二重終了しない');
 });
 
+// 月初AIは処理対象外の勢力に待機を積まず、存続勢力だけ従来の描画・失効境界を維持する。
+test('月初AI作戦は滅亡・無所属勢力の待機を省き、存続勢力の再判定と計画を維持する', async () => {
+    const scheduled = [];
+    const trace = [];
+    const ctx = createContext({
+        setTimeout: callback => { scheduled.push(callback); callback(); },
+        document: {body: {classList: {contains: () => true}}}
+    });
+    loadScript(ctx, 'js/ai_operation.js');
+    const clans = [
+        {id: 0, isDestroyed: false}, {id: 1, isDestroyed: true},
+        {id: 2, isDestroyed: false}, {id: 3, isDestroyed: true},
+        {id: 4, isDestroyed: false}
+    ];
+    const game = {
+        phase: 'game', isRestoringSave: false, playerClanId: -1,
+        clans, getClanCastles: () => [],
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: () => true},
+        writeSystemDiagnostic: message => trace.push(message)
+    };
+    const manager = new (vm.runInContext('AIOperationManager', ctx))(game);
+    manager.validateAllOperations = () => {};
+    manager.decreaseSentimentForHighTension = id => trace.push(`sentiment:${id}`);
+    manager.thinkMonthlyDiplomacy = clan => trace.push(`diplomacy:${clan.id}`);
+    await manager.processMonthlyOperations();
+    assert.strictEqual(scheduled.length, 2, '存続する2勢力の描画待機のみ行う');
+    assert.deepStrictEqual(trace.filter(x => x.startsWith('sentiment:')), ['sentiment:2', 'sentiment:4'],
+        '外交判断の順番と対象勢力は変えない');
+    assert.deepStrictEqual(Object.keys(manager.historyOwnedCastles).sort(), ['2', '4'],
+        '滅亡勢力の履歴を増やさず、生存勢力の履歴は従来どおり確定する');
+    assert.deepStrictEqual(Object.keys(manager.operations).sort(), ['2', '4'],
+        '存続勢力の作戦保存先を従来どおり用意する');
+
+    // 描画待機の間に存続勢力が滅亡する場合は旧版と同様、計画を立てない。
+    const pending = [];
+    const ctx2 = createContext({setTimeout: callback => pending.push(callback)});
+    loadScript(ctx2, 'js/ai_operation.js');
+    const formerlyAlive = {id: 7, isDestroyed: false};
+    const secondGame = {
+        phase:'game', isRestoringSave:false, clans:[formerlyAlive], playerClanId:-1,
+        turnManager:{captureTurnFlowGeneration:()=>1,isTurnFlowGenerationCurrent:()=>true}
+    };
+    const second = new (vm.runInContext('AIOperationManager', ctx2))(secondGame);
+    second.validateAllOperations = () => {};
+    const planned = second.processMonthlyOperations();
+    assert.strictEqual(pending.length, 1, '生存勢力の待機は省かない');
+    formerlyAlive.isDestroyed = true;
+    pending.shift()();
+    await planned;
+    assert.deepStrictEqual(Object.keys(second.operations), [],
+        'await中に滅亡した勢力へ旧計画を発行しない');
+});
+
 // r545: 旧シナリオで中断されたAI作戦会議は、新しいゲーム/ターンへ結果を書かない。
 test('r545 旧シナリオのAI作戦生成は非同期再開後に新ゲームへ混入しない', async () => {
     const delayed = [];
@@ -31649,6 +31783,65 @@ test('r657 双方向登録済み地図の隣接候補順は300種類の配置で
                 castle.adjacentCastleIds, `双方向の地図${round}／${castle.id}は旧候補順を保持する`);
         }
     }
+});
+
+// 地図の接続順と作戦候補は不変のまま、同じ拠点の隣接情報再組立だけ減らす。
+test('r939 AI月次作戦は接続候補順を保ち、重複隣接情報の組立を省く', async () => {
+    const ctx = createContext({
+        document: {body: {classList: {contains: () => true}}},
+        MainParams: {StartYear: 1560, StartMonth: 1},
+        DiplomacyRules: {isFriendly: () => false}
+    });
+    loadScript(ctx, 'js/map_graph.js');
+    loadScript(ctx, 'js/ai_operation.js');
+    const Graph = vm.runInContext('MapGraphService', ctx);
+    const Operations = vm.runInContext('AIOperationManager', ctx);
+    const owned = Array.from({length: 60}, (_, i) => ({
+        id: i + 1, ownerClan: 1, legionId: 0, castellanId: 1000 + i,
+        provinceId: 1, adjacentCastleIds: [((i + 59) % 60) + 1, ((i + 1) % 60) + 1],
+        soldiers: 3500, kokudaka: 1000, isDelegated: false
+    }));
+    const enemy = Array.from({length: 10}, (_, i) => ({
+        id: 61 + i, ownerClan: 2, legionId: 0, provinceId: 1,
+        adjacentCastleIds: [i * 6 + 1], soldiers: 300, defense: 50, immunityUntil: 0
+    }));
+    for (let i = 0; i < enemy.length; i++) owned[i * 6].adjacentCastleIds.push(enemy[i].id);
+    const castles = owned.concat(enemy);
+    const byId = new Map(castles.map(c => [c.id, c]));
+    const stop = new Error('候補順の検証完了');
+    const candidateLists = [];
+    const game = {
+        phase: 'game', castles, clans: [{id: 1}, {id: 2}], provinces: [], playerClanId: 99,
+        gameStartYear: 1560, gameStartMonth: 1, year: 1561, month: 5,
+        getClanCastles: id => castles.filter(c => c.ownerClan === id),
+        getCastle: id => byId.get(Number(id)) || null,
+        getBusho: id => ({id, isActionDone: false}),
+        getClanDaimyo: () => ({intelligence: 60}),
+        getRelation: () => ({status: '敵対'}), getCurrentTurnId: () => 10,
+        diplomacyManager: {isNonAggression: () => false},
+        kunishuSystem: {getKunishusInCastle: () => []},
+        aiEngine: {decideAttackTarget(base, _, targets) {
+            candidateLists.push([base.id, ...targets.map(c => c.id)]);
+            if (candidateLists.length === 20) throw stop;
+            return null;
+        }}
+    };
+    game.mapGraph = new Graph(game);
+    const planner = new Operations(game);
+    planner.operations[1] = {};
+    const getAdjacent = planner._getAdjacentIds.bind(planner);
+    let adjacencyBuilds = 0;
+    planner._getAdjacentIds = castle => { adjacencyBuilds++; return getAdjacent(castle); };
+    try { await planner.generateOperation(1, 0); }
+    catch (error) { if (error !== stop) throw error; }
+    assert.strictEqual(candidateLists.length, 20, '実際の作戦生成で20出撃元を検証');
+    assert.deepStrictEqual(candidateLists.slice(0, 3), [
+        [1, 61, 70, 62, 69, 63, 68, 64, 67, 65, 66],
+        [2, 61, 62, 70, 63, 69, 64, 68, 65, 67, 66],
+        [3, 61, 62, 70, 63, 69, 64, 68, 65, 67, 66]
+    ], 'r938と同じ攻撃候補・順序を維持');
+    assert.strictEqual(adjacencyBuilds, 70, '接続情報は各拠点につき一度だけ組み立てる');
+    assert.strictEqual(planner._operationAdjacencyCache, undefined, '長寿命キャッシュを持たない');
 });
 
 // r659: 援軍の「接続領＋隣接」「目標＋隣接」は地図サービスの双方向接続を共有する。

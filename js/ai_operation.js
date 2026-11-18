@@ -334,11 +334,15 @@ class AIOperationManager {
         let processedLegions = 0;
 
         for (const clan of this.game.clans) {
-            // ★追加：大名家ごとに一瞬「息継ぎ」を入れて、月替わりの激しい計算の重さを軽減します！
+            // 無所属・滅亡勢力では作戦計算も画面更新も行わないため、待機予約自体を省く。
+            // 生存勢力の描画機会とawait後の失効・滅亡再判定は従来どおり保持する。
+            if (clan.id === 0 || clan.isDestroyed) {
+                if (!isCurrentFlow()) return;
+                continue;
+            }
             await new Promise(resolve => setTimeout(resolve, 0));
             if (!isCurrentFlow()) return;
-
-            if (clan.id === 0 || clan.isDestroyed) continue; // ★滅亡した勢力はスキップします！
+            if (clan.id === 0 || clan.isDestroyed) continue;
             // 実機診断は月初の古い253/252表示ではなく、作戦更新中の勢力を直接残します。
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}`);
@@ -899,6 +903,17 @@ class AIOperationManager {
             return true;
         };
 
+        // 地図の隣接構造は一度の作戦立案中は不変。
+        // 各出撃元から重複して探索しても、元の接続順で組み立てる処理は拠点ごとに一度だけ。
+        // 所有者・外交・兵力などの可変条件はここへ保存せず、従来どおり探索時に評価する。
+        const operationAdjacentIds = new Map();
+        const getOperationAdjacentIds = castle => {
+            if (operationAdjacentIds.has(castle)) return operationAdjacentIds.get(castle);
+            const ids = this._getAdjacentIds(castle);
+            operationAdjacentIds.set(castle, ids);
+            return ids;
+        };
+
         const myClanCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
         if (myClanCastles.length === 0) return;
 
@@ -931,7 +946,7 @@ class AIOperationManager {
         const adjacentEnemyClans = new Set();
 
         for (const myCastle of myClanCastles) {
-            const adjacentIds = this._getAdjacentIds(myCastle);
+            const adjacentIds = getOperationAdjacentIds(myCastle);
             if (adjacentIds.length) {
                 for (const adjId of adjacentIds) {
                     const adjCastle = this.game.getCastle(adjId);
@@ -993,7 +1008,7 @@ class AIOperationManager {
                 const current = currentData.castle;
                 const currentDist = currentData.distance;
 
-                const adjacentIds = this._getAdjacentIds(current);
+                const adjacentIds = getOperationAdjacentIds(current);
                 if (adjacentIds.length) {
                     adjacentIds.forEach(adjId => {
                         if (!visited.has(adjId)) {
@@ -1016,7 +1031,7 @@ class AIOperationManager {
 
             const validEnemies = neighbors.filter(target => {
                 let isDirectlyAdjacent = false;
-                const adjacentIds = this._getAdjacentIds(target);
+                const adjacentIds = getOperationAdjacentIds(target);
                 if (adjacentIds.length) {
                     isDirectlyAdjacent = adjacentIds.some(adjId => {
                         const adjCastle = this.game.getCastle(adjId);
@@ -1251,7 +1266,7 @@ class AIOperationManager {
                 } else {
                     // 同じ目標に届く他の城がなかった場合、出撃元のお隣の城（自領）を予備として選ぶ魔法
                     const stagingCastle = this.game.getCastle(cand.castleId);
-                    const stagingAdjacentIds = stagingCastle ? this._getAdjacentIds(stagingCastle) : [];
+                    const stagingAdjacentIds = stagingCastle ? getOperationAdjacentIds(stagingCastle) : [];
                     if (stagingAdjacentIds.length) {
                         const adjMyCastles = stagingAdjacentIds
                             .map(id => this.game.getCastle(id))
