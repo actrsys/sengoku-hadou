@@ -353,10 +353,11 @@ class AIOperationManager {
             // ★変更：外交などの全体方針は、プレイヤー大名家以外の時だけAIに考えさせます
             if (!isPlayerClan) {
                 // ★追加：毎月、同盟や自分を支配している相手への不満を溜める魔法です！
-                this.decreaseSentimentForHighTension(clan.id);
+                const directNeighborClanIds = this.decreaseSentimentForHighTension(clan.id);
 
-                // ★追加：毎月、まずは大名家単位で「誰と外交するか」を考えます！
-                this.thinkMonthlyDiplomacy(clan);
+                // 友好度は更新されても隣接勢力の顔ぶれは変わらないため、同じ順序で渡す。
+                // 外交状態の判定は後段の専門処理で改めて行う。
+                this.thinkMonthlyDiplomacy(clan, directNeighborClanIds);
             }
             if (this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                 this.game.writeSystemDiagnostic(`month_start:operations:clan_${clan.id}:diplomacy_done`);
@@ -624,26 +625,36 @@ class AIOperationManager {
         }
     }
 
+    // 月初外交の二段階で重複していた隣接勢力収集の共通窓口。
+    // 元の拠点配列・隣接配列の走査順とownerClanの厳密比較を維持する。
+    // 関係・威信など変動する情報は収集しない。
+    _collectDirectNeighborClanIds(clanId) {
+        const neighboringClanIds = new Set();
+        this.game.getClanCastles(clanId).forEach(myCastle => {
+            const adjacentIds = this._getAdjacentIds(myCastle);
+            if (adjacentIds.length) {
+                adjacentIds.forEach(adjId => {
+                    const adjCastle = this.game.getCastle(adjId);
+                    if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== clanId) {
+                        neighboringClanIds.add(adjCastle.ownerClan);
+                    }
+                });
+            }
+        });
+        return [...neighboringClanIds];
+    }
+
     // ★追加：同盟や支配されている相手に攻撃したいけど友好度が高くて我慢している時に、友好度を1下げる魔法です
     decreaseSentimentForHighTension(clanId) {
         const myPower = this.game.aiEngine.getClanPrestige(clanId);
         const myDaimyo = this.game.getClanDaimyo(clanId) || { duty: 50 };
 
-        const myClanCastles = this.game.getClanCastles(clanId);
-        const neighborCastles = [];
-        myClanCastles.forEach(myC => {
-            const adjacentIds = this._getAdjacentIds(myC);
-            if (adjacentIds.length) {
-                adjacentIds.forEach(adjId => {
-                    const adjCastle = this.game.getCastle(adjId);
-                    if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== clanId) {
-                        neighborCastles.push(adjCastle);
-                    }
-                });
-            }
-        });
-
-        const adjacentClans = [...new Set(neighborCastles.map(c => c.ownerClan))];
+        const adjacentClans = this._collectDirectNeighborClanIds(clanId);
+        // 同じ不満判定中に変わるのは友好度だけで、隣接勢力と威信の比較対象は不変。
+        // 対象が実際に見つかった時だけ初回計算し、後続の同盟・主家にも同じ値を使う。
+        // 月や勢力をまたいで保持せず、各相手の友好度・statusは従来どおりその都度読む。
+        let minEnemyPower = -1;
+        let enemyPowerChecked = false;
 
         adjacentClans.forEach(targetClanId => {
             const rel = this.game.getRelation(clanId, targetClanId);
@@ -652,18 +663,19 @@ class AIOperationManager {
             if (rel && (rel.status === '同盟' || rel.status === '支配') && rel.sentiment >= 50 && !rel.isEvent) {
                 const targetPower = this.game.aiEngine.getClanPrestige(targetClanId);
                 
-                let breakScore = 0; 
-                let minEnemyPower = -1; 
-                
-                adjacentClans.forEach(cId => {
-                    const r = this.game.getRelation(clanId, cId);
-                    if (r && !window.DiplomacyRules.isAllianceOrVassal(r.status)) {
-                        const p = this.game.aiEngine.getClanPrestige(cId);
-                        if (minEnemyPower === -1 || p < minEnemyPower) {
-                            minEnemyPower = p;
+                let breakScore = 0;
+                if (!enemyPowerChecked) {
+                    adjacentClans.forEach(cId => {
+                        const r = this.game.getRelation(clanId, cId);
+                        if (r && !window.DiplomacyRules.isAllianceOrVassal(r.status)) {
+                            const p = this.game.aiEngine.getClanPrestige(cId);
+                            if (minEnemyPower === -1 || p < minEnemyPower) {
+                                minEnemyPower = p;
+                            }
                         }
-                    }
-                });
+                    });
+                    enemyPowerChecked = true;
+                }
 
                 let comparePower = minEnemyPower !== -1 ? minEnemyPower : myPower;
                 const powerRatio = targetPower / comparePower;
@@ -682,6 +694,7 @@ class AIOperationManager {
                 }
             }
         });
+        return adjacentClans;
     }
 
     // ★ここから追加：徴兵用の拠点を選ぶ魔法です
@@ -762,7 +775,7 @@ class AIOperationManager {
     }
 
     // ★今回追加：毎月1回だけ、大名家として外交の狙いを1つに絞って覚えておく魔法です！
-    thinkMonthlyDiplomacy(clan) {
+    thinkMonthlyDiplomacy(clan, directNeighborClanIds = null) {
         // 一旦、今までの記憶を忘れます
         clan.currentDiplomacyTarget = null;
 
@@ -771,23 +784,10 @@ class AIOperationManager {
         const myDaimyo = this.game.getClanDaimyo(myClanId) || { duty: 50, intelligence: 50 };
         const smartness = this.game.aiEngine.getAISmartness(myDaimyo.intelligence);
 
-        // 周りのお城を探します
-        const myCastles = this.game.getClanCastles(myClanId);
-        const neighborCastles = [];
-        myCastles.forEach(myCastle => {
-            const adjacentIds = this._getAdjacentIds(myCastle);
-            if (adjacentIds.length) {
-                adjacentIds.forEach(adjId => {
-                    const adjCastle = this.game.getCastle(adjId);
-                    if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== myClanId) {
-                        neighborCastles.push(adjCastle);
-                    }
-                });
-            }
-        });
-
-        // まずは直接お隣さんのリストを作ります
-        const directNeighbors = [...new Set(neighborCastles.map(c => c.ownerClan))];
+        // 毎月の不満更新で収集済みなら同じ順序の配列を使う。
+        // 単独での外交判断も既存の入口を維持し、未指定時だけ再収集する。
+        const directNeighbors = Array.isArray(directNeighborClanIds)
+            ? directNeighborClanIds : this._collectDirectNeighborClanIds(myClanId);
         let diplomacyCandidates = [...directNeighbors];
 
         // 従属先とは領地が離れていても主従関係そのものが外交経路になる。
@@ -912,6 +912,16 @@ class AIOperationManager {
             const ids = this._getAdjacentIds(castle);
             operationAdjacentIds.set(castle, ids);
             return ids;
+        };
+
+        // この作戦生成だけで使う評価コンテキスト。AIEngineが初回参照時に上洛経路・所領履歴を確定する。
+        // ループごとの判断順・乱数消費は変えず、次月や別軍団へ結果を持ち越さない。
+        const operationDecisionContext = {};
+        const getPastOwnedCastleIdsForOperation = () => {
+            if (!operationDecisionContext.pastOwnedSet) {
+                operationDecisionContext.pastOwnedSet = this.getPastOwnedCastleIds(clanId);
+            }
+            return operationDecisionContext.pastOwnedSet;
         };
 
         const myClanCastles = this.game.getClanCastles(clanId).filter(c => c.legionId === legionId);
@@ -1100,7 +1110,7 @@ class AIOperationManager {
 
             // 敵がいたら、ai.jsの戦力分析を使って点数をつけてもらいます！
             if (validEnemies.length > 0) {
-                const decision = this.game.aiEngine.decideAttackTarget(myCastle, myGeneral, validEnemies);
+                const decision = this.game.aiEngine.decideAttackTarget(myCastle, myGeneral, validEnemies, operationDecisionContext);
                 
                 // 点数がついたら、とりあえず候補の箱に入れておきます
                 if (decision && decision.score > 0) {
@@ -1124,7 +1134,7 @@ class AIOperationManager {
                                 isTargetMatch = true;
                             } else if (myGrandObj.type === '反攻作戦') {
                                 // ★今回追加：反攻作戦の場合、目標が過去60ヶ月に持っていた拠点ならマッチ
-                                const pastOwnedSet = this.getPastOwnedCastleIds(clanId);
+                                const pastOwnedSet = getPastOwnedCastleIdsForOperation();
                                 if (pastOwnedSet.has(decision.target.id)) {
                                     isTargetMatch = true;
                                 }
@@ -1140,7 +1150,7 @@ class AIOperationManager {
                                 isTargetMatch = true;
                             } else if (myGrandObj.type === '反攻作戦') {
                                 // ★今回追加：諸勢力の場合でも、その居城が奪還対象ならマッチ
-                                const pastOwnedSet = this.getPastOwnedCastleIds(clanId);
+                                const pastOwnedSet = getPastOwnedCastleIdsForOperation();
                                 if (pastOwnedSet.has(decision.target.id)) {
                                     isTargetMatch = true;
                                 }
@@ -1483,7 +1493,7 @@ class AIOperationManager {
                         // ★今回追加：国攻略にもならなかった場合、反攻作戦の判定
                         if (!objectiveType && !firstTarget.isKunishuTarget) {
                             // 攻めようとしている相手の城が、過去に持っていた城なら反攻作戦にします
-                            if (this.getPastOwnedCastleIds(clanId).has(firstTarget.targetId)) {
+                            if (getPastOwnedCastleIdsForOperation().has(firstTarget.targetId)) {
                                 objectiveType = '反攻作戦';
                             }
                         }

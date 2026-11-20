@@ -16184,7 +16184,7 @@ test('外交の血縁・二条経路BFSはArray.shift再詰めを避け探索順
 
 test('AI攻撃候補比較は不変な勢力兵数・領内敵対諸勢力を一判断内だけ再利用する', () => {
     const ai = read('js/ai.js');
-    const at = ai.indexOf('decideAttackTarget(myCastle, myGeneral, enemies)');
+    const at = ai.indexOf('decideAttackTarget(myCastle, myGeneral, enemies, operationDecisionContext = null)');
     const end = ai.indexOf('\n    //', at + 100);
     const block = ai.slice(at, end > at ? end : at + 17000);
     assert.ok(block.includes('const clanSoldierTotalCache = new Map();'));
@@ -16198,55 +16198,197 @@ test('AI攻撃候補比較は不変な勢力兵数・領内敵対諸勢力を一
 });
 
 
-test('r658 AI攻撃評価の全領地・同一軍団の隣接勢力集合は旧方式と取得順まで一致する', () => {
+test('AI攻撃評価の全領地・同一軍団の隣接勢力は一走査でも候補と順序が一致する', () => {
     const ai = read('js/ai.js');
-    const start = ai.indexOf('const collectAdjacentClanIds = (sameLegionOnly = false) => {');
-    const end = ai.indexOf('\n\n        // 自家全領地', start);
-    assert.ok(start > 0 && end > start, '同一メソッド内の局所共通窓口だけを抽出する');
-    const helperSource = ai.slice(start, end);
-    assert.ok(ai.includes('const allAdjacentClans = collectAdjacentClanIds();'));
-    assert.ok(ai.includes('const adjacentClans = collectAdjacentClanIds(true);'));
-    // 断交評価は同じ勢力に複数拠点がある場合、拠点一覧を必要とする別用途。統合しない。
-    assert.ok(ai.includes('neighborCastles.push(adjCastle);'));
-    const createCollector = new Function('myClanCastles', 'myClanId', 'myCastle', 'game',
-        `return (function () { ${helperSource}\n return collectAdjacentClanIds; }).call({ game });`);
+    const start = ai.indexOf('const allAdjacentClans = new Set();');
+    const end = ai.indexOf('\n            territoryAnalysis = {', start);
+    assert.ok(start > 0 && end > start);
+    const source = ai.slice(start, end);
+    const collect = new Function('myClanCastles', 'myClanId', 'myCastle', 'game',
+        `return (function () { ${source}\n return [allAdjacentClans, adjacentClans]; }).call({ game });`);
     let seed = 658;
     const next = (max) => {
         seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
         return seed % max;
     };
-    for (let iteration = 0; iteration < 1000; iteration++) {
+    for (let iteration = 0; iteration < 1200; iteration++) {
         const castles = [];
         const count = 5 + next(35);
         for (let id = 1; id <= count; id++) {
             const owned = id === 1 || next(4) === 0;
             const castle = { id, ownerClan: owned ? 1 : next(7), legionId: next(4), adjacentCastleIds: [] };
             const degree = next(7);
-            for (let n = 0; n < degree; n++) {
-                castle.adjacentCastleIds.push(1 + next(count + 2)); // 重複・不明IDも含む
-            }
+            for (let n = 0; n < degree; n++) castle.adjacentCastleIds.push(1 + next(count + 2));
             if (next(9) === 0) castle.adjacentCastleIds = null;
             castles.push(castle);
         }
         const castleById = new Map(castles.map(c => [c.id, c]));
-        const game = { getCastle(id) { return castleById.get(id); } };
+        let lookups = 0;
+        const game = { getCastle(id) { lookups++; return castleById.get(id); } };
         const myClanCastles = castles.filter(c => c.ownerClan === 1);
         const myCastle = myClanCastles[0];
-        const collect = createCollector(myClanCastles, 1, myCastle, game);
-        for (const sameLegionOnly of [false, true]) {
-            const oldResult = new Set();
+        const [allActual, legionActual] = collect(myClanCastles, 1, myCastle, game);
+        const onePassLookups = lookups;
+        for (const [sameLegionOnly, actual] of [[false, allActual], [true, legionActual]]) {
+            const expected = new Set();
             myClanCastles.forEach(myC => {
                 if ((!sameLegionOnly || myC.legionId === myCastle.legionId) && myC.adjacentCastleIds) {
                     myC.adjacentCastleIds.forEach(adjId => {
                         const c = game.getCastle(adjId);
-                        if (c && c.ownerClan !== 0 && c.ownerClan !== 1) oldResult.add(c.ownerClan);
+                        if (c && c.ownerClan !== 0 && c.ownerClan !== 1) expected.add(c.ownerClan);
                     });
                 }
             });
-            assert.deepStrictEqual([...collect(sameLegionOnly)], [...oldResult],
-                `状態${iteration}・軍団絞り込み${sameLegionOnly}の候補集合と出現順`);
+            assert.deepStrictEqual([...actual], [...expected],
+                `状態${iteration}・軍団絞り込み${sameLegionOnly}の候補とSet挿入順`);
+        }
+        if (myClanCastles.some(c => c.legionId === myCastle.legionId && c.adjacentCastleIds?.length)) {
+            assert.ok(onePassLookups < lookups - onePassLookups, '同一軍団の重複した隣接照会を削減');
         }
     }
+});
+
+test('AI攻撃の同盟破棄用隣接拠点は判断内でのみ再利用し重複も保持する', () => {
+    const ai = read('js/ai.js');
+    const start = ai.indexOf('let breakAllianceNeighborCastles = null;');
+    const end = ai.indexOf('\n\n        enemies.forEach(target => {', start);
+    assert.ok(start > 0 && end > start);
+    const source = ai.slice(start, end);
+    const create = new Function('myClanCastles', 'myCastle', 'game',
+        `return (function () { ${source}\n return getBreakAllianceNeighborCastles; }).call({ game });`);
+    const castles = [
+        {id:1,ownerClan:1,adjacentCastleIds:[3,4,3,10]},
+        {id:2,ownerClan:1,adjacentCastleIds:[4,5,3]},
+        {id:3,ownerClan:2}, {id:4,ownerClan:3}, {id:5,ownerClan:0}
+    ];
+    const byId = new Map(castles.map(c => [c.id,c]));
+    let reads = 0;
+    const game = {getCastle(id) {reads++; return byId.get(id);}};
+    const myClanCastles = castles.slice(0,2);
+    const get = create(myClanCastles, myClanCastles[0], game);
+    assert.deepStrictEqual(get().map(c => c.id), [3,4,3,4,3]);
+    const firstReads = reads;
+    assert.strictEqual(get(), get(), '同じ判断では配列参照を再利用');
+    assert.strictEqual(reads, firstReads, '後続同盟候補の隣接照会を省略');
+    const newDecision = create(myClanCastles, myClanCastles[0], game);
+    byId.get(4).ownerClan = 1;
+    assert.deepStrictEqual(newDecision().map(c => c.id), [3,3,3], '新たな攻撃判断は変化した所属を読み直す');
+});
+
+test('AI上洛経路・過去所領の共有は同じ作戦生成に閉じ、次計画では再評価する', () => {
+    const ai = read('js/ai.js');
+    const op = read('js/ai_operation.js');
+    assert.ok(op.includes('const operationDecisionContext = {};'), '作戦生成ごとに新しい共有文脈を持つ');
+    assert.ok(op.includes('decideAttackTarget(myCastle, myGeneral, validEnemies, operationDecisionContext)'), '同一作戦生成内だけ判断間で共有');
+    assert.ok(op.includes('const getPastOwnedCastleIdsForOperation = () => {'), '反攻目標も同じ過去所領集合を使う');
+    assert.ok(ai.includes('if (operationDecisionContext) operationDecisionContext.jorakuTargets = jorakuTargets;'));
+    const context = createContext({
+        BushoStatusRules: {isActive: b => b.status === 'active'},
+        TroopAllocationService: {clampArmySoldiers: () => 1000},
+        AIParams: {AI: {Difficulty: 'normal'}},
+        WarParams: {Reinforcement: {SelfSoldierRatio: 0.3}},
+        DiplomacyRules: {isFriendly: () => false}
+    });
+    loadScript(context, 'js/ai.js');
+    const Engine = vm.runInContext('AIEngine', context);
+    const origin = {id: 1, ownerClan: 1, legionId: 0, soldiers: 3000, rice: 10000,
+        provinceId: 1, adjacentCastleIds: []};
+    const kyoto = {id: 26, ownerClan: 2, legionId: 0, soldiers: 3000, rice: 10000,
+        provinceId: 1, adjacentCastleIds: []};
+    const general = {id: 1, clan: 1, status: 'active', belongKunishuId: 0,
+        courtRankIds: [80], castleId: 1, intelligence: 90, personality: 'normal'};
+    let shogunChecks = 0, ownedHistoryReads = 0;
+    let historyId = 41;
+    const game = {
+        castles: [origin, kyoto], provinces: [], clans: [], playerClanId: 0,
+        getClanDaimyo: () => general,
+        getClanBushos: () => {shogunChecks++; return [general];},
+        getCastleBushos: () => [general],
+        getClanCastles: () => [origin],
+        getCastle: id => id === 1 ? origin : id === 26 ? kyoto : null,
+        getProvince: () => ({regionId: 1}),
+        getRelation: () => ({status: '敵対', sentiment: 30}),
+        diplomacyManager: {isNonAggression: () => false},
+        kunishuSystem: {getKunishusInCastle: () => []},
+        aiOperationManager: {
+            grandObjectives: {},
+            getPastOwnedCastleIds() {ownedHistoryReads++; return new Set([historyId]);}
+        }
+    };
+    const engine = new Engine(game);
+    engine.getClanPrestige = () => 100;
+    const shared = {};
+    assert.strictEqual(engine.decideAttackTarget(origin, general, [], shared), null);
+    assert.strictEqual(engine.decideAttackTarget(origin, general, [], shared), null);
+    assert.strictEqual(shogunChecks, 1, '上洛の対象資格探索は一度だけ');
+    assert.strictEqual(ownedHistoryReads, 1, '過去所領の集合化も一度だけ');
+    assert.deepStrictEqual(Array.from(shared.pastOwnedSet), [41]);
+    historyId = 42;
+    const nextOperation = {};
+    engine.decideAttackTarget(origin, general, [], nextOperation);
+    assert.strictEqual(shogunChecks, 2, '次の作戦生成では上洛資格を読み直す');
+    assert.strictEqual(ownedHistoryReads, 2, '次の作戦生成では新しい所領履歴を読む');
+    assert.deepStrictEqual(Array.from(nextOperation.pastOwnedSet), [42]);
+    engine.decideAttackTarget(origin, general, []);
+    assert.strictEqual(shogunChecks, 3, '共有文脈を渡さない単発判断は従来どおり独立');
+    assert.strictEqual(ownedHistoryReads, 3);
+});
+
+test('AI攻撃評価の勢力広域調査は作戦生成内で一度だけ計算し次計画では更新する', () => {
+    const ctx = createContext({
+        BushoStatusRules: {isActive: b => b.status === 'active'},
+        TroopAllocationService: {clampArmySoldiers: () => 1000},
+        AIParams: {AI: {Difficulty: 'normal'}},
+        WarParams: {Reinforcement: {SelfSoldierRatio: 0.3}},
+        DiplomacyRules: {isFriendly: () => false}
+    });
+    loadScript(ctx, 'js/ai.js');
+    const Engine = vm.runInContext('AIEngine', ctx);
+    const origin = {id: 1, ownerClan: 1, legionId: 0, soldiers: 3000, rice: 10000,
+        provinceId: 1, adjacentCastleIds: [2], lastAttackerClanId: 2, lastAttackerIsKunishu: false};
+    const other = {id: 2, ownerClan: 2, legionId: 0, soldiers: 2500, rice: 10000,
+        provinceId: 2, adjacentCastleIds: [1]};
+    const general = {id: 1, clan: 1, status: 'active', belongKunishuId: 0,
+        courtRankIds: [], castleId: 1, intelligence: 90, personality: 'normal'};
+    const province1 = {id: 1, regionId: 1, statusEffects: []};
+    const province2 = {id: 2, regionId: 2, statusEffects: []};
+    let clanReads = 0;
+    const game = {
+        castles: [origin, other], provinces: [province1, province2], clans: [], playerClanId: 0,
+        getClanDaimyo: () => general, getClanBushos: () => [general],
+        getCastleBushos: () => [general],
+        getClanCastles: id => {clanReads++; return game.castles.filter(c => c.ownerClan === id);},
+        getCastle: id => game.castles.find(c => c.id === id) || null,
+        getProvince: id => game.provinces.find(p => p.id === id) || null,
+        getRelation: () => ({status: '敵対', sentiment: 30}),
+        diplomacyManager: {isNonAggression: () => false},
+        kunishuSystem: {getKunishusInCastle: () => []},
+        aiOperationManager: {grandObjectives: {}, getPastOwnedCastleIds: () => new Set([2])}
+    };
+    const engine = new Engine(game);
+    engine.getClanPrestige = () => 100;
+    const shared = {};
+    engine.decideAttackTarget(origin, general, [], shared);
+    assert.strictEqual(clanReads, 1, '勢力の全領地取得は最初の評価一度だけ');
+    assert.deepStrictEqual(Array.from(shared.territoryAnalysis.adjacentClans), [2], '隣接勢力と順序を記録');
+    assert.deepStrictEqual(Array.from(shared.territoryAnalysis.myProvIds), [1]);
+    assert.deepStrictEqual(Array.from(shared.heavySnowProvIds), []);
+    assert.strictEqual(shared.stolenCountsByClan[2], 1);
+    engine.decideAttackTarget(origin, general, [], shared);
+    assert.strictEqual(clanReads, 1, '同じ計画の別出撃元で広域調査を重複しない');
+    assert.deepStrictEqual(Array.from(shared.territoryAnalysis.myProvIds), [1]);
+
+    other.ownerClan = 1;
+    province2.statusEffects.push('heavySnow');
+    const next = {};
+    engine.decideAttackTarget(origin, general, [], next);
+    assert.strictEqual(clanReads, 2, '新しい作戦は領土を再取得する');
+    assert.deepStrictEqual(Array.from(next.territoryAnalysis.myProvIds), [1, 2]);
+    assert.deepStrictEqual(Array.from(next.territoryAnalysis.adjacentClans), [], '新しい所有者に応じて隣接関係も再評価する');
+    assert.deepStrictEqual(Array.from(next.heavySnowProvIds), [2], '新しい月の大雪情報を読み直す');
+    assert.strictEqual(next.stolenCountsByClan[2], undefined, '奪われた領地の集計を更新する');
+    engine.decideAttackTarget(origin, general, []);
+    assert.strictEqual(clanReads, 3, '単発判断は共有文脈を持たず毎回調査する');
 });
 
 test('通常ターンの0ms継続はTurnManager世代で一元管理しシナリオ切替時に破棄する', () => {
@@ -44684,6 +44826,151 @@ test('r944 失効した月末死亡処理は後発シナリオの会話holdを�
     resume();
     await run;
     assert.strictEqual(count,1,'旧処理のfinallyは新画面を解除しない');
+});
+
+
+// r948: 月初の外交二段階は隣接勢力の顔ぶれのみ共有し、外交関係は最新値を読む。
+// 通常の月次経路と、単独で呼ぶ外交計画の両方を維持する。
+test('r948 月初外交の隣接勢力収集を一元化し、関係更新後の判定順を維持する', () => {
+    const ctx = createContext({
+        GameConstants: {DiplomacyStatus: {SUBORDINATE: '従属'}},
+        DiplomacyRules: {isAllianceOrVassal: s => ['同盟','支配','従属'].includes(s)}
+    });
+    loadScript(ctx, 'js/ai_operation.js');
+    const clans = Array.from({length: 4}, (_, i) => ({id: i + 1, isDestroyed: false}));
+    const castles = [
+        {id: 10, ownerClan: 1, adjacentCastleIds: [20, 30]},
+        {id: 11, ownerClan: 1, adjacentCastleIds: [20, 40]},
+        {id: 20, ownerClan: 2, adjacentCastleIds: [10]},
+        {id: 30, ownerClan: 3, adjacentCastleIds: [10]},
+        {id: 40, ownerClan: 4, adjacentCastleIds: [11]}
+    ];
+    const relations = {2:{status:'同盟',sentiment:60},3:{status:'敵対',sentiment:40},4:{status:'普通',sentiment:50}};
+    let ownCastleReads = 0;
+    let capturedNeighbors = [];
+    let capturedSentiment = 0;
+    const game = {
+        clans,
+        getClanCastles(id) {
+            if (id === 1) ownCastleReads++;
+            return castles.filter(c => c.ownerClan === id);
+        },
+        getCastle(id) {return castles.find(c => c.id === id);},
+        getClanDaimyo() {return {duty: 10, intelligence: 60};},
+        getRelation(_id, otherId) {return relations[otherId] || null;},
+        aiEngine: {getClanPrestige(id) {return ({1:200,2:50,3:150,4:110})[id];},getAISmartness(){return 0.5;}},
+        diplomacyManager: {
+            updateSentiment(_from, to, delta) {relations[to].sentiment += delta;},
+            isNonAggression: status => ['同盟','支配','従属','和睦'].includes(status),
+            getAllyCount: () => 1,
+            getDiplomacyPriorityList(_id, neighbors) {
+                capturedNeighbors = Array.from(neighbors);
+                capturedSentiment = relations[2].sentiment;
+                return [];
+            }
+        }
+    };
+    const manager = new (vm.runInContext('AIOperationManager', ctx))(game);
+    manager._getAdjacentIds = castle => castle.adjacentCastleIds;
+    const directNeighbors = manager.decreaseSentimentForHighTension(1);
+    assert.deepStrictEqual(Array.from(directNeighbors), [2,3,4], '重複と順序は従来のSet収集と一致');
+    assert.strictEqual(relations[2].sentiment, 59.5, '先行する不満更新の結果を保持');
+    manager.thinkMonthlyDiplomacy(clans[0], directNeighbors);
+    assert.strictEqual(ownCastleReads, 1, '同じ月初外交の二段階で自領を再走査しない');
+    assert.deepStrictEqual(capturedNeighbors, [2,3,4], '外交目標の候補順を維持');
+    assert.strictEqual(capturedSentiment, 59.5, '後段は最新の外交状態を参照');
+
+    // 単独呼出は前回の配列を持ち越さず、現在の隣接関係を取得し直す。
+    castles[1].adjacentCastleIds = [20];
+    capturedNeighbors = [];
+    manager.thinkMonthlyDiplomacy(clans[0]);
+    assert.strictEqual(ownCastleReads, 2);
+    assert.deepStrictEqual(capturedNeighbors, [2,3], '単独外交判断では新しい接続を再収集する');
+});
+
+// r949: 同じ月初不満判定内で変わらない非同盟隣接勢力の最小威信は一度だけ計算する。
+// 友好度の更新順・判定式を変えず、翌回は最新威信と関係を再取得する。
+test('r949 AI月初不満判定の敵威信最小値を一回だけ集計し、毎回最新状態で再評価する', () => {
+    const ctx = createContext({
+        DiplomacyRules: {isAllianceOrVassal: s => ['同盟', '支配', '従属'].includes(s)}
+    });
+    loadScript(ctx, 'js/ai_operation.js');
+    const castles = [
+        {id: 10, ownerClan: 1, adjacentCastleIds: [20, 30, 40, 50]},
+        {id: 20, ownerClan: 2}, {id: 30, ownerClan: 3},
+        {id: 40, ownerClan: 4}, {id: 50, ownerClan: 5}
+    ];
+    const relations = {
+        2: {status:'同盟', sentiment:60, isEvent:false},
+        3: {status:'支配', sentiment:70, isEvent:false},
+        4: {status:'敵対', sentiment:20, isEvent:false},
+        5: {status:'普通', sentiment:50, isEvent:false}
+    };
+    let powerReads = 0;
+    let relationReads = 0;
+    const power = {1:300,2:30,3:40,4:100,5:200};
+    const updates = [];
+    const game = {
+        getClanCastles(id) {return castles.filter(c => c.ownerClan === id);},
+        getCastle(id) {return castles.find(c => c.id === id);},
+        getClanDaimyo() {return {duty:0};},
+        getRelation(_id, id) {relationReads++; return relations[id];},
+        aiEngine: {getClanPrestige(id) {powerReads++; return power[id];}},
+        diplomacyManager: {updateSentiment(_id, target, delta) {
+            updates.push(target); relations[target].sentiment += delta;
+        }}
+    };
+    const manager = new (vm.runInContext('AIOperationManager', ctx))(game);
+    manager._getAdjacentIds = castle => castle.adjacentCastleIds || [];
+    assert.deepStrictEqual(Array.from(manager.decreaseSentimentForHighTension(1)), [2,3,4,5]);
+    assert.deepStrictEqual(updates, [2,3], '対象2勢力を初出順に評価する');
+    assert.strictEqual(relations[2].sentiment, 59.5);
+    assert.strictEqual(relations[3].sentiment, 69.5);
+    assert.strictEqual(powerReads, 5, '自家1＋保護対象2＋非保護隣接2を各1回だけ取得');
+    assert.strictEqual(relationReads, 8, '保護候補の状態4＋初回のみの全隣接4の関係照会');
+
+    power[4] = 10;
+    manager.decreaseSentimentForHighTension(1);
+    assert.strictEqual(powerReads, 10, '次の呼出では最小威信を再計算する');
+    assert.deepStrictEqual(updates, [2,3,2,3]);
+});
+
+// r950: 同一のAI外交判定中に直接隣接勢力の一覧を二度取得しない。
+// 単独の和睦資格判定は、従来どおり現時点の国境を再取得する。
+test('r950 AI外交の前線数と和睦資格は一度の隣接収集を共有し、単独照会は最新情報を使う', () => {
+    const fixedMath = Object.create(Math);
+    fixedMath.random = () => 0.95;
+    const ctx = createContext({Math: fixedMath, MapGraphService: {isAdjacent: () => false}});
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    const DM = vm.runInContext('DiplomacyManager', ctx);
+    const clans = [1, 2, 3].map(id => ({id, isDestroyed: false, courtTrust: 0}));
+    const leaders = {1:{id:101,duty:50,nemesisIds:[]}, 2:{id:201,duty:50,nemesisIds:[]}, 3:{id:301,duty:50,nemesisIds:[]}};
+    const game = {
+        clans, courtRankSystem: {RANK_ID_SHOGUN: 1},
+        getClan: id => clans.find(c => c.id === id) || null,
+        getClanDaimyo: id => leaders[id] || null,
+        getClanTotalSoldiers: () => 10000,
+        getClanCastles: () => [],
+        getCastle: () => null
+    };
+    const dm = new DM(game);
+    const relations = {2:{status:'敵対',sentiment:25},3:{status:'敵対',sentiment:30}};
+    dm.getRelation = (_id, targetId) => relations[targetId] || null;
+    let scans = 0;
+    let currentNeighbors = [2,3];
+    dm.getDirectNeighborClanIds = () => {scans++; return [...currentNeighbors];};
+    const result = dm.determineAIDiplomacyAction(1,2,10000,12000,12000,50,0,false,0);
+    assert.ok(result && typeof result.action === 'string');
+    assert.strictEqual(scans, 1, '前線数の計算と和睦資格で同じ一覧を再走査しない');
+    assert.strictEqual(dm.canAttemptAITruce(1,2), true);
+    assert.strictEqual(scans, 2, '独立した資格照会は新しい一覧を取得する');
+    currentNeighbors = [3];
+    assert.strictEqual(dm.canAttemptAITruce(1,2), false, '離れた後の国境状態を認識する');
+    assert.strictEqual(scans, 3);
+    assert.strictEqual(dm.canAttemptAITruce(1,2,[2,3]), true, '明示した短命文脈に限って同じ隣接一覧を使う');
+    assert.strictEqual(scans, 3);
 });
 
 Promise.all(pendingTests).then(() => {

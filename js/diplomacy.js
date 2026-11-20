@@ -3535,19 +3535,23 @@ class DiplomacyManager {
         return [...result];
     }
 
-    areClansDirectlyAdjacent(clanAId, clanBId) {
+    areClansDirectlyAdjacent(clanAId, clanBId, directNeighborClanIds = null) {
         const targetId = Number(clanBId);
         if (targetId <= 0 || Number(clanAId) === targetId) return false;
-        return this.getDirectNeighborClanIds(clanAId).some(id => Number(id) === targetId);
+        // 同一判定内で既に収集した一覧があれば再走査せず使う。
+        // 単独呼出では従来どおり現在の隣接関係を取得する。
+        const neighbors = Array.isArray(directNeighborClanIds)
+            ? directNeighborClanIds : this.getDirectNeighborClanIds(clanAId);
+        return neighbors.some(id => Number(id) === targetId);
     }
 
-    canAttemptAITruce(clanId, targetClanId) {
+    canAttemptAITruce(clanId, targetClanId, directNeighborClanIds = null) {
         const clan = this.game.getClan(clanId);
         const target = this.game.getClan(targetClanId);
         if (!clan || !target || clan.isDestroyed || target.isDestroyed) return false;
         const rel = this.getRelation(clanId, targetClanId);
         if (!rel || rel.status !== window.GameConstants.DiplomacyStatus.HOSTILE) return false;
-        return this.areClansDirectlyAdjacent(clanId, targetClanId);
+        return this.areClansDirectlyAdjacent(clanId, targetClanId, directNeighborClanIds);
     }
 
     _getAITrucePressureScore(clanId, opponentClanId) {
@@ -3682,14 +3686,17 @@ class DiplomacyManager {
         
         // AI和睦は現在の前線相手だけを対象にする。
         // 二段先まで広げた一般外交候補から、領地が接していない敵対勢力へ和睦を打診しない。
-        const directEnemyIds = this.getDirectNeighborClanIds(myClanId).filter(cId => {
+        // 前線敵の数と和睦資格は、同じ瞬間の直接隣接一覧で判断する。
+        // canAttemptAITruceの独立呼出では従来どおり最新の一覧を得る。
+        const directNeighborClanIds = this.getDirectNeighborClanIds(myClanId);
+        const directEnemyIds = directNeighborClanIds.filter(cId => {
             const clan = this.game.getClan(cId);
             if (!clan || clan.isDestroyed) return false;
             const r = this.getRelation(myClanId, cId);
             return r && r.status === window.GameConstants.DiplomacyStatus.HOSTILE;
         });
         const enemyCount = directEnemyIds.length;
-        const canAttemptTruce = this.canAttemptAITruce(myClanId, targetClanId);
+        const canAttemptTruce = this.canAttemptAITruce(myClanId, targetClanId, directNeighborClanIds);
 
         const myClan = this.game.getClan(myClanId);
         const courtTrust = myClan ? (myClan.courtTrust || 0) : 0;

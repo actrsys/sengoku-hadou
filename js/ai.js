@@ -491,7 +491,7 @@ class AIEngine {
         }
     }
 
-    decideAttackTarget(myCastle, myGeneral, enemies) {
+    decideAttackTarget(myCastle, myGeneral, enemies, operationDecisionContext = null) {
         // 城主の性格による出陣兵士数の割合決定
         let sendRate = 0.6; // normal (バランス)
         if (myGeneral.personality === 'aggressive') sendRate = 0.8;
@@ -537,7 +537,12 @@ class AIEngine {
         }
 
         const myClanId = myCastle.ownerClan;
-        const myClanCastles = this.game.getClanCastles(myClanId);
+        // 月次作戦の出撃元間で勢力所属拠点は不変。単発判断では従来どおり取得する。
+        let myClanCastles = operationDecisionContext && operationDecisionContext.myClanCastles;
+        if (!myClanCastles) {
+            myClanCastles = this.game.getClanCastles(myClanId);
+            if (operationDecisionContext) operationDecisionContext.myClanCastles = myClanCastles;
+        }
         const myTotalPower = this.getClanPrestige(myClanId);
 
         // ★追加：自分の軍団が抱えている「方針」を調べます！
@@ -546,141 +551,157 @@ class AIEngine {
 
         // =========================================================================
         // ★新規追加：上洛ルート検索（将軍候補がいる場合）
-        const jorakuTargets = new Set();
-        let hasShogunCandidate = false;
+        // 同じ作戦生成中の出撃元では、自勢力・領地・外交関係が変化しない。
+        // 上洛経路の探索は最初に必要となった判断で行い、次の出撃元では結果だけ参照する。
+        // 通常の単発判断には共有コンテキストを渡さず、毎回再計算する。
+        let jorakuTargets = operationDecisionContext && operationDecisionContext.jorakuTargets;
+        if (!jorakuTargets) {
+            jorakuTargets = new Set();
+            let hasShogunCandidate = false;
         
-        // 自勢力に正式所属する通常の活動中武将だけから「左馬頭（ID: 80）」を探す。
-        // 自領に滞在している浪人・諸勢力人物を、自家の将軍候補として誤認しない。
-        const myBushos = this.game.getClanBushos(myClanId).filter(b =>
-            Number(b.belongKunishuId || 0) === 0
-            && window.BushoStatusRules.isActive(b)
-        );
-        for (const b of myBushos) {
-            if (Array.isArray(b.courtRankIds) && b.courtRankIds.map(Number).includes(80)) {
-                hasShogunCandidate = true;
-                break;
+            // 自勢力に正式所属する通常の活動中武将だけから「左馬頭（ID: 80）」を探す。
+            // 自領に滞在している浪人・諸勢力人物を、自家の将軍候補として誤認しない。
+            const myBushos = this.game.getClanBushos(myClanId).filter(b =>
+                Number(b.belongKunishuId || 0) === 0
+                && window.BushoStatusRules.isActive(b)
+            );
+            for (const b of myBushos) {
+                if (Array.isArray(b.courtRankIds) && b.courtRankIds.map(Number).includes(80)) {
+                    hasShogunCandidate = true;
+                    break;
+                }
             }
-        }
 
-        // 将軍候補がいたら、京都への道を探します！
-        if (hasShogunCandidate) {
-            // まだ持っていない二条城（ID: 26）と槇島城（ID: 90）を探します
-            // すでに片方を持っていても、もう片方を狙うようになります
-            const unownedKyotoCastles = [this.game.getCastle(26), this.game.getCastle(90)].filter(c => c && c.ownerClan !== myClanId);
+            // 将軍候補がいたら、京都への道を探します！
+            if (hasShogunCandidate) {
+                // まだ持っていない二条城（ID: 26）と槇島城（ID: 90）を探します
+                // すでに片方を持っていても、もう片方を狙うようになります
+                const unownedKyotoCastles = [this.game.getCastle(26), this.game.getCastle(90)].filter(c => c && c.ownerClan !== myClanId);
             
-            if (unownedKyotoCastles.length > 0) {
-                // 距離を測るためのノートを作ります
-                const dist = {};
-                const prev = {};
-                this.game.castles.forEach(c => dist[c.id] = Infinity); // 最初は全部「無限遠」にしておきます
-                const queue = [];
-                const queuedCastleIds = new Set();
+                if (unownedKyotoCastles.length > 0) {
+                    // 距離を測るためのノートを作ります
+                    const dist = {};
+                    const prev = {};
+                    this.game.castles.forEach(c => dist[c.id] = Infinity); // 最初は全部「無限遠」にしておきます
+                    const queue = [];
+                    const queuedCastleIds = new Set();
                 
-                // 自分の領地は「距離0」として出発点にします
-                myClanCastles.forEach(c => {
-                    dist[c.id] = 0;
-                    queue.push(c.id);
-                    queuedCastleIds.add(c.id);
-                });
+                    // 自分の領地は「距離0」として出発点にします
+                    myClanCastles.forEach(c => {
+                        dist[c.id] = 0;
+                        queue.push(c.id);
+                        queuedCastleIds.add(c.id);
+                    });
                 
-                // 道が繋がっているお城を順番に調べていきます
-                while(queue.length > 0) {
-                    let minD = Infinity;
-                    let u = -1;
-                    let uIdx = -1;
-                    // 今一番近いお城を探します
-                    for(let i=0; i<queue.length; i++) {
-                        if (dist[queue[i]] < minD) {
-                            minD = dist[queue[i]];
-                            u = queue[i];
-                            uIdx = i;
+                    // 道が繋がっているお城を順番に調べていきます
+                    while(queue.length > 0) {
+                        let minD = Infinity;
+                        let u = -1;
+                        let uIdx = -1;
+                        // 今一番近いお城を探します
+                        for(let i=0; i<queue.length; i++) {
+                            if (dist[queue[i]] < minD) {
+                                minD = dist[queue[i]];
+                                u = queue[i];
+                                uIdx = i;
+                            }
                         }
-                    }
-                    if (u === -1) break;
-                    queue.splice(uIdx, 1);
-                    queuedCastleIds.delete(u);
+                        if (u === -1) break;
+                        queue.splice(uIdx, 1);
+                        queuedCastleIds.delete(u);
                     
-                    const uCastle = this.game.getCastle(u);
-                    if (!uCastle.adjacentCastleIds) continue;
+                        const uCastle = this.game.getCastle(u);
+                        if (!uCastle.adjacentCastleIds) continue;
                     
-                    // お隣のお城への道しるべを書きます
-                    for (const adjId of uCastle.adjacentCastleIds) {
-                        const vCastle = this.game.getCastle(adjId);
-                        if (!vCastle) continue;
+                        // お隣のお城への道しるべを書きます
+                        for (const adjId of uCastle.adjacentCastleIds) {
+                            const vCastle = this.game.getCastle(adjId);
+                            if (!vCastle) continue;
                         
-                        let cost = Infinity; // 最初は通れない壁だと仮定します
+                            let cost = Infinity; // 最初は通れない壁だと仮定します
                         
-                        if (vCastle.ownerClan === myClanId) {
-                            cost = 0; // 自分のお城ならスイスイ通れます（コスト0）
-                        } else {
-                            // 同盟国など、攻撃しちゃダメな相手か確認します
-                            let isProtected = false;
-                            if (vCastle.ownerClan !== 0) {
-                                const rel = this.game.getRelation(myClanId, vCastle.ownerClan);
-                                if (rel && this.game.diplomacyManager.isNonAggression(rel.status)) {
-                                    isProtected = true; // 攻撃できないので通れません！
+                            if (vCastle.ownerClan === myClanId) {
+                                cost = 0; // 自分のお城ならスイスイ通れます（コスト0）
+                            } else {
+                                // 同盟国など、攻撃しちゃダメな相手か確認します
+                                let isProtected = false;
+                                if (vCastle.ownerClan !== 0) {
+                                    const rel = this.game.getRelation(myClanId, vCastle.ownerClan);
+                                    if (rel && this.game.diplomacyManager.isNonAggression(rel.status)) {
+                                        isProtected = true; // 攻撃できないので通れません！
+                                    }
+                                }
+                                // 攻撃できる相手（または空き城）なら、1回戦えば通れます（コスト1）
+                                if (!isProtected) {
+                                    cost = 1;
                                 }
                             }
-                            // 攻撃できる相手（または空き城）なら、1回戦えば通れます（コスト1）
-                            if (!isProtected) {
-                                cost = 1;
-                            }
-                        }
                         
-                        // 今までの道より近ければ、ノートを書き直します
-                        if (cost !== Infinity) {
-                            if (dist[u] + cost < dist[vCastle.id]) {
-                                dist[vCastle.id] = dist[u] + cost;
-                                prev[vCastle.id] = u; // どこから来たかメモしておきます
-                                if (!queuedCastleIds.has(vCastle.id)) {
-                                    queue.push(vCastle.id);
-                                    queuedCastleIds.add(vCastle.id);
+                            // 今までの道より近ければ、ノートを書き直します
+                            if (cost !== Infinity) {
+                                if (dist[u] + cost < dist[vCastle.id]) {
+                                    dist[vCastle.id] = dist[u] + cost;
+                                    prev[vCastle.id] = u; // どこから来たかメモしておきます
+                                    if (!queuedCastleIds.has(vCastle.id)) {
+                                        queue.push(vCastle.id);
+                                        queuedCastleIds.add(vCastle.id);
+                                    }
                                 }
                             }
                         }
                     }
-                }
                 
-                // 二条城か槇島城のうち、近い方を目的地に決めます！
-                // もし両方同じ距離でも、片方だけが選ばれるので二重に狙うことはありません！
-                let bestKyotoCastle = null;
-                let minDistToKyoto = Infinity;
-                unownedKyotoCastles.forEach(kc => {
-                    if (dist[kc.id] < minDistToKyoto) {
-                        minDistToKyoto = dist[kc.id];
-                        bestKyotoCastle = kc;
-                    }
-                });
+                    // 二条城か槇島城のうち、近い方を目的地に決めます！
+                    // もし両方同じ距離でも、片方だけが選ばれるので二重に狙うことはありません！
+                    let bestKyotoCastle = null;
+                    let minDistToKyoto = Infinity;
+                    unownedKyotoCastles.forEach(kc => {
+                        if (dist[kc.id] < minDistToKyoto) {
+                            minDistToKyoto = dist[kc.id];
+                            bestKyotoCastle = kc;
+                        }
+                    });
                 
-                // 目的地にたどり着く道があったら、足跡をたどって「次に攻めるべき城」を特定します！
-                if (bestKyotoCastle && minDistToKyoto > 0 && minDistToKyoto !== Infinity) {
-                    let curr = bestKyotoCastle.id;
-                    // 距離が「1（次に攻める場所）」になるまで逆戻りします
-                    // もし目的地が隣のお城（距離1）なら、逆戻りせずそのままターゲットになります（直接攻撃！）
-                    while (curr !== undefined && dist[curr] > 1) {
-                        curr = prev[curr];
-                    }
-                    if (curr !== undefined && dist[curr] === 1) {
-                        jorakuTargets.add(curr); // 上洛の第一歩としてロックオンします！
+                    // 目的地にたどり着く道があったら、足跡をたどって「次に攻めるべき城」を特定します！
+                    if (bestKyotoCastle && minDistToKyoto > 0 && minDistToKyoto !== Infinity) {
+                        let curr = bestKyotoCastle.id;
+                        // 距離が「1（次に攻める場所）」になるまで逆戻りします
+                        // もし目的地が隣のお城（距離1）なら、逆戻りせずそのままターゲットになります（直接攻撃！）
+                        while (curr !== undefined && dist[curr] > 1) {
+                            curr = prev[curr];
+                        }
+                        if (curr !== undefined && dist[curr] === 1) {
+                            jorakuTargets.add(curr); // 上洛の第一歩としてロックオンします！
+                        }
                     }
                 }
             }
+
+            if (operationDecisionContext) operationDecisionContext.jorakuTargets = jorakuTargets;
         }
 
         // =========================================================================
         // ★新規追加：過去の記憶から「奪われた拠点（失地）」を洗い出し、勢力ごとに数を数えます！
-        const pastOwnedSet = this.game.aiOperationManager
-            ? this.game.aiOperationManager.getPastOwnedCastleIds(myClanId)
-            : new Set();
+        // 月次履歴の集合化も同一作戦生成内だけで再利用し、次の計画へ保持しない。
+        const pastOwnedSet = operationDecisionContext && operationDecisionContext.pastOwnedSet
+            ? operationDecisionContext.pastOwnedSet
+            : (this.game.aiOperationManager
+                ? this.game.aiOperationManager.getPastOwnedCastleIds(myClanId)
+                : new Set());
+        if (operationDecisionContext) operationDecisionContext.pastOwnedSet = pastOwnedSet;
 
         // 過去に自分のもので、今は他の大名家に奪われている拠点をカウントします
-        const stolenCountsByClan = {};
-        pastOwnedSet.forEach(cid => {
-            const c = this.game.getCastle(cid);
-            if (c && c.ownerClan !== myClanId && c.ownerClan !== 0) {
-                stolenCountsByClan[c.ownerClan] = (stolenCountsByClan[c.ownerClan] || 0) + 1;
-            }
-        });
+        let stolenCountsByClan = operationDecisionContext && operationDecisionContext.stolenCountsByClan;
+        if (!stolenCountsByClan) {
+            stolenCountsByClan = {};
+            pastOwnedSet.forEach(cid => {
+                const c = this.game.getCastle(cid);
+                if (c && c.ownerClan !== myClanId && c.ownerClan !== 0) {
+                    stolenCountsByClan[c.ownerClan] = (stolenCountsByClan[c.ownerClan] || 0) + 1;
+                }
+            });
+            if (operationDecisionContext) operationDecisionContext.stolenCountsByClan = stolenCountsByClan;
+        }
         // =========================================================================
 
         // =========================================================================
@@ -688,62 +709,68 @@ class AIEngine {
 
         // ★ここから追加：自分が持っている「国」と「地方」が、統一されているか調べる魔法！
         // まずは自分が持っている国と地方の出席番号を書き出します
-        const myProvIds = new Set();
-        const myRegionIds = new Set();
-        myClanCastles.forEach(c => {
-            myProvIds.add(c.provinceId);
-            const prov = this.game.getProvince(c.provinceId);
-            if (prov) myRegionIds.add(prov.regionId);
-        });
-
-        // 次に、世界中のすべてのお城を調べて、自分以外のお城がある国や地方は「まだ統一していない」とメモします
-        const ununifiedProvIds = new Set();
-        const ununifiedRegionIds = new Set();
-        this.game.castles.forEach(c => {
-            if (c.ownerClan !== myClanId) {
-                if (myProvIds.has(c.provinceId)) {
-                    ununifiedProvIds.add(c.provinceId);
-                }
+        // 同一軍団の作戦生成では自領の国・地方、攻撃履歴、隣接勢力の集合は変わらない。
+        // 個別出撃元の戦力評価・乱数や可変条件の判定は従来どおり実行する。
+        let territoryAnalysis = operationDecisionContext && operationDecisionContext.territoryAnalysis;
+        if (!territoryAnalysis) {
+            const myProvIds = new Set();
+            const myRegionIds = new Set();
+            myClanCastles.forEach(c => {
+                myProvIds.add(c.provinceId);
                 const prov = this.game.getProvince(c.provinceId);
-                if (prov && myRegionIds.has(prov.regionId)) {
-                    ununifiedRegionIds.add(prov.regionId);
-                }
-            }
-        });
+                if (prov) myRegionIds.add(prov.regionId);
+            });
 
-        // ★追加：過去に自領を攻撃してきた大名家や諸勢力をリストアップします！
-        const pastAttackerClans = new Set();
-        const pastAttackerKunishus = new Set();
-        myClanCastles.forEach(c => {
-            if (c.lastAttackerClanId > 0) {
-                if (c.lastAttackerIsKunishu) {
-                    pastAttackerKunishus.add(c.lastAttackerClanId);
-                } else {
-                    pastAttackerClans.add(c.lastAttackerClanId);
-                }
-            }
-        });
-
-        // 全領地・同一軍団で共通の「隣接する他勢力」資格判定。
-        // 周辺城そのものを並べる断交評価や経路探索とは用途が異なるため、ここだけで共有する。
-        const collectAdjacentClanIds = (sameLegionOnly = false) => {
-            const clans = new Set();
-            myClanCastles.forEach(myC => {
-                if (sameLegionOnly && myC.legionId !== myCastle.legionId) return;
-                if (myC.adjacentCastleIds) {
-                    myC.adjacentCastleIds.forEach(adjId => {
-                        const c = this.game.getCastle(adjId);
-                        if (c && c.ownerClan !== 0 && c.ownerClan !== myClanId) {
-                            clans.add(c.ownerClan);
-                        }
-                    });
+            // 次に、世界中のすべてのお城を調べて、自分以外のお城がある国や地方は「まだ統一していない」とメモします
+            const ununifiedProvIds = new Set();
+            const ununifiedRegionIds = new Set();
+            this.game.castles.forEach(c => {
+                if (c.ownerClan !== myClanId) {
+                    if (myProvIds.has(c.provinceId)) {
+                        ununifiedProvIds.add(c.provinceId);
+                    }
+                    const prov = this.game.getProvince(c.provinceId);
+                    if (prov && myRegionIds.has(prov.regionId)) {
+                        ununifiedRegionIds.add(prov.regionId);
+                    }
                 }
             });
-            return clans;
-        };
 
-        // 自家全領地の隣接勢力（占領後に新しく接する勢力の判定用）。
-        const allAdjacentClans = collectAdjacentClanIds();
+            // ★追加：過去に自領を攻撃してきた大名家や諸勢力をリストアップします！
+            const pastAttackerClans = new Set();
+            const pastAttackerKunishus = new Set();
+            myClanCastles.forEach(c => {
+                if (c.lastAttackerClanId > 0) {
+                    if (c.lastAttackerIsKunishu) {
+                        pastAttackerKunishus.add(c.lastAttackerClanId);
+                    } else {
+                        pastAttackerClans.add(c.lastAttackerClanId);
+                    }
+                }
+            });
+
+            // 全領地・同一軍団の隣接勢力は同じ領地走査から収集する。
+            // 元の拠点・隣接ID順でそれぞれSetへ追加し、警戒と新戦線の評価順を維持する。
+            const allAdjacentClans = new Set();
+            const adjacentClans = new Set();
+            myClanCastles.forEach(myC => {
+                const isSameLegion = myC.legionId === myCastle.legionId;
+                if (!myC.adjacentCastleIds) return;
+                myC.adjacentCastleIds.forEach(adjId => {
+                    const c = this.game.getCastle(adjId);
+                    if (!c || c.ownerClan === 0 || c.ownerClan === myClanId) return;
+                    allAdjacentClans.add(c.ownerClan);
+                    if (isSameLegion) adjacentClans.add(c.ownerClan);
+                });
+            });
+            territoryAnalysis = {
+                myProvIds, myRegionIds, ununifiedProvIds, ununifiedRegionIds,
+                pastAttackerClans, pastAttackerKunishus, allAdjacentClans, adjacentClans
+            };
+            if (operationDecisionContext) operationDecisionContext.territoryAnalysis = territoryAnalysis;
+        }
+        const { myProvIds, myRegionIds, ununifiedProvIds, ununifiedRegionIds,
+                pastAttackerClans, pastAttackerKunishus, allAdjacentClans, adjacentClans } = territoryAnalysis;
         
         // ★見積もりをする人（評価者）の智謀を決めます
         // プレイヤーの委任城なら「城主（myGeneral）」、敵AIなら「大名（myDaimyo）」の智謀を使います
@@ -755,8 +782,6 @@ class AIEngine {
         }
         
         // 同一軍団の隣接勢力だけを警戒評価に使用する。全領地の集合とは混同しない。
-        const adjacentClans = collectAdjacentClanIds(true);
-        
         // 警戒すべき敵対大名を複数リストアップします！
         const adjacentEnemyClans = [];
         adjacentClans.forEach(clanId => {
@@ -794,12 +819,16 @@ class AIEngine {
         let highestProb = -1;
 
         // ★高速化：大雪が降っている国（provinceId）のリストを最初に作っておきます！
-        const heavySnowProvIds = new Set();
-        this.game.provinces.forEach(p => {
-            if (p.statusEffects && p.statusEffects.includes('heavySnow')) {
-                heavySnowProvIds.add(p.id);
-            }
-        });
+        let heavySnowProvIds = operationDecisionContext && operationDecisionContext.heavySnowProvIds;
+        if (!heavySnowProvIds) {
+            heavySnowProvIds = new Set();
+            this.game.provinces.forEach(p => {
+                if (p.statusEffects && p.statusEffects.includes('heavySnow')) {
+                    heavySnowProvIds.add(p.id);
+                }
+            });
+            if (operationDecisionContext) operationDecisionContext.heavySnowProvIds = heavySnowProvIds;
+        }
 
         // ★自分がいる国が大雪かどうか調べます！
         const isSrcHeavySnow = heavySnowProvIds.has(myCastle.provinceId);
@@ -827,6 +856,26 @@ class AIEngine {
             });
             hostileKunishuCountForDecision = count;
             return count;
+        };
+
+        // 同盟破棄の比較だけが必要とする隣接拠点リスト。重複も元の順序も保持し、
+        // 同じ攻撃判断で複数の同盟候補を比較する際だけ再利用する。
+        let breakAllianceNeighborCastles = null;
+        const getBreakAllianceNeighborCastles = () => {
+            if (breakAllianceNeighborCastles !== null) return breakAllianceNeighborCastles;
+            const neighbors = [];
+            myClanCastles.forEach(myC => {
+                if (myC.adjacentCastleIds) {
+                    myC.adjacentCastleIds.forEach(adjId => {
+                        const adjCastle = this.game.getCastle(adjId);
+                        if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== myCastle.ownerClan) {
+                            neighbors.push(adjCastle);
+                        }
+                    });
+                }
+            });
+            breakAllianceNeighborCastles = neighbors;
+            return neighbors;
         };
 
         enemies.forEach(target => {
@@ -933,19 +982,7 @@ class AIEngine {
             
             // ★今回追加：もし相手が同盟国や従属先だったら、特別に「破棄して攻撃するかのスコア」を計算します！
             if (rel && (rel.status === '同盟' || rel.status === '従属')) {
-                // お隣の城リストを作って専門部署に渡してあげます
-                const myClanCastles = this.game.getClanCastles(myCastle.ownerClan);
-                const neighborCastles = [];
-                myClanCastles.forEach(myC => {
-                    if (myC.adjacentCastleIds) {
-                        myC.adjacentCastleIds.forEach(adjId => {
-                            const adjCastle = this.game.getCastle(adjId);
-                            if (adjCastle && adjCastle.ownerClan !== 0 && adjCastle.ownerClan !== myCastle.ownerClan) {
-                                neighborCastles.push(adjCastle);
-                            }
-                        });
-                    }
-                });
+                const neighborCastles = getBreakAllianceNeighborCastles();
 
                 const myPower = this.getClanPrestige(myCastle.ownerClan);
                 const targetPower = this.getClanPrestige(target.ownerClan);
