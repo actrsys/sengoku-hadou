@@ -109,21 +109,9 @@ class AIDomesticPriorityRules {
         return rows;
     }
 
-    static getBestLocalPlan(game, castle) {
-        return this.getCastleLocalPriorityScores(game, castle)
-            .sort((a, b) => b.score - a.score || String(a.type).localeCompare(String(b.type)))[0] || null;
-    }
-
     static getBestDomesticPlan(game, castles) {
         const rows = [];
         (castles || []).forEach(castle => rows.push(...this.getCastleLocalPriorityScores(game, castle)));
-        rows.sort((a, b) => b.score - a.score || Number(a.castle.id || 0) - Number(b.castle.id || 0));
-        return rows[0] || null;
-    }
-
-    static getBestEconomicPlan(game, castles) {
-        const rows = [];
-        (castles || []).forEach(castle => rows.push(...this.getCastleEconomicScores(game, castle)));
         rows.sort((a, b) => b.score - a.score || Number(a.castle.id || 0) - Number(b.castle.id || 0));
         return rows[0] || null;
     }

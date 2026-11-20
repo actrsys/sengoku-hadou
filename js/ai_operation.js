@@ -332,6 +332,13 @@ class AIOperationManager {
             return true;
         };
         let processedLegions = 0;
+        // 月初の作戦生成は最初の勢力で描画機会を渡し、その後も約8msの
+        // 同期処理ごとにブラウザへ制御を返す。計算の軽い勢力にも一律で
+        // タイマーを挟むと、ブラウザのタイマー間隔制限が月全体に累積する。
+        // 実際のAI判断・勢力順・スマホの軍団単位の分割は変更しない。
+        const nowForYield = () => (typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now() : Date.now());
+        let lastClanYieldAt = -Infinity;
 
         for (const clan of this.game.clans) {
             // 無所属・滅亡勢力では作戦計算も画面更新も行わないため、待機予約自体を省く。
@@ -340,7 +347,10 @@ class AIOperationManager {
                 if (!isCurrentFlow()) return;
                 continue;
             }
-            await new Promise(resolve => setTimeout(resolve, 0));
+            if (nowForYield() - lastClanYieldAt >= 8) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+                lastClanYieldAt = nowForYield();
+            }
             if (!isCurrentFlow()) return;
             if (clan.id === 0 || clan.isDestroyed) continue;
             // 実機診断は月初の古い253/252表示ではなく、作戦更新中の勢力を直接残します。

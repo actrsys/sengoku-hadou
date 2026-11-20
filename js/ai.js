@@ -1767,9 +1767,18 @@ class AIEngine {
         const totalLegionKokudaka = legionCastlesForInternalAffairs.reduce((sum, c) => sum + c.kokudaka, 0);
         
         // ③ 決められた回数だけ、行動を繰り返します！
+        // 初回は必ず制御を譲り、それ以降は約8msの処理時間で分割する。
+        // 軽い内政行動にも固定タイマーを積まない一方、長い内政判断は従来どおり
+        // ブラウザへ制御を返す。待機管理はこの拠点の内政計画内だけで完結させる。
+        const nowForActionYield = () => (typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now() : Date.now());
+        let lastActionYieldAt = -Infinity;
         for (let step = 0; step < maxActions; step++) {
-            // ★追加：スマホの強制リロード対策。行動を1回考えるごとに一瞬「息継ぎ」をして、ブラウザのフリーズを防ぎます！
-            await new Promise(resolve => setTimeout(resolve, 0));
+            if (nowForActionYield() - lastActionYieldAt >= 8) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+                lastActionYieldAt = nowForActionYield();
+            }
+            // 制御譲渡を省いた場合も、各行動前の旧ターン失効検査は維持する。
             if (!isCurrentTurnFlow()) return;
 
             // ★毎回、AIが安全に使えるお金（給金と余裕分を引いた額）を計算します！

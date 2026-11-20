@@ -2619,20 +2619,6 @@ class DiplomacyManager {
     }
     
     /**
-     * 指定した大名家の支配・従属関係をクリアする魔法です
-     */
-    clearDominationRelations(clanId) {
-        this.game.clans.forEach(c => {
-            if (c.id !== 0 && c.id !== clanId && !c.isDestroyed) {
-                const rel = this.game.getRelation(clanId, c.id);
-                if (rel && (rel.status === '支配' || rel.status === '従属')) {
-                    this.changeStatus(clanId, c.id, '普通');
-                }
-            }
-        });
-    }
-    
-    /**
      * 従属により指定した拠点を割譲する処理
      */
     applyCastleCessionData(castleId, subordinateClanId, dominantClanId) {
@@ -3083,18 +3069,6 @@ class DiplomacyManager {
         // ★臣従の場合は、自分の操作担当(playerClanId)が相手の大名家(targetClanId)に切り替わっているので注意！
         // 画面を更新させるために、実行者として targetClanId を渡します。
         this.showDiplomacyResult(targetClanId, true, msg);
-    }
-
-    /**
-     * 戦闘などで敗北した勢力を従属させる処理です
-     */
-    executeSubjugation(winnerClanId, loserClanId) {
-        this.changeStatus(winnerClanId, loserClanId, '支配');
-        const winner = this.game.getClan(winnerClanId);
-        const loser = this.game.getClan(loserClanId);
-        if (winner && loser) {
-            this.game.ui.log(`${winner.name}が${loser.name}を従属させました`, { clanIds: [winnerClanId, loserClanId], category: 'diplomacy', inferCurrentTurn: false });
-        }
     }
     
     // AI→プレイヤー外交の結果画面後に旧ターンのcallbackを残さない。

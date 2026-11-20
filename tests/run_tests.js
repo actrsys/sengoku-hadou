@@ -2305,7 +2305,7 @@ test('面談の実父系呼称は話者本人・質問者との関係を分け�
     const elderStanding = ctx.ConversationStandingRules.getPersonalStanding(game, nobuhide, retainer);
     const elderProfile = interview._getHouseholdElderAssessmentProfile(nobuhide, retainer, elderStanding);
     assert.ok(elderProfile && elderProfile.key === 'senior_close', '当主の父などは格下家臣を評する時に家中年長者口調を使える');
-    assert.strictEqual(interview._getHouseholdElderTopicOpening(nobuhide, retainer, elderProfile, 'friendly'), '柴田か。');
+    assert.strictEqual(interview._getIndependentTopicOpening(nobuhide, retainer, null, elderProfile, 'friendly'), '柴田か。');
     assert.ok(interview._getHouseholdElderOpinionText(75).includes('信頼しておる'), '家中年長者の他者評価は通常家臣より一段くだけた語り口にする');
 
     const gunshiStanding = ctx.ConversationStandingRules.getPersonalStanding(game, nobuhide, gunshi);
@@ -8948,12 +8948,12 @@ test('面談の他者評価は高智謀の偽装・看破・全く読めない�
     const concealed = { loyalty: 65, intelligence: 90, ambition: 50 };
 
     const sharpInterviewer = { loyalty: 90, intelligence: 95, duty: 80 };
-    const detected = system._getTargetLoyaltyText(sharpInterviewer, concealed, relationClose);
+    const detected = system._getTargetLoyaltyAssessment(sharpInterviewer, concealed, relationClose).text;
     assert.ok(detected.includes('表向き') || detected.includes('表には出して'), '高智謀の聞き手は表面上の偽装を見抜く');
     assert.ok(detected.includes('不満') || detected.includes('思うところ'), '看破後は実際の危険度を伝える');
 
     const middlingInterviewer = { loyalty: 90, intelligence: 65, duty: 80 };
-    const fooled = system._getTargetLoyaltyText(middlingInterviewer, concealed, relationClose);
+    const fooled = system._getTargetLoyaltyAssessment(middlingInterviewer, concealed, relationClose).text;
     assert.ok(fooled.includes('忠義は確か'), '偽装を見抜けない場合は表向きの忠誠を信じることがある');
     assert.ok(!fooled.includes('表向き') && !fooled.includes('表には出して'));
 
@@ -9083,12 +9083,12 @@ test('低忠誠の聞き手も他者評価で固定の自己露呈台詞を使�
     const target = { loyalty: 65, intelligence: 40, ambition: 40 };
 
     const cleverDisloyal = { loyalty: 20, intelligence: 90, duty: 40 };
-    const cleverText = system._getTargetLoyaltyText(cleverDisloyal, target, relation);
+    const cleverText = system._getTargetLoyaltyAssessment(cleverDisloyal, target, relation).text;
     assert.ok(!cleverText.includes('申せる立場では'), '高智謀の低忠誠武将が自分の不満を固定台詞で露呈しない');
     assert.ok(cleverText.includes('不満') || cleverText.includes('思うところ'));
 
     const bluntDisloyal = { loyalty: 20, intelligence: 25, duty: 25 };
-    const bluntText = system._getTargetLoyaltyText(bluntDisloyal, { loyalty: 65, intelligence: 90, ambition: 50 }, relation);
+    const bluntText = system._getTargetLoyaltyAssessment(bluntDisloyal, { loyalty: 65, intelligence: 90, ambition: 50 }, relation).text;
     assert.ok(!bluntText.includes('申せる立場では'));
     assert.ok(bluntText.includes('読み切れませぬ') || bluntText.includes('読み取れませぬ'));
 });
@@ -9175,9 +9175,9 @@ test('面談の他者忠誠評価は偏見を悲観方向にだけ加え高い�
     const interviewer = { clan: 1, affinity: 0, innovation: 0, ambition: 90, loyalty: 20, duty: 20, intelligence: 95 };
     const target = { affinity: 30, innovation: 90, ambition: 40, loyalty: 90, intelligence: 40 };
     const relation = ctx.PersonnelRules.calcRelationshipProfile(interviewer, target);
-    const text = system._getTargetLoyaltyText(interviewer, target, relation);
+    const text = system._getTargetLoyaltyAssessment(interviewer, target, relation).text;
     assert.ok(!text.includes('忠義は本物'), '強い悪評バイアスで実忠誠より悲観的に評する');
-    assert.strictEqual(system._toneTopicFollowup(text), text, '後続台詞へ機械的な相槌や三点リーダを重ねない');
+    assert.strictEqual(system._toneSequence([text], 'topic')[0], text, '後続台詞へ機械的な相槌や三点リーダを重ねない');
 });
 
 
@@ -11930,7 +11930,8 @@ test('一般地点の表示語は拠点を正本とし、城主・城壁・攻�
 
 test('AI人事の配置人数は同居人物数ではなく自家の通常活動中武将だけを数える', () => {
     const staffing = read('js/ai_staffing.js');
-    assert.ok(staffing.includes('_getActiveClanBushosInCastle(castle'));
+    assert.ok(!staffing.includes('_getActiveClanBushosInCastle('), '配列を返す旧人数取得窓口を残さない');
+
     const countAt = staffing.indexOf('_getActiveClanBushoCount(castle');
     const countBlock = staffing.slice(countAt, countAt + 1200);
     assert.ok(countBlock.includes('for (const id of castle.samuraiIds)'), '人数取得は在城IDを直接走査して一時配列を作らない');
@@ -11943,6 +11944,42 @@ test('AI人事の配置人数は同居人物数ではなく自家の通常活動
     ['totalBushosInNetwork += getActiveClanBushoCount(c);',
      'let remainingCount = getActiveClanBushoCount(castle);',
      'let targetCount = getActiveClanBushoCount(group.target);'].forEach(text => assert.ok(staffing.includes(text)));
+});
+
+test('構造監査: 未使用の旧中継APIを撤去し面談・内政・人事の現行正本だけを残す', () => {
+    const staffing = read('js/ai_staffing.js');
+    assert.ok(!/\b_getActiveClanBushosInCastle\s*\(/.test(staffing), '旧配列生成を残さず現行の直接人数集計へ一元化');
+    const interview = read('js/interview_system.js');
+    assert.ok(!/\b_getTargetLoyaltyText\s*\(/.test(interview), '忠誠判定は結果と方向を返す正本だけを残す');
+    assert.ok(!/\b_getHouseholdElderTopicOpening\s*\(/.test(interview), '呼び出されない年長者用中継窓口を残さない');
+    assert.ok(!/\b_toneTopicFollowup\s*\(/.test(interview), '処理を変えない旧口調中継を残さない');
+    const priorities = read('js/ai_domestic_priority_rules.js');
+    assert.ok(!/\bgetBestLocalPlan\s*\(/.test(priorities), '使用されない単拠点計画APIを残さない');
+    assert.ok(!/\bgetBestEconomicPlan\s*\(/.test(priorities), '使用されない経済計画APIを残さない');
+});
+
+test('構造監査: 不使用の外交・経済・会話・履歴・独立旧窓口は残さず現行正本を維持する', () => {
+    const rules = read('js/conversation_standing_rules.js');
+    const economy = read('js/economy_rules.js');
+    const diplomacy = read('js/diplomacy.js');
+    const history = read('js/history_system.js');
+    const independence = read('js/independence_system.js');
+    for (const [source, oldNames] of [
+        [rules, ['usesIndependentDaimyoRegister']],
+        [economy, ['calcBuyHorseEfficiency', 'calcBuyGunEfficiency']],
+        [diplomacy, ['clearDominationRelations', 'executeSubjugation']],
+        [history, ['formatEntry']],
+        [independence, ['calcCastlePower']]
+    ]) {
+        for (const name of oldNames) {
+            assert.ok(!new RegExp('\\b' + name + '\\s*\\(').test(source), `${name} は旧入口として残さない`);
+        }
+    }
+    assert.ok(rules.includes('static getDaimyoSpeakerPosture('), '会話格の正規計算を維持');
+    assert.ok(economy.includes('static calcBuyEquipEfficiency('), '装備購入効率の共通計算を維持');
+    assert.ok(diplomacy.includes('applyDominationData('), '従属確定の正規窓口を維持');
+    assert.ok(history.includes('getEntries(') && history.includes('record('), '履歴の正規取得・記録を維持');
+    assert.ok(independence.includes('calcClanPower('), '独立判定用の勢力戦力集計を維持');
 });
 
 test('諸勢力蜂起の勝利時は旧城主家臣だけを退避させ同居諸勢力を巻き込まない', () => {
@@ -25254,6 +25291,7 @@ test('月初AI作戦は滅亡・無所属勢力の待機を省き、存続勢力
     const trace = [];
     const ctx = createContext({
         setTimeout: callback => { scheduled.push(callback); callback(); },
+        performance: {now: () => 0},
         document: {body: {classList: {contains: () => true}}}
     });
     loadScript(ctx, 'js/ai_operation.js');
@@ -25273,7 +25311,7 @@ test('月初AI作戦は滅亡・無所属勢力の待機を省き、存続勢力
     manager.decreaseSentimentForHighTension = id => trace.push(`sentiment:${id}`);
     manager.thinkMonthlyDiplomacy = clan => trace.push(`diplomacy:${clan.id}`);
     await manager.processMonthlyOperations();
-    assert.strictEqual(scheduled.length, 2, '存続する2勢力の描画待機のみ行う');
+    assert.strictEqual(scheduled.length, 1, '最初の存続勢力で描画機会を渡し、軽い連続勢力には固定待機を積まない');
     assert.deepStrictEqual(trace.filter(x => x.startsWith('sentiment:')), ['sentiment:2', 'sentiment:4'],
         '外交判断の順番と対象勢力は変えない');
     assert.deepStrictEqual(Object.keys(manager.historyOwnedCastles).sort(), ['2', '4'],
@@ -25299,6 +25337,37 @@ test('月初AI作戦は滅亡・無所属勢力の待機を省き、存続勢力
     await planned;
     assert.deepStrictEqual(Object.keys(second.operations), [],
         'await中に滅亡した勢力へ旧計画を発行しない');
+});
+
+// 月初作戦の予算制御はCPUを長時間専有せず、計画の実行順を維持する。
+test('月初AI作戦の待機は処理時間予算で分割し、勢力判断の順序を維持する', async () => {
+    let clock = 0;
+    const yields = [];
+    const considered = [];
+    const ctx = createContext({
+        performance: {now: () => clock},
+        setTimeout: resolve => { yields.push(clock); resolve(); },
+        document: {body: {classList: {contains: () => true}}}
+    });
+    loadScript(ctx, 'js/ai_operation.js');
+    const game = {
+        phase: 'game', isRestoringSave: false, playerClanId: -1,
+        clans: [1, 2, 3, 4].map(id => ({id, isDestroyed: false})),
+        getClanCastles: () => [],
+        turnManager: {captureTurnFlowGeneration: () => 2, isTurnFlowGenerationCurrent: n => n === 2}
+    };
+    const manager = new (vm.runInContext('AIOperationManager', ctx))(game);
+    manager.validateAllOperations = () => {};
+    manager.decreaseSentimentForHighTension = id => {
+        considered.push(id);
+        clock += id === 1 ? 2 : id === 2 ? 7 : id === 3 ? 1 : 0;
+        return [];
+    };
+    manager.thinkMonthlyDiplomacy = () => {};
+    await manager.processMonthlyOperations();
+    assert.deepStrictEqual(yields, [0, 9], '先頭では必ず描画へ制御を返し、8ms経過後だけ再度待つ');
+    assert.deepStrictEqual(considered, [1, 2, 3, 4], '処理時間に関係なくAI判断の勢力順は維持する');
+    assert.deepStrictEqual(Object.keys(manager.historyOwnedCastles), ['1', '2', '3', '4'], '全勢力の月次履歴は1回ずつ更新する');
 });
 
 // r545: 旧シナリオで中断されたAI作戦会議は、新しいゲーム/ターンへ結果を書かない。
@@ -45039,6 +45108,129 @@ test('AI起動時の戦闘中ガードは短い予約でも維持する', async 
     game.warManager.state.active = true;
     await scheduled();
     assert.strictEqual(calls, 0, '戦闘開始後には予約済みAIを起動しない');
+});
+
+// r953: 四半期AI人事は初回4勢力の待機を維持し、軽負荷では固定タイマーを積まない。
+test('r953 四半期AI人事の軽負荷は初回描画待ちだけで全勢力を同順処理する', async () => {
+    let clock = 0;
+    const pendingTimers = [];
+    const ctx = createContext({
+        performance: {now: () => clock},
+        setTimeout: callback => { pendingTimers.push(callback); return pendingTimers.length; }
+    });
+    loadScript(ctx, 'js/ai_staffing.js');
+    const Staffing = vm.runInContext('AIStaffing', ctx);
+    const processed = [];
+    const sys = new Staffing();
+    sys.game = {
+        year: 1560, month: 4,
+        clans: Array.from({length: 40}, (_, i) => ({id: i + 1, isDestroyed: false})),
+        getBusho: () => null,
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: () => true}
+    };
+    sys.createNewLegionIfNeeded = id => { processed.push(id); return false; };
+    const run = sys.processQuarterlyStaffing(4, 99);
+    assert.deepStrictEqual(processed, [1, 2, 3, 4], '最初の分割待機は4勢力後');
+    assert.strictEqual(pendingTimers.length, 1);
+    pendingTimers.shift()();
+    await run;
+    assert.deepStrictEqual(processed, Array.from({length: 40}, (_, i) => i + 1));
+    assert.strictEqual(pendingTimers.length, 0, '軽い勢力で固定の4勢力おきタイマーを積み重ねない');
+});
+
+// 8msを超えた時は追加の制御譲渡を入れ、その間の旧タブ・旧月失効を止める。
+test('r953 四半期AI人事の高負荷は時間予算で分割し、失効後の勢力を処理しない', async () => {
+    let clock = 0, generation = 1;
+    const pendingTimers = [];
+    const ctx = createContext({
+        performance: {now: () => clock},
+        setTimeout: callback => { pendingTimers.push(callback); return pendingTimers.length; }
+    });
+    loadScript(ctx, 'js/ai_staffing.js');
+    const Staffing = vm.runInContext('AIStaffing', ctx);
+    const processed = [];
+    const sys = new Staffing();
+    sys.game = {
+        year: 1560, month: 4,
+        clans: Array.from({length: 9}, (_, i) => ({id: i + 1, isDestroyed: false})),
+        getBusho: () => null,
+        turnManager: {
+            captureTurnFlowGeneration: () => generation,
+            isTurnFlowGenerationCurrent: value => value === generation
+        }
+    };
+    sys.createNewLegionIfNeeded = id => { processed.push(id); clock += 5; return false; };
+    const run = sys.processQuarterlyStaffing(4, 99);
+    assert.deepStrictEqual(processed, [1, 2, 3, 4]);
+    assert.strictEqual(pendingTimers.length, 1);
+    pendingTimers.shift()();
+    await Promise.resolve();
+    assert.deepStrictEqual(processed, [1, 2, 3, 4, 5, 6], '連続処理が8msを超えた時点で譲渡する');
+    assert.strictEqual(pendingTimers.length, 1, '長いCPU処理には追加の分割待機がある');
+    generation = 2;
+    pendingTimers.shift()();
+    await run;
+    assert.deepStrictEqual(processed, [1, 2, 3, 4, 5, 6], '旧世代の待機再開後に7勢力目へ進まない');
+});
+
+
+// r954: AI内政の分割は最初の行動で描画機会を残し、軽負荷では毎行動の固定待機を積まない。
+test('r954 AI内政の行動時間予算は先頭待機・実行順・長時間処理での分割を維持する', async () => {
+    const src = read('js/ai.js');
+    const fnStart = src.indexOf('async execInternalAffairs(');
+    const yieldStart = src.indexOf('const nowForActionYield = ', fnStart);
+    const loopStart = src.indexOf('for (let step = 0; step < maxActions; step++)', yieldStart);
+    const yieldEnd = src.indexOf('// ★毎回、AIが安全に使えるお金', loopStart);
+    assert.ok(fnStart >= 0 && yieldStart > fnStart && loopStart > yieldStart && yieldEnd > loopStart);
+    const prefix = src.slice(yieldStart, yieldEnd);
+    assert.ok(prefix.includes('if (!isCurrentTurnFlow()) return;'), '待機しない行動にも旧ターン失効判定を残す');
+    const exercise = new Function('performance', 'setTimeout', 'isCurrentTurnFlow', 'work', 'maxActions',
+        `return (async () => { ${prefix}\nwork(step);\n}\n})();`);
+
+    const lightSteps = [], lightYields = [];
+    await exercise({now: () => 0}, resolve => { lightYields.push(lightSteps.length); resolve(); },
+        () => true, step => lightSteps.push(step), 5);
+    assert.deepStrictEqual(lightYields, [0], '軽負荷でも最初の待機は省略しない');
+    assert.deepStrictEqual(lightSteps, [0, 1, 2, 3, 4], '軽負荷は行動を省略・並べ替えない');
+
+    let clock = 0;
+    const heavySteps = [], heavyYields = [];
+    await exercise({now: () => clock}, resolve => { heavyYields.push(clock); resolve(); },
+        () => true, step => { heavySteps.push(step); clock += 5; }, 5);
+    assert.deepStrictEqual(heavyYields, [0, 10, 20], '8ms以上の同期負荷が続けば追加の描画機会を渡す');
+    assert.deepStrictEqual(heavySteps, [0, 1, 2, 3, 4]);
+});
+
+test('r954 AI内政は待機なしの行動間・待機再開時とも旧ターン失効で停止する', async () => {
+    const src = read('js/ai.js');
+    const begin = src.indexOf('const nowForActionYield = ', src.indexOf('async execInternalAffairs('));
+    const end = src.indexOf('// ★毎回、AIが安全に使えるお金', begin);
+    const prefix = src.slice(begin, end);
+    const exercise = new Function('performance', 'setTimeout', 'isCurrentTurnFlow', 'work', 'maxActions',
+        `return (async () => { ${prefix}\nwork(step);\n}\n})();`);
+    let valid = true;
+    const immediateSteps = [];
+    await exercise({now: () => 0}, resolve => resolve(), () => valid, step => {
+        immediateSteps.push(step);
+        if (step === 0) valid = false;
+    }, 4);
+    assert.deepStrictEqual(immediateSteps, [0], '次の固定待機が省略されても必ず失効を確認する');
+
+    let clock = 0, scheduled = null;
+    const delayedSteps = [];
+    valid = true;
+    const running = exercise({now: () => clock}, resolve => { scheduled = resolve; },
+        () => valid, step => { delayedSteps.push(step); clock += 9; }, 4);
+    assert.strictEqual(typeof scheduled, 'function');
+    scheduled();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.deepStrictEqual(delayedSteps, [0]);
+    assert.strictEqual(typeof scheduled, 'function', '高負荷なら次行動の前にもう一度待機する');
+    valid = false;
+    scheduled();
+    await running;
+    assert.deepStrictEqual(delayedSteps, [0], '待機中の旧世代失効後に次行動へ進まない');
 });
 
 Promise.all(pendingTests).then(() => {

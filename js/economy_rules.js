@@ -192,15 +192,11 @@ class EconomyRules {
         return Math.floor(gold / unitPrice);
     }
 
-    static calcBuyHorseEfficiency(daimyo, castellan) { return this.calcBuyEquipEfficiency(daimyo, castellan, 'horse'); }
-
     static calcBuyHorseUnitPrice(daimyo, castellan, game) { return this.calcBuyEquipUnitPrice(daimyo, castellan, 'horse', game); }
 
     static calcBuyHorseCost(amount, daimyo, castellan, game) { return this.calcBuyEquipCost(amount, daimyo, castellan, 'horse', game); }
 
     static calcBuyHorseAmount(gold, daimyo, castellan, game) { return this.calcBuyEquipAmount(gold, daimyo, castellan, 'horse', game); }
-
-    static calcBuyGunEfficiency(daimyo, castellan) { return this.calcBuyEquipEfficiency(daimyo, castellan, 'gun'); }
 
     static calcBuyGunUnitPrice(daimyo, castellan, game) { return this.calcBuyEquipUnitPrice(daimyo, castellan, 'gun', game); }
 

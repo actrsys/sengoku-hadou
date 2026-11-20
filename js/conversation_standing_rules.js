@@ -320,11 +320,6 @@ class ConversationStandingRules {
         return this.getDaimyoSpeakerPosture(game, speaker, daimyo);
     }
 
-    static usesIndependentDaimyoRegister(game, speaker, daimyo) {
-        const posture = this.getDaimyoSpeakerPosture(game, speaker, daimyo);
-        return ['senior_close', 'senior_extended', 'higher_court'].includes(posture.key);
-    }
-
     /**
      * 当主に対して家中年長者・高格式者が話す時の常体レジスター。
      * 面談と軍師助言で同じ変換を使い、「誰について話すか」による敬意とは分離する。

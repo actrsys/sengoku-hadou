@@ -233,17 +233,8 @@ class AIStaffing {
         return false;
     }
 
-    // getCastleBushos() / samuraiIds は同居する浪人・諸勢力等も含むため、
-    // AI人事の「配置人数」は当該大名家に所属する通常の活動中武将だけを数える。
-    _getActiveClanBushosInCastle(castle, clanId = castle ? castle.ownerClan : 0) {
-        if (!castle) return [];
-        return this.game.getCastleBushos(castle.id).filter(b =>
-            Number(b.clan) === Number(clanId) &&
-            Number(b.belongKunishuId || 0) === 0 &&
-            window.BushoStatusRules.isActive(b)
-        );
-    }
-
+    // AI人事の「配置人数」は同居する浪人・諸勢力等を含めず、
+    // 当該大名家の通常の活動中武将だけを数える。
     _getActiveClanBushoCount(castle, clanId = castle ? castle.ownerClan : 0) {
         if (!castle || !Array.isArray(castle.samuraiIds) || castle.samuraiIds.length === 0) return 0;
         const numericClanId = Number(clanId);
@@ -1135,7 +1126,7 @@ class AIStaffing {
     /** 四半期の全国AI人事。TurnManagerは実行時期だけを決める。 */
     async processQuarterlyStaffing(month, playerClanId) {
         if (![1, 4, 7, 10].includes(month)) return;
-        // 4勢力ごとの描画待ち中に別タブへ操作権が移った場合も、
+        // 全国人事の描画待ち中に別タブへ操作権が移った場合も、
         // 通知を待たずにTurnManagerの共通ターン寿命判定で旧人事を停止する。
         const turnManager = this.game && this.game.turnManager;
         const generation = turnManager && typeof turnManager.captureTurnFlowGeneration === 'function'
@@ -1150,6 +1141,12 @@ class AIStaffing {
         // 呼出し元から渡された実施月と実際のゲーム月がずれた古い処理を開始しない。
         if (!isCurrentFlow() || (expectedMonth !== undefined && Number(expectedMonth) !== Number(month))) return;
         let staffingProcessed = 0;
+        // 初回の分割待ちは従来どおり4勢力後に確保し、以後は実際の
+        // 処理時間に応じてブラウザへ制御を返す。軽い勢力にも毎回
+        // 固定タイマーを挟まず、負荷の高い勢力では8msを目安に分割する。
+        const nowForYield = () => (typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now() : Date.now());
+        let lastStaffingYieldAt = null;
 
         for (const clan of this.game.clans) {
             if (!isCurrentFlow()) return;
@@ -1185,8 +1182,9 @@ class AIStaffing {
             }
 
             staffingProcessed++;
-            if (staffingProcessed % 4 === 0) {
+            if (staffingProcessed === 4 || (lastStaffingYieldAt !== null && nowForYield() - lastStaffingYieldAt >= 8)) {
                 await new Promise(resolve => setTimeout(resolve, 0));
+                lastStaffingYieldAt = nowForYield();
                 if (!isCurrentFlow()) return;
             }
         }

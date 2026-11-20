@@ -968,13 +968,6 @@ class IndependenceSystem {
         });
         return Math.floor(pop / 2000) + Math.floor(sol / 20) + Math.floor(koku / 20) + Math.floor(gold / 50) + Math.floor(rice / 100);
     }
-
-    /**
-     * 城単体の戦力を計算する道具
-     */
-    calcCastlePower(castle) {
-        return Math.floor(castle.population / 2000) + Math.floor(castle.soldiers / 20) + Math.floor(castle.kokudaka / 20) + Math.floor(castle.gold / 50) + Math.floor(castle.rice / 100);
-    }
     
     /**
      * ★追加：イベント等で特定の行動（'indep': 独立, 'defect': 寝返り, 'coup': 謀反）を強制的に起こす魔法

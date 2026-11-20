@@ -108,14 +108,6 @@ class HistorySystem {
             });
         });
     }
-
-    formatEntry(entry) {
-        if (!entry) return '';
-        const y = Number(entry.year) || 0;
-        const m = Number(entry.month) || 0;
-        const prefix = y > 0 && m > 0 ? `[${y}年${m}月] ` : '';
-        return `${prefix}${entry.text || ''}`;
-    }
 }
 
 window.HistorySystem = HistorySystem;

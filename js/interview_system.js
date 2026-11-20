@@ -443,10 +443,6 @@ class InterviewSystem {
         return rows;
     }
 
-    _toneTopicFollowup(text) {
-        return text;
-    }
-
     _getCommanderLegion(busho) {
         if (!busho || !this.game || !Array.isArray(this.game.legions)) return null;
         return this.game.legions.find(l => Number(l.clanId) === Number(busho.clan)
@@ -1376,10 +1372,6 @@ class InterviewSystem {
         return `${callName}か。${hint}`;
     }
 
-    _getHouseholdElderTopicOpening(interviewer, target, posture, attitude = this.activeInterviewAttitude) {
-        return this._getIndependentTopicOpening(interviewer, target, null, posture, attitude);
-    }
-
     _getHouseholdElderOpinionText(score) {
         if (score >= 82) return 'あれは話のわかる者だ。よく信頼しておる。';
         if (score >= 68) return '話のわかる者だ。信頼しておる。';
@@ -1935,10 +1927,6 @@ class InterviewSystem {
 
         const uncertain = knowledge < I.KnowledgeConfidentMin;
         return { text: this._getTargetLoyaltyBandText(assessedBand, uncertain, loyaltyStyle), direction };
-    }
-
-    _getTargetLoyaltyText(interviewer, target, relation) {
-        return this._getTargetLoyaltyAssessment(interviewer, target, relation).text;
     }
 }
 
