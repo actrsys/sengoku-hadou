@@ -1085,15 +1085,11 @@ class InterviewSystem {
         }
     }
 
-    _isRumorSeniorFamilyRelation(relation) {
-        return ['mother', 'adoptive_father', 'father', 'older_brother', 'grandfather', 'older_uncle', 'younger_uncle'].includes(relation);
-    }
-
     _getRumorFamilyAffiliationText(interviewer, target) {
         const relation = this._getRumorFamilyRelation(interviewer, target);
         const reference = this._getRumorFamilyReference(interviewer, target);
         if (!reference || relation === 'none') return '';
-        const senior = this._isRumorSeniorFamilyRelation(relation);
+        const senior = window.ConversationStandingRules.isSeniorFamilyRelation(relation);
         const presentVerb = senior ? 'おられます' : 'おります';
         const leadVerb = senior ? '率いておられます' : '率いております';
 
@@ -1121,7 +1117,7 @@ class InterviewSystem {
 
     _getRumorFamilyAbilityText(interviewer, row, attitude) {
         const relation = this._getRumorFamilyRelation(interviewer, row && row.target);
-        const senior = this._isRumorSeniorFamilyRelation(relation);
+        const senior = window.ConversationStandingRules.isSeniorFamilyRelation(relation);
         const strong = attitude === 'welcoming' || attitude === 'friendly' || attitude === 'polite';
         if (row.mode === 'expert' && row.domain) {
             if (senior) return `${row.domain.label}には${strong ? 'ことのほか' : ''}長けておられます。`;

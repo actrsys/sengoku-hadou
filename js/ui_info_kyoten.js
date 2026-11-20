@@ -448,26 +448,13 @@ Object.assign(UIInfoManager.prototype, {
             ];
         }
 
-        // ★追加：勢力名が4文字以上の場合は縮小する魔法
-        const getCompressedTextHtml = (text, threshold) => {
-            if (!text) return "";
-            if (text.length >= threshold) {
-                // ★修正：縮み具合を少し緩やかにしました（0.1 → 0.05）
-                let scale = 1.0 - (text.length - (threshold - 1)) * 0.05;
-                // ★修正：これ以上小さくならない下限も少し緩めました（0.55 → 0.75）
-                if (scale < 0.75) scale = 0.75;
-                return `<span class="compressed-list-text" style="--text-scale:${scale}; --text-unscale:${1/scale};">${this._escapePlainText(text)}</span>`;
-            }
-            return this._escapePlainText(text);
-        };
-
         let items = [];
         
         displayCastles.forEach(c => {
             // ★高速化：ループ内でも早見表を使います
             const clanData = this.game.getClan(c.ownerClan);
             const clanName = clanData ? clanData.name : "";
-            const compressedClanName = getCompressedTextHtml(clanName, 4); // ★魔法をかけます！
+            const compressedClanName = this._getCompressedInfoListTextHtml(clanName, 4);
             
             const castellan = this.game.getBusho(c.castellanId);
             const castellanName = castellan ? castellan.name : "";

@@ -18,6 +18,17 @@ class UIInfoManager {
         return `data/images/faceicons/${safeName}`;
     }
 
+    // 勢力・拠点の一覧で共通する長い名称の表示。文字圧縮は同じHTMLとCSS変数を用いる。
+    _getCompressedInfoListTextHtml(text, threshold) {
+        if (!text) return "";
+        if (text.length >= threshold) {
+            let scale = 1.0 - (text.length - (threshold - 1)) * 0.05;
+            if (scale < 0.75) scale = 0.75;
+            return `<span class="compressed-list-text" style="--text-scale:${scale}; --text-unscale:${1/scale};">${this._escapePlainText(text)}</span>`;
+        }
+        return this._escapePlainText(text);
+    }
+
     constructor(ui, game) {
         // 元のui.jsとgameの情報を覚えておきます
         this.ui = ui;
@@ -914,23 +925,10 @@ class UIInfoManager {
             ];
         }
 
-        // ★追加：勢力名が4文字以上の場合は縮小する魔法
-        const getCompressedTextHtml = (text, threshold) => {
-            if (!text) return "";
-            if (text.length >= threshold) {
-                // ★修正：縮み具合を少し緩やかにしました（0.1 → 0.05）
-                let scale = 1.0 - (text.length - (threshold - 1)) * 0.05;
-                // ★修正：これ以上小さくならない下限も少し緩めました（0.55 → 0.75）
-                if (scale < 0.75) scale = 0.75;
-                return `<span class="compressed-list-text" style="--text-scale:${scale}; --text-unscale:${1/scale};">${this._escapePlainText(text)}</span>`;
-            }
-            return this._escapePlainText(text);
-        };
-
         let items = [];
 
         clanDataList.forEach(d => {
-            const compressedDaimyoName = getCompressedTextHtml(d.name, 4); // ★魔法をかけます！
+            const compressedDaimyoName = this._getCompressedInfoListTextHtml(d.name, 4);
 
             let cells = [];
             if (this.daimyoCurrentTab === 'status') {

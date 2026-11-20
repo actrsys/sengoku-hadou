@@ -7749,10 +7749,10 @@ test('r369の1570初期配置は池田家独立化を含む連続性・忠誠基
     assert.ok(converter.includes("warriors_state: new Set(['isGunshi','isRetired'])"), '軍師・隠居フラグを変換時に正規化する');
 });
 
-test('r369では池田家・荒木村重の旧イベント2件を再設計まで登録停止する', () => {
+test('r369の時系列未整理だった荒木村重旧イベント2件は製品コードへ登録されない', () => {
     const historical = read('js/event/historical_event.js');
-    assert.ok(historical.includes('//     id: "historical_araki_takeover"'), '池田家乗っ取りイベントはコメントアウト');
-    assert.ok(historical.includes('//     id: "historical_murashige_submission"'), '荒木村重臣従イベントはコメントアウト');
+    assert.ok(!/id:\s*["']historical_(?:araki_takeover|murashige_submission)["']/.test(historical),
+        '登録停止中の旧イベントIDを製品定義へ復活させない');
 });
 
 test('r371では従属と直臣化を分け、和田家・志摩衆を在地諸勢力として維持する', () => {
@@ -12692,17 +12692,7 @@ test('外部一門の当主・国主継承は通常所属移籍窓口で妻婚�
 });
 
 
-test('荒木村重の池田家乗っ取りは国主時も Legion の席次で発生条件を判定する', () => {
-    const historical = read('js/event/historical_event.js');
-    const at = historical.indexOf('id: "historical_araki_takeover"');
-    const block = historical.slice(at, at + 5600);
-    assert.ok(block.includes('Number(l.commanderId) === Number(tomomasa.id)'));
-    assert.ok(block.includes('tomomasaLegionNo = Number(tomomasaLegion.legionNo) || 0'));
-    assert.ok(block.includes('Number(itamiCastle.legionId) === tomomasaLegionNo'));
-    assert.ok(block.includes('Number(murashigeCastle.legionId) !== tomomasaLegionNo'));
-    assert.ok(!block.includes('tomomasa.legionId'));
-    assert.ok(!block.includes('murashige.legionId'));
-});
+
 
 
 test('現行の隣接・海路判定は MapGraphService を正本にし片方向fallbackへ戻らない', () => {
@@ -12864,13 +12854,8 @@ test('将軍家新設は候補の旧軍団・派閥と妻婚姻を通常所属�
 });
 
 
-test('歴史イベントの国主・大名任命も軍師との役職排他を守る', () => {
+test('現行の義継追放イベントでは国主解任と軍師役職排他を守る', () => {
     const historical = read('js/event/historical_event.js');
-
-    const arakiAt = historical.indexOf('id: "historical_araki_takeover"');
-    const arakiBlock = historical.slice(arakiAt, arakiAt + 6200);
-    assert.ok(arakiBlock.includes('if (murashige.isGunshi) game.affiliationSystem.clearGunshiRole(murashige);'));
-    assert.ok(arakiBlock.includes('murashige.isCommander = true;'));
 
     const exileAt = historical.indexOf('id: "historical_yoshitsugu_exile"');
     const exileBlock = historical.slice(exileAt, exileAt + 5000);
@@ -12890,34 +12875,13 @@ test('国主フラグは Legion を正本としてセーブ復元時に再構築
     assert.ok(save.includes('const legionCommanderIds = new Set();'));
 });
 
-test('荒木村重の軍団引継ぎは既存国主職を二重に残さない', () => {
-    const historical = read('js/event/historical_event.js');
-    const at = historical.indexOf('id: "historical_araki_takeover"');
-    const block = historical.slice(at, at + 6800);
-    assert.ok(block.includes('const oldMurashigeLegion = game.legions.find'));
-    assert.ok(block.includes('game.castleManager.disbandLegion(oldMurashigeLegion.id);'));
-    assert.ok(block.includes('Number(oldMurashigeLegion.id) !== Number(legionToTakeover.id)'));
-});
 
 
-test('荒木村重降伏イベントの退避は国主フラグを先消しせず移動窓口へ軍団解散を任せる', () => {
-    const historical = read('js/event/historical_event.js');
-    const at = historical.indexOf('id: "historical_murashige_submission"');
-    const block = historical.slice(at, at + 9000);
-    const retreatAt = block.indexOf('IDの範囲外の人がいれば、お引越しさせます');
-    const retreat = block.slice(retreatAt, retreatAt + 700);
-    assert.ok(retreat.includes('window.EventAction.moveBusho(game, busho, nagayasu.castleId);'));
-    assert.ok(!retreat.includes('busho.isCommander = false;'));
-});
 
 
-test('城内の大名・退避対象判定は同居者ではなく城主家所属者だけを見る', () => {
-    const historical = read('js/event/historical_event.js');
-    const murashigeAt = historical.indexOf('id: "historical_murashige_submission"');
-    const murashigeBlock = historical.slice(murashigeAt, murashigeAt + 9000);
-    assert.ok(murashigeBlock.includes('Number(b.clan) === Number(miyoshiClanId)'));
-    assert.ok(murashigeBlock.includes('Number(b.belongKunishuId || 0) === 0'));
 
+
+test('戦後と武将情報の大名判定は同居者ではなく城主家所属者だけを見る', () => {
     const war = read('js/war_effort.js');
     assert.ok(war.includes('b.isDaimyo && Number(b.clan) === oldOwner && Number(b.belongKunishuId || 0) === 0'));
 
@@ -13041,12 +13005,6 @@ test('一括吸収は軍団を一度だけ正規解散し、国主を二重解�
     const absorb = aff.slice(start, end);
     assert.ok(absorb.includes('this.game.castleManager.disbandLegion(l.id)'));
     assert.ok(!/b\.isCommander\s*=\s*false/.test(absorb));
-    const historical = read('js/event/historical_event.js');
-    const arakiStart = historical.indexOf('id: "historical_murashige_submission"');
-    const arakiEnd = historical.indexOf('// ==========================================', arakiStart + 10);
-    const araki = historical.slice(arakiStart, arakiEnd);
-    assert.ok(araki.includes('game.affiliationSystem.joinClan(busho, sponsorClanId, busho.castleId, 100);'));
-    assert.ok(!araki.includes('game.castleManager.disbandLegion(legionToDismiss.id);'));
 });
 
 test('お市の婚姻イベントは元の実家ではなく現在所属を正本にする', () => {
@@ -20725,6 +20683,30 @@ test('r477 表示圧縮は短い名前も長い名前もHTMLを解釈させな�
     assert.strictEqual(ctx.StatPresenter.safeFaceIconPath('oda_nobunaga.webp'), 'data/images/faceicons/oda_nobunaga.webp');
 });
 
+test('r958 勢力・拠点一覧の文字圧縮は単一表示窓口でHTMLと縮小率を維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ui_info.js');
+    loadScript(ctx, 'js/ui_info_kyoten.js');
+    const info = Object.create(vm.runInContext('UIInfoManager.prototype', ctx));
+    const cases = [
+        ['', 4, ''],
+        ['織田', 4, '織田'],
+        ['織田家', 4, '織田家'],
+        ['織田家臣', 4, '<span class="compressed-list-text" style="--text-scale:0.95; --text-unscale:1.0526315789473684;">織田家臣</span>'],
+        ['abcdefghijklmnop', 4, '<span class="compressed-list-text" style="--text-scale:0.75; --text-unscale:1.3333333333333333;">abcdefghijklmnop</span>'],
+        ['<&"\'', 10, '&lt;&amp;&quot;&#39;']
+    ];
+    for (const [value, threshold, expected] of cases) {
+        assert.strictEqual(info._getCompressedInfoListTextHtml(value, threshold), expected);
+    }
+    for (const file of ['js/ui_info.js', 'js/ui_info_kyoten.js']) {
+        const source = read(file);
+        assert.ok(source.includes('this._getCompressedInfoListTextHtml('), `共通表示の呼出し: ${file}`);
+        assert.ok(!source.includes('const getCompressedTextHtml ='), `ローカルの旧定義を残さない: ${file}`);
+    }
+    assert.strictEqual((read('js/ui_info.js').match(/_getCompressedInfoListTextHtml\(text, threshold\)/g) || []).length, 1);
+});
+
 test('r477 野戦部隊の軍勢名と部隊情報の表示では保存名をHTML化しない', () => {
     const elements = new Map();
     const getEl = id => {
@@ -20893,10 +20875,11 @@ test('r478 拠点三タブ一覧と勢力一覧の名前圧縮で安全表示を
     const info = read('js/ui_info.js');
     assert.ok(kyoten.includes('${this._escapePlainText(c.name)}'));
     assert.ok(!kyoten.includes('<span class="col-castle-name col-name-left">${c.name}</span>'));
-    assert.ok(kyoten.includes('${this._escapePlainText(text)}'));
+    assert.ok(kyoten.includes('this._getCompressedInfoListTextHtml(clanName, 4)'));
     assert.ok(info.includes('${this._escapePlainText(d.leaderName)}'));
     assert.ok(info.includes('${this._escapePlainText(d.friendStatus)}'));
-    assert.ok(info.includes('${this._escapePlainText(text)}'));
+    assert.ok(info.includes('this._getCompressedInfoListTextHtml(d.name, 4)'));
+    assert.ok(info.includes('${this._escapePlainText(text)}'), '共通窓口の出力はHTMLエスケープ済み');
 });
 
 
@@ -45231,6 +45214,31 @@ test('r954 AI内政は待機なしの行動間・待機再開時とも旧ター�
     scheduled();
     await running;
     assert.deepStrictEqual(delayedSteps, [0], '待機中の旧世代失効後に次行動へ進まない');
+});
+
+// r957: 年長親族の敬語判定は、面談の噂だけに別一覧を持たず会話Rulesを正本とする。
+test('r957 面談の親族噂は共通の年長親族判定を使用して従来の敬語を維持する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/conversation_standing_rules.js');
+    loadScript(ctx, 'js/interview_system.js');
+    const Interview = vm.runInContext('InterviewSystem', ctx);
+    const interview = Object.create(Interview.prototype);
+    interview.game = {};
+    interview._getRumorFamilyReference = () => '親族';
+    const senior = new Set(['mother', 'adoptive_father', 'father', 'older_brother', 'grandfather', 'older_uncle', 'younger_uncle']);
+    const relations = [...senior, 'younger_brother', 'son', 'grandson', 'adoptive_child', 'sibling_child', 'none', null];
+    for (const relation of relations) {
+        interview._getRumorFamilyRelation = () => relation;
+        const expectedSenior = senior.has(relation);
+        assert.strictEqual(ctx.ConversationStandingRules.isSeniorFamilyRelation(relation), expectedSenior);
+        assert.strictEqual(interview._getRumorFamilyAffiliationText({}, {clan: 0, belongKunishuId: 0}),
+            relation === 'none' ? '' : `親族は今、他家には仕えずに${expectedSenior ? 'おられます' : 'おります'}。`, `所属の敬語: ${relation}`);
+        assert.strictEqual(interview._getRumorFamilyAbilityText({}, {target: {}, mode: 'unknown'}, 'friendly'),
+            expectedSenior ? '総じて力量は確かな方です。' : '総じて力量は確かなものです。', `力量の敬語: ${relation}`);
+    }
+    const source = read('js/interview_system.js');
+    assert.ok(source.includes('window.ConversationStandingRules.isSeniorFamilyRelation(relation)'));
+    assert.ok(!source.includes('_isRumorSeniorFamilyRelation('), '年長親族の別定義を復活させない');
 });
 
 Promise.all(pendingTests).then(() => {
