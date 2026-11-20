@@ -463,7 +463,8 @@ class TurnManager {
         game.ui.updateAIProgress(game.currentIndex + 1, game.turnQueue.length);
         if (game.ui) game.ui.currentCastle = castle;
 
-        const delay = 30;
+        // ガードと進捗は予約前に確定済み。0msのタスク境界でブラウザへ制御を返し、
+        // AIEngine.execAI() の冒頭の0ms待機も維持する。拠点ごとの固定30ms待ちは不要。
         game.aiTimer = setTimeout(async () => {
             if (!isScheduledTurnCurrent()) return;
             if (game.warManager.state.active) return;
@@ -475,7 +476,7 @@ class TurnManager {
                 if (!isScheduledTurnCurrent()) return;
                 game.finishTurn();
             }
-        }, delay);
+        }, 0);
     }
 
     async processTurn() {  // ★最初に async を付けます！

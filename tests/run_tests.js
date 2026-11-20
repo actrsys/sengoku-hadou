@@ -44973,6 +44973,74 @@ test('r950 AI外交の前線数と和睦資格は一度の隣接収集を共有�
     assert.strictEqual(scans, 3);
 });
 
+
+// AI拠点ごとの固定待機撤去。ガードの公開・非同期境界・旧予約の失効は残す。
+test('AI起動予約は進捗とガードを先に公開し、非同期0msで開始する', async () => {
+    const timers = [];
+    const ctx = createContext({
+        setTimeout: (callback, delay) => { timers.push({callback, delay}); return timers.length; },
+        clearTimeout() {}
+    });
+    loadScript(ctx, 'js/turn_manager.js');
+    const castle = {id: 7, ownerClan: 2};
+    const guard = {classList: new FakeClassList(['hidden'])};
+    const progress = [];
+    let starts = 0;
+    let menusCleared = 0;
+    let restoredGuard = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 5,
+        currentIndex: 0, turnQueue: [castle], isProcessingAI: false,
+        warManager: {state: {active: false}},
+        ui: {
+            aiGuard: guard,
+            clearCommandMenu() {menusCleared++;},
+            restoreAIGuardText() {restoredGuard++;},
+            updateAIProgress(value, total) {progress.push([value, total]);}
+        },
+        aiEngine: {async execAI() {starts++;}}
+    };
+    const manager = new ctx.TurnManager(game);
+    game.turnManager = manager;
+    manager._scheduleAITurn(castle);
+    assert.strictEqual(starts, 0, 'AIロジックを同期実行しない');
+    assert.strictEqual(timers.length, 1);
+    assert.strictEqual(timers[0].delay, 0, '各拠点で固定30msの待機を加えない');
+    assert.strictEqual(menusCleared, 1);
+    assert.strictEqual(restoredGuard, 1);
+    assert.strictEqual(guard.classList.contains('hidden'), false, '予約時点でAIガードを公開する');
+    assert.deepStrictEqual(progress, [[1,1]], '予約前に従来の進捗を更新する');
+    await timers[0].callback();
+    assert.strictEqual(starts, 1, '同じ世代・年月・拠点でAIが一度だけ開始する');
+
+    // 新たなタイマーを作っても、旧シナリオからはAIを起動しない。
+    manager._scheduleAITurn(castle);
+    manager.abortForScenarioTransition();
+    game.phase = 'title';
+    await timers[1].callback();
+    assert.strictEqual(starts, 1, '失効した短時間予約から次のシナリオを進めない');
+});
+
+test('AI起動時の戦闘中ガードは短い予約でも維持する', async () => {
+    let scheduled;
+    const ctx = createContext({setTimeout: callback => {scheduled = callback; return 1;}});
+    loadScript(ctx, 'js/turn_manager.js');
+    const castle = {id: 8, ownerClan: 2};
+    let calls = 0;
+    const game = {
+        phase: 'game', isRestoringSave: false, year: 1570, month: 5,
+        currentIndex: 0, turnQueue: [castle],
+        warManager: {state: {active: false}},
+        ui: {aiGuard: null, updateAIProgress() {}},
+        aiEngine: {async execAI() {calls++;}}
+    };
+    const manager = new ctx.TurnManager(game);
+    manager._scheduleAITurn(castle);
+    game.warManager.state.active = true;
+    await scheduled();
+    assert.strictEqual(calls, 0, '戦闘開始後には予約済みAIを起動しない');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);
