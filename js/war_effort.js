@@ -1823,7 +1823,7 @@ Object.assign(WarManager.prototype, {
                         await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason1, winnerClan);
                         if (!isCurrentWar()) return;
                         if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige(); // 威信を更新
-                        this.game.finishTurn();
+                        return this.game.finishTurn();
                         // ==========================================
                     }
                 } else {
@@ -1835,7 +1835,7 @@ Object.assign(WarManager.prototype, {
                     await this.game.lifeSystem.checkClanExtinction(s.oldDefClanId, extReason2, winnerClan);
                     if (!isCurrentWar()) return;
                     if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige(); // 威信を更新
-                    this.game.finishTurn();
+                    return this.game.finishTurn();
                     // ==========================================
                 }
             };
@@ -3102,7 +3102,7 @@ Object.assign(WarManager.prototype, {
         }
         this._prisonerPhaseFlow = null;
         if (typeof this.game.updateAllClanPrestige === 'function') this.game.updateAllClanPrestige();
-        this.game.finishTurn();
+        return this.game.finishTurn();
     },
     
     async autoResolvePrisoners(captives, winnerClanId, { deferFactionUpdate = false } = {}) {

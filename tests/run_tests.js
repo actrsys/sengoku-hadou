@@ -43562,6 +43562,42 @@ test('r908 捕虜処遇の終端確認は死亡処理から戦後完了までの
     assert.strictEqual(calls.at(-1)[2](), pending, '登用可能者なしの通知');
 });
 
+// r961: プレイヤーが戦後の捕虜処遇を終える実経路では、ターン復帰まで
+// 共通UIの完了Promiseを維持する。単にfinishTurn()を呼ぶだけでは暗幕が先に外れる。
+test('r961 捕虜処遇の完了は非同期ターン復帰が終わるまでUIへ返さない', async () => {
+    const ctx = createContext({ WarManager: class WarManager {} });
+    loadScript(ctx, 'js/war_effort.js');
+    const war = new ctx.WarManager();
+    war._prisonerPhaseFlow = { finishing: false };
+    war._isPrisonerPhaseCurrent = (session = war._prisonerPhaseFlow) => !!session && session === war._prisonerPhaseFlow;
+    war._prisonerPhaseContext = null;
+    war.pendingPrisoners = [];
+    war.pendingKills = [];
+    war.state = { attacker: { ownerClan: 1 }, oldDefClanId: 2, isTotalTakeoverExecuted: false };
+    war.checkTotalTakeover = async () => {};
+    let releaseTurn = null;
+    let turnCalls = 0;
+    war.game = {
+        playerClanId: 1,
+        lifeSystem: { async checkClanExtinction() {} },
+        updateAllClanPrestige() {},
+        finishTurn() {
+            turnCalls++;
+            return new Promise(resolve => { releaseTurn = resolve; });
+        }
+    };
+    let completionSettled = false;
+    const completion = war.finishPrisonerPhase();
+    completion.then(() => { completionSettled = true; });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(turnCalls, 1, '通常の戦後ターン復帰は一度だけ開始する');
+    assert.strictEqual(completionSettled, false, 'ターン復帰途中に捕虜UIの完了を確定しない');
+    assert.strictEqual(typeof releaseTurn, 'function');
+    releaseTurn();
+    await completion;
+    assert.strictEqual(completionSettled, true, '復帰後に初めて捕虜処遇を完了する');
+});
+
 // r915: 通常の攻城戦が上限15ラウンドに達した場合も、
 // 他の終戦通知と同じく入力画面を先に閉じ、終戦Promiseを共通UIへ返す。
 test('r915 攻城戦のラウンド上限通知は終戦完了をUIへ引き渡す', () => {
@@ -45285,6 +45321,66 @@ test('r960 AI作戦の予備出撃元は先頭の別城を選び、重複候補�
     assert.ok(source.includes('const sameTargetSupport = operationCandidates.find('));
     assert.ok(!source.includes('const sameTargetCands = operationCandidates.filter('),
         '初回一致しか使わない旧全件抽出を戻さない');
+});
+
+
+// 野戦中の通常操作：一般部隊が撤退した後、次部隊へ移るまでの待機中に同じ命令を受け付けない。
+test('野戦の一般部隊撤退は入力を閉じ、同じ部隊への再撤退で兵数を二重計上しない', () => {
+    const ids = ['fw-menu-main', 'fw-menu-cmd', 'fw-menu-info', 'fw-status-bar',
+        'fw-btn-wait', 'fw-btn-retreat', 'fw-btn-cmd-back'];
+    const elements = new Map(ids.map(id => {
+        const el = fakeElement(id);
+        el.classList.add('hidden');
+        return [id, el];
+    }));
+    const scheduled = [];
+    const ctx = createContext({
+        document: { getElementById: id => elements.get(id) || null },
+        setTimeout: (callback, ms) => { scheduled.push({ callback, ms }); return scheduled.length; },
+        SkillManager: { calcRetreatUnitBonusRecovery: () => 0 }
+    });
+    loadScript(ctx, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', ctx);
+    const field = Object.create(Field.prototype);
+    let dialogs = 0;
+    let confirm;
+    const departing = { id: 11, name: '退却する部隊', isPlayer: true, isAttacker: true,
+        isGeneral: false, initialSoldiers: 100, soldiers: 90 };
+    const next = { id: 12, name: '次の部隊', isPlayer: true, isAttacker: true,
+        isGeneral: true, initialSoldiers: 100, soldiers: 100 };
+    const enemy = { id: 13, name: '守備部隊', isPlayer: false, isAttacker: false,
+        isGeneral: true, initialSoldiers: 100, soldiers: 100 };
+    field.game = { playerClanId: 1, ui: { showDialog(_message, _confirm, callback) {
+        dialogs++;
+        confirm = callback;
+    } } };
+    Object.assign(field, {
+        hexW: 30, hexH: 26, cols: 20, rows: 12,
+        _fieldWarGeneration: 1, active: true, state: 'PHASE_MOVE',
+        isCmdMode: true, isInfoMode: false,
+        units: [departing, next, enemy], turnQueue: [departing, next, enemy],
+        retreatedUnits: [], warState: { deadSoldiers: { attacker: 10, defender: 0 } }
+    });
+    field.log = () => {};
+    field.updateMap = () => {};
+    field.updateStatus = () => {};
+    field.initUI();
+    field.updateMenu();
+    assert.strictEqual(elements.get('fw-menu-cmd').classList.contains('hidden'), false,
+        '通常のプレイヤー命令中は撤退を表示する');
+    elements.get('fw-btn-retreat').onclick();
+    assert.strictEqual(dialogs, 1);
+    confirm();
+    assert.strictEqual(field.state, 'IDLE');
+    assert.strictEqual(elements.get('fw-menu-cmd').classList.contains('hidden'), true,
+        '撤退確定直後に旧命令メニューを閉じる');
+    // 非表示DOMに遅延タップが届いた場合も、同じ行動済み部隊への再命令は不可。
+    elements.get('fw-btn-retreat').onclick();
+    assert.strictEqual(dialogs, 1, '再度の撤退確認は表示しない');
+    assert.strictEqual(field.retreatedUnits.length, 1, '残兵の二重計上を防止する');
+    assert.strictEqual(scheduled.filter(t => t.ms === 500).length, 1,
+        '次部隊への進行を一回だけ予約する');
+    assert.strictEqual(departing.hasActionDone, true);
 });
 
 Promise.all(pendingTests).then(() => {

@@ -1012,7 +1012,7 @@ class FieldWarManager {
 
         if (btnWait) {
             btnWait.onclick = () => {
-                if (!this.isPlayerTurn() || this.isInfoMode) return;
+                if (!this.isPlayerTurn() || this.isInfoMode || this.turnQueue[0].hasActionDone) return;
                 const unit = this.turnQueue[0];
                 this.log(`${unit.name}隊は待機した。`);
                 unit.hasActionDone = true;
@@ -1023,7 +1023,7 @@ class FieldWarManager {
         
         if (btnRetreat) {
             btnRetreat.onclick = () => {
-                if (!this.isPlayerTurn() || this.isInfoMode) return;
+                if (!this.isPlayerTurn() || this.isInfoMode || this.turnQueue[0].hasActionDone) return;
                 const unit = this.turnQueue[0];
                 if (unit.isGeneral) {
                     this.game.ui.showDialog("全軍を撤退させますか？（総大将が撤退すると野戦は終了します）", true, () => {
@@ -2735,6 +2735,8 @@ class FieldWarManager {
         // マップとステータスを更新し、行動済み扱いにして次の部隊へ
         unit.hasActionDone = true;
         this.state = 'IDLE';
+        // 退却確定後の次部隊待ちで旧命令を再入力できないよう、既存の入力状態へ同期する。
+        this.updateMenu();
 
         const isPlayerInvolved = this.units.some(u => u.isPlayer);
         if (isPlayerInvolved) {
