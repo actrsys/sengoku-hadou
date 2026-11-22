@@ -45241,6 +45241,52 @@ test('r957 面談の親族噂は共通の年長親族判定を使用して従来
     assert.ok(!source.includes('_isRumorSeniorFamilyRelation('), '年長親族の別定義を復活させない');
 });
 
+
+// r960: 攻撃作戦の予備拠点は、同じ目標への最高順位の別出撃元だけを選ぶ。
+test('r960 AI作戦の予備出撃元は先頭の別城を選び、重複候補の全配列を作らない', async () => {
+    const ctx = createContext({
+        document: {body: {classList: {contains: () => true}}},
+        MainParams: {StartYear: 1560, StartMonth: 1},
+        DiplomacyRules: {isProtectedFromImmediateAttack: () => false}
+    });
+    loadScript(ctx, 'js/ai_operation.js');
+    const Manager = vm.runInContext('AIOperationManager', ctx);
+    const a = {id:1, name:'甲', ownerClan:1, legionId:0, castellanId:101, provinceId:25,
+        soldiers:11000, kokudaka:30, defense:10, adjacentCastleIds:[2,10]};
+    const b = {id:2, name:'乙', ownerClan:1, legionId:0, castellanId:102, provinceId:25,
+        soldiers:12000, kokudaka:30, defense:10, adjacentCastleIds:[1,10]};
+    const target = {id:10, name:'敵城', ownerClan:2, provinceId:25,
+        soldiers:500, defense:100, adjacentCastleIds:[1,2]};
+    const byId = new Map([a,b,target].map(c=>[c.id,c]));
+    const game = {
+        gameStartYear:1560, gameStartMonth:1, year:1560, month:4, playerClanId:99,
+        clans:[{id:1}, {id:2}], provinces:[],
+        getClanCastles:id => [a,b,target].filter(c=>c.ownerClan === id),
+        getCastle:id => byId.get(id), getBusho:id => ({id,isActionDone:false}),
+        getClanDaimyo:()=>({intelligence:80}), getRelation:()=>({status:'敵対'}),
+        getCurrentTurnId:()=>10, getClanTotalSoldiers:()=>23000,
+        diplomacyManager:{isNonAggression:()=>false},
+        kunishuSystem:{getKunishusInCastle:()=>[]},
+        aiEngine:{decideAttackTarget: (origin, general, candidates)=>({
+            target:candidates[0], score:origin.id===1?85:75, sendSoldiers:300, sendRice:300
+        })}
+    };
+    const manager = new Manager(game);
+    manager.operations[1] = {};
+    manager.grandObjectives[1] = {0:{type:'国攻略',targetProvId:25}};
+    manager.getOperationLogInfo = () => ({clanName:'甲家',commanderName:'甲',grandObjStr:'国攻略'});
+    await manager.generateOperation(1,0);
+    const plan = manager.operations[1][0];
+    assert.strictEqual(plan.type, '攻撃');
+    assert.strictEqual(plan.stagingBase, 1, '最高点の甲城を主出撃元とする');
+    assert.strictEqual(plan.supportBase, 2, '次点の乙城を予備出撃元とする');
+    assert.strictEqual(plan.attackTargets[0].supportBase, 2);
+    const source = read('js/ai_operation.js');
+    assert.ok(source.includes('const sameTargetSupport = operationCandidates.find('));
+    assert.ok(!source.includes('const sameTargetCands = operationCandidates.filter('),
+        '初回一致しか使わない旧全件抽出を戻さない');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);

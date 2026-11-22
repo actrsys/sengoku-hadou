@@ -1275,14 +1275,16 @@ class AIOperationManager {
                 const isAlreadyAdded = attackTargets.some(t => t.targetId === targetId && t.isKunishuTarget === isKunishuTarget);
                 if (isAlreadyAdded) continue;
 
-                const sameTargetCands = operationCandidates.filter(c => {
+                // 候補はスコア降順に並んでいるので、最初の別出撃元だけが必要。
+                // 全一致を配列化せず先頭で検索を止め、選択順と得点は維持する。
+                const sameTargetSupport = operationCandidates.find(c => {
                     const cTargetId = c.target.isKunishuTarget ? c.target.kunishu.id : c.target.id;
                     const cIsKunishu = c.target.isKunishuTarget === true;
                     return cTargetId === targetId && cIsKunishu === isKunishuTarget && c.castleId !== cand.castleId;
                 });
 
-                if (sameTargetCands.length > 0) {
-                    supportBaseId = sameTargetCands[0].castleId; // 同じ目標への点数が2番目に高かった城
+                if (sameTargetSupport) {
+                    supportBaseId = sameTargetSupport.castleId; // 同じ目標への点数が2番目に高かった城
                 } else {
                     // 同じ目標に届く他の城がなかった場合、出撃元のお隣の城（自領）を予備として選ぶ魔法
                     const stagingCastle = this.game.getCastle(cand.castleId);
