@@ -45536,6 +45536,66 @@ test('r965 野戦で総大将の撤退確認は非同期終了Promiseを共通UI
     assert.strictEqual(requested, 1, '総大将撤退を一度だけ処理');
 });
 
+
+// SH-BUG-006: 通常の月終了確認2経路で共通幕へターン終了Promiseを引き渡す。
+test('SH-BUG-006 全武将行動済みの月終了確認はfinishTurnの完了Promiseを渡す', async () => {
+    const fixture = createAllActionsDoneConfirmationFixture();
+    let resolveFinish;
+    const pending = new Promise(resolve => { resolveFinish = resolve; });
+    let called = 0;
+    fixture.game.finishTurn = () => { called++; return pending; };
+    const returned = fixture.confirm();
+    assert.strictEqual(returned, pending, '行動済み確認のcallbackからPromiseを返す');
+    let finished = false;
+    returned.then(() => { finished = true; });
+    await Promise.resolve();
+    assert.strictEqual(finished, false, 'ターン終了前に共通幕を解放しない契約');
+    resolveFinish();
+    await returned;
+    assert.strictEqual(called, 1);
+});
+
+test('SH-BUG-006 PC/スマホ共通の命令終了確認はfinishTurnの完了Promiseを渡す', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/ui.js');
+    const prototype = vm.runInContext('UIManager.prototype', ctx);
+    const ui = Object.create(prototype);
+    const castle = { id: 5 };
+    const turnContext = { castle };
+    let resolveFinish;
+    const pending = new Promise(resolve => { resolveFinish = resolve; });
+    let called = 0;
+    let callback = null;
+    const game = {
+        turnManager: {
+            capturePlayerTurnContext() { return turnContext; },
+            isPlayerTurnContextCurrent(ctx) { return ctx === turnContext; }
+        },
+        getNavigatorInfo() { return { faceIcon: 'any.webp', name: '軍師' }; },
+        finishTurn() { called++; return pending; }
+    };
+    ui.game = game;
+    ui.currentCastle = castle;
+    ui._canRenderCommandMenuForCurrentCastle = () => true;
+    ui.cancelMapSelection = () => {};
+    ui.showDialog = (_msg, isConfirm, ok, _cancel, opts) => {
+        assert.strictEqual(isConfirm, true);
+        assert.strictEqual(opts.closeBeforeOk, true);
+        callback = ok;
+    };
+    ui._confirmFinishTurn();
+    assert.strictEqual(typeof callback, 'function', '実UIの月終了確認に到達');
+    const returned = callback();
+    assert.strictEqual(returned, pending, '月終了確認callbackからPromiseを返す');
+    let finished = false;
+    returned.then(() => { finished = true; });
+    await Promise.resolve();
+    assert.strictEqual(finished, false);
+    resolveFinish();
+    await returned;
+    assert.strictEqual(called, 1);
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);

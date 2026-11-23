@@ -3581,7 +3581,7 @@ class UIManager {
             if (!turnManager.isPlayerTurnContextCurrent(turnContext)
                 || this.currentCastle !== turnContext.castle
                 || !this._canRenderCommandMenuForCurrentCastle()) return;
-            this.game.finishTurn();
+            return this.game.finishTurn();
         }, null, {
             leftFace: nav.faceIcon,
             leftName: nav.name,

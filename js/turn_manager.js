@@ -897,7 +897,7 @@ class TurnManager {
                      const remaining = game.getCastleBushos(c.id)
                          .filter(b => b.clan === c.ownerClan && b.status === window.GameConstants.BushoStatus.ACTIVE);
                      if (remaining.length === 0 || !remaining.every(b => b.isActionDone)) return;
-                     game.finishTurn();
+                     return game.finishTurn();
                  }, null, {
                      leftFace: nav.faceIcon,
                      leftName: nav.name,
