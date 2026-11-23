@@ -794,8 +794,9 @@ class CommandSystem {
                 break;
             case 'title':
                 this._showCommandConfirmation("タイトル画面に戻りますか？\n保存していないデータは失われます。", () => {
-                    // 固定画面の切替はUIManager.returnToTitleに委譲する。
-                    this.game.ui.returnToTitle();
+                    // 固定画面の切替はUIManager.returnToTitleに委譲し、
+                    // 完了まで共通ダイアログの暗幕を引き継ぐ。
+                    return this.game.ui.returnToTitle();
                 }, null, { closeBeforeOk: true, closeBeforeCancel: true });
                 break;
             default:

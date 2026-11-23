@@ -45383,6 +45383,48 @@ test('野戦の一般部隊撤退は入力を閉じ、同じ部隊への再撤�
     assert.strictEqual(departing.hasActionDone, true);
 });
 
+
+// r963: 通常のシステム命令「タイトルへ戻る」の非同期完了は共通ダイアログの暗幕所有権へ返す。
+test('r963 タイトル復帰の確認コールバックは実際の復帰Promiseを共通UIへ返す', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    let onOk = null;
+    let onCancel = null;
+    let returnCalls = 0;
+    let resolveReturn;
+    const pendingReturn = new Promise(resolve => { resolveReturn = resolve; });
+    const game = {
+        year: 1560, month: 1, currentIndex: 0, turnQueue: [17],
+        turnManager: {
+            captureTurnFlowGeneration: () => 2,
+            isTurnFlowGenerationCurrent: g => g === 2
+        },
+        ui: {
+            showDialog(_text, isConfirm, cb, cancel, opts) {
+                assert.strictEqual(isConfirm, true);
+                assert.strictEqual(opts.closeBeforeOk, true);
+                onOk = cb;
+                onCancel = cancel;
+            },
+            returnToTitle() { returnCalls++; return pendingReturn; }
+        }
+    };
+    const command = new Command(game);
+    command.executeSystemCommand('title');
+    assert.strictEqual(typeof onOk, 'function', 'ゲーム中のタイトル戻り確認を経由する');
+    const result = onOk();
+    assert.strictEqual(result, pendingReturn, '確認完了の暗幕所有権へ同じPromiseを引き渡す');
+    assert.strictEqual(returnCalls, 1);
+    resolveReturn(true);
+    assert.strictEqual(await result, true, 'タイトルへの正常復帰を呼出元へ伝える');
+    // 確認待機中に進行が変わった旧コマンドは実行しない。
+    command.executeSystemCommand('title');
+    game.month = 2;
+    assert.strictEqual(onOk(), undefined, '旧月の確認は破棄');
+    assert.strictEqual(returnCalls, 1);
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);
