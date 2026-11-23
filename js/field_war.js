@@ -1029,7 +1029,7 @@ class FieldWarManager {
                     this.game.ui.showDialog("全軍を撤退させますか？（総大将が撤退すると野戦は終了します）", true, () => {
                         if (unit.isAttacker) this.log(`全軍、撤退を開始します……`);
                         else this.log(`全軍、拠点へ撤退を開始します……`);
-                        this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
+                        return this.endFieldWar(unit.isAttacker ? 'attacker_retreat' : 'defender_retreat');
                     }, null, { closeBeforeOk: true, closeBeforeCancel: true });
                 } else {
                     this.game.ui.showDialog(`${unit.name}隊を戦場から離脱（撤退）させますか？`, true, () => {
@@ -2767,7 +2767,8 @@ class FieldWarManager {
         if (shouldShowNotice && !this.fieldEndNoticeShown) {
             this.fieldEndNoticeShown = true;
             this.game.ui.showDialog(message || '野戦は終結しました。', false, () => {
-                this.endFieldWar(resultType);
+                // 戦場が先に閉じたAI継続戦でも、後続イベントまで共通暗幕へ引き渡す。
+                return this.endFieldWar(resultType);
             }, null, { closeBeforeOk: true });
         } else {
             this.endFieldWar(resultType);
@@ -3140,7 +3141,9 @@ class FieldWarManager {
             // 最後の操作部隊を失った場合も、決着通知の直後に背面地図を露出させない。
             this._scheduleFieldWarCallback(() => finishProcess(), 300, false);
         } else {
-            finishProcess();
+            // 戦場が既に非表示の場合、戦後イベント処理の完了まで呼出元にPromiseを返す。
+            // 表示中の戦場を保持する既存の1500/300ms演出は変更しない。
+            return finishProcess();
         }
     }
 

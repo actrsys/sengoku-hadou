@@ -45425,6 +45425,117 @@ test('r963 タイトル復帰の確認コールバックは実際の復帰Promis
     assert.strictEqual(returnCalls, 1);
 });
 
+
+// r964: 最終操作部隊を失った後、画面非表示のままAI野戦が決着しても、
+// 決着通知の暗幕は「野戦後イベント」の完了を待つ。戦争結果計算は変更しない。
+test('r964 操作部隊消滅後の野戦通知は非表示画面に頼らず戦後イベント完了まで暗幕を引継ぐ', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', ctx);
+    const field = Object.create(Field.prototype);
+    let confirm = null;
+    let afterFinished = false;
+    let completeCount = 0;
+    let resolveAfter;
+    const pendingAfter = new Promise(resolve => { resolveAfter = resolve; });
+    field.game = {
+        playerClanId: 1,
+        ui: {
+            showDialog(_message, _confirm, cb, _cancel, opts) {
+                confirm = cb;
+                assert.strictEqual(opts.closeBeforeOk, true, '共通UIへ完了を渡す操作');
+            },
+            resumeMainMapAfterBattle() {}
+        },
+        eventManager: {
+            processEvents(type) {
+                if (type === 'after_field_war') {
+                    return pendingAfter.then(() => { afterFinished = true; });
+                }
+                return Promise.resolve();
+            }
+        }
+    };
+    Object.assign(field, {
+        _fieldWarGeneration: 1, active: true, playerWasInvolved: true, fieldEndNoticeShown: false,
+        modal: { classList: { contains(name) { return name === 'hidden'; }, add() {} } },
+        units: [
+            { id: 4, isAttacker: true, isGeneral: true, soldiers: 300, groupId: 'atk_main', troopType: 'ashigaru' },
+            { id: 5, isAttacker: false, isGeneral: true, soldiers: 200, groupId: 'def_main', troopType: 'ashigaru' }
+        ],
+        retreatedUnits: [],
+        groupStats: {
+            atk_main: { rice: 100, morale: 50, training: 50 },
+            def_main: { rice: 100, morale: 50, training: 50 }
+        },
+        warState: {
+            attacker: { ownerClan: 1, name: '攻撃軍', soldiers: 300, horses: 0, guns: 0 },
+            defender: { ownerClan: 2, name: '守備軍', fieldSoldiers: 200, fieldHorses: 0, fieldGuns: 0 },
+            deadSoldiers: { attacker: 0, defender: 0 }
+        }
+    });
+    field.log = () => {};
+    field.releaseFieldWarVisualResources = () => {};
+    field.onComplete = () => { completeCount++; assert.strictEqual(afterFinished, true); };
+    field.finishFieldWarWithNotice('attacker_lose', '野戦終了');
+    assert.strictEqual(typeof confirm, 'function', 'プレイヤー参加履歴のある野戦は終了を通知');
+    const task = confirm();
+    assert.ok(task && typeof task.then === 'function', '通知の完了Promiseを共通UIへ渡す');
+    let settled = false;
+    Promise.resolve(task).then(() => { settled = true; });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(settled, false, '戦後イベント待機中には暗幕完了解放を許さない');
+    assert.strictEqual(completeCount, 0, '戦後の完了通知はまだ発火しない');
+    resolveAfter();
+    await task;
+    assert.strictEqual(afterFinished, true);
+    assert.strictEqual(completeCount, 1, '戦後イベントと終了コールバックを一度だけ処理');
+});
+
+
+// r965: 総大将の「撤退する」確認は実際の野戦終了Promiseを共通UIへ返す。
+// 一般部隊の撤退は同期処理であり、混同して不要なPromiseを作らない。
+test('r965 野戦で総大将の撤退確認は非同期終了Promiseを共通UIへ引継ぐ', async () => {
+    const btn = fakeElement('fw-btn-retreat');
+    const ctx = createContext({
+        document: { getElementById: id => id === 'fw-btn-retreat' ? btn : null }
+    });
+    loadScript(ctx, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', ctx);
+    const field = Object.create(Field.prototype);
+    const general = {id:91, name:'当軍総大将', isPlayer:true, isAttacker:true, isGeneral:true, hasActionDone:false};
+    let confirm = null;
+    let requested = 0;
+    let resolveEnd;
+    const pendingEnd = new Promise(resolve => { resolveEnd = resolve; });
+    field.game = { ui: { showDialog(_msg, yesNo, callback, _cancel, opts) {
+        assert.strictEqual(yesNo, true);
+        assert.strictEqual(opts.closeBeforeOk, true);
+        confirm = callback;
+    } } };
+    Object.assign(field, { active:true, turnQueue:[general], isInfoMode:false, state:'PHASE_MOVE' });
+    field.log = () => {};
+    field.endFieldWar = result => {
+        assert.strictEqual(result, 'attacker_retreat');
+        requested++;
+        return pendingEnd;
+    };
+    field.initUI();
+    assert.strictEqual(typeof btn.onclick, 'function');
+    btn.onclick();
+    assert.strictEqual(typeof confirm, 'function', '実際の総大将撤退確認へ到達');
+    const task = confirm();
+    assert.strictEqual(task, pendingEnd, '既存の終了Promiseを共通画面引継ぎへ返す');
+    let settled = false;
+    Promise.resolve(task).then(() => { settled = true; });
+    await Promise.resolve();
+    assert.strictEqual(settled, false, '終了処理が未完了なら確認側も完了扱いにしない');
+    resolveEnd();
+    await task;
+    assert.strictEqual(requested, 1, '総大将撤退を一度だけ処理');
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);
