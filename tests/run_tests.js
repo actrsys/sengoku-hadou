@@ -4429,10 +4429,10 @@ test('野戦終了通知は終了瞬間の生存部隊ではなく参加実績�
 
 test('攻城戦はラウンド開始時点で決着済みでも終了理由を表示してから戦後処理へ進む', () => {
     const war = read('js/war.js');
-    assert.ok(war.includes('finishSiegeWithNotice(attackerWon, message)'));
-    assert.ok(war.includes("this.finishSiegeWithNotice(true, '拠点の防御が尽き、拠点は陥落しました。')"));
-    assert.ok(war.includes("this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊し、拠点は陥落しました。')"));
-    assert.ok(war.includes("this.finishSiegeWithNotice(false, '攻撃本隊の士気が崩壊し、攻撃軍は退却しました。')"));
+    assert.ok(war.includes('finishSiegeWithNotice(attackerWon, message, progressLog)'));
+    assert.ok(war.includes("this.finishSiegeWithNotice(true, '拠点の防御が尽き、拠点は陥落しました。', '城の防御力が尽きた')"));
+    assert.ok(war.includes("this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊し、拠点は陥落しました。', '守備本隊の士気が崩壊')"));
+    assert.ok(war.includes("this.finishSiegeWithNotice(false, '攻撃本隊の士気が崩壊し、攻撃軍は退却しました。', '攻撃本隊の士気が崩壊')"));
     assert.ok(war.includes("`${activeArmyName}は軍を鼓舞しました。`"));
     assert.ok(war.includes("`${activeArmyName}は火計を仕掛けました。`"));
     assert.ok(war.includes("`${activeArmyName}は突撃を仕掛けました。`"));
@@ -33879,7 +33879,9 @@ test('r710 野戦で敵部隊を壊滅させたグループの士気+3が他グ�
     });
     for (const attackingArmy of [true, false]) {
         for (const killedByCounter of [false, true]) {
+        const progressLogs = [];
         const game = { playerClanId: 99, year: 1570,
+            warManager: { recordOtherWarProgressEvent(phase, state, message) { progressLogs.push({phase, state, message}); } },
             getBusho(id) { return { id, clan: id % 2 ? 1 : 2, factionId: 0, originalEndYear: 1600, strength: 60 }; }
         };
         const field = new Field(game);
@@ -33909,6 +33911,7 @@ test('r710 野戦で敵部隊を壊滅させたグループの士気+3が他グ�
         await field.executeAttack(killedByCounter ? losingUnit : winner, killedByCounter ? winner : losingUnit); // 攻撃撃破と反撃撃破の両方を実処理で確認。
         assert.strictEqual(losingUnit.soldiers, 0, '通常攻撃で相手部隊を壊滅');
         assert.strictEqual(field.units.includes(losingUnit), false, '壊滅部隊は戦場から除去');
+        assert.deepStrictEqual(progressLogs.map(log=>log.message), ['武将2隊が全滅'], '攻撃・反撃の実際の壊滅から一度だけログ');
         assert.strictEqual(field.groupStats[winnerGroup].morale, 56,
             `${winnerGroup}の戦闘優勢+3に加え撃破当事者ボーナス+3`);
         assert.strictEqual(field.groupStats[otherWinnerGroup].morale, 51,
@@ -34494,7 +34497,7 @@ test('r898 戦争リザルトは勝敗・撤退・指揮官・拠点を既存デ
     manager.isPlayerClanReinforcement = () => false;
     manager.state = {isPlayerInvolved:true,isPlayerFactionInvolved:true,
         attacker:{ownerClan:1,isKunishu:false},defender:{id:3,name:'城A',ownerClan:2,isKunishu:false},oldDefClanId:2,
-        atkBushos:[{name:'信長'}],defBusho:{name:'信玄'}};
+        atkBushos:[{name:'信長',faceIcon:'oda_nobunaga.webp'}],defBusho:{name:'信玄',faceIcon:'takeda_shingen.webp'}};
     const win = manager.createWarResultPresentation('攻め落としました',true,false);
     assert.strictEqual(win.title,'勝利');
     assert.strictEqual(win.tone,'victory');
@@ -34502,6 +34505,8 @@ test('r898 戦争リザルトは勝敗・撤退・指揮官・拠点を既存デ
     assert.strictEqual(win.defender,'武田家');
     assert.strictEqual(win.attackerLeader,'信長');
     assert.strictEqual(win.defenderLeader,'信玄');
+    assert.strictEqual(win.attackerFace,'oda_nobunaga.webp');
+    assert.strictEqual(win.defenderFace,'takeda_shingen.webp');
     assert.strictEqual(win.target,'城Aの戦い');
     assert.strictEqual(manager.createWarResultPresentation('守れず',false,false).title,'敗北');
     assert.strictEqual(manager.createWarResultPresentation('撤退',false,true).title,'撤退');
@@ -34525,7 +34530,7 @@ test('r898 結果リザルトは閉じるまで進行せず、閉じる操作は
     const createEl = () => ({textContent:'',listeners:new Map(),
         classList:{values:new Set(['hidden']),add(...v){v.forEach(x=>this.values.add(x));},remove(...v){v.forEach(x=>this.values.delete(x));},toggle(x,force){if(force)this.add(x);else this.remove(x);},contains(x){return this.values.has(x);}},
         addEventListener(type,fn){this.listeners.set(type,fn);},removeEventListener(type,fn){if(this.listeners.get(type)===fn)this.listeners.delete(type);}});
-    for (const id of ['war-result-modal','war-result-close-btn','war-result-title','war-result-target','war-result-attacker','war-result-defender','war-result-attacker-leader','war-result-defender-leader','war-result-description']) elements.set(id,createEl());
+    for (const id of ['war-result-modal','war-result-close-btn','war-result-title','war-result-target','war-result-attacker','war-result-defender','war-result-attacker-leader','war-result-defender-leader','war-result-description','war-result-message']) elements.set(id,createEl());
     const ctx = createContext({document:{getElementById(id){return elements.get(id)||null;}}});
     vm.runInContext('class UIManager {}; this.UIManager = UIManager;', ctx);
     loadScript(ctx, 'js/ui_war_result.js');
@@ -45981,8 +45986,8 @@ test('r972 他家攻城戦の開始・ラウンド終了の実兵糧・兵力を
 test('r972 野戦の部隊・参加グループの実数だけを集計し、ラウンド末の兵糧を一度記録', () => {
     const ctx=createContext();loadScript(ctx,'js/field_war.js');
     const Field=vm.runInContext('FieldWarManager',ctx);const field=Object.create(Field.prototype);
-    const recorded=[];
-    field.game={warManager:{recordOtherWarProgress(phase,state,turn,read){recorded.push({phase,state,turn,frame:read()});}}};
+    const recorded=[], progressLogs=[];
+    field.game={warManager:{recordOtherWarProgress(phase,state,turn,read){recorded.push({phase,state,turn,frame:read()});},recordOtherWarProgressEvent(phase,state,message){progressLogs.push(message);}}};
     Object.assign(field,{active:true,turnCount:1,turnQueue:[],warState:{},isHeavySnowBattle:false,
         units:[{isAttacker:true,soldiers:300,groupId:'atk_main'},{isAttacker:true,soldiers:100,groupId:'atk_main'},{isAttacker:true,soldiers:200,groupId:'atk_ally'},{isAttacker:false,soldiers:100,groupId:'def_main'}],
         groupStats:{atk_main:{rice:500},atk_ally:{rice:150},def_main:{rice:90},def_ally:{rice:999}}});
@@ -45993,30 +45998,94 @@ test('r972 野戦の部隊・参加グループの実数だけを集計し、ラ
     assert.strictEqual(recorded.length,1);assert.strictEqual(recorded[0].turn,1);assert.strictEqual(recorded[0].frame.attacker.rice,647);
     field.units=field.units.filter(u=>u.groupId!=='atk_ally');
     assert.strictEqual(field.getFieldProgressFrame().attacker.rice,498,'撤退済援軍を再加算しない');
+    field.groupStats.atk_main.rice=1;field.consumeRice();field.consumeRice();
+    assert.deepStrictEqual(progressLogs,['攻撃本隊の兵糧が尽きた'],'実消費で0になった瞬間だけ記録');
 });
 
 test('r972 戦況表示は同じ初期尺度を維持し、自動完了・省略・強制終了を一度だけ処理', async () => {
-    const elements=new Map(), timers=new Map();let nextTimer=0;
+    const elements=new Map(), timers=new Map(), delays=[];let nextTimer=0;
     const make=()=>({textContent:'',style:{setProperty(k,v){this[k]=v;}},listeners:new Map(),classList:{v:new Set(['hidden']),add(...x){x.forEach(y=>this.v.add(y));},remove(...x){x.forEach(y=>this.v.delete(y));},toggle(x,b){if(b)this.add(x);else this.remove(x);},contains(x){return this.v.has(x);}},addEventListener(k,v){this.listeners.set(k,v);},removeEventListener(k,v){if(this.listeners.get(k)===v)this.listeners.delete(k);}});
-    for(const id of ['war-result-modal','war-result-close-btn','war-result-kicker','war-result-title','war-result-target','war-result-attacker','war-result-defender','war-result-attacker-leader','war-result-defender-leader','war-result-description'])elements.set(id,make());
+    for(const id of ['war-result-modal','war-result-close-btn','war-result-kicker','war-result-title','war-result-target','war-result-attacker','war-result-defender','war-result-attacker-leader','war-result-defender-leader','war-result-description','war-result-message','war-progress-turn','war-progress-log','war-progress-defender-defense','war-progress-defender-defense-bar'])elements.set(id,make());
     for(const side of ['attacker','defender'])for(const metric of ['soldiers','rice'])for(const suffix of ['', '-bar'])elements.set(`war-progress-${side}-${metric}${suffix}`,make());
-    const ctx=createContext({document:{getElementById:id=>elements.get(id)||null},setTimeout(fn){timers.set(++nextTimer,fn);return nextTimer;},clearTimeout:id=>timers.delete(id)});
+    const ctx=createContext({document:{getElementById:id=>elements.get(id)||null},setTimeout(fn,ms){delays.push(ms);timers.set(++nextTimer,fn);return nextTimer;},clearTimeout:id=>timers.delete(id)});
     vm.runInContext('class UIManager {};this.UIManager=UIManager;',ctx);loadScript(ctx,'js/ui_war_result.js');
     const ui=new ctx.UIManager();ui.prepareCoveredViewForOpen=modal=>modal.classList.remove('hidden');
     const step=()=>{const [id,fn]=timers.entries().next().value;timers.delete(id);fn();};
     const frame=(turn,a,d,ar,dr)=>({turn,attacker:{soldiers:a,rice:ar},defender:{soldiers:d,rice:dr}});
     const data={title:'野戦',attacker:'甲',defender:'乙',target:'城'};
     const frames=[frame(0,1000,250,500,1000),frame(1,600,100,400,800),frame(2,400,0,300,700)];
+    frames[0].defender.defense=300;frames[1].defender.defense=150;frames[2].defender.defense=0;
+    frames[1].logs=['甲隊が撤退','乙隊が全滅'];frames[2].logs=['城の防御力が尽きた'];
     let promise=ui.showWarProgressAsync(data,frames);
     assert.strictEqual(elements.get('war-progress-defender-soldiers-bar').style.transform,'scaleX(0.25)');
     assert.strictEqual(elements.get('war-progress-attacker-rice-bar').style.transform,'scaleX(0.5)');
     step();assert.strictEqual(elements.get('war-progress-attacker-soldiers-bar').style.transform,'scaleX(0.6)');
+    assert.strictEqual(elements.get('war-progress-defender-defense-bar').style.transform,'scaleX(0.5)');
+    assert.strictEqual(elements.get('war-progress-log').textContent,'甲隊が撤退');assert.ok(delays.at(-1)>=850);
+    step();assert.strictEqual(elements.get('war-progress-log').textContent,'乙隊が全滅');assert.strictEqual(elements.get('war-progress-defender-defense-bar').style.transform,'scaleX(0.5)');
     step();assert.strictEqual(elements.get('war-progress-defender-soldiers-bar').style.transform,'scaleX(0)');
-    step();assert.strictEqual(await promise,true);assert.strictEqual(timers.size,0);
+    assert.strictEqual(elements.get('war-progress-defender-defense').textContent,'0');assert.strictEqual(elements.get('war-progress-turn').textContent,'第2ターン・決着');assert.ok(delays.at(-1)>=1400);assert.strictEqual(elements.get('war-result-modal').classList.contains('hidden'),false);
+    step();assert.strictEqual(await promise,true);assert.strictEqual(timers.size,0);assert.strictEqual(elements.get('war-progress-log').textContent,'');
     promise=ui.showWarProgressAsync(data,frames);const old=timers.values().next().value;
     const skip=elements.get('war-result-close-btn').listeners.get('click');skip();skip();assert.strictEqual(await promise,true);assert.strictEqual(timers.size,0);
     promise=ui.showWarProgressAsync(data,frames);ui.dismissWarResult(true);assert.strictEqual(await promise,false);assert.strictEqual(timers.size,0);
-    ui.showWarResult({...data,title:'攻撃軍勝利'},()=>{});old();assert.strictEqual(elements.get('war-result-title').textContent,'攻撃軍勝利');assert.strictEqual(elements.get('war-result-close-btn').textContent,'閉じる');
+    ui.showWarResult({...data,title:'攻撃軍勝利'},()=>{});old();assert.strictEqual(elements.get('war-result-title').textContent,'攻撃軍勝利');assert.strictEqual(elements.get('war-result-modal').classList.contains('is-siege-progress'),false);assert.strictEqual(elements.get('war-result-close-btn').textContent,'閉じる');
+});
+
+test('r973 攻城の決着値は壁修復前の0を保持し、同ターンの撤退ログも失わず表示する', async () => {
+    const ctx=createContext({UserSettings:{aiWarNotify:true},WarParams:{Military:{WarMaxRounds:15}}});
+    loadScript(ctx,'js/war.js');loadScript(ctx,'js/war_effort.js');
+    const War=vm.runInContext('WarManager',ctx);let shown;
+    const game={playerClanId:1,getClan:id=>({name:`勢力${id}`}),ui:{showWarProgressAsync(data,frames){shown=frames;return Promise.resolve(true);}}};
+    const war=new War(game);game.warManager=war;
+    const s=war.state={active:true,phase:'init',round:1,attacker:{ownerClan:2,soldiers:1000,rice:800,morale:50},defender:{ownerClan:3,name:'城',soldiers:500,rice:600,defense:300,morale:50},reinforcement:{soldiers:100,rice:80,bushos:[{name:'甲'}]},isPlayerInvolved:false,isPlayerFactionInvolved:false,atkBushos:[],defBusho:null};
+    war.beginOtherWarProgress('siege',s,()=>war.getSiegeProgressFrame(s));
+    war.retreatReinforcementForce('reinforcement');
+    war.recordOtherWarProgress('siege',s,1,()=>war.getSiegeProgressFrame(s));
+    s.defender.defense=0;
+    // 製品ラウンド初期化の終了条件を使用。後続の戦後計算は既存の再生窓口までに限定。
+    war.endWar=()=>war.playOtherWarProgress('siege',s,1,()=>war.getSiegeProgressFrame(s));
+    war.processWarRound();
+    assert.strictEqual(s.defender.defense,150,'従来どおり城壁を修復');
+    assert.ok(shown);assert.strictEqual(shown[0].defender.defense,300);assert.strictEqual(shown.at(-1).defender.defense,0);
+    assert.strictEqual(shown.at(-1).attacker.soldiers,1000);assert.ok(shown.at(-1).logs.includes('甲軍が撤退'));
+    assert.ok(shown.at(-1).logs.some(log=>log.includes('防御')));assert.strictEqual(war._otherWarProgress,null);
+    ctx.UserSettings.aiWarNotify=false;let reads=0;
+    war.beginOtherWarProgress('siege',s,()=>{reads++;return war.getSiegeProgressFrame(s);});
+    war.captureOtherWarProgressFinal('siege',s,()=>{reads++;return war.getSiegeProgressFrame(s);});
+    war.recordOtherWarProgressEvent('siege',s,'旧ログ');assert.strictEqual(reads,0);assert.strictEqual(war._otherWarProgress,null);
+});
+
+test('r974 戦況・結果の顔準備中は非公開・タイマー未開始、強制終了と連戦で旧画像を公開しない', async () => {
+    const els=new Map(), timers=new Map();let seq=0, holds=0, opened=0, confirm=0;
+    const make=()=>({textContent:'',style:{setProperty(){}},attrs:new Map(),listeners:new Map(),classList:{v:new Set(['hidden']),add(...x){x.forEach(y=>this.v.add(y));},remove(...x){x.forEach(y=>this.v.delete(y));},toggle(x,b){if(b)this.add(x);else this.remove(x);},contains(x){return this.v.has(x);}},setAttribute(k,v){this.attrs.set(k,v);},removeAttribute(k){this.attrs.delete(k);},getAttribute(k){return this.attrs.get(k);},addEventListener(k,v){this.listeners.set(k,v);},removeEventListener(k,v){if(this.listeners.get(k)===v)this.listeners.delete(k);}});
+    for(const id of ['war-result-modal','war-result-close-btn','war-result-attacker-face','war-result-defender-face'])els.set(id,make());
+    const ctx=createContext({document:{getElementById:id=>els.get(id)||null},setTimeout(fn){timers.set(++seq,fn);return seq;},clearTimeout:id=>timers.delete(id)});
+    loadScript(ctx,'js/stat_presenter.js');vm.runInContext('class UIManager {};this.UIManager=UIManager;',ctx);loadScript(ctx,'js/ui_war_result.js');
+    const ui=new ctx.UIManager(),pending=[];ui.prepareCoveredViewForOpen=el=>el.classList.remove('hidden');ui.beginModalHandoff=()=>{holds++;let done=false;return()=>{if(!done){holds--;done=true;}};};
+    ui._waitForWarFaceImage=(img,current)=>new Promise(resolve=>pending.push(()=>{if(current())img.style.visibility='';resolve();}));
+    const modal=els.get('war-result-modal'),face=els.get('war-result-attacker-face');
+    const data={attackerFace:'oda_nobunaga.webp',defenderFace:'takeda_shingen.webp',onOpen:()=>opened++};
+    const first=ui.showWarResultAsync(data,1500);assert.ok(modal.classList.contains('hidden'));assert.strictEqual(timers.size,0);assert.strictEqual(opened,0);assert.strictEqual(face.style.visibility,'hidden');
+    ui.dismissWarResult(true);assert.strictEqual(await first,false);assert.strictEqual(holds,0);
+    const second=ui.showWarResult({...data,attackerFace:'../bad.webp',defenderFace:null},()=>confirm++,1500);assert.strictEqual(face.getAttribute('src'),'data/images/faceicons/unknown_face.webp');
+    pending.shift()();pending.shift()();await Promise.resolve();assert.ok(modal.classList.contains('hidden'));assert.strictEqual(opened,0);assert.strictEqual(face.style.visibility,'hidden');
+    pending.shift()();assert.strictEqual(await second,true);assert.strictEqual(opened,1);assert.strictEqual(holds,0);assert.ok(!modal.classList.contains('hidden'));assert.strictEqual(timers.size,1);assert.strictEqual(els.get('war-result-defender-face').getAttribute('src'),undefined);
+    els.get('war-result-close-btn').listeners.get('click')();assert.strictEqual(confirm,1);assert.strictEqual(timers.size,0);assert.strictEqual(face.getAttribute('src'),undefined);
+});
+
+test('r974 他家野戦と攻城戦の総大将は各段階の実指揮官で確定し、野戦のみの結果では城主に置換しない', () => {
+    const ctx=createContext({UserSettings:{aiWarNotify:true}});loadScript(ctx,'js/war.js');loadScript(ctx,'js/war_effort.js');
+    const War=vm.runInContext('WarManager',ctx);let shown;
+    const game={playerClanId:1,getClan:id=>({name:`勢力${id}`}),ui:{showWarProgressAsync(data){shown=data;return Promise.resolve(true);}}};
+    const war=new War(game);const commander={name:'城主',faceIcon:'castellan.webp'},general={name:'迎撃大将',faceIcon:'field.webp'},attacker={name:'攻撃大将',faceIcon:'attacker.webp'};
+    const state=war.state={attacker:{ownerClan:2},defender:{ownerClan:3,name:'城'},atkBushos:[attacker],defBusho:commander,atkAssignments:[{busho:attacker,soldiers:100}],defAssignments:[{busho:general,soldiers:100}],isPlayerInvolved:false,isPlayerFactionInvolved:false};
+    const frame=()=>({attacker:{soldiers:100,rice:100},defender:{soldiers:100,rice:100}});
+    war.beginOtherWarProgress('field',state,frame);state.defAssignments[0].soldiers=0;war.playOtherWarProgress('field',state,1,frame);
+    assert.strictEqual(shown.defenderLeader,'迎撃大将');assert.strictEqual(shown.defenderFace,'field.webp');assert.strictEqual(war.createWarResultPresentation('',true,false).defenderFace,'field.webp');
+    war.beginOtherWarProgress('siege',state,frame);war.playOtherWarProgress('siege',state,1,frame);
+    assert.strictEqual(shown.defenderLeader,'城主');assert.strictEqual(shown.defenderFace,'castellan.webp');assert.strictEqual(war.createWarResultPresentation('',true,false).defenderFace,'castellan.webp');
+    war._beginWarLifecycle();assert.strictEqual(war._otherWarResultLeaders,null);
 });
 
 Promise.all(pendingTests).then(() => {

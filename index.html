@@ -241,9 +241,14 @@
                 <div id="war-result-target" class="war-result-target"></div>
                 <div class="war-result-armies">
                     <div class="war-result-army">
-                        <span class="war-result-army-label">攻撃軍</span>
-                        <strong id="war-result-attacker" class="war-result-army-name"></strong>
-                        <span id="war-result-attacker-leader" class="war-result-commander"></span>
+                        <div class="war-result-army-heading">
+                            <img id="war-result-attacker-face" class="war-result-face" alt="" draggable="false" width="60" height="60">
+                            <div class="war-result-army-identity">
+                                <span class="war-result-army-label">攻撃軍</span>
+                                <strong id="war-result-attacker" class="war-result-army-name"></strong>
+                                <span id="war-result-attacker-leader" class="war-result-commander"></span>
+                            </div>
+                        </div>
                         <div class="war-progress-metrics">
                             <div class="war-progress-metric"><span>兵力</span><strong id="war-progress-attacker-soldiers">0</strong><div class="war-progress-track"><div id="war-progress-attacker-soldiers-bar" class="war-progress-fill"></div></div></div>
                             <div class="war-progress-metric"><span>兵糧</span><strong id="war-progress-attacker-rice">0</strong><div class="war-progress-track"><div id="war-progress-attacker-rice-bar" class="war-progress-fill is-rice"></div></div></div>
@@ -251,16 +256,26 @@
                     </div>
                     <div class="war-result-versus">対</div>
                     <div class="war-result-army">
-                        <span class="war-result-army-label">守備軍</span>
-                        <strong id="war-result-defender" class="war-result-army-name"></strong>
-                        <span id="war-result-defender-leader" class="war-result-commander"></span>
+                        <div class="war-result-army-heading">
+                            <img id="war-result-defender-face" class="war-result-face" alt="" draggable="false" width="60" height="60">
+                            <div class="war-result-army-identity">
+                                <span class="war-result-army-label">守備軍</span>
+                                <strong id="war-result-defender" class="war-result-army-name"></strong>
+                                <span id="war-result-defender-leader" class="war-result-commander"></span>
+                            </div>
+                        </div>
                         <div class="war-progress-metrics">
                             <div class="war-progress-metric"><span>兵力</span><strong id="war-progress-defender-soldiers">0</strong><div class="war-progress-track"><div id="war-progress-defender-soldiers-bar" class="war-progress-fill"></div></div></div>
                             <div class="war-progress-metric"><span>兵糧</span><strong id="war-progress-defender-rice">0</strong><div class="war-progress-track"><div id="war-progress-defender-rice-bar" class="war-progress-fill is-rice"></div></div></div>
+                            <div class="war-progress-metric war-progress-defense"><span>防御力</span><strong id="war-progress-defender-defense">0</strong><div class="war-progress-track"><div id="war-progress-defender-defense-bar" class="war-progress-fill is-defense"></div></div></div>
                         </div>
                     </div>
                 </div>
-                <div id="war-result-description" class="war-result-description"></div>
+                <div id="war-result-description" class="war-result-description">
+                    <div id="war-result-message"></div>
+                    <div id="war-progress-turn"></div>
+                    <div id="war-progress-log"></div>
+                </div>
             </div>
             <div class="modal-footer war-result-footer">
                 <button type="button" id="war-result-close-btn" class="btn-secondary">閉じる</button>

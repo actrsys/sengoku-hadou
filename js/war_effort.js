@@ -32,6 +32,18 @@ Object.assign(WarManager.prototype, {
         audio.restoreMemorizedBgm();
     },
 
+    // 総大将の名前・顔は同じ武将から一組で生成する。野戦は実配置の先頭総大将、攻城は本隊の指揮官。
+    createWarLeaderPresentation(state, phase) {
+        const fieldLeader = assignments => assignments?.[0]?.soldiers > 0 ? assignments[0].busho : null;
+        const attacker = phase === 'field' && Array.isArray(state.atkAssignments) ? fieldLeader(state.atkAssignments) : state.atkBushos?.[0];
+        const defender = phase === 'field' && Array.isArray(state.defAssignments) ? fieldLeader(state.defAssignments) : state.defBusho;
+        return {
+            attackerLeader: attacker?.name || '', defenderLeader: defender?.name || '',
+            attackerFace: attacker ? (attacker.faceIcon || 'unknown_face.webp') : null,
+            defenderFace: defender ? (defender.faceIcon || 'unknown_face.webp') : null
+        };
+    },
+
     // 戦後の地図点滅・制圧演出が完了してから表示する、戦争結果の統一入口。
     // 結果の確定・勝敗計算はendWarが担当し、この関数は表示に必要な情報だけ組み立てる。
     createWarResultPresentation(message, attackerWon, isRetreat) {
@@ -65,8 +77,7 @@ Object.assign(WarManager.prototype, {
             target: `${s.defender?.name || '戦場'}の戦い`,
             attacker: s.attacker.isKunishu ? (s.attacker.name || '諸勢力') : nameFor(s.attacker.ownerClan, '攻撃軍'),
             defender: s.defender.isKunishu ? (s.defender.name || '諸勢力') : nameFor(s.oldDefClanId ?? s.defender.ownerClan, '守備軍'),
-            attackerLeader: s.atkBushos?.[0]?.name || '',
-            defenderLeader: s.defBusho?.name || '',
+            ...(this._otherWarResultLeaders?.state === s ? this._otherWarResultLeaders.data : this.createWarLeaderPresentation(s)),
             description: String(message || ''),
             playerWon
         };
@@ -75,14 +86,14 @@ Object.assign(WarManager.prototype, {
     showWarOutcome(message, attackerWon, isRetreat, onConfirm) {
         const data = this.createWarResultPresentation(message, attackerWon, isRetreat);
         // 結果のSEは専用リザルトの公開時にだけ鳴らす。確認後のBGM復帰は従来の終了窓口に任せる。
-        this.prepareWarResultAudio(data.playerWon);
+        data.onOpen = () => this.prepareWarResultAudio(data.playerWon);
         const autoCloseTime = this.game.isWatchMode && !this.state.isPlayerInvolved ? 1500 : 0;
         this.game.ui.showWarResult(data, onConfirm, autoCloseTime);
     },
 
     async showWarOutcomeAsync(message, attackerWon, isRetreat) {
         const data = this.createWarResultPresentation(message, attackerWon, isRetreat);
-        this.prepareWarResultAudio(data.playerWon);
+        data.onOpen = () => this.prepareWarResultAudio(data.playerWon);
         const autoCloseTime = this.game.isWatchMode && !this.state.isPlayerInvolved ? 1500 : 0;
         return this.game.ui.showWarResultAsync(data, autoCloseTime);
     },
@@ -95,18 +106,36 @@ Object.assign(WarManager.prototype, {
 
     beginOtherWarProgress(phase, state, readFrame) {
         this._otherWarProgress = null;
+        this._otherWarResultLeaders = null;
         if (!this.shouldShowOtherWarProgress(state)) return;
-        this._otherWarProgress = { phase, state, frames: [] };
+        // 野戦の帰還処理で配備数が変わる前に確定。攻城へ移れば新しい総大将で上書きする。
+        this._otherWarResultLeaders = { state, data: this.createWarLeaderPresentation(state, phase) };
+        this._otherWarProgress = { phase, state, frames: [], pendingLogs: [], finalFrame: null };
         this.recordOtherWarProgress(phase, state, 0, readFrame);
+    },
+
+    // 戦闘の確定箇所だけから記録。戦闘状態・履歴・通知OFFの処理には保存しない。
+    recordOtherWarProgressEvent(phase, state, message) {
+        const progress = this._otherWarProgress;
+        if (!progress || progress.phase !== phase || progress.state !== state || !message) return;
+        progress.pendingLogs.push(message);
+    },
+
+    // 城壁修復など戦後の数値操作が始まる前の決着値を保存する。
+    captureOtherWarProgressFinal(phase, state, readFrame) {
+        const progress = this._otherWarProgress;
+        if (progress?.phase === phase && progress.state === state && !progress.finalFrame) progress.finalFrame = readFrame();
     },
 
     recordOtherWarProgress(phase, state, turn, readFrame) {
         const progress = this._otherWarProgress;
         if (!progress || progress.phase !== phase || progress.state !== state) return;
-        const frame = { turn, ...readFrame() };
+        const frame = { turn, ...readFrame(), logs: progress.pendingLogs.splice(0) };
         const previous = progress.frames[progress.frames.length - 1];
-        if (previous && previous.turn === frame.turn) progress.frames[progress.frames.length - 1] = frame;
-        else progress.frames.push(frame);
+        if (previous && previous.turn === frame.turn) {
+            frame.logs = [...previous.logs, ...frame.logs];
+            progress.frames[progress.frames.length - 1] = frame;
+        } else progress.frames.push(frame);
     },
 
     getSiegeProgressFrame(state) {
@@ -119,7 +148,7 @@ Object.assign(WarManager.prototype, {
         }, { soldiers: 0, rice: 0 });
         return {
             attacker: sum([state.attacker, state.selfReinforcement, state.reinforcement]),
-            defender: sum([state.defender, state.defSelfReinforcement, state.defReinforcement])
+            defender: { ...sum([state.defender, state.defSelfReinforcement, state.defReinforcement]), defense: Math.max(0, Number(state.defender.defense) || 0) }
         };
     },
 
@@ -127,11 +156,12 @@ Object.assign(WarManager.prototype, {
         const progress = this._otherWarProgress;
         if (!progress || progress.phase !== phase || progress.state !== state) return null;
         // 決着がターン境界直後なら同じ数値で次ターンを捏造しない。
-        const finalFrame = readFrame();
+        const finalFrame = progress.finalFrame || readFrame();
         const previous = progress.frames[progress.frames.length - 1];
-        if (!previous || ['attacker','defender'].some(side => ['soldiers','rice'].some(metric => previous[side][metric] !== finalFrame[side][metric]))) {
-            this.recordOtherWarProgress(phase, state, turn, () => finalFrame);
-        }
+        const changed = !previous || ['attacker', 'defender'].some(side =>
+            ['soldiers', 'rice', 'defense'].some(metric => previous[side][metric] !== finalFrame[side][metric]));
+        if (changed) this.recordOtherWarProgress(phase, state, turn, () => finalFrame);
+        else if (progress.pendingLogs.length) previous.logs.push(...progress.pendingLogs.splice(0));
         this._otherWarProgress = null;
         if (!this.shouldShowOtherWarProgress(state)) return null;
         const data = this.createWarResultPresentation('', false, false);
@@ -1611,6 +1641,12 @@ Object.assign(WarManager.prototype, {
         if (!s || !s[reinfKey]) return;
 
         const reinf = s[reinfKey];
+        const progress = this._otherWarProgress;
+        if (progress?.phase === 'siege' && progress.state === s) {
+            const leader = reinf.bushos?.[0]?.name;
+            const name = leader ? `${leader}軍` : ({ selfReinforcement: '攻撃側応援軍', reinforcement: '攻撃側友軍', defSelfReinforcement: '守備側応援軍', defReinforcement: '守備側友軍' })[reinfKey];
+            this.recordOtherWarProgressEvent('siege', s, `${name}${reinf.soldiers <= 0 ? 'が全滅' : 'が撤退'}`);
+        }
         
         // 撤退した人たちを忘れないように、専用の「帰宅待ちリスト」を作ります
         if (!s.retreatedReinforcements) {
@@ -1678,6 +1714,7 @@ Object.assign(WarManager.prototype, {
                         this.handleDaimyoEscape(b, target);
                     }
                 });
+                this.captureOtherWarProgressFinal('siege', s, () => this.getSiegeProgressFrame(s));
                 defCastle.gold -= carryGold; defCastle.rice = 0; defCastle.soldiers = 0;
                 defCastle.horses = 0; defCastle.guns = 0;
                 
@@ -3304,6 +3341,7 @@ Object.assign(WarManager.prototype, {
         // 旧戦争の非同期継続が次戦へ触れないだけでなく、諸勢力側の完了待ちもこの世代を正本にする。
         const warGeneration = Number(this._warGeneration || 0);
         const closeState = this.state;
+        this._otherWarResultLeaders = null;
         const closeFlowContext = this._captureWarFlowContext();
         const isCurrentClose = () => {
             if (this.state === closeState && this._isWarLifecycleCurrent(warGeneration, false)

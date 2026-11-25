@@ -170,6 +170,7 @@ class WarManager {
         this._warGeneration = Number(this._warGeneration || 0) + 1;
         this._warEnding = false;
         this._otherWarProgress = null;
+        this._otherWarResultLeaders = null;
         return this._warGeneration;
     }
 
@@ -264,6 +265,7 @@ class WarManager {
         this._warGeneration = Number(this._warGeneration || 0) + 1;
         this._warEnding = false;
         this._otherWarProgress = null;
+        this._otherWarResultLeaders = null;
         if (this.state) this.state.active = false;
         this.pendingPrisoners = [];
         this.pendingKills = [];
@@ -648,9 +650,10 @@ class WarManager {
         } catch(e) { console.error(e); this.endWar(false); } 
     }
 
-    finishSiegeWithNotice(attackerWon, message) {
+    finishSiegeWithNotice(attackerWon, message, progressLog) {
         if (!this.state || !this.state.active) return;
         const s = this.state;
+        this.recordOtherWarProgressEvent?.('siege', s, progressLog || message);
         const finalize = () => this.endWar(attackerWon);
 
         if (s.isPlayerInvolved && this.game && this.game.ui && typeof this.game.ui.showWarActionMessage === 'function') {
@@ -741,28 +744,30 @@ class WarManager {
             if (s.defender.defense <= 0) {
                 // 城壁が壊れて落ちた場合、少しだけ城壁（防御力）を修復してから戦後処理へ。
                 // ラウンド開始時点で既に0だった場合でも、プレイヤーには終了理由を必ず見せます。
+                this.captureOtherWarProgressFinal?.('siege', s, () => this.getSiegeProgressFrame(s));
                 s.defender.defense += 150;
-                this.finishSiegeWithNotice(true, '拠点の防御が尽き、拠点は陥落しました。');
+                this.finishSiegeWithNotice(true, '拠点の防御が尽き、拠点は陥落しました。', '城の防御力が尽きた');
                 return;
             }
             if (s.defender.morale <= 0) {
-                this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊し、拠点は陥落しました。');
+                this.finishSiegeWithNotice(true, '守備本隊の士気が崩壊し、拠点は陥落しました。', '守備本隊の士気が崩壊');
                 return;
             }
             if (s.defender.soldiers <= 0) {
-                this.finishSiegeWithNotice(true, '守備本隊が全滅し、拠点は陥落しました。');
+                this.finishSiegeWithNotice(true, '守備本隊が全滅し、拠点は陥落しました。', '守備本隊が全滅');
                 return;
             }
             if (s.attacker.morale <= 0) {
-                this.finishSiegeWithNotice(false, '攻撃本隊の士気が崩壊し、攻撃軍は退却しました。');
+                this.finishSiegeWithNotice(false, '攻撃本隊の士気が崩壊し、攻撃軍は退却しました。', '攻撃本隊の士気が崩壊');
                 return;
             }
             if (s.attacker.soldiers <= 0) {
-                this.finishSiegeWithNotice(false, '攻撃本隊が全滅し、守備軍が拠点を守り切りました。');
+                this.finishSiegeWithNotice(false, '攻撃本隊が全滅し、守備軍が拠点を守り切りました。', '攻撃本隊が全滅');
                 return;
             }
             
             if (s.attacker.rice <= 0) { 
+                this.recordOtherWarProgressEvent?.('siege', s, '攻撃本隊の兵糧が尽きた');
                 if (s.isPlayerInvolved && this.game.ui) {
                     this.game.ui.log("攻撃軍の兵糧が尽きました！", { history: false });
                     this.game.ui.showDialog("攻撃軍の兵糧が尽きました。\n攻撃軍は撤退します。", false, () => {
@@ -774,6 +779,7 @@ class WarManager {
                 return; 
             }
             if (s.defender.rice <= 0) { 
+                this.recordOtherWarProgressEvent?.('siege', s, '守備本隊の兵糧が尽きた');
                 if (s.isPlayerInvolved && this.game.ui) {
                     this.game.ui.log("守備軍の兵糧が尽きました！", { history: false });
                     this.game.ui.showDialog("守備軍の兵糧が尽きました。\nこれ以上の籠城は続けられません。", false, () => {
@@ -1162,15 +1168,21 @@ class WarManager {
                  }
 
                  if (s.defender.defense <= 0) {
+                     this.recordOtherWarProgressEvent?.('siege', s, '城の防御力が尽きた');
+                     this.captureOtherWarProgressFinal?.('siege', s, () => this.getSiegeProgressFrame(s));
                      s.defender.defense += 150;
                      this.endWar(true);
                  } else if (s.defender.morale <= 0) {
+                     this.recordOtherWarProgressEvent?.('siege', s, '守備本隊の士気が崩壊');
                      this.endWar(true);
                  } else if (s.defender.soldiers <= 0) {
+                     this.recordOtherWarProgressEvent?.('siege', s, '守備本隊が全滅');
                      this.endWar(true);
                  } else if (s.attacker.morale <= 0) {
+                     this.recordOtherWarProgressEvent?.('siege', s, '攻撃本隊の士気が崩壊');
                      this.endWar(false);
                  } else if (s.attacker.soldiers <= 0) {
+                     this.recordOtherWarProgressEvent?.('siege', s, '攻撃本隊が全滅');
                      this.endWar(false);
                  } else {
                      this.advanceWarTurn();
@@ -1276,6 +1288,7 @@ class WarManager {
 
         if (type === 'retreat') { 
             if (s.turn === 'attacker') { 
+                this.recordOtherWarProgressEvent?.('siege', s, '攻撃本隊が撤退');
                 pushMsg({ text: `<span class="war-critical-message">攻撃本隊は撤退を開始し、合戦は終結しました。</span>`, log: `${activeArmyName}が撤退を開始した！` });
                 const finalize = () => { this.endWar(false, true); };
                 if (s.isPlayerInvolved && actionMessages.length > 0) {
@@ -1284,6 +1297,7 @@ class WarManager {
                     finalize();
                 }
             } else if (s.turn === 'defender') { 
+                this.recordOtherWarProgressEvent?.('siege', s, '守備本隊が撤退を開始');
                 pushMsg({ text: `<span class="war-critical-message">守備本隊は拠点を放棄して撤退し、合戦は終結しました。</span>`, log: `${activeArmyName}が拠点を放棄し撤退した！` });
                 const finalize = () => { this.executeRetreatLogic(s.defender); };
                 if (s.isPlayerInvolved && actionMessages.length > 0) {
@@ -2212,6 +2226,7 @@ class WarManager {
                 s.phase = 'init';
                 s.round++;
                 if (s.round > window.WarParams.Military.WarMaxRounds) { 
+                    this.recordOtherWarProgressEvent?.('siege', s, '攻撃軍が攻略を断念し撤退');
                     if (s.isPlayerInvolved && this.game.ui) {
                         const isAtkPlayer = (Number(s.attacker.ownerClan) === Number(this.game.playerClanId));
                         const isDefPlayer = (Number(s.defender.ownerClan) === Number(this.game.playerClanId));

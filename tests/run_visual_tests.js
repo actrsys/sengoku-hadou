@@ -3295,42 +3295,66 @@ async function validateWarProgressAndResultLayout(cdp) {
     assert.ok(start>=0 && end>start);
     const markup=index.slice(start,end);
     const scripts=['js/stat_presenter.js','js/ui.js','js/ui_war_result.js'].map(f=>fs.readFileSync(path.join(ROOT,f),'utf8')).join('\n');
-    const html=`<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css.replace(/<\/style/gi,'<\\/style')}</style></head><body><div id="game-screen">${markup}</div></body></html>`;
-    const expr = (pc,w,h) => `(() => {
+    // 同梱顔画像だけを実際のHTTP画像として読み込み、欠損時の共通フォールバックも検証する。
+    const faceServer=http.createServer((req,res)=>{
+        if (!/^\/data\/images\/faceicons\/[A-Za-z0-9_-]+\.webp$/.test(req.url)) {res.writeHead(404);res.end();return;}
+        const file=path.join(ROOT,req.url.slice(1));
+        if (!fs.existsSync(file)) {res.writeHead(404);res.end();return;}
+        res.setHeader('Content-Type','image/webp');res.end(fs.readFileSync(file));
+    });
+    await new Promise(resolve=>faceServer.listen(0,'127.0.0.1',resolve));
+    try {
+    const html=`<!doctype html><html lang="ja"><head><meta charset="utf-8"><base href="http://127.0.0.1:${faceServer.address().port}/"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css.replace(/<\/style/gi,'<\\/style')}</style></head><body><div id="game-screen">${markup}</div></body></html>`;
+    const expr = (pc,w,h) => `(async () => {
         document.open();document.write(${JSON.stringify(html)});document.close();
         document.body.classList.toggle('is-pc',${pc});
         const screen=document.getElementById('game-screen');Object.assign(screen.style,{width:'${w}px',height:'${h}px',position:'absolute',left:'0',top:'0',transform:'none',background:'#18251d'});
         const UI=(new Function(${JSON.stringify(scripts+'\nreturn UIManager;')}))();
-        const ui=Object.create(UI.prototype);ui.prepareCoveredViewForOpen=el=>el.classList.remove('hidden');
+        const ui=Object.create(UI.prototype);ui.prepareCoveredViewForOpen=el=>el.classList.remove('hidden');ui.beginModalHandoff=()=>()=>{};
         const frame=(turn,a,d,ar,dr)=>({turn,attacker:{soldiers:a,rice:ar},defender:{soldiers:d,rice:dr}});
         const frames=[frame(0,30000,18000,24000,36000),frame(1,25000,12400,18000,29000),frame(2,900,100,100,10)];
-        const short={title:'野戦',target:'稲葉山城の戦い',attacker:'織田家',defender:'斎藤家',attackerLeader:'織田信長',defenderLeader:'斎藤龍興',description:'',tone:''};
+        const short={title:'野戦',target:'稲葉山城の戦い',attacker:'織田家',defender:'斎藤家',attackerLeader:'織田信長',defenderLeader:'斎藤龍興',attackerFace:'oda_nobunaga.webp',defenderFace:'saitou_tatsuoki.webp',description:'',tone:''};
         const long={...short,title:'攻城戦',target:'非常に長い名前の諸勢力が守る大きな城の戦い',attacker:'南部大浦一族と非常に長い名前の応援軍',defender:'非常に長い名称を持つ諸勢力守備軍',attackerLeader:'非常に長い名前を持つ総大将',defenderLeader:'非常に長い名前を持つ守備大将'};
         const sel=['.war-result-content','.war-result-armies','.war-result-army:first-child','.war-result-army:last-child','.war-result-title','.war-result-target','.war-result-description','.war-result-footer','#war-result-close-btn'];
         const tracks=['#war-progress-attacker-soldiers','#war-progress-defender-soldiers','#war-progress-attacker-rice','#war-progress-defender-rice',...Array.from({length:4},(_,i)=>'.war-result-army:nth-child('+(i<2?1:3)+') .war-progress-metric:nth-child('+(i%2+1)+') .war-progress-track')];
         const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return [r.x,r.y,r.width,r.height];};
         const snapshot=()=>sel.map(rect);
-        const progress=(data,values)=>{ui.showWarResult({...data,progressFrames:values},()=>{});clearTimeout(ui._warResultTimer);};
+        const progress=async(data,values)=>{await ui.showWarResult({...data,progressFrames:values},()=>{});clearTimeout(ui._warResultTimer);};
         const barRatio=(side,metric)=>{const el=document.getElementById('war-progress-'+side+'-'+metric+'-bar');return el.getBoundingClientRect().width/el.parentElement.getBoundingClientRect().width;};
-        progress(short,frames);const initial=snapshot(),metricInitial=tracks.map(rect),ratios=[barRatio('attacker','soldiers'),barRatio('defender','soldiers'),barRatio('attacker','rice'),barRatio('defender','rice')];
+        await progress(short,frames);const initial=snapshot(),faceRects=['#war-result-attacker-face','#war-result-defender-face'].map(rect),facesReady=[...document.querySelectorAll('.war-result-face')].every((img,i)=>img.naturalWidth>0&&getComputedStyle(img).visibility==='visible'&&img.getAttribute('src').endsWith(i?'saitou_tatsuoki.webp':'oda_nobunaga.webp')),metricInitial=tracks.map(rect),ratios=[barRatio('attacker','soldiers'),barRatio('defender','soldiers'),barRatio('attacker','rice'),barRatio('defender','rice')];
         ui._renderWarProgressFrame(frames[2],frames[0],false);const after=snapshot(),metricAfter=tracks.map(rect),finalRatios=[barRatio('attacker','soldiers'),barRatio('defender','soldiers')];
         const huge=[frame(0,1234567,999999,9000000,8888888),frame(1,1,0,0,1)];
-        progress(long,huge);const lengthy=snapshot(),metricLong=tracks.map(rect);
+        huge[0].defender.defense=500;huge[1].defender.defense=0;
+        huge[1].logs=['非常に長い名前の部隊が兵糧を使い果たして撤退しました。'.repeat(4)];
+        await progress(long,huge);const lengthy=snapshot(),metricLong=tracks.map(rect);
+        const defense=document.querySelector('.war-progress-defense');const defenseVisible=getComputedStyle(defense).visibility==='visible';
+        const logRect=rect('#war-progress-log'),defenseRect=rect('.war-progress-defense');
+        ui._renderWarProgressFrame(huge[1],huge[0],false,true);const siegeFinal=snapshot(),logFinalRect=rect('#war-progress-log'),defenseFinalRect=rect('.war-progress-defense');
+        const defenseRatio=barRatio('defender','defense'),defenseZero=document.getElementById('war-progress-defender-defense').textContent==='0';
+        const terminalLabel=document.getElementById('war-progress-turn').textContent;
+        const logSingleLine=getComputedStyle(document.getElementById('war-progress-log')).whiteSpace==='nowrap';
+        const detail=document.getElementById('war-result-description'),detailRect=detail.getBoundingClientRect(),turnRect=document.getElementById('war-progress-turn').getBoundingClientRect(),logBox=document.getElementById('war-progress-log').getBoundingClientRect();
+        const logReadable=turnRect.height>0&&logBox.height>0&&turnRect.top>=detailRect.top&&logBox.bottom<=detailRect.bottom+0.5&&logBox.top>=turnRect.bottom-0.5&&detail.scrollHeight<=detail.clientHeight+1;
         const metricContained=Array.from(document.querySelectorAll('.war-progress-metric')).every(el=>{const r=el.getBoundingClientRect(),card=el.closest('.war-result-army').getBoundingClientRect();return r.bottom<=card.bottom+0.5&&r.top>=card.top-0.5&&r.left>=card.left-0.5&&r.right<=card.right+0.5;});
-        ui.showWarResult({...short,title:'攻撃軍勝利',description:'稲葉山城を制圧しました。'},()=>{});const resultShort=snapshot();
-        ui.showWarResult({...long,title:'守備軍勝利',description:'長い戦後報告。'.repeat(100)},()=>{});const resultLong=snapshot();
+        await ui.showWarResult({...short,title:'攻撃軍勝利',description:'稲葉山城を制圧しました。'},()=>{});const resultShort=snapshot();
+        await ui.showWarResult({...long,title:'守備軍勝利',description:'長い戦後報告。'.repeat(100)},()=>{});const resultLong=snapshot(),resultFaces=['#war-result-attacker-face','#war-result-defender-face'].map(rect);
         const description=document.getElementById('war-result-description');const scrollable=description.scrollHeight>description.clientHeight&&getComputedStyle(description).overflowY==='auto';
+        await ui.showWarResult({...short,attackerFace:'missing_test.webp',defenderFace:null},()=>{});const fallback=document.getElementById('war-result-attacker-face'),absent=document.getElementById('war-result-defender-face');const fallbackOK=fallback.getAttribute('src').endsWith('/unknown_face.webp')&&fallback.naturalWidth>0&&getComputedStyle(fallback).visibility==='visible'&&!absent.hasAttribute('src')&&getComputedStyle(absent).visibility==='hidden';
         // 検査後は通常の初期状態に戻し、確認用の実描画を残す。
-        progress(short,frames);window.__warLayoutPreview={ui,short,frames};
-        return {initial,after,lengthy,metricInitial,metricAfter,metricLong,resultShort,resultLong,ratios,finalRatios,metricContained,scrollable};
+        await progress(short,frames);const fieldDefenseHidden=getComputedStyle(defense).visibility==='hidden';
+        const siegePreview=[frame(0,30000,18000,24000,36000),frame(3,11200,3400,2300,0)];siegePreview[0].defender.defense=750;siegePreview[1].defender.defense=0;siegePreview[1].logs=['城の防御力が尽きた'];
+        await progress({...short,title:'攻城戦'},siegePreview);ui._renderWarProgressFrame(siegePreview[1],siegePreview[0],false,true);window.__warLayoutPreview={ui,short,frames};
+        return {faceRects,resultFaces,facesReady,fallbackOK,initial,after,lengthy,metricInitial,metricAfter,metricLong,resultShort,resultLong,ratios,finalRatios,metricContained,scrollable,defenseVisible,fieldDefenseHidden,defenseZero,defenseRatio,terminalLabel,logSingleLine,logReadable,logRect,logFinalRect,defenseRect,defenseFinalRect,siegeFinal};
     })()`;
     for (const dev of [{name:'PC',w:1280,h:720,pc:true},{name:'SP',w:360,h:640,pc:false}]) {
         await cdp.call('Emulation.setDeviceMetricsOverride',{width:dev.w,height:dev.h,deviceScaleFactor:1,mobile:!dev.pc});
-        const res=await cdp.call('Runtime.evaluate',{expression:expr(dev.pc,dev.w,dev.h),returnByValue:true});
+        const res=await cdp.call('Runtime.evaluate',{expression:expr(dev.pc,dev.w,dev.h),returnByValue:true,awaitPromise:true});
         if(res.exceptionDetails)throw new Error(JSON.stringify(res.exceptionDetails));
         const v=res.result.value;assert.ok(v,dev.name+' 計測値なし');
         const same=(a,b,label)=>a.forEach((r,i)=>r.forEach((n,j)=>approx(b[i][j],n,0.6,dev.name+' '+label+' '+i+':'+j)));
-        same(v.initial,v.after,'数値変動後');same(v.initial,v.lengthy,'長い名前・7桁');
+        same(v.faceRects.map(r=>[r[0],r[2],r[3]]),v.resultFaces.map(r=>[r[0],r[2],r[3]]),'顔枠幅・高さ・横位置固定');assert.ok(v.facesReady&&v.fallbackOK,dev.name+' 顔画像decode・欠損フォールバック・不在消去');
+        same(v.initial,v.after,'数値変動後');same(v.initial,v.lengthy,'長い名前・7桁');same(v.initial,v.siegeFinal,'攻城戦の決着時');same([v.logRect],[v.logFinalRect],'ログ欄固定');same([v.defenseRect],[v.defenseFinalRect],'防御力欄固定');
+        assert.ok(v.defenseVisible&&v.fieldDefenseHidden&&v.defenseZero&&v.logSingleLine&&v.logReadable,dev.name+' 防御力と固定ログ表示');assert.strictEqual(v.terminalLabel,'第1ターン・決着');approx(v.defenseRatio,0,.01,dev.name+' 防御0');
         same(v.metricInitial,v.metricAfter,'ゲージ枠と数値欄');same(v.metricInitial,v.metricLong,'長い名称と多桁');
         same(v.resultShort,v.resultLong,'長い戦後文');same(v.initial,v.resultShort,'戦況→結果の外形');
         for(let i=0;i<4;i++)approx(v.ratios[i],[1,.6,2/3,1][i],.015,dev.name+' 初期比 '+i);
@@ -3340,14 +3364,15 @@ async function validateWarProgressAndResultLayout(cdp) {
         if (process.env.WAR_PREVIEW_DIR) {
             await new Promise(resolve=>setTimeout(resolve,100));
             const shot=await cdp.call('Page.captureScreenshot',{format:'png',fromSurface:true});
-            fs.writeFileSync(path.join(process.env.WAR_PREVIEW_DIR,`r972_戦況_${dev.name}.png`),Buffer.from(shot.data,'base64'));
-            await cdp.call('Runtime.evaluate',{expression:`(()=>{const {ui,short}=window.__warLayoutPreview;ui.showWarResult({...short,title:'攻撃軍勝利',tone:'victory',description:'織田家が稲葉山城を制圧しました。'},()=>{});return true;})()`,returnByValue:true});
+            fs.writeFileSync(path.join(process.env.WAR_PREVIEW_DIR,`r974_攻城戦況_${dev.name}.png`),Buffer.from(shot.data,'base64'));
+            await cdp.call('Runtime.evaluate',{expression:`(async()=>{const {ui,short}=window.__warLayoutPreview;await ui.showWarResult({...short,title:'攻撃軍勝利',tone:'victory',description:'織田家が稲葉山城を制圧しました。'},()=>{});return true;})()`,returnByValue:true,awaitPromise:true});
             await new Promise(resolve=>setTimeout(resolve,100));
             const resultShot=await cdp.call('Page.captureScreenshot',{format:'png',fromSurface:true});
-            fs.writeFileSync(path.join(process.env.WAR_PREVIEW_DIR,`r972_リザルト_${dev.name}.png`),Buffer.from(resultShot.data,'base64'));
+            fs.writeFileSync(path.join(process.env.WAR_PREVIEW_DIR,`r974_リザルト_${dev.name}.png`),Buffer.from(resultShot.data,'base64'));
         }
     }
-    console.log('✓ r972 他家戦況・戦争リザルト PC/SP固定矩形・初期戦力比・桁/名称/長文 regression');
+    console.log('✓ r974 他家戦況・戦争リザルト PC/SP顔画像・固定矩形・城防御力・決着ログ regression');
+    } finally { await new Promise(resolve=>faceServer.close(resolve)); }
 }
 
 async function main() {
