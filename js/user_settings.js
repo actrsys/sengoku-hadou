@@ -13,7 +13,7 @@ class UserSettingsManager {
         bgmVolume: 1.0,
         seVolume: 1.0,
         displayMode: 'auto',
-        difficulty: 'advanced'
+        difficulty: 'beginner'
     });
 
     static STORAGE_KEYS = Object.freeze({

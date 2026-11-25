@@ -46124,7 +46124,9 @@ test('難易度は他家の内政上限を一度抽選し、0回・委任・観�
     const other={ownerClan:2}, delegated={ownerClan:'1',isDelegated:true};
     const caps=[0,1,2,3,4,6];
     const limits=castle=>caps.map(n=>ai.getInternalActionLimit(castle,n));
-    assert.strictEqual(ctx.UserSettings.difficulty,'advanced');
+    assert.strictEqual(ctx.UserSettings.difficulty,'beginner');
+    assert.strictEqual(values.has('userDifficulty'),false);
+    ctx.UserSettings.setDifficulty('advanced');
     assert.deepStrictEqual(limits(other),caps); assert.strictEqual(draws,0);
     ctx.UserSettings.setDifficulty('intermediate');
     roll=0; assert.deepStrictEqual(limits(other),caps);
@@ -46142,13 +46144,34 @@ test('難易度は他家の内政上限を一度抽選し、0回・委任・観�
     const results=[]; before=draws;
     for(const r of [0.99,0.01,0.5,0.99,0.01]){roll=r;results.push(ai.getInternalActionLimit(other,1));}
     assert.deepStrictEqual(results,[0,1,0,0,1]); assert.strictEqual(draws-before,5);
-    ctx.UserSettings.setDifficulty('invalid'); assert.strictEqual(ctx.UserSettings.difficulty,'advanced');
-    before=draws;assert.deepStrictEqual(limits(other),caps);assert.strictEqual(draws,before);
-    values.set('userDifficulty','corrupt');ctx.UserSettings.reload();assert.strictEqual(ctx.UserSettings.difficulty,'advanced');
+    ctx.UserSettings.setDifficulty('invalid'); assert.strictEqual(ctx.UserSettings.difficulty,'beginner');
+    roll=2/3;before=draws;assert.deepStrictEqual(limits(other),[0,0,0,1,2,4]);assert.strictEqual(draws-before,5);
+    values.set('userDifficulty','corrupt');ctx.UserSettings.reload();assert.strictEqual(ctx.UserSettings.difficulty,'beginner');
     assert.strictEqual(ctx.AIParams.AI.Difficulty,'normal','従来の判断補正は変えない');
 });
 
-test('下級の0回は製品の内政実行から候補評価前に正常復帰し、次回の抽選や自家を止めない', async () => {
+test('難易度の初期値は初級、保存済み選択と他設定は維持される', () => {
+    const values = new Map([['userBgmVolume','0.4'],['autoSave','false']]);
+    const storage = {getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,String(v))};
+    const ctx=createContext({localStorage:storage});
+    loadScript(ctx,'js/user_settings.js');
+    assert.strictEqual(ctx.UserSettings.difficulty,'beginner');
+    assert.strictEqual(values.has('userDifficulty'),false);
+    for (const difficulty of ['beginner','intermediate','advanced']) {
+        ctx.UserSettings.setDifficulty(difficulty);
+        const restored=new ctx.UserSettingsManager(storage);
+        assert.strictEqual(restored.difficulty,difficulty);
+        assert.strictEqual(restored.bgmVolume,0.4);
+        assert.strictEqual(restored.autoSave,false);
+    }
+    const unavailable={getItem(){throw new Error('blocked');},setItem(){throw new Error('blocked');}};
+    const temporary=new ctx.UserSettingsManager(unavailable);
+    assert.strictEqual(temporary.difficulty,'beginner');
+    assert.strictEqual(temporary.setDifficulty('advanced'),'advanced');
+    assert.strictEqual(temporary.difficulty,'advanced');
+});
+
+test('初級の0回は製品の内政実行から候補評価前に正常復帰し、次回の抽選や自家を止めない', async () => {
     const reached = new Error('内政候補評価に到達');
     let roll=0.99;
     const randomMath=Object.create(Math);randomMath.random=()=>roll;
@@ -46194,7 +46217,7 @@ test('難易度の月初自然増加は他家の正の増加のみ補正し、�
         assert.strictEqual(rules.applyMonthlyGrowthPercent(0,percent),0);
         assert.strictEqual(rules.applyMonthlyGrowthPercent(1,percent),percent===100?1:0);
     }
-    ctx.UserSettings.setDifficulty('invalid');assert.strictEqual(rules.getMonthlyGrowthPercent(castle,game),100);
+    ctx.UserSettings.setDifficulty('invalid');assert.strictEqual(rules.getMonthlyGrowthPercent(castle,game),70);
 });
 
 test('製品の月初進行で各拠点の難易度補正・人口差分・兵士計算順を保持する', async () => {

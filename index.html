@@ -743,9 +743,9 @@
                         <div class="setting-row">
                             <label class="slider-row-label">難易度</label>
                             <div class="setting-toggle-group setting-three-way-toggle" role="group" aria-label="難易度">
-                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-difficulty-beginner" aria-pressed="false">下級</button>
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-difficulty-beginner" aria-pressed="true">初級</button>
                                 <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-difficulty-intermediate" aria-pressed="false">中級</button>
-                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-difficulty-advanced" aria-pressed="true">上級</button>
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-difficulty-advanced" aria-pressed="false">上級</button>
                             </div>
                         </div>
                         <div class="setting-row">
@@ -805,12 +805,12 @@
     </div>
     <!-- script一覧は唯一の配布正本。template内部では実行されず、startup_loaderが順番に読み込む。 -->
     <template id="startup-script-manifest">
-    <script src="js/user_settings.js?v=981"></script>
+    <script src="js/user_settings.js?v=982"></script>
     <script src="js/app_bootstrap.js"></script>
     <script src="js/tab_session.js"></script>
     <!-- Round5: Howlerは1本だけ読み込み、min版が無い環境では通常版へフォールバック -->
     <script src="js/howler.min.js"></script>
-    <script src="js/config.js?v=981"></script>
+    <script src="js/config.js?v=982"></script>
     <script src="js/constants.js"></script>
     <script src="js/game_math.js"></script>
     <script src="js/map_graph.js"></script>
@@ -846,7 +846,7 @@
     <script src="js/faction_system.js"></script>
     <script src="js/strategy_system.js"></script>
     <script src="js/command_catalog.js"></script>
-    <script src="js/guide_data.js?v=981"></script>
+    <script src="js/guide_data.js?v=982"></script>
     <script src="js/guide_view.js"></script>
     <script src="js/save_load_view.js"></script>
     <script src="js/war_preparation_controller.js"></script>
