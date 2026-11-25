@@ -1477,10 +1477,10 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 /* 戦況再生と戦争結果は同じ固定枠・外側footerを使う。文字や桁数で外形を動かさない。 */
 #war-result-modal { z-index: 9650; background: rgba(0, 0, 0, 0.42); }
 #war-result-modal .war-result-content {
-    width: min(90%, 590px); max-width: 590px; height: 414px; flex: 0 0 auto;
+    width: min(90%, 590px); max-width: 590px; height: 390px; flex: 0 0 auto;
     padding: 16px 24px; overflow: hidden !important;
     background: linear-gradient(to bottom, #243e30 0%, #14291e 100%); border-color: #c2a15e;
-    display: grid; grid-template-rows: 18px 44px 23px minmax(0, 1fr) 64px; gap: 8px; align-items: stretch;
+    display: grid; grid-template-rows: 18px 44px 23px minmax(0, 1fr) 72px; gap: 8px; align-items: stretch;
 }
 .war-result-kicker { color: #e4d1a1; font-size: 0.82rem; letter-spacing: 0.22em; }
 .war-result-title { font-family: var(--font-decorative-ja); font-size: 2.2rem; font-weight: bold; color: #f3da8f; line-height: 1.2; text-shadow: 1px 2px 3px #111; }
@@ -1495,31 +1495,20 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 .war-result-army-name { font-size: 1.05rem; color: #fff4d6; }
 .war-result-commander { font-size: .8rem; color: #c8d4c9; }
 .war-result-versus { align-self: center; color: #bba36e; font-family: var(--font-decorative-ja); font-weight: bold; }
-.war-result-description { white-space: normal; overflow-wrap: anywhere; min-height: 0; overflow-y: auto; overscroll-behavior: contain; font-size: .93rem; line-height: 1.5; color: #f2ead6; border-top: 1px solid rgba(212, 175, 55, .26); padding: 8px 4px 0; box-sizing: border-box; }
+.war-result-description { white-space: pre-line; overflow-wrap: anywhere; min-height: 0; overflow-y: auto; overscroll-behavior: contain; font-size: .93rem; line-height: 1.5; color: #f2ead6; border-top: 1px solid rgba(212, 175, 55, .26); padding: 8px 4px 0; box-sizing: border-box; }
 #war-result-modal .war-result-footer { justify-content: center; }
 #war-result-close-btn { min-width: 120px; }
 .war-progress-metrics { display: none; min-width: 0; min-height: 0; }
-#war-result-modal.is-progress .war-progress-metrics { display: grid; grid-template-rows: repeat(3, 28px); gap: 4px; align-self: stretch; align-content: center; }
-.war-progress-metric { display: grid; grid-template-columns: 3.2em minmax(0, 1fr); grid-template-rows: 19px 6px; align-content: center; align-items: center; gap: 3px 4px; min-width: 0; }
+#war-result-modal.is-progress .war-progress-metrics { display: grid; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 5px; align-self: stretch; }
+.war-progress-metric { display: grid; grid-template-columns: 2.5em minmax(0, 1fr); grid-template-rows: 19px 6px; align-content: center; align-items: center; gap: 3px 4px; min-width: 0; }
 .war-progress-metric > span { text-align: left; color: #c8d4c9; font-size: .75rem; }
 .war-progress-metric > strong { text-align: right; font-size: .94rem; color: #fff4d6; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .war-progress-track { grid-column: 1 / -1; height: 6px; background: rgba(0,0,0,.45); border-radius: 3px; overflow: hidden; }
 .war-progress-fill { width: 100%; height: 100%; background: #bd796b; border-radius: 3px; transform: scaleX(0); transform-origin: left center; transition: transform var(--war-progress-step, 100ms) linear; }
 .war-result-army:last-child .war-progress-fill { background: #779eb9; }
 .war-result-army .war-progress-fill.is-rice { background: #c1a76b; }
-.war-result-army .war-progress-fill.is-defense { background: #a9b4ac; }
-.war-progress-defense { visibility: hidden; }
-#war-result-modal.is-siege-progress .war-progress-defense { visibility: visible; }
-#war-result-message { white-space: pre-line; }
-#war-progress-turn, #war-progress-log { display: none; }
-#war-result-modal.is-progress #war-result-message { display: none; }
-#war-result-modal.is-progress .war-result-description { overflow: hidden; }
-#war-result-modal.is-progress #war-progress-turn, #war-result-modal.is-progress #war-progress-log {
-    display: block; height: 1.5em; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-#war-progress-log { color: #e4d1a1; }
 @media (prefers-reduced-motion: reduce) { .war-progress-fill { transition: none; } }
-body:not(.is-pc) #war-result-modal .war-result-content { width: 93%; height: 382px; padding: 10px; gap: 6px; grid-template-rows: 16px 36px 20px minmax(0, 1fr) 58px; }
+body:not(.is-pc) #war-result-modal .war-result-content { width: 93%; height: 358px; padding: 10px; gap: 6px; grid-template-rows: 16px 36px 20px minmax(0, 1fr) 70px; }
 body:not(.is-pc) .war-result-title { font-size: 1.7rem; }
 body:not(.is-pc) .war-result-target { font-size: .8rem; }
 body:not(.is-pc) .war-result-armies { gap: 4px; grid-template-columns: minmax(0, 1fr) 17px minmax(0, 1fr); }
