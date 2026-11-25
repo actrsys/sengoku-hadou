@@ -809,6 +809,53 @@ async function validateEndingAndWatchStates(cdp) {
 }
 
 
+async function validateWatchReturnNoticeLayer(cdp) {
+    const html = fixtureHtml('dialog_confirm.html');
+    const uiSource = fs.readFileSync(path.join(ROOT, 'js', 'ui.js'), 'utf8');
+    const gameSource = fs.readFileSync(path.join(ROOT, 'js', 'game.js'), 'utf8').split('function initializeGameApp()')[0];
+    for (const [width,height,pc] of [[1280,720,true],[360,640,false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride', {width,height,deviceScaleFactor:1,mobile:!pc});
+        const init = await cdp.call('Runtime.evaluate',{expression:`(() => {
+            document.open();document.write(${JSON.stringify(html)});document.close();document.body.classList.toggle('is-pc',${pc});
+            const screen=document.getElementById('game-screen');screen.style.cssText='position:absolute;inset:0;background:#314c35';
+            const dialog=document.getElementById('dialog-modal');dialog.classList.add('hidden');dialog.classList.remove('event-choices-active');dialog.querySelector('.modal-footer').classList.add('hidden');
+            document.getElementById('dialog-message').textContent='大名が独立を宣言しました。';
+            for(const [id,classes] of [['modal-handoff-backdrop','hidden'],['war-result-modal','modal hidden'],['cutin-overlay','cutin-overlay hidden'],['ending-screen','hidden'],['global-loading-screen','hidden']]) {const el=document.createElement('div');el.id=id;el.className=classes;screen.appendChild(el);}
+            const UI=(new Function(${JSON.stringify(uiSource+'\nreturn UIManager;')}))();
+            const Game=(new Function(${JSON.stringify(gameSource+'\nreturn GameManager;')}))();
+            const game=Object.create(Game.prototype);const ui=Object.create(UI.prototype);game.ui=ui;ui.game=game;game.isWatchMode=true;game.writeSystemDiagnostic=()=>{};
+            window.__watchTest={game,ui,dialog,screen};
+            if(!game.requestWatchReturn())throw Error('予約できない');
+            const notice=document.getElementById('watch-return-reserved-notice');
+            window.__watchVisible=()=>getComputedStyle(notice).visibility==='visible'&&getComputedStyle(notice).display!=='none';
+            const initial=window.__watchVisible();const rect=notice.getBoundingClientRect();dialog.classList.remove('hidden');
+            return {initial,visible:window.__watchVisible(),overlap:rect.bottom>dialog.querySelector('.modal-content').getBoundingClientRect().top};
+        })()`,returnByValue:true});
+        if(init.exceptionDetails)throw Error(JSON.stringify(init.exceptionDetails));
+        const data=init.result.value;
+        if(process.env.WATCH_PREVIEW_DIR){const shot=await cdp.call('Page.captureScreenshot',{format:'png',fromSurface:true});fs.writeFileSync(path.join(process.env.WATCH_PREVIEW_DIR,`event_${pc?'PC':'SP'}.png`),Buffer.from(shot.data,'base64'));}
+        const result=await cdp.call('Runtime.evaluate',{expression:`(() => {
+            const {game,ui,dialog,screen}=window.__watchTest;const visible=window.__watchVisible;
+            const notice=document.getElementById('watch-return-reserved-notice');const states=[];
+            const record=label=>states.push([label,visible(),game._watchReturnRequested,notice.isConnected]);
+            record('event');dialog.classList.add('event-choices-active');dialog.querySelector('.modal-footer').classList.remove('hidden');record('choices');
+            const backdrop=document.getElementById('modal-handoff-backdrop');backdrop.classList.remove('hidden');dialog.classList.add('hidden');record('handoff');
+            dialog.classList.remove('hidden');backdrop.classList.add('hidden');record('next dialogue');
+            dialog.classList.add('hidden');record('map');
+            for(const id of ['war-result-modal','cutin-overlay','ending-screen','global-loading-screen']) {const el=document.getElementById(id);el.classList.remove('hidden');record(id);el.classList.add('hidden');record('map');}
+            const disaster=document.createElement('div');disaster.className='event-map-overlay';document.body.appendChild(disaster);record('disaster');disaster.remove();record('map');
+            game._resetWatchReturnState();dialog.classList.remove('hidden');const accepted=game.requestWatchReturn();const next=document.getElementById('watch-return-reserved-notice');const during=getComputedStyle(next).visibility==='visible';const duplicate=game.requestWatchReturn();dialog.classList.add('hidden');const after=getComputedStyle(next).visibility==='visible';game._resetWatchReturnState();
+            return {states,accepted,during,duplicate,after,cleared:!document.getElementById('watch-return-reserved-notice')&&!game._watchReturnRequested};
+        })()`,returnByValue:true});
+        if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));
+        const r=result.result.value;console.log('  watch notice '+(pc?'PC':'SP')+' '+JSON.stringify({data,...r}));
+        assert.ok(data.initial&&data.overlap&&!data.visible,JSON.stringify(data));
+        for(const [label,shown,reserved,connected] of r.states){assert.strictEqual(shown,label==='map',label);assert.ok(reserved&&connected,label+' reservation preserved');}
+        assert.ok(r.accepted&&!r.during&&!r.duplicate&&r.after&&r.cleared,JSON.stringify(r));
+    }
+    console.log('✓ 観戦終了予約の会話・暗幕・戦況・災害表示との共存と復帰 (PC/SP)');
+}
+
 async function validateGuideLayout(cdp) {
     const html = fixtureHtml('guide.html');
     const loadAt = async (width, height, mobile, isPc) => {
@@ -3485,6 +3532,7 @@ async function main() {
         await validateFloatingStatusLayout(cdp);
         await validateCommandAndInterviewStates(cdp);
         await validateEndingAndWatchStates(cdp);
+        await validateWatchReturnNoticeLayer(cdp);
         await validateGuideLayout(cdp);
         await validateWarAptitudeLayout(cdp);
         await validateUnitDivideZeroAllocation(cdp);

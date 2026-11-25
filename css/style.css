@@ -6623,7 +6623,8 @@ body:not(.is-pc) .saveload-latest-mark {
     left: 50%;
     bottom: max(18px, env(safe-area-inset-bottom));
     transform: translateX(-50%);
-    z-index: 12000;
+    /* 通常地図の案内層。共通引継ぎ暗幕(4999)・モーダルより下に置く。 */
+    z-index: 4950;
     pointer-events: none;
     padding: 8px 14px;
     border-radius: 8px;
@@ -6637,6 +6638,21 @@ body:not(.is-pc) .saveload-latest-mark {
     text-shadow: 1px 1px 2px #000;
 }
 body.is-pc #watch-return-reserved-notice { font-size: 0.9rem; }
+
+/* 予約そのものは維持し、前面表示だけを既存の画面状態から退避する。
+   固定DOMの後ろに追加される案内なので兄弟セレクタで即時同期し、
+   会話の引継ぎ暗幕中も再表示しない。JS側のタイマー・予約フラグを増やさない。 */
+#game-screen > .modal:not(.hidden) ~ #watch-return-reserved-notice,
+#game-screen > #modal-handoff-backdrop:not(.hidden) ~ #watch-return-reserved-notice,
+#game-screen > #cutin-overlay:not(.hidden) ~ #watch-return-reserved-notice,
+#game-screen > #ending-screen:not(.hidden) ~ #watch-return-reserved-notice,
+#game-screen > #global-loading-screen:not(.hidden) ~ #watch-return-reserved-notice {
+    visibility: hidden;
+}
+/* 災害専用地図はbody直下へ動的に生成される。準備～破棄の間は案内を出さない。 */
+body:has(> .event-map-overlay) #watch-return-reserved-notice {
+    visibility: hidden;
+}
 
 
 /* ========================================================================== 
