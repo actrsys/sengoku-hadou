@@ -26,6 +26,10 @@ Object.assign(UIManager.prototype, {
         };
         const frames = Array.isArray(data.progressFrames) ? data.progressFrames : [];
         const isProgress = frames.length > 0;
+        const winnerSide = !isProgress && ['attacker', 'defender'].includes(data.winnerSide) ? data.winnerSide : null;
+        // 閉じる領域は確保したまま、公開前から操作も描画も止める。
+        modal.classList.toggle('is-outcome-pending', !!winnerSide);
+        confirmBtn.disabled = !!winnerSide;
         modal.classList.toggle('is-progress', isProgress);
         modal.classList.toggle('is-siege-progress', isProgress && frames[0].defender.defense != null);
         setText('war-result-kicker', isProgress ? '戦況' : '合戦結果');
@@ -74,8 +78,19 @@ Object.assign(UIManager.prototype, {
             if (!isCurrent()) return false;
             this.prepareCoveredViewForOpen(modal);
             if (typeof data.onOpen === 'function') data.onOpen();
-            this._warResultConfirm = finish;
-            confirmBtn.addEventListener('click', finish, { once: true });
+            const enableConfirm = () => {
+                if (!isCurrent()) return;
+                modal.classList.remove('is-outcome-pending');
+                confirmBtn.disabled = false;
+                this._warResultConfirm = finish;
+                confirmBtn.addEventListener('click', finish, { once: true });
+                // 観戦の自動終了も、演出完了後の結果を読む時間を確保する。
+                if (!isProgress && autoCloseTime > 0) this._warResultTimer = setTimeout(finish, autoCloseTime);
+            };
+            if (winnerSide) {
+                // 中立状態のpaintを確認してから、実際の勝敗だけを明暗で演出する。
+                this._revealWarOutcome(modal, winnerSide, isCurrent).then(enableConfirm);
+            } else enableConfirm();
             if (isProgress) {
                 let index = 0;
                 // 1行ログは同一ターンの数値を保ったまま順次表示する。タイマーは既存の1本のみ。
@@ -98,7 +113,7 @@ Object.assign(UIManager.prototype, {
                     schedule();
                 };
                 schedule();
-            } else if (autoCloseTime > 0) this._warResultTimer = setTimeout(finish, autoCloseTime);
+            }
             return true;
         };
         // 同じ攻城戦の顔画像準備を利用。表示やタイマーはdecodeの完了後に開始する。
@@ -123,6 +138,28 @@ Object.assign(UIManager.prototype, {
             });
     },
 
+    async _revealWarOutcome(modal, winnerSide, isCurrent) {
+        try {
+            await this.waitForCoveredMapPaint();
+            if (!isCurrent()) return;
+            const cards = Array.from(modal.querySelectorAll('.war-result-army'));
+            // 完了を検出できない旧環境では演出なしで確定表示し、操作不能にしない。
+            const canAnimate = cards.length === 2 && cards.every(card => typeof card.getAnimations === 'function');
+            if (canAnimate) modal.classList.add('is-outcome-revealing');
+            modal.classList.add(`is-${winnerSide}-victory`);
+            if (canAnimate) {
+                const animations = cards.flatMap(card => card.getAnimations()).filter(animation => animation.animationName === 'war-result-reveal');
+                await Promise.allSettled(animations.map(animation => animation.finished));
+            }
+        } catch (error) {
+            // 表示演出の障害で戦後処理を止めない。確定済みの勝敗は保持する。
+            if (isCurrent()) modal.classList.add(`is-${winnerSide}-victory`);
+            console.warn('戦争リザルトの明暗演出を省略しました:', error);
+        } finally {
+            if (isCurrent()) modal.classList.remove('is-outcome-revealing');
+        }
+    },
+
     dismissWarResult(canceled = false) {
         this._warResultGeneration = Number(this._warResultGeneration || 0) + 1;
         if (this._warResultFaceHandoff) {
@@ -134,10 +171,11 @@ Object.assign(UIManager.prototype, {
         const confirmBtn = document.getElementById('war-result-close-btn');
         if (confirmBtn && this._warResultConfirm) confirmBtn.removeEventListener('click', this._warResultConfirm);
         this._warResultConfirm = null;
+        if (confirmBtn) confirmBtn.disabled = false;
         const modal = document.getElementById('war-result-modal');
         if (modal) {
             modal.classList.add('hidden');
-            modal.classList.remove('is-defeat', 'is-retreat', 'is-progress', 'is-siege-progress');
+            modal.classList.remove('is-defeat', 'is-retreat', 'is-progress', 'is-siege-progress', 'is-outcome-pending', 'is-outcome-revealing', 'is-attacker-victory', 'is-defender-victory');
         }
         for (const side of ['attacker', 'defender']) {
             const img = document.getElementById(`war-result-${side}-face`);

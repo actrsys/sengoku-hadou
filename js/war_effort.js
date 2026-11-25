@@ -74,6 +74,7 @@ Object.assign(WarManager.prototype, {
         };
         return {
             title, tone,
+            winnerSide: attackerWon ? 'attacker' : 'defender',
             target: `${s.defender?.name || '戦場'}の戦い`,
             attacker: s.attacker.isKunishu ? (s.attacker.name || '諸勢力') : nameFor(s.attacker.ownerClan, '攻撃軍'),
             defender: s.defender.isKunishu ? (s.defender.name || '諸勢力') : nameFor(s.oldDefClanId ?? s.defender.ownerClan, '守備軍'),

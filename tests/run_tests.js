@@ -34501,6 +34501,7 @@ test('r898 戦争リザルトは勝敗・撤退・指揮官・拠点を既存デ
     const win = manager.createWarResultPresentation('攻め落としました',true,false);
     assert.strictEqual(win.title,'勝利');
     assert.strictEqual(win.tone,'victory');
+    assert.strictEqual(win.winnerSide,'attacker');
     assert.strictEqual(win.attacker,'織田家');
     assert.strictEqual(win.defender,'武田家');
     assert.strictEqual(win.attackerLeader,'信長');
@@ -34510,9 +34511,12 @@ test('r898 戦争リザルトは勝敗・撤退・指揮官・拠点を既存デ
     assert.strictEqual(win.target,'城Aの戦い');
     assert.strictEqual(manager.createWarResultPresentation('守れず',false,false).title,'敗北');
     assert.strictEqual(manager.createWarResultPresentation('撤退',false,true).title,'撤退');
+    assert.strictEqual(manager.createWarResultPresentation('撤退',false,true).winnerSide,'defender');
+    assert.strictEqual(manager.createWarResultPresentation('守備軍撤退',true,true).winnerSide,'attacker');
     manager.state.attacker.ownerClan = 2;
     manager.state.oldDefClanId = 1;
     assert.strictEqual(manager.createWarResultPresentation('防衛',false,false).title,'勝利');
+    assert.strictEqual(manager.createWarResultPresentation('防衛',false,false).winnerSide,'defender');
     // プレイヤーの操作可能部隊が全滅しても参戦した事実は消えず、結果は当人目線で表示する。
     manager.state.isPlayerInvolved = false;
     assert.strictEqual(manager.createWarResultPresentation('防衛',true,false).title,'敗北');
@@ -46086,6 +46090,25 @@ test('r974 他家野戦と攻城戦の総大将は各段階の実指揮官で確
     war.beginOtherWarProgress('siege',state,frame);war.playOtherWarProgress('siege',state,1,frame);
     assert.strictEqual(shown.defenderLeader,'城主');assert.strictEqual(shown.defenderFace,'castellan.webp');assert.strictEqual(war.createWarResultPresentation('',true,false).defenderFace,'castellan.webp');
     war._beginWarLifecycle();assert.strictEqual(war._otherWarResultLeaders,null);
+});
+
+test('r975 戦争リザルトは公開→勝敗演出完了→確認・観戦自動終了の順を守り、強制終了・連戦を隔離する', async () => {
+    const elements=new Map(),timers=new Map(),paints=[],animations=[];let seq=0,confirmed=0;
+    const make=()=>({textContent:'',disabled:false,listeners:new Map(),classList:{v:new Set(['hidden']),add(...x){x.forEach(y=>this.v.add(y));},remove(...x){x.forEach(y=>this.v.delete(y));},toggle(x,b){if(b)this.add(x);else this.remove(x);},contains(x){return this.v.has(x);}},addEventListener(k,v){this.listeners.set(k,v);},removeEventListener(k,v){if(this.listeners.get(k)===v)this.listeners.delete(k);}});
+    const modal=make(),btn=make();elements.set('war-result-modal',modal);elements.set('war-result-close-btn',btn);
+    modal.querySelectorAll=()=>[0,1].map(()=>({getAnimations(){return [{animationName:'war-result-reveal',finished:new Promise(resolve=>animations.push(resolve))}];}}));
+    const ctx=createContext({document:{getElementById:id=>elements.get(id)||null},setTimeout(fn,delay){timers.set(++seq,{fn,delay});return seq;},clearTimeout:id=>timers.delete(id)});
+    vm.runInContext('class UIManager {};this.UIManager=UIManager;',ctx);loadScript(ctx,'js/ui_war_result.js');
+    const ui=new ctx.UIManager();ui.prepareCoveredViewForOpen=el=>el.classList.remove('hidden');ui.waitForCoveredMapPaint=()=>new Promise(resolve=>paints.push(resolve));
+    const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
+    const open=side=>ui.showWarResult({winnerSide:side},()=>confirmed++,1500);
+    open('attacker');assert.ok(!modal.classList.contains('hidden')&&modal.classList.contains('is-outcome-pending')&&btn.disabled);assert.ok(!modal.classList.contains('is-attacker-victory'));assert.strictEqual(timers.size,0);assert.strictEqual(btn.listeners.size,0);
+    paints.shift()();await flush();assert.ok(modal.classList.contains('is-attacker-victory')&&btn.disabled);assert.strictEqual(animations.length,2);animations.shift()();await flush();assert.ok(btn.disabled);assert.strictEqual(timers.size,0);
+    const stale=animations.shift();open('defender');assert.ok(!modal.classList.contains('is-attacker-victory')&&btn.disabled);stale();await flush();assert.ok(btn.disabled);assert.strictEqual(btn.listeners.size,0);
+    paints.shift()();await flush();assert.ok(modal.classList.contains('is-defender-victory'));animations.splice(0).forEach(resolve=>resolve());await flush();assert.ok(!btn.disabled&&!modal.classList.contains('is-outcome-pending'));assert.strictEqual(timers.size,1);assert.strictEqual([...timers.values()][0].delay,1500);
+    const finish=btn.listeners.get('click');finish();finish();assert.strictEqual(confirmed,1);assert.strictEqual(timers.size,0);assert.ok(!modal.classList.contains('is-defender-victory'));
+    const canceled=ui.showWarResultAsync({winnerSide:'attacker'},1500);paints.shift()();await flush();ui.dismissWarResult(true);assert.strictEqual(await canceled,false);animations.splice(0).forEach(resolve=>resolve());await flush();assert.ok(modal.classList.contains('hidden'));assert.strictEqual(timers.size,0);assert.strictEqual(btn.listeners.size,0);
+    modal.querySelectorAll=()=>[{},{}];open('defender');paints.shift()();await flush();assert.ok(!btn.disabled&&modal.classList.contains('is-defender-victory'));assert.strictEqual(timers.size,1);ui.dismissWarResult(true);
 });
 
 Promise.all(pendingTests).then(() => {

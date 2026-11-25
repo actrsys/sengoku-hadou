@@ -1502,6 +1502,16 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 .war-result-description { white-space: normal; overflow-wrap: anywhere; min-height: 0; overflow-y: auto; overscroll-behavior: contain; font-size: .93rem; line-height: 1.5; color: #f2ead6; border-top: 1px solid rgba(212, 175, 55, .26); padding: 8px 4px 0; box-sizing: border-box; }
 #war-result-modal .war-result-footer { justify-content: center; }
 #war-result-close-btn { min-width: 120px; }
+/* 結果だけを明暗で示す。枠・文字配置・footerの高さは変更しない。 */
+#war-result-modal.is-outcome-pending #war-result-close-btn { visibility: hidden; pointer-events: none; }
+#war-result-modal.is-attacker-victory .war-result-army:first-child,
+#war-result-modal.is-defender-victory .war-result-army:last-child { --war-outcome-brightness: 1.22; filter: brightness(var(--war-outcome-brightness)); }
+#war-result-modal.is-attacker-victory .war-result-army:last-child,
+#war-result-modal.is-defender-victory .war-result-army:first-child { --war-outcome-brightness: .68; filter: brightness(var(--war-outcome-brightness)); }
+#war-result-modal.is-outcome-revealing .war-result-army { animation: war-result-reveal 550ms ease 250ms both; }
+@keyframes war-result-reveal { from { filter: brightness(1); } to { filter: brightness(var(--war-outcome-brightness)); } }
+@media (prefers-reduced-motion: reduce) { #war-result-modal.is-outcome-revealing .war-result-army { animation: none; } }
+
 .war-progress-metrics { display: none; min-width: 0; min-height: 0; }
 #war-result-modal.is-progress .war-progress-metrics { display: grid; grid-template-rows: repeat(3, 28px); gap: 4px; align-self: stretch; align-content: center; }
 .war-progress-metric { display: grid; grid-template-columns: 3.2em minmax(0, 1fr); grid-template-rows: 19px 6px; align-content: center; align-items: center; gap: 3px 4px; min-width: 0; }
