@@ -741,6 +741,15 @@
 
                     <section id="settings-panel-game" class="settings-panel active" role="tabpanel" aria-labelledby="settings-tab-game">
                         <div class="setting-row">
+                            <label class="slider-row-label">難易度</label>
+                            <div class="setting-toggle-group setting-three-way-toggle" role="group" aria-label="難易度">
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-difficulty-beginner" aria-pressed="false">下級</button>
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-difficulty-intermediate" aria-pressed="false">中級</button>
+                                <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-difficulty-advanced" aria-pressed="true">上級</button>
+                            </div>
+                            <div class="setting-note">下級・中級は他家の内政行動回数を減らします。</div>
+                        </div>
+                        <div class="setting-row">
                             <label class="slider-row-label">オートセーブ</label>
                             <div class="setting-toggle-group">
                                 <button type="button" class="ui-toggle-btn" data-se="choice.ogg" id="btn-autosave-true">する</button>

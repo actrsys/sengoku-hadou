@@ -4955,7 +4955,7 @@ test('表示モード設定は起動判定より先にUserSettingsを読み込�
 });
 
 test('ユーザー設定キーは user_settings.js 以外で直接localStorage操作しない', () => {
-    const keys = ['aiWarNotify', 'historicalEvent', 'autoSave', 'userBgmVolume', 'userSeVolume'];
+    const keys = ['aiWarNotify', 'historicalEvent', 'autoSave', 'userBgmVolume', 'userSeVolume', 'userDifficulty'];
     const offenders = [];
     const walk = dir => {
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -46113,6 +46113,62 @@ test('r975 戦争リザルトは公開→勝敗演出完了→確認・観戦自
     const finish=btn.listeners.get('click');finish();finish();assert.strictEqual(confirmed,1);assert.strictEqual(timers.size,0);assert.ok(!modal.classList.contains('is-defender-victory'));
     const canceled=ui.showWarResultAsync({winnerSide:'attacker'},1500);paints.shift()();await flush();ui.dismissWarResult(true);assert.strictEqual(await canceled,false);animations.splice(0).forEach(resolve=>resolve());await flush();assert.ok(modal.classList.contains('hidden'));assert.strictEqual(timers.size,0);assert.strictEqual(btn.listeners.size,0);
     modal.querySelectorAll=()=>[{},{}];open('defender');paints.shift()();await flush();assert.ok(!btn.disabled&&modal.classList.contains('is-defender-victory'));assert.strictEqual(timers.size,1);ui.dismissWarResult(true);
+});
+
+test('難易度は他家の内政上限を一度抽選し、0回・委任・観戦・保存に対応する', () => {
+    const values = new Map(); let roll=0, draws=0;
+    const randomMath=Object.create(Math); randomMath.random=()=>{draws++;return roll;};
+    const ctx = createContext({Math:randomMath,localStorage:{getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,String(v))}});
+    loadScript(ctx,'js/config.js'); loadScript(ctx,'js/user_settings.js'); loadScript(ctx,'js/ai.js');
+    const AI=vm.runInContext('AIEngine',ctx), game={playerClanId:1}, ai=new AI(game);
+    const other={ownerClan:2}, delegated={ownerClan:'1',isDelegated:true};
+    const caps=[0,1,2,3,4,6];
+    const limits=castle=>caps.map(n=>ai.getInternalActionLimit(castle,n));
+    assert.strictEqual(ctx.UserSettings.difficulty,'advanced');
+    assert.deepStrictEqual(limits(other),caps); assert.strictEqual(draws,0);
+    ctx.UserSettings.setDifficulty('intermediate');
+    roll=0; assert.deepStrictEqual(limits(other),caps);
+    roll=0.5; assert.deepStrictEqual(limits(other),[0,1,1,2,3,5]);
+    let before=draws; assert.deepStrictEqual(limits(delegated),caps); assert.strictEqual(draws,before);
+    ctx.UserSettings.setDifficulty('beginner');
+    roll=0; assert.deepStrictEqual(limits(other),caps);
+    roll=1/3; assert.deepStrictEqual(limits(other),[0,0,1,2,3,5]);
+    roll=2/3; assert.deepStrictEqual(limits(other),[0,0,0,1,2,4]);
+    before=draws; assert.deepStrictEqual(limits(delegated),caps); assert.strictEqual(draws,before);
+    assert.strictEqual(new ctx.UserSettingsManager(ctx.localStorage).difficulty,'beginner');
+    game.playerClanId=-100;
+    assert.deepStrictEqual(limits(delegated),[0,0,0,1,2,4]);
+    // 同じ拠点の次回算定では独立した抽選。小拠点が常時0回にならない。
+    const results=[]; before=draws;
+    for(const r of [0.99,0.01,0.5,0.99,0.01]){roll=r;results.push(ai.getInternalActionLimit(other,1));}
+    assert.deepStrictEqual(results,[0,1,0,0,1]); assert.strictEqual(draws-before,5);
+    ctx.UserSettings.setDifficulty('invalid'); assert.strictEqual(ctx.UserSettings.difficulty,'advanced');
+    before=draws;assert.deepStrictEqual(limits(other),caps);assert.strictEqual(draws,before);
+    values.set('userDifficulty','corrupt');ctx.UserSettings.reload();assert.strictEqual(ctx.UserSettings.difficulty,'advanced');
+    assert.strictEqual(ctx.AIParams.AI.Difficulty,'normal','従来の判断補正は変えない');
+});
+
+test('下級の0回は製品の内政実行から候補評価前に正常復帰し、次回の抽選や自家を止めない', async () => {
+    const reached = new Error('内政候補評価に到達');
+    let roll=0.99;
+    const randomMath=Object.create(Math);randomMath.random=()=>roll;
+    const ctx = createContext({Math:randomMath,EconomyRules:{getBaseRiceRate(){throw reached;}}});
+    loadScript(ctx,'js/config.js');loadScript(ctx,'js/user_settings.js');loadScript(ctx,'js/ai.js');
+    ctx.BushoStatusRules={isActive:()=>true};
+    const castle={id:2,ownerClan:2,legionId:0,adjacentCastleIds:[]};
+    const leader={politics:80,charm:80,leadership:80,strength:80,castleId:2,clan:2};
+    let available=1;
+    const game={playerClanId:1,getClanDaimyo:()=>leader,getClanGunshi:()=>null,getCastleBushos:()=>Array.from({length:available},()=>({clan:castle.ownerClan,isActionDone:false}))};
+    const AI=vm.runInContext('AIEngine',ctx), ai=new AI(game);
+    const run=()=>ai.execInternalAffairs(castle,leader,{},0.5);
+    ctx.UserSettings.setDifficulty('beginner');await run();
+    roll=0;await assert.rejects(run(),err=>err===reached);
+    roll=0.99;available=2;await run();
+    available=3;await assert.rejects(run(),err=>err===reached);
+    available=1;ctx.UserSettings.setDifficulty('intermediate');await assert.rejects(run(),err=>err===reached);
+    ctx.UserSettings.setDifficulty('advanced');await assert.rejects(run(),err=>err===reached);
+    ctx.UserSettings.setDifficulty('beginner');game.playerClanId=2;await assert.rejects(run(),err=>err===reached);
+    available=0;await run();
 });
 
 Promise.all(pendingTests).then(() => {

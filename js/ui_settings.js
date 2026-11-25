@@ -109,6 +109,22 @@ function initializeSettingsUi() {
 
     updateDisplayModeSetting(settings ? settings.displayMode : 'auto', false);
 
+    const updateDifficultySetting = (value, persist = true) => {
+        if (persist) settings.setDifficulty(value);
+        window.UserSettingsManager.DIFFICULTIES.forEach(difficulty => {
+            const btn = document.getElementById(`btn-difficulty-${difficulty}`);
+            if (!btn) return;
+            const active = difficulty === settings.difficulty;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-pressed', String(active));
+        });
+    };
+    window.UserSettingsManager.DIFFICULTIES.forEach(difficulty => {
+        const btn = document.getElementById(`btn-difficulty-${difficulty}`);
+        if (btn) btn.addEventListener('click', () => updateDifficultySetting(difficulty));
+    });
+    updateDifficultySetting(settings.difficulty, false);
+
     // UserSettings は user_settings.js の読込時に localStorage から復元済み。
     updateToggleSetting('notify', settings ? settings.aiWarNotify : true, false);
     updateToggleSetting('historical', settings ? settings.historicalEvent : true, false);

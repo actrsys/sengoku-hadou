@@ -1594,9 +1594,12 @@ async function validateFieldTerrainLayout(cdp) {
 
 async function validateSettingsTabsLayout(cdp) {
     const settingsJs = fs.readFileSync(path.join(ROOT, 'js', 'ui_settings.js'), 'utf8');
-    const settingsStub = `<script>window.UserSettings={bgmVolume:1,seVolume:1,displayMode:'auto',aiWarNotify:true,historicalEvent:true,autoSave:true,setDisplayMode(){},setAiWarNotify(){},setHistoricalEvent(){},setAutoSave(){}};<\/script>`;
+    const settingsSource = fs.readFileSync(path.join(ROOT, 'js', 'user_settings.js'), 'utf8');
+    const settingsStub = `<script>${settingsSource.replace(/<\/script/gi, '<\\/script')}<\/script>`;
     const settingsScript = `<script>${settingsJs.replace(/<\/script/gi, '<\\/script')}<\/script>`;
-    const html = fixtureHtml('settings_tabs.html').replace('<!-- SETTINGS_JS -->', settingsStub + settingsScript);
+    const production = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+    const gamePanel = production.match(/<section id="settings-panel-game"[\s\S]*?<\/section>/)[0];
+    const html = fixtureHtml('settings_tabs.html').replace(/<section id="settings-panel-game"[\s\S]*?<\/section>/, gamePanel).replace('<!-- SETTINGS_JS -->', settingsStub + settingsScript);
 
     await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
     let result = await cdp.call('Runtime.evaluate', {
@@ -1628,6 +1631,16 @@ async function validateSettingsTabsLayout(cdp) {
     let st=result.result.value;
     assert.notStrictEqual(st.tabsDisplay, 'none', 'スマホ設定タブが表示されていない');
     assert.notStrictEqual(st.firstTab, 'none', 'スマホ設定タブボタンが表示されていない');
+    const difficultyResult = await cdp.call('Runtime.evaluate', {expression: `(() => {
+        const buttons = [...document.querySelectorAll('[id^=btn-difficulty-]')];
+        const initial = buttons.find(b=>b.classList.contains('active'))?.id;
+        const states = buttons.map(b=>{b.click();return {value:window.UserSettings.difficulty, pressed:buttons.filter(x=>x.getAttribute('aria-pressed')==='true').map(x=>x.id)};});
+        return {initial, states, saved:window.UserSettings.difficulty};
+    })()`, returnByValue:true});
+    const difficultyState = difficultyResult.result.value;
+    assert.strictEqual(difficultyState.initial, 'btn-difficulty-advanced');
+    assert.deepStrictEqual(difficultyState.states.map(x=>x.value), ['beginner','intermediate','advanced']);
+    assert.deepStrictEqual(difficultyState.states.map(x=>x.pressed), [['btn-difficulty-beginner'],['btn-difficulty-intermediate'],['btn-difficulty-advanced']]);
     assert.notStrictEqual(st.audioDisplay, 'none', 'スマホ設定の音・表示パネルがレイアウトから消えている');
     assert.notStrictEqual(st.gameDisplay, 'none', 'スマホ設定は両パネルを同じgridセルで高さ計算へ参加させる');
     assert.strictEqual(st.audioVisibility, 'hidden', 'スマホ設定の非選択音・表示パネルが初期表示されている');

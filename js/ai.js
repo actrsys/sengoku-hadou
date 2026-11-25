@@ -1612,6 +1612,18 @@ class AIEngine {
         this.game.kunishuSystem.executeKunishuSubjugate(sourceCastle, Number(kunishu.castleId), sorted.map(b => b.id), sendSoldiers, sendRice, sendHorses, sendGuns, kunishu);
     }
     
+    getInternalActionLimit(castle, maxActions) {
+        // 委任を含む自家は常に従来どおり。観戦時は自家がないため全勢力が対象。
+        if (Number(castle.ownerClan) === Number(this.game.playerClanId) || maxActions <= 0) return maxActions;
+        const difficulty = window.UserSettings?.difficulty;
+        if (!difficulty) return maxActions;
+        const rule = window.AIParams.AI.InternalActionDifficulty[difficulty];
+        if (!rule || rule.maxPenalty === 0 || maxActions <= rule.minimum) return maxActions;
+        // 拠点の内政開始時に一度だけ抽選。上級・自家・補正不能時は乱数を消費しない。
+        const penalty = Math.floor(Math.random() * (rule.maxPenalty + 1));
+        return Math.max(rule.minimum, maxActions - penalty);
+    }
+
     async execInternalAffairs(castle, castellan, mods, smartness, turnFlowContext = null) {
         const isCurrentTurnFlow = () => !turnFlowContext || this._isTurnFlowContextCurrent(turnFlowContext);
         if (!isCurrentTurnFlow()) return;
@@ -1714,6 +1726,8 @@ class AIEngine {
 
         // 武将の人数より多くは行動できません
         maxActions = Math.min(maxActions, availableBushos.length);
+        // 人数制限後の実行可能な上限へ、拠点ごとに一度だけ難易度補正を適用。
+        maxActions = this.getInternalActionLimit(castle, maxActions);
 
         // やるべき回数が0回になったり、武将がいなかったらおしまいです
         if (maxActions <= 0) return;

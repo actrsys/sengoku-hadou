@@ -12,7 +12,8 @@ class UserSettingsManager {
         autoSave: true,
         bgmVolume: 1.0,
         seVolume: 1.0,
-        displayMode: 'auto'
+        displayMode: 'auto',
+        difficulty: 'advanced'
     });
 
     static STORAGE_KEYS = Object.freeze({
@@ -21,8 +22,15 @@ class UserSettingsManager {
         autoSave: 'autoSave',
         bgmVolume: 'userBgmVolume',
         seVolume: 'userSeVolume',
-        displayMode: 'userDisplayMode'
+        displayMode: 'userDisplayMode',
+        difficulty: 'userDifficulty'
     });
+
+    static DIFFICULTIES = Object.freeze(['beginner', 'intermediate', 'advanced']);
+
+    static normalizeDifficulty(value) {
+        return this.DIFFICULTIES.includes(value) ? value : this.DEFAULTS.difficulty;
+    }
 
     constructor(storage = null) {
         this.storage = storage || this._resolveStorage();
@@ -84,6 +92,7 @@ class UserSettingsManager {
         this.bgmVolume = this._readVolume('bgmVolume');
         this.seVolume = this._readVolume('seVolume');
         this.displayMode = this._readDisplayMode();
+        this.difficulty = UserSettingsManager.normalizeDifficulty(this._read(UserSettingsManager.STORAGE_KEYS.difficulty));
         return this;
     }
 
@@ -108,6 +117,12 @@ class UserSettingsManager {
         this.autoSave = !!value;
         this._write(UserSettingsManager.STORAGE_KEYS.autoSave, this.autoSave);
         return this.autoSave;
+    }
+
+    setDifficulty(value) {
+        this.difficulty = UserSettingsManager.normalizeDifficulty(value);
+        this._write(UserSettingsManager.STORAGE_KEYS.difficulty, this.difficulty);
+        return this.difficulty;
     }
 
     setDisplayMode(value) {
