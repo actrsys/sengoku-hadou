@@ -291,7 +291,7 @@ class SaveLoadView {
                     const executeSelected = action => {
                         if (!isSelectionCurrent()) return;
                         this.close();
-                        action();
+                        return action();
                     };
 
                     if (mode === 'save') {
@@ -300,7 +300,7 @@ class SaveLoadView {
                             ? `${displayTitle}には現在の形式で読み込めないデータが存在します。上書きすると元の保存内容は失われます。現在の状態をセーブしますか？`
                             : `${displayTitle}に現在の状態をセーブ（上書き）しますか？`;
                         this.ui.showDialog(saveMessage, true, () => {
-                            executeSelected(() => this.game.saveGameToLocal(i));
+                            return executeSelected(() => this.game.saveGameToLocal(i));
                         }, null, {
                             okText: 'セーブする',
                             okClass: 'btn-primary',
@@ -313,7 +313,7 @@ class SaveLoadView {
                             executeSelected(() => this.game.loadGameFromLocal(i, prefix));
                         } else {
                             this.ui.showDialog(`${displayTitle}のデータをロードしますか？\n（現在の進行状況は失われます）`, true, () => {
-                                executeSelected(() => this.game.loadGameFromLocal(i, prefix));
+                                return executeSelected(() => this.game.loadGameFromLocal(i, prefix));
                             }, null, {
                                 okText: 'ロードする',
                                 okClass: 'btn-danger',

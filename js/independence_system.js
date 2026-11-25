@@ -1307,6 +1307,10 @@ class IndependenceSystem {
                         this.game.affiliationSystem.enterCastle(b, escapeCastleId, {
                             deferCastleLordUpdate: true
                         });
+                        // 謀反敗者とともに早期元服した一門は通常の年初登場を通らない。
+                        // 生命Systemの既存式で登場時点の能力補正を一度だけ同期する。
+                        this.game.lifeSystem?._syncPreBirthStatus?.(b, currentYear);
+                        this.game.lifeSystem?.recalculateBushoAgeStats?.(b, currentYear);
                         
                         // フルネームから「|」を消して綺麗なお名前にします
                         const cleanName = b.name.replace('|', '');

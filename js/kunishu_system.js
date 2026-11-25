@@ -879,6 +879,10 @@ class KunishuSystem {
                 if (castle && !castle.samuraiIds.includes(successor.id)) {
                     castle.samuraiIds.push(successor.id);
                 }
+                // 頭領死亡による早期元服も年初の能力更新より先に活動化するため、
+                // 計算式は生命Systemの既存正本を利用して登場当年分を適用する。
+                this.game.lifeSystem?._syncPreBirthStatus?.(successor, this.game.year);
+                this.game.lifeSystem?.recalculateBushoAgeStats?.(successor, this.game.year);
                 extraMsg = `${successor.name.replace('|','')}が急遽元服し、跡を継ぎました。`;
             }
 

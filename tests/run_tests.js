@@ -14920,7 +14920,7 @@ test('セーブ・ロードの確認取消はスロット一覧を閉じず、�
     const block = source.slice(start, end);
     assert.ok(block.includes('const executeSelected = action => {'));
     assert.ok(block.includes('if (!isSelectionCurrent()) return;'));
-    assert.ok(block.includes('this.close();\n                        action();'), '確定可否を確認してから閉じて実行する');
+    assert.ok(block.includes('this.close();\n                        return action();'), '確定可否を確認してから閉じて実行する');
     assert.ok(block.includes('closeBeforeCancel: true'));
     assert.ok(block.includes('executeSelected(() => this.game.saveGameToLocal(i))'));
     assert.ok(block.includes('executeSelected(() => this.game.loadGameFromLocal(i, prefix))'));
@@ -37847,6 +37847,7 @@ test('r779 謀反勝利後に旧主家と無関係な予定所属の未登場一
         { id: 1, name: '旧家', diplomacyValue: { 2: { status: '友好', sentiment: 80 } } },
         { id: 2, name: '友好家' }, { id: 3, name: '他家' }
     ];
+    const earlyIndependenceRecalc = [];
     const game = {
         year: 1570, month: 6, playerClanId: 99, bushos, castles, clans, legions: [],
         getBusho: id => bushos.find(b => b.id === Number(id)) || null,
@@ -37862,7 +37863,8 @@ test('r779 謀反勝利後に旧主家と無関係な予定所属の未登場一
             async playBattleBlink() { return true; } },
         historySystem: { record() {} },
         factionSystem: { updateFactions() {}, handleMove() {} },
-        lifeSystem: { applyDaimyoNameAndFaceChange() { return null; } },
+        lifeSystem: { applyDaimyoNameAndFaceChange() { return null; },
+            recalculateBushoAgeStats(b) { earlyIndependenceRecalc.push(b.id); } },
         diplomacyManager: { reorganizeRelationsAfterRebellion() {} },
         castleManager: { setOwnerIdRaw(c, clan) { c.ownerClan = clan; }, disbandLegion() {} }
     };
@@ -37897,6 +37899,8 @@ test('r779 謀反勝利後に旧主家と無関係な予定所属の未登場一
     assert.strictEqual(plannedKunishuUnborn.belongKunishuId, 61, '別諸勢力の未出生者の予定所属を維持');
     assert.strictEqual(unassignedRelative.status, 'ronin', '所属未定の出生済み一門は従来どおり逃亡に合流');
     assert.strictEqual(unassignedRelative.castleId, 21, '所属未定一門は退避先で早期元服する');
+    assert.deepStrictEqual(earlyIndependenceRecalc, [ownFuture.id, unassignedRelative.id],
+        '謀反後の早期元服者だけを、通常のLifeSystem能力再計算へ委譲する');
 });
 
 // A-106: 実際の派閥再編を謀反勝利に接続し、新当主就任後の派閥孤児を防ぐ。
@@ -45594,6 +45598,243 @@ test('SH-BUG-006 PC/スマホ共通の命令終了確認はfinishTurnの完了Pr
     resolveFinish();
     await returned;
     assert.strictEqual(called, 1);
+});
+
+// SH-BUG-007: スロットの保存・ロード確認は共通暗幕へ非同期完了を渡す。
+function createSaveLoadConfirmationFixture(mode) {
+    class SimpleNode {
+        constructor() {
+            this._innerHTML = '';
+            this.children = [];
+            this.className = '';
+            this.classList = { add() {}, remove() {}, contains() { return false; } };
+            this.onclick = null;
+            this.disabled = false;
+        }
+        set innerHTML(value) { this._innerHTML = value; this.children = []; }
+        get innerHTML() { return this._innerHTML; }
+        appendChild(child) { this.children.push(child); return child; }
+    }
+    const nodes = Object.fromEntries([
+        'saveload-modal', 'saveload-title', 'saveload-list', 'saveload-tabs',
+        'saveload-tab-manual', 'saveload-tab-auto'
+    ].map(id => [id, new SimpleNode()]));
+    const document = {
+        body: { classList: { contains() { return false; } } },
+        getElementById(id) { return nodes[id] || null; },
+        createElement() { return new SimpleNode(); }
+    };
+    const ctx = createContext({ document, setTimeout() {}, requestAnimationFrame() {} });
+    loadScript(ctx, 'js/save_load_view.js');
+    const SaveLoadView = ctx.SaveLoadView;
+    let onConfirm = null;
+    let called = 0;
+    let resolveAction;
+    const pending = new Promise(resolve => { resolveAction = resolve; });
+    const game = {
+        phase: 'game', scenarioFolder: '1560', year: 1560, month: 1,
+        currentIndex: 0, turnQueue: [{ id: 1 }],
+        turnManager: {
+            captureTurnFlowGeneration() { return 1; },
+            isTurnFlowGenerationLatest(generation) { return generation === 1; }
+        },
+        saveManager: {
+            async readSaveSlots(prefix, count) {
+                return Array.from({ length: count }, (_, index) => ({
+                    originalSlotNo: index + 1,
+                    hasData: index === 0,
+                    readError: false, invalidData: false,
+                    saveTimestamp: index === 0 ? 100 : 0,
+                    data: index === 0 ? {
+                        scenarioName: '1560年 戦国', year: 1560, month: 1,
+                        gameStartYear: 1560, saveTime: '2026/11/23 20:00',
+                        playerClanId: 1, clans: [{ id: 1, name: '試験家' }],
+                        mapThumbnail: null
+                    } : null
+                }));
+            }
+        },
+        saveGameToLocal() { called++; return pending; },
+        loadGameFromLocal() { called++; return pending; }
+    };
+    const ui = {
+        showDialog(_message, isConfirm, onOk, _cancel, options) {
+            assert.strictEqual(isConfirm, true);
+            assert.strictEqual(options.closeBeforeOk, true);
+            onConfirm = onOk;
+        },
+        prepareCoveredViewForOpen() {},
+        updateCustomScrollbars() {}
+    };
+    const view = new SaveLoadView(ui, game);
+    return { view, nodes, pending, resolveAction, getConfirm: () => onConfirm, getCalls: () => called };
+}
+
+for (const mode of ['save', 'load']) {
+    test(`SH-BUG-007 ${mode === 'save' ? '手動セーブ' : 'スロットロード'}確認は完了Promiseを共通暗幕へ引き渡す`, async () => {
+        const f = createSaveLoadConfirmationFixture(mode);
+        await f.view.open(mode);
+        // renderSlots は open の内部から非同期起動するので、一覧更新まで1回イベントループを進める。
+        await new Promise(setImmediate);
+        const btn = f.nodes['saveload-list'].children[0];
+        assert.strictEqual(typeof btn?.onclick, 'function', '通常の第1スロット選択ができる');
+        btn.onclick();
+        const confirm = f.getConfirm();
+        assert.strictEqual(typeof confirm, 'function', '実際の確認ダイアログへ到達');
+        const result = confirm();
+        assert.strictEqual(result, f.pending, '保存・ロード完了Promiseを確認ダイアログへ返す');
+        assert.strictEqual(f.getCalls(), 1, '保存・ロードを1回だけ起動');
+        let settled = false;
+        result.then(() => { settled = true; });
+        await Promise.resolve();
+        assert.strictEqual(settled, false, '操作未完了で共通暗幕の完了扱いにしない');
+        f.resolveAction();
+        await result;
+    });
+}
+
+// r968: 年初の年齢計算は未登場者を除外するため、元服確定時に同年分の年齢補正を反映する。
+// 実際の1560/1570マスターと年代別stateから対象武将を作り、既存のLifeSystem/Bushoの計算を使う。
+for (const [folder, year, bushoId, scenarioLabel] of [
+    ['1560_okehazama', 1561, 2000001, '1560桶狭間→1561年'],
+    ['1570_anegawa', 1571, 1001088, '1570姉川→1571年']
+]) {
+    test(`r968 ${scenarioLabel} 元服した武将の初年度年齢補正を登場直後に反映する`, async () => {
+        const runtime = getRuntimeData(folder);
+        const master = runtime.common.warriorsMaster.find(b => Number(b.id) === bushoId);
+        const state = runtime.scenario.warriorsState.find(b => Number(b.id) === bushoId);
+        assert.ok(master && state, '正本BINに検証対象が存在する');
+        const ctx = createContext({ setTimeout });
+        loadScript(ctx, 'js/constants.js');
+        loadScript(ctx, 'js/models.js');
+        loadScript(ctx, 'js/affiliation_system.js');
+        loadScript(ctx, 'js/life_system.js');
+        ctx.bushoData = { ...master, ...state };
+        const b = vm.runInContext('new Busho(bushoData)', ctx);
+        assert.strictEqual(Number(b.startYear), year, '実データ上の登場年');
+        const age = year - Number(b.birthYear);
+        assert.strictEqual(age, 12, '元服年齢は12歳の実データ');
+        b.status = 'unborn';
+        b.isNotBorn = false;
+        const castle = { id: Number(b.castleId), ownerClan: Number(b.clan) || 1, samuraiIds: [] };
+        const game = {
+            year, month: 1, bushos: [b], princesses: [], playerClanId: 99999,
+            getCastle: id => Number(id) === castle.id ? castle : null,
+            getClan: () => null,
+            ui: { log() {}, showDialogAsync: async () => {} },
+            historySystem: { record() {} },
+            turnManager: { captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: gen => gen === 1 }
+        };
+        ctx.game = game;
+        game.affiliationSystem = vm.runInContext('new AffiliationSystem(game)', ctx);
+        game.lifeSystem = vm.runInContext('new LifeSystem(game)', ctx);
+        await game.lifeSystem.updateAllBushosAgeCooperatively();
+        assert.strictEqual(b.status, 'unborn', '年初再計算中は未登場のまま');
+        await game.lifeSystem.checkBirth([]);
+        assert.ok(['active', 'ronin'].includes(b.status), '年初で正しく登場した');
+        const expected = Math.max(1, Number(b.baseLeadership) - (5 + (20 - age)));
+        assert.strictEqual(b._leadership, expected, '既存の12歳補正を登場当年にも適用する');
+        assert.deepStrictEqual(castle.samuraiIds, [bushoId], '在城名簿の追加は従来どおり1回');
+    });
+}
+
+
+// SH-BUG-009: 通常元服r968と異なり、死亡に伴う早期家督・国主・諸勢力継承は
+// 年初の一括計算に入らない未登場者を月中に活動化する。実BINの親子データを使う。
+function createEarlySuccessionAgeFixture(folder, leaderId, successorId) {
+    const runtime = getRuntimeData(folder);
+    const states = new Map(runtime.scenario.warriorsState.map(x => [Number(x.id), x]));
+    const makeData = id => ({
+        ...runtime.common.warriorsMaster.find(x => Number(x.id) === id),
+        ...(states.get(id) || {})
+    });
+    const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/models.js');
+    loadScript(ctx, 'js/affiliation_system.js');
+    loadScript(ctx, 'js/life_system.js');
+    loadScript(ctx, 'js/kunishu_system.js');
+    ctx.parentData = makeData(leaderId);
+    ctx.childData = makeData(successorId);
+    const parent = vm.runInContext('new Busho(parentData)', ctx);
+    const child = vm.runInContext('new Busho(childData)', ctx);
+    const year = Number(runtime.scenario.scenario.startYear);
+    assert.strictEqual(Number(child.realFatherId), leaderId, '実データの親子関係');
+    assert.ok(Number(child.startYear) > year && Number(child.birthYear) <= year,
+        '実データ上、元服予定前だが出生済み');
+    parent.status = 'active';
+    child.status = 'unborn';
+    child.isNotBorn = false;
+    parent.familyIds = [leaderId];
+    child.familyIds = [leaderId];
+    const castle = {
+        id: Number(parent.castleId), ownerClan: Number(parent.clan), legionId: 1,
+        samuraiIds: [parent.id], castellanId: parent.id
+    };
+    const game = {
+        year, month: 6, playerClanId: 99999,
+        bushos: [parent, child], legions: [{ id: 1, legionNo: 1, clanId: Number(parent.clan), commanderId: parent.id }],
+        getBusho: id => [parent, child].find(b => b.id === Number(id)) || null,
+        getCastle: id => Number(id) === castle.id ? castle : null,
+        getClan: id => ({ id: Number(id), name: '実データの大名家' }),
+        getClanBushos: id => [parent, child].filter(b => Number(b.clan) === Number(id)),
+        getClanCastles: () => [castle],
+        ui: { log() {}, showDialogAsync: async () => {} },
+        turnManager: { captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: g => g === 1 }
+    };
+    game.affiliationSystem = vm.runInContext('new AffiliationSystem(game)', Object.assign(ctx, { game }));
+    game.lifeSystem = vm.runInContext('new LifeSystem(game)', ctx);
+    const age = year - Number(child.birthYear);
+    const penalty = age < 20 ? 5 + 20 - age : age < 30 ? Math.ceil((30 - age) / 2) : 0;
+    const expected = Math.max(1, Number(child.baseLeadership) - penalty);
+    assert.notStrictEqual(Number(child._leadership), expected, '改修前の未登場基礎値との比較が有効');
+    return { ctx, parent, child, castle, game, expected };
+}
+
+test('SH-BUG-009 1560実データ伊達晴宗の子・政景の早期家督継承で当年能力補正が欠けない', () => {
+    const f = createEarlySuccessionAgeFixture('1560_okehazama', 1074004, 1074013);
+    // 大名・国主共通の本番配置窓口。本人の所属・活動確定直後に検証する。
+    f.game.lifeSystem._placeSuccessionSuccessor(f.child, f.parent.clan, f.castle);
+    assert.strictEqual(f.child.status, 'active');
+    assert.strictEqual(f.child._leadership, f.expected);
+    assert.deepStrictEqual(f.castle.samuraiIds, [f.parent.id, f.child.id]);
+});
+
+test('SH-BUG-009 1570実データ赤松義祐→則房の早期国主継承は当年能力補正を反映する', async () => {
+    const f = createEarlySuccessionAgeFixture('1570_anegawa', 1040003, 1040004);
+    f.parent.isCommander = true;
+    f.child.isNotBorn = true; // 年初同期前の出生済み派生フラグが残っていても再計算する
+    await f.game.lifeSystem.handleCommanderDeath(f.parent);
+    assert.strictEqual(f.game.legions[0].commanderId, f.child.id, '国主席を継承');
+    assert.strictEqual(f.child.status, 'active');
+    assert.strictEqual(f.child._leadership, f.expected, '同じ年齢式を早期元服にも適用');
+    assert.strictEqual(f.child.isNotBorn, false, '生年に基づく出生済みフラグを同期');
+});
+
+test('SH-BUG-009 1560実データ百地正永→正西の諸勢力頭領継承にも当年補正を反映', async () => {
+    const f = createEarlySuccessionAgeFixture('1560_okehazama', 2002001, 2002002);
+    const kunishuId = Number(f.child.belongKunishuId);
+    const castle = f.castle;
+    castle.id = Number(f.child.castleId);
+    f.game.getCastle = id => Number(id) === castle.id ? castle : null;
+    f.parent.status = 'dead';
+    f.child.clan = 0;
+    const kunishu = { id: kunishuId, name: '百地衆', castleId: castle.id,
+        leaderId: f.parent.id, soldiers: 500, isDestroyed: false, getName() { return this.name; } };
+    f.game.kunishuSystem = vm.runInContext('new KunishuSystem(game)', f.ctx);
+    f.game.kunishuSystem.setKunishuData([kunishu]);
+    await f.game.kunishuSystem.checkDestroyed(kunishu);
+    assert.strictEqual(kunishu.leaderId, f.child.id, '正規の諸勢力継承が成立');
+    assert.strictEqual(f.child._leadership, f.expected);
+    assert.strictEqual(castle.samuraiIds.filter(id => id === f.child.id).length, 1);
+});
+
+test('SH-BUG-009 通常の現役武将の継承では現在の能力値を勝手に再計算しない', () => {
+    const f = createEarlySuccessionAgeFixture('1560_okehazama', 1074004, 1074013);
+    f.child.status = 'active';
+    f.child._leadership = 77;
+    f.game.lifeSystem._placeSuccessionSuccessor(f.child, f.parent.clan, f.castle);
+    assert.strictEqual(f.child._leadership, 77, '未登場者の早期元服以外は元の挙動を維持');
 });
 
 Promise.all(pendingTests).then(() => {

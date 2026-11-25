@@ -756,6 +756,9 @@ class LifeSystem {
             }
 
             if (!isCurrentFlow()) return;
+            // 年初の一括年齢計算では未登場武将を除外する。登場が確定した
+            // この時点で同じ既存計算を適用し、元服当年だけ年齢補正が抜けるのを防ぐ。
+            if (window.LifeStatusRules.isPresent(b)) this.recalculateBushoAgeStats(b, currentYear);
             this._recordBushoAppearance(b);
         }
 
@@ -1260,6 +1263,9 @@ class LifeSystem {
      */
     _placeSuccessionSuccessor(successor, clanId, baseCastle, options = {}) {
         if (!baseCastle) return;
+        // 未登場者の急遽元服は1月の一括能力更新を通っていない。
+        // 大名・国主の後継配置でのみ既存の年齢計算を登場時に反映する。
+        const wasUnborn = window.LifeStatusRules?.isUnborn?.(successor) === true;
         const oldCastleId = Number(successor.castleId) || 0;
         const isCastleTransfer = oldCastleId !== Number(baseCastle.id);
         const wasClanRetainer = oldCastleId > 0 && Number(successor.clan) === Number(clanId)
@@ -1281,6 +1287,11 @@ class LifeSystem {
         });
         successor.loyalty = 100;
         if (!baseCastle.samuraiIds.includes(successor.id)) baseCastle.samuraiIds.push(successor.id);
+        if (wasUnborn) {
+            // 出生済みかどうかの派生フラグも既存の生死Systemで同期する。
+            this._syncPreBirthStatus(successor, this.game.year);
+            this.recalculateBushoAgeStats(successor, this.game.year);
+        }
     }
 
     /**
