@@ -1598,8 +1598,9 @@ async function validateSettingsTabsLayout(cdp) {
     const settingsStub = `<script>${settingsSource.replace(/<\/script/gi, '<\\/script')}<\/script>`;
     const settingsScript = `<script>${settingsJs.replace(/<\/script/gi, '<\\/script')}<\/script>`;
     const production = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-    const gamePanel = production.match(/<section id="settings-panel-game"[\s\S]*?<\/section>/)[0];
-    const html = fixtureHtml('settings_tabs.html').replace(/<section id="settings-panel-game"[\s\S]*?<\/section>/, gamePanel).replace('<!-- SETTINGS_JS -->', settingsStub + settingsScript);
+    const settingsMarkup = production.slice(production.indexOf('<div id="settings-modal"'), production.indexOf('<div id="saveload-modal"')).replace('class="modal hidden"', 'class="modal"');
+    const fixture = fixtureHtml('settings_tabs.html');
+    const html = fixture.slice(0, fixture.indexOf('<div id="settings-modal"')) + settingsMarkup + '</div>' + settingsStub + settingsScript + '</body></html>';
 
     await cdp.call('Emulation.setDeviceMetricsOverride', { width: 360, height: 640, deviceScaleFactor: 1, mobile: true });
     let result = await cdp.call('Runtime.evaluate', {
@@ -1631,16 +1632,29 @@ async function validateSettingsTabsLayout(cdp) {
     let st=result.result.value;
     assert.notStrictEqual(st.tabsDisplay, 'none', 'スマホ設定タブが表示されていない');
     assert.notStrictEqual(st.firstTab, 'none', 'スマホ設定タブボタンが表示されていない');
-    const difficultyResult = await cdp.call('Runtime.evaluate', {expression: `(() => {
-        const buttons = [...document.querySelectorAll('[id^=btn-difficulty-]')];
-        const initial = buttons.find(b=>b.classList.contains('active'))?.id;
-        const states = buttons.map(b=>{b.click();return {value:window.UserSettings.difficulty, pressed:buttons.filter(x=>x.getAttribute('aria-pressed')==='true').map(x=>x.id)};});
-        return {initial, states, saved:window.UserSettings.difficulty};
-    })()`, returnByValue:true});
-    const difficultyState = difficultyResult.result.value;
-    assert.strictEqual(difficultyState.initial, 'btn-difficulty-advanced');
-    assert.deepStrictEqual(difficultyState.states.map(x=>x.value), ['beginner','intermediate','advanced']);
-    assert.deepStrictEqual(difficultyState.states.map(x=>x.pressed), [['btn-difficulty-beginner'],['btn-difficulty-intermediate'],['btn-difficulty-advanced']]);
+    const verifyDifficultyInput = async (mobile) => {
+        for (const value of ['beginner', 'intermediate', 'advanced']) {
+            const id = `btn-difficulty-${value}`;
+            const result = await cdp.call('Runtime.evaluate', {expression: `(() => {
+                const el = document.getElementById(${JSON.stringify(id)});
+                const r = el.getBoundingClientRect(), x = r.x+r.width/2, y = r.y+r.height/2;
+                return {x,y,hit:document.elementFromPoint(x,y)===el};
+            })()`, returnByValue:true});
+            const {x,y,hit} = result.result.value;
+            assert.ok(hit, `${id} の中心を別要素が覆っている`);
+            if (mobile) {
+                await cdp.call('Input.dispatchTouchEvent', {type:'touchStart',touchPoints:[{x,y}]});
+                await cdp.call('Input.dispatchTouchEvent', {type:'touchEnd',touchPoints:[]});
+            } else {
+                await cdp.call('Input.dispatchMouseEvent', {type:'mousePressed', x,y,button:'left',clickCount:1});
+                await cdp.call('Input.dispatchMouseEvent', {type:'mouseReleased', x,y,button:'left',clickCount:1});
+            }
+            const state = await cdp.call('Runtime.evaluate', {expression: `(() => ({value:window.UserSettings.difficulty, pressed:[...document.querySelectorAll('[id^=btn-difficulty-][aria-pressed=true]')].map(b=>b.id)}))()`, returnByValue:true});
+            assert.strictEqual(state.result.value.value, value, `${id} の実入力で設定値が変わらない`);
+            assert.deepStrictEqual(state.result.value.pressed, [id]);
+        }
+    };
+    await verifyDifficultyInput(true);
     assert.notStrictEqual(st.audioDisplay, 'none', 'スマホ設定の音・表示パネルがレイアウトから消えている');
     assert.notStrictEqual(st.gameDisplay, 'none', 'スマホ設定は両パネルを同じgridセルで高さ計算へ参加させる');
     assert.strictEqual(st.audioVisibility, 'hidden', 'スマホ設定の非選択音・表示パネルが初期表示されている');
@@ -1781,6 +1795,9 @@ async function validateSettingsTabsLayout(cdp) {
     assert.notStrictEqual(st.gameDisplay, 'none', 'PC設定ではゲーム設定を従来どおり同じ画面に表示する');
     assert.strictEqual(st.displayModeDisplay, 'none', 'PCでは表示モード設定自体を非表示にする');
     assert.ok(st.content.top >= st.screen.top - 1 && st.content.bottom <= st.screen.bottom + 1, 'PC設定モーダルが画面外へはみ出す');
+    // 本番のUIManagerが行う標準フッターの外出しを再現して、画面上の入力と位置を検査する。
+    await cdp.call('Runtime.evaluate', {expression: `document.getElementById('settings-modal').appendChild(document.querySelector('#settings-modal .modal-footer')); true`,returnByValue:true});
+    await verifyDifficultyInput(false);
     console.log('✓ 設定画面 ゲーム左・毎回ゲーム初期表示 / スマホ2タブ/PC単一画面 visual/layout regression');
 }
 

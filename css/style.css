@@ -5370,12 +5370,23 @@ body:not(.is-pc) #settings-modal .settings-panel.active {
     visibility: visible;
     pointer-events: auto;
 }
+/* PCは1画面のままゲーム左・音量右に整理し、縦方向の過密を防ぐ。 */
+body.is-pc #settings-modal .modal-content.modal-small { max-width: 680px; }
+body.is-pc #settings-modal .settings-panels {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+}
 body.is-pc #settings-modal .settings-panel {
     display: block !important;
+    min-width: 0;
 }
+body.is-pc #settings-panel-game { grid-column: 1; grid-row: 1; }
+body.is-pc #settings-panel-audio-display { grid-column: 2; grid-row: 1; }
 
 .setting-row {
-    margin: 20px 0;
+    margin: 12px 0;
     text-align: left;
 }
 
@@ -5385,8 +5396,9 @@ body:not(.is-pc) .setting-row {
 }
 .setting-row .slider-row-label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     font-size: 0.95rem;
+    line-height: 1.35;
 }
 .setting-slider-wrap {
     display: flex;
@@ -5430,6 +5442,16 @@ body.is-pc .setting-display-mode-row { display: none; }
     padding: 8px 12px;
     font-size: 1rem;
 }
+#settings-modal .setting-toggle-group .ui-toggle-btn {
+    min-width: 0;
+    min-height: 40px;
+    box-sizing: border-box;
+    padding: 8px;
+    line-height: 1.25;
+    white-space: nowrap;
+}
+
+#settings-modal .setting-toggle-group .ui-toggle-btn.active { transform: none; }
 
 /* 設定内の危険操作は、設定トグルと同じ矩形系の形を使い、色だけ赤系にする。
    決定/キャンセル用の特殊形状(btn-danger)はモーダル外操作専用なので流用しない。 */

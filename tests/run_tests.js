@@ -291,7 +291,7 @@ test('r649 兵士合流時の加重平均は従来の切捨て算式と一致し
     const mathIdx = html.indexOf('src="js/game_math.js"');
     assert.ok(mathIdx > 0);
     for (const file of ['command_system.js', 'ai.js', 'war_effort.js', 'diplomacy.js']) {
-        assert.ok(mathIdx < html.indexOf(`src="js/${file}"`), `${file} loads after game_math.js`);
+        assert.ok(mathIdx < html.indexOf(`src="js/${file}`), `${file} loads after game_math.js`);
     }
 });
 
@@ -4948,10 +4948,10 @@ test('UserSettings は GameConfig と分離され、localStorage の正本にな
 
 test('表示モード設定は起動判定より先にUserSettingsを読み込む', () => {
     const html = read('index.html');
-    const userAt = html.indexOf('<script src="js/user_settings.js"></script>');
+    const userAt = html.search(/<script src="js\/user_settings\.js(?:\?[^"]+)?"><\/script>/);
     const bootstrapAt = html.indexOf('<script src="js/app_bootstrap.js"></script>');
     assert.ok(userAt >= 0 && bootstrapAt > userAt);
-    assert.strictEqual(html.indexOf('<script src="js/user_settings.js"></script>', userAt + 1), -1, 'UserSettingsを二重読込しない');
+    assert.strictEqual(html.match(/<script src="js\/user_settings\.js(?:\?[^"]+)?"><\/script>/g)?.length, 1, 'UserSettingsを二重読込しない');
 });
 
 test('ユーザー設定キーは user_settings.js 以外で直接localStorage操作しない', () => {
@@ -33273,7 +33273,7 @@ test('r687 初回ページにCSS・本編JSより前の独立ロード幕と遅�
     const end = html.indexOf('</template>', start);
     const splash = html.indexOf('<div id="startup-loading-screen"');
     const screen = html.indexOf('<div id="game-screen">');
-    const activeLoader = html.lastIndexOf('<script src="js/startup_loader.js"></script>');
+    const activeLoader = html.search(/<script src="js\/startup_loader\.js(?:\?[^"]+)?"><\/script>/);
     assert.ok(splash > html.indexOf('<body>') && splash < screen, '本体DOMより先に初回ロード画面を配置');
     assert.ok(start > screen && end > start && activeLoader > end, '本体用scriptは非実行template内');
     assert.ok(!html.includes('<link rel="stylesheet" href="css/style.css">'), '本編CSSで初回描画を止めない');
@@ -33281,7 +33281,7 @@ test('r687 初回ページにCSS・本編JSより前の独立ロード幕と遅�
     assert.ok(html.includes('#startup-loading-screen { position: fixed;') && html.includes('visibility: visible !important;'),
         'フォント待機でbodyがhiddenでも、初回ロード幕だけは可視');
     const manifest = html.slice(start, end);
-    const files = [...manifest.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
+    const files = [...manifest.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1].split('?')[0]);
     assert.strictEqual(files[0], 'js/user_settings.js');
     assert.strictEqual(files[1], 'js/app_bootstrap.js');
     assert.ok(files.indexOf('js/config.js') < files.indexOf('js/game.js'));
@@ -33290,7 +33290,7 @@ test('r687 初回ページにCSS・本編JSより前の独立ロード幕と遅�
     assert.strictEqual(new Set(files).size, files.length, '起動scriptを二重読込しない');
     assert.strictEqual(html.slice(0, start).match(/<script\s+[^>]*src=/g), null,
         'ロード入口以外で本編スクリプトを先行実行しない');
-    assert.ok(loader.includes('await givePaintOpportunity();') && loader.includes("loadStylesheet('css/style.css')"));
+    assert.ok(loader.includes('await givePaintOpportunity();') && /loadStylesheet\('css\/style\.css(?:\?[^']+)?'\)/.test(loader));
     assert.ok(loader.includes('element.async = false;'), '動的scriptの実行順序を保証する');
     assert.ok(loader.includes('await Promise.all(batch.map(loadScript));'), '各batchが終わってから次の依存を読む');
     assert.ok(loader.includes('await window.__titleFontLoadPromise;'), 'タイトル書体の準備完了後に公開');

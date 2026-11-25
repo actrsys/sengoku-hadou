@@ -53,7 +53,7 @@
         // 最初のpaint。ゲーム用font-faceや複雑なCSSはまだ存在しない。
         await givePaintOpportunity();
         await Promise.all([
-            loadStylesheet('css/style.css'),
+            loadStylesheet('css/style.css?v=981'),
             loadStylesheet('css/animation.css')
         ]);
         await givePaintOpportunity();
