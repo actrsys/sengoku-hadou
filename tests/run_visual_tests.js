@@ -3344,23 +3344,26 @@ async function validateWarProgressAndResultLayout(cdp) {
         const modal=document.getElementById('war-result-modal'),button=document.getElementById('war-result-close-btn'),cards=[...modal.querySelectorAll('.war-result-army')];
         const waitUntil=async predicate=>{const end=performance.now()+3500;while(!predicate()){if(performance.now()>end)throw new Error('明暗演出完了待ち timeout');await new Promise(requestAnimationFrame);}};
         const filters=()=>cards.map(el=>getComputedStyle(el).filter);
+        const surfaces=()=>cards.map(el=>{const css=getComputedStyle(el);return [css.backgroundColor,css.borderTopColor].join('/');});
+        const neutralSurfaces=()=>surfaces().every(x=>x==='rgba(0, 0, 0, 0.23)/rgba(215, 185, 112, 0.35)');
+        const victorySurface='rgb(64, 84, 58)/rgb(194, 161, 94)', defeatSurface='rgb(21, 35, 27)/rgb(142, 149, 133)';
         const hiddenButton=()=>button.disabled&&getComputedStyle(button).visibility==='hidden';
         let called=0;
         await ui.showWarResult({...short,winnerSide:'attacker'},()=>called++);
-        const neutral=filters().every(x=>x==='none')&&hiddenButton();const revealRect=snapshot();button.click();
+        const neutral=filters().every(x=>x==='none')&&neutralSurfaces()&&hiddenButton();const revealRect=snapshot();button.click();
         await waitUntil(()=>modal.classList.contains('is-outcome-revealing'));
         const animating=hiddenButton()&&cards.every(card=>card.getAnimations().some(a=>a.animationName==='war-result-reveal'));
         button.click();const blocked=called===0;
         await waitUntil(()=>!button.disabled);
-        const attackerVictory=filters().join(',')==='brightness(1.22),brightness(0.68)'&&getComputedStyle(button).visibility==='visible';const finishedRect=snapshot();
+        const attackerVictory=filters().join(',')==='brightness(1.32),brightness(0.55)'&&surfaces().join(',')===[victorySurface,defeatSurface].join(',')&&getComputedStyle(button).visibility==='visible';const finishedRect=snapshot();
         await ui.showWarResult({...short,winnerSide:'defender'},()=>called++);
-        const reset=filters().every(x=>x==='none')&&hiddenButton();
+        const reset=filters().every(x=>x==='none')&&neutralSurfaces()&&hiddenButton();
         await waitUntil(()=>!button.disabled);
-        const defenderVictory=filters().join(',')==='brightness(0.68),brightness(1.22)';button.click();const confirmedOnce=called===1;
+        const defenderVictory=filters().join(',')==='brightness(0.55),brightness(1.32)'&&surfaces().join(',')===[defeatSurface,victorySurface].join(',');button.click();const confirmedOnce=called===1;
         await ui.showWarResult({...short,winnerSide:'attacker'},()=>called++);
         await waitUntil(()=>modal.classList.contains('is-outcome-revealing'));
         await progress({...short,winnerSide:'defender'},frames);
-        const progressNeutral=filters().every(x=>x==='none')&&!button.disabled&&button.textContent==='省略';
+        const progressNeutral=filters().every(x=>x==='none')&&neutralSurfaces()&&!button.disabled&&button.textContent==='省略';
         const outcomeOK=neutral&&animating&&blocked&&attackerVictory&&reset&&defenderVictory&&confirmedOnce&&progressNeutral;
         // 検査後は通常の初期状態に戻し、確認用の実描画を残す。
         await progress(short,frames);const fieldDefenseHidden=getComputedStyle(defense).visibility==='hidden';
@@ -3387,14 +3390,14 @@ async function validateWarProgressAndResultLayout(cdp) {
         if (process.env.WAR_PREVIEW_DIR) {
             await new Promise(resolve=>setTimeout(resolve,100));
             const shot=await cdp.call('Page.captureScreenshot',{format:'png',fromSurface:true});
-            fs.writeFileSync(path.join(process.env.WAR_PREVIEW_DIR,`r975_攻城戦況_${dev.name}.png`),Buffer.from(shot.data,'base64'));
+            fs.writeFileSync(path.join(process.env.WAR_PREVIEW_DIR,`r976_攻城戦況_${dev.name}.png`),Buffer.from(shot.data,'base64'));
             await cdp.call('Runtime.evaluate',{expression:`(async()=>{const {ui,short}=window.__warLayoutPreview;await ui.showWarResult({...short,title:'攻撃軍勝利',tone:'victory',winnerSide:'attacker',description:'織田家が稲葉山城を制圧しました。'},()=>{});return true;})()`,returnByValue:true,awaitPromise:true});
             await cdp.call('Runtime.evaluate',{expression:`(async()=>{while(document.getElementById("war-result-close-btn").disabled)await new Promise(requestAnimationFrame);return true;})()`,returnByValue:true,awaitPromise:true});
             const resultShot=await cdp.call('Page.captureScreenshot',{format:'png',fromSurface:true});
-            fs.writeFileSync(path.join(process.env.WAR_PREVIEW_DIR,`r975_リザルト_${dev.name}.png`),Buffer.from(resultShot.data,'base64'));
+            fs.writeFileSync(path.join(process.env.WAR_PREVIEW_DIR,`r976_リザルト_${dev.name}.png`),Buffer.from(resultShot.data,'base64'));
         }
     }
-    console.log('✓ r975 他家戦況・戦争リザルト PC/SP顔画像・固定矩形・明暗演出 regression');
+    console.log('✓ 他家戦況・戦争リザルト PC/SP顔画像・固定矩形・明暗演出 regression');
     } finally { await new Promise(resolve=>faceServer.close(resolve)); }
 }
 

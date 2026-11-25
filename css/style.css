@@ -1489,7 +1489,7 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 .war-result-target { font-size: 0.95rem; color: #ded6ba; }
 .war-result-title, .war-result-target, .war-result-army-name, .war-result-commander { min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .war-result-armies { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr); gap: 9px; align-items: stretch; min-height: 0; }
-.war-result-army { display: grid; grid-template-rows: 69px minmax(0, 1fr); align-content: center; align-items: center; gap: 3px; min-width: 0; min-height: 0; padding: 8px; border: 1px solid rgba(215, 185, 112, .35); background: rgba(0, 0, 0, .23); border-radius: 4px; box-sizing: border-box; }
+.war-result-army { --war-neutral-surface: rgba(0, 0, 0, .23); --war-neutral-border: rgba(215, 185, 112, .35); display: grid; grid-template-rows: 69px minmax(0, 1fr); align-content: center; align-items: center; gap: 3px; min-width: 0; min-height: 0; padding: 8px; border: 1px solid var(--war-neutral-border); background: var(--war-neutral-surface); border-radius: 4px; box-sizing: border-box; }
 #war-result-modal:not(.is-progress) .war-result-army { grid-template-rows: 69px; align-content: center; }
 .war-result-army-heading { display: grid; grid-template-columns: 60px minmax(0, 1fr); align-items: center; gap: 6px; min-width: 0; }
 .war-result-face { width: 60px; height: 60px; object-fit: contain; border: 1px solid rgba(215,185,112,.45); box-sizing: border-box; background: rgba(0,0,0,.25); }
@@ -1502,14 +1502,19 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 .war-result-description { white-space: normal; overflow-wrap: anywhere; min-height: 0; overflow-y: auto; overscroll-behavior: contain; font-size: .93rem; line-height: 1.5; color: #f2ead6; border-top: 1px solid rgba(212, 175, 55, .26); padding: 8px 4px 0; box-sizing: border-box; }
 #war-result-modal .war-result-footer { justify-content: center; }
 #war-result-close-btn { min-width: 120px; }
-/* 結果だけを明暗で示す。枠・文字配置・footerの高さは変更しない。 */
+/* 結果だけを明暗で示す。半透明の黒を明るくするだけでは下地が変わらないため、面・境界・内容を同時に変化させる。 */
 #war-result-modal.is-outcome-pending #war-result-close-btn { visibility: hidden; pointer-events: none; }
 #war-result-modal.is-attacker-victory .war-result-army:first-child,
-#war-result-modal.is-defender-victory .war-result-army:last-child { --war-outcome-brightness: 1.22; filter: brightness(var(--war-outcome-brightness)); }
+#war-result-modal.is-defender-victory .war-result-army:last-child { --war-outcome-brightness: 1.32; --war-outcome-surface: #40543a; --war-outcome-border: #c2a15e; }
 #war-result-modal.is-attacker-victory .war-result-army:last-child,
-#war-result-modal.is-defender-victory .war-result-army:first-child { --war-outcome-brightness: .68; filter: brightness(var(--war-outcome-brightness)); }
+#war-result-modal.is-defender-victory .war-result-army:first-child { --war-outcome-brightness: .55; --war-outcome-surface: #15231b; --war-outcome-border: #8e9585; }
+#war-result-modal.is-attacker-victory .war-result-army,
+#war-result-modal.is-defender-victory .war-result-army { filter: brightness(var(--war-outcome-brightness)); background-color: var(--war-outcome-surface); border-color: var(--war-outcome-border); }
 #war-result-modal.is-outcome-revealing .war-result-army { animation: war-result-reveal 550ms ease 250ms both; }
-@keyframes war-result-reveal { from { filter: brightness(1); } to { filter: brightness(var(--war-outcome-brightness)); } }
+@keyframes war-result-reveal {
+    from { filter: brightness(1); background-color: var(--war-neutral-surface); border-color: var(--war-neutral-border); }
+    to { filter: brightness(var(--war-outcome-brightness)); background-color: var(--war-outcome-surface); border-color: var(--war-outcome-border); }
+}
 @media (prefers-reduced-motion: reduce) { #war-result-modal.is-outcome-revealing .war-result-army { animation: none; } }
 
 .war-progress-metrics { display: none; min-width: 0; min-height: 0; }
