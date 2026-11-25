@@ -295,7 +295,8 @@ class TurnManager {
             castle.gold = Math.min(GameConfig.Limits.CastleStock, castle.gold + income);
 
             const neighborMultiplier = DomesticRules.calcNeighborGrowthMultiplier(castle, game);
-            const populationGrowth = DomesticRules.calcMonthlyPopulationGrowth(castle, neighborMultiplier);
+            const growthPercent = DomesticRules.getMonthlyGrowthPercent(castle, game);
+            const populationGrowth = DomesticRules.calcMonthlyPopulationGrowth(castle, neighborMultiplier, growthPercent);
             castle.population = Math.min(GameConfig.Limits.CastlePopulation, Math.max(0, castle.population + populationGrowth));
             // 従来は各拠点の港収入計算時にreduceしていたため、先に処理済みの拠点の人口増加は
             // 後続拠点の港ボーナスへ反映されていた。短命集計Mapも同じ順序で差分更新する。
@@ -309,7 +310,7 @@ class TurnManager {
             const daimyo = daimyoByClanIdForGrowth.get(castle.ownerClan);
             if (daimyo) {
                 const ownedCount = ownedCastleCountByClanId.get(castle.ownerClan) || 0;
-                const soldierGrowth = DomesticRules.calcMonthlySoldierGrowth(castle, daimyo, ownedCount, neighborMultiplier);
+                const soldierGrowth = DomesticRules.calcMonthlySoldierGrowth(castle, daimyo, ownedCount, neighborMultiplier, growthPercent);
                 castle.soldiers = Math.min(GameConfig.Limits.CastleStock, castle.soldiers + soldierGrowth);
             }
 

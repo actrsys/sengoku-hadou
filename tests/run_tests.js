@@ -46171,6 +46171,62 @@ test('下級の0回は製品の内政実行から候補評価前に正常復帰�
     available=0;await run();
 });
 
+test('難易度の月初自然増加は他家の正の増加のみ補正し、既存の丸め・減少を維持する', () => {
+    const ctx=createContext();
+    loadScript(ctx,'js/config.js');loadScript(ctx,'js/user_settings.js');loadScript(ctx,'js/domestic_rules.js');
+    const rules=ctx.DomesticRules, game={playerClanId:1};
+    const castle={ownerClan:2,population:10000,peoplesLoyalty:80,kokudaka:4000,defense:500,soldiers:2000};
+    const daimyo={leadership:80,strength:70,politics:75,diplomacy:65,intelligence:85,charm:70};
+    const pop=rules.calcMonthlyPopulationGrowth(castle,1.2), soldiers=rules.calcMonthlySoldierGrowth(castle,daimyo,5,1.2);
+    assert.ok(pop>0&&soldiers>0);
+    for (const [difficulty, percent] of [['advanced',100],['intermediate',85],['beginner',70]]) {
+        ctx.UserSettings.setDifficulty(difficulty);
+        assert.strictEqual(rules.getMonthlyGrowthPercent(castle,game),percent);
+        assert.strictEqual(rules.getMonthlyGrowthPercent({ownerClan:'1',isDelegated:true},game),100);
+        assert.strictEqual(rules.getMonthlyGrowthPercent({ownerClan:0},game),100);
+        assert.strictEqual(rules.getMonthlyGrowthPercent({ownerClan:1},{playerClanId:-100}),percent);
+        assert.strictEqual(rules.calcMonthlyPopulationGrowth(castle,1.2,percent),Math.floor(pop*percent/100));
+        assert.strictEqual(rules.calcMonthlySoldierGrowth(castle,daimyo,5,1.2,percent),Math.floor(soldiers*percent/100));
+        const low={...castle,peoplesLoyalty:0};
+        const loss=rules.calcMonthlyPopulationGrowth(low,1.2);
+        assert.ok(loss<0);assert.strictEqual(rules.calcMonthlyPopulationGrowth(low,1.2,percent),loss);
+        assert.strictEqual(rules.calcMonthlySoldierGrowth(castle,null,5,1.2,percent),0);
+        assert.strictEqual(rules.applyMonthlyGrowthPercent(0,percent),0);
+        assert.strictEqual(rules.applyMonthlyGrowthPercent(1,percent),percent===100?1:0);
+    }
+    ctx.UserSettings.setDifficulty('invalid');assert.strictEqual(rules.getMonthlyGrowthPercent(castle,game),100);
+});
+
+test('製品の月初進行で各拠点の難易度補正・人口差分・兵士計算順を保持する', async () => {
+    let draws=0;const randomMath=Object.create(Math);randomMath.random=()=>{draws++;return 0.5;};
+    const ctx=createContext({Math:randomMath,setTimeout,clearTimeout,PersonnelRules:{},EconomyRules:{
+        updateMonthlyProvinceMarketRates(){},calcMonthlyGoldIncome(c,g,total){g.incomeInputs.push([c.id,total]);return 0;},
+        calcMonthlyTradeLimit(){return 0;},applyMonthlyCastleUpkeep(){return {isGoldShort:false};}
+    }});
+    for(const f of ['config','user_settings','domestic_rules','turn_manager'])loadScript(ctx,`js/${f}.js`);
+    const rules=ctx.DomesticRules, TM=vm.runInContext('TurnManager',ctx);
+    const base={population:10000,peoplesLoyalty:80,kokudaka:4000,defense:500,soldiers:2000,gold:0,adjacentCastleIds:[]};
+    const daimyo={leadership:80,strength:70,politics:75,diplomacy:65,intelligence:85,charm:70};
+    for(const [difficulty,percent,playerClanId] of [['advanced',100,1],['intermediate',85,1],['beginner',70,1],['beginner',70,-100]]) {
+        ctx.UserSettings.setDifficulty(difficulty);
+        const castles=[{...base,id:1,ownerClan:1,isDelegated:true},{...base,id:2,ownerClan:2},{...base,id:3,ownerClan:2,peoplesLoyalty:0},{...base,id:4,ownerClan:0}];
+        let finished=0;const noop=()=>{};
+        const game={phase:'game',year:1560,month:4,playerClanId,castles,clans:[{id:1,leaderId:1},{id:2,leaderId:2}],bushos:[],incomeInputs:[],
+            getBusho:()=>daimyo,getClanCastles:id=>castles.filter(c=>c.ownerClan===id),getCastleBushos:()=>[],getCurrentTurnCastle:()=>null,
+            writeSystemDiagnostic:noop,ui:{showCutin:async()=>{},log:noop},factionSystem:{applyStartMonthSameFactionEffects:noop,processStartMonth:async()=>{}},
+            lifeSystem:{processStartMonth:async()=>{}},affiliationSystem:{processRoninMovements:noop},updateAllCastlesLords:noop,updateAllClanPrestige:noop,
+            courtRankSystem:{processMonthlyPromotions:()=>[]},tryProcessQueuedWatchReturn:async()=>false,processTurn:()=>finished++};
+        const expected=castles.map(c=>{if(!c.ownerClan)return [c.population,c.soldiers];const p=c.ownerClan===playerClanId?100:percent;
+            const pop=rules.calcMonthlyPopulationGrowth(c,1.2);const population=c.population+(pop>0?Math.floor(pop*p/100):pop);
+            const soldiers=c.soldiers+Math.floor(rules.calcMonthlySoldierGrowth({...c,population},daimyo,game.getClanCastles(c.ownerClan).length,1.2)*p/100);
+            return [population,soldiers];});
+        const before=draws;await new TM(game).startMonth();
+        assert.deepStrictEqual(castles.map(c=>[c.population,c.soldiers]),expected);
+        assert.strictEqual(game.incomeInputs[2][1],10000+expected[1][0]);
+        assert.strictEqual(draws-before,castles.length-1,'既存の順番抽選だけ');assert.strictEqual(finished,1);
+    }
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);

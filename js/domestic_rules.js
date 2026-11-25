@@ -78,8 +78,20 @@ class DomesticRules {
         return multiplier;
     }
 
+    /** 月初の自然増加だけに適用する難易度倍率（整数％）。自家・中立は従来どおり。 */
+    static getMonthlyGrowthPercent(castle, game) {
+        if (Number(castle.ownerClan) === 0 || Number(castle.ownerClan) === Number(game.playerClanId)) return 100;
+        const rule = window.GameConfig.AI.AI.DifficultyModifiers[window.UserSettings?.difficulty];
+        return rule ? rule.monthlyGrowthPercent : 100;
+    }
+
+    static applyMonthlyGrowthPercent(growth, percent) {
+        // 自然減少を緩和しない。上級では従来の整数値をそのまま返す。
+        return growth > 0 && percent !== 100 ? Math.floor(growth * percent / 100) : growth;
+    }
+
     /** 月初の人口自然増減を計算する。 */
-    static calcMonthlyPopulationGrowth(castle, neighborMultiplier) {
+    static calcMonthlyPopulationGrowth(castle, neighborMultiplier, growthPercent = 100) {
         const currentLoyalty = Math.max(0, Math.min(100, castle.peoplesLoyalty));
         let calcLoyalty = currentLoyalty;
         if (castle.population < 2000 && currentLoyalty < 60) calcLoyalty = 60;
@@ -107,11 +119,11 @@ class DomesticRules {
         const loyaltyScore = (castle.peoplesLoyalty / 100) + 0.5;
         const baseScore = (kokudakaBonus + defenseBonus) * loyaltyScore;
         if (growth > 0 && castle.population >= baseScore) growth = Math.floor(growth / 20);
-        return growth;
+        return this.applyMonthlyGrowthPercent(growth, growthPercent);
     }
 
     /** 月初の兵士自然増加を計算する。 */
-    static calcMonthlySoldierGrowth(castle, daimyo, ownedCastlesCount, neighborMultiplier) {
+    static calcMonthlySoldierGrowth(castle, daimyo, ownedCastlesCount, neighborMultiplier, growthPercent = 100) {
         if (!daimyo) return 0;
         const statBonus = (
             daimyo.leadership + daimyo.strength + daimyo.politics +
@@ -131,7 +143,7 @@ class DomesticRules {
         const penaltyMultiplier = Math.max(0, 1.0 - (soldierRatio * 1.25));
         let soldierGrowth = Math.floor(suppressedGrowth * penaltyMultiplier);
         if (soldierGrowth > 0) soldierGrowth = Math.floor(soldierGrowth * neighborMultiplier);
-        return Math.max(0, soldierGrowth);
+        return this.applyMonthlyGrowthPercent(Math.max(0, soldierGrowth), growthPercent);
     }
 
     static calcFactionBonusRate(bushos) {

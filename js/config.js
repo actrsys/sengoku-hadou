@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r979'
+        Version: 'r980'
     },
 
     Ending: {
@@ -343,10 +343,10 @@ window.GameConfig = {
         AI: {
             // 従来のAI判断補正は現行値を維持。ユーザー難易度とは別に扱う。
             Difficulty: 'normal',
-            InternalActionDifficulty: {
-                advanced: { maxPenalty: 0, minimum: 1 },
-                intermediate: { maxPenalty: 1, minimum: 1 },
-                beginner: { maxPenalty: 2, minimum: 0 }
+            DifficultyModifiers: {
+                advanced: { maxPenalty: 0, minimum: 1, monthlyGrowthPercent: 100 },
+                intermediate: { maxPenalty: 1, minimum: 1, monthlyGrowthPercent: 85 },
+                beginner: { maxPenalty: 2, minimum: 0, monthlyGrowthPercent: 70 }
             },
             AbilityBase: 50,
             AbilitySensitivity: 3.0,

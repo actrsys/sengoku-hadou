@@ -1617,7 +1617,7 @@ class AIEngine {
         if (Number(castle.ownerClan) === Number(this.game.playerClanId) || maxActions <= 0) return maxActions;
         const difficulty = window.UserSettings?.difficulty;
         if (!difficulty) return maxActions;
-        const rule = window.AIParams.AI.InternalActionDifficulty[difficulty];
+        const rule = window.AIParams.AI.DifficultyModifiers[difficulty];
         if (!rule || rule.maxPenalty === 0 || maxActions <= rule.minimum) return maxActions;
         // 拠点の内政開始時に一度だけ抽選。上級・自家・補正不能時は乱数を消費しない。
         const penalty = Math.floor(Math.random() * (rule.maxPenalty + 1));
