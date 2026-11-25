@@ -96,17 +96,32 @@ Object.assign(WarManager.prototype, {
     beginOtherWarProgress(phase, state, readFrame) {
         this._otherWarProgress = null;
         if (!this.shouldShowOtherWarProgress(state)) return;
-        this._otherWarProgress = { phase, state, frames: [] };
+        this._otherWarProgress = { phase, state, frames: [], pendingLogs: [], finalFrame: null };
         this.recordOtherWarProgress(phase, state, 0, readFrame);
+    },
+
+    // 戦闘の確定箇所だけから記録。戦闘状態・履歴・通知OFFの処理には保存しない。
+    recordOtherWarProgressEvent(phase, state, message) {
+        const progress = this._otherWarProgress;
+        if (!progress || progress.phase !== phase || progress.state !== state || !message) return;
+        progress.pendingLogs.push(message);
+    },
+
+    // 城壁修復など戦後の数値操作が始まる前の決着値を保存する。
+    captureOtherWarProgressFinal(phase, state, readFrame) {
+        const progress = this._otherWarProgress;
+        if (progress?.phase === phase && progress.state === state && !progress.finalFrame) progress.finalFrame = readFrame();
     },
 
     recordOtherWarProgress(phase, state, turn, readFrame) {
         const progress = this._otherWarProgress;
         if (!progress || progress.phase !== phase || progress.state !== state) return;
-        const frame = { turn, ...readFrame() };
+        const frame = { turn, ...readFrame(), logs: progress.pendingLogs.splice(0) };
         const previous = progress.frames[progress.frames.length - 1];
-        if (previous && previous.turn === frame.turn) progress.frames[progress.frames.length - 1] = frame;
-        else progress.frames.push(frame);
+        if (previous && previous.turn === frame.turn) {
+            frame.logs = [...previous.logs, ...frame.logs];
+            progress.frames[progress.frames.length - 1] = frame;
+        } else progress.frames.push(frame);
     },
 
     getSiegeProgressFrame(state) {
@@ -119,7 +134,7 @@ Object.assign(WarManager.prototype, {
         }, { soldiers: 0, rice: 0 });
         return {
             attacker: sum([state.attacker, state.selfReinforcement, state.reinforcement]),
-            defender: sum([state.defender, state.defSelfReinforcement, state.defReinforcement])
+            defender: { ...sum([state.defender, state.defSelfReinforcement, state.defReinforcement]), defense: Math.max(0, Number(state.defender.defense) || 0) }
         };
     },
 
@@ -127,11 +142,12 @@ Object.assign(WarManager.prototype, {
         const progress = this._otherWarProgress;
         if (!progress || progress.phase !== phase || progress.state !== state) return null;
         // 決着がターン境界直後なら同じ数値で次ターンを捏造しない。
-        const finalFrame = readFrame();
+        const finalFrame = progress.finalFrame || readFrame();
         const previous = progress.frames[progress.frames.length - 1];
-        if (!previous || ['attacker','defender'].some(side => ['soldiers','rice'].some(metric => previous[side][metric] !== finalFrame[side][metric]))) {
-            this.recordOtherWarProgress(phase, state, turn, () => finalFrame);
-        }
+        const changed = !previous || ['attacker', 'defender'].some(side =>
+            ['soldiers', 'rice', 'defense'].some(metric => previous[side][metric] !== finalFrame[side][metric]));
+        if (changed) this.recordOtherWarProgress(phase, state, turn, () => finalFrame);
+        else if (progress.pendingLogs.length) previous.logs.push(...progress.pendingLogs.splice(0));
         this._otherWarProgress = null;
         if (!this.shouldShowOtherWarProgress(state)) return null;
         const data = this.createWarResultPresentation('', false, false);
@@ -1611,6 +1627,12 @@ Object.assign(WarManager.prototype, {
         if (!s || !s[reinfKey]) return;
 
         const reinf = s[reinfKey];
+        const progress = this._otherWarProgress;
+        if (progress?.phase === 'siege' && progress.state === s) {
+            const leader = reinf.bushos?.[0]?.name;
+            const name = leader ? `${leader}軍` : ({ selfReinforcement: '攻撃側応援軍', reinforcement: '攻撃側友軍', defSelfReinforcement: '守備側応援軍', defReinforcement: '守備側友軍' })[reinfKey];
+            this.recordOtherWarProgressEvent('siege', s, `${name}${reinf.soldiers <= 0 ? 'が全滅' : 'が撤退'}`);
+        }
         
         // 撤退した人たちを忘れないように、専用の「帰宅待ちリスト」を作ります
         if (!s.retreatedReinforcements) {
@@ -1678,6 +1700,7 @@ Object.assign(WarManager.prototype, {
                         this.handleDaimyoEscape(b, target);
                     }
                 });
+                this.captureOtherWarProgressFinal('siege', s, () => this.getSiegeProgressFrame(s));
                 defCastle.gold -= carryGold; defCastle.rice = 0; defCastle.soldiers = 0;
                 defCastle.horses = 0; defCastle.guns = 0;
                 

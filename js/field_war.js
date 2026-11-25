@@ -2649,7 +2649,12 @@ class FieldWarManager {
         for (let key in groupSoldiers) {
             if (this.groupStats[key]) {
                 let cons = Math.floor(groupSoldiers[key] * consumeRate);
-                this.groupStats[key].rice = Math.max(0, this.groupStats[key].rice - cons);
+                const riceBefore = this.groupStats[key].rice;
+                this.groupStats[key].rice = Math.max(0, riceBefore - cons);
+                if (riceBefore > 0 && this.groupStats[key].rice === 0) {
+                    const label = { atk_main: '攻撃本隊', atk_self: '攻撃側応援軍', atk_ally: '攻撃側友軍', def_main: '守備本隊', def_self: '守備側応援軍', def_ally: '守備側友軍' }[key];
+                    if (label) this.game?.warManager?.recordOtherWarProgressEvent?.('field', this.warState, `${label}の兵糧が尽きた`);
+                }
             }
         }
     }
@@ -2706,6 +2711,7 @@ class FieldWarManager {
                 unitMorale = this.groupStats[u.groupId].morale;
             }
             if (unitMorale <= 0 && u.soldiers > 0) {
+                this.game?.warManager?.recordOtherWarProgressEvent?.('field', this.warState, `${u.name}隊の士気が崩壊`);
                 this.log(`士気が完全に崩壊し、${u.name}隊の兵士たちは戦場から逃亡した！`);
                 u.soldiers = 0;
                 
@@ -2722,6 +2728,7 @@ class FieldWarManager {
 
     // ★追加: 個別部隊の撤退処理
     retreatUnit(unit) {
+        this.game?.warManager?.recordOtherWarProgressEvent?.('field', this.warState, `${unit.name}隊が撤退`);
         // 退き巧者の回復量そのものは SkillManager が決定します。
         const retreatLoss = unit.initialSoldiers - unit.soldiers;
         const bonusRecovery = SkillManager.calcRetreatUnitBonusRecovery(unit, retreatLoss, this.game);
@@ -2776,7 +2783,10 @@ class FieldWarManager {
     finishFieldWarWithNotice(resultType, message) {
         if (!this.active) return;
 
-        if (message) this.log(message);
+        if (message) {
+            this.game?.warManager?.recordOtherWarProgressEvent?.('field', this.warState, message.split('。')[0]);
+            this.log(message);
+        }
         const shouldShowNotice = !!(this.playerWasInvolved && this.game && this.game.ui && typeof this.game.ui.showDialog === 'function');
         if (shouldShowNotice && !this.fieldEndNoticeShown) {
             this.fieldEndNoticeShown = true;
@@ -4068,6 +4078,7 @@ class FieldWarManager {
         // 守備側→攻撃側の順序、負傷時の残兵回収、壊滅時の士気補正は従来どおり。
         const resolveCasualty = (unit, opponent) => {
             if (unit.isWounded) {
+                this.game?.warManager?.recordOtherWarProgressEvent?.('field', this.warState, `${unit.name}隊が負傷により離脱`);
                 this.log(`${unit.name}が負傷しました！　${unit.name}隊は戦場から離脱します！`);
                 this.units = this.units.filter(u => u.id !== unit.id);
                 const el = document.getElementById(`fw-unit-el-${unit.id}`);
@@ -4077,6 +4088,7 @@ class FieldWarManager {
                     this.retreatedUnits.push(unit);
                 }
             } else if (unit.soldiers <= 0) {
+                this.game?.warManager?.recordOtherWarProgressEvent?.('field', this.warState, `${unit.name}隊が全滅`);
                 this.log(`${unit.name}隊が壊滅した！`);
                 this.units = this.units.filter(u => u.id !== unit.id);
                 applyDestroyedUnitMorale(unit, opponent);
