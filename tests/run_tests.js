@@ -45498,6 +45498,59 @@ test('r964 操作部隊消滅後の野戦通知は非表示画面に頼らず戦
 });
 
 
+// r971: 通常の野戦終了通知から籠城通知へ遷移する際、野戦の完了Promiseは
+// WarManagerへ渡した非同期onCompleteの完了まで持ち越す（旧画面を先に解放しない）。
+test('野戦終了の非同期onCompleteが籠城通知中なら共通UIへの完了は保留される', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/field_war.js');
+    const Field = vm.runInContext('FieldWarManager', ctx);
+    const field = Object.create(Field.prototype);
+    const events = [];
+    let releaseSiege;
+    const pendingSiegeMessage = new Promise(resolve => { releaseSiege = resolve; });
+    let callbackStarted = 0;
+    let callbackEnded = 0;
+    field.game = {
+        playerClanId: 1,
+        ui: { resumeMainMapAfterBattle() {} },
+        eventManager: { processEvents(timing) { events.push(timing); return Promise.resolve(); } }
+    };
+    Object.assign(field, {
+        _fieldWarGeneration: 1, active: true, playerWasInvolved: true,
+        modal: { classList: { contains: name => name === 'hidden', add() {} } },
+        units: [
+            { id: 4, isAttacker: true, isGeneral: true, soldiers: 300, groupId: 'atk_main', troopType: 'ashigaru' },
+            { id: 5, isAttacker: false, isGeneral: true, soldiers: 200, groupId: 'def_main', troopType: 'ashigaru' }
+        ],
+        retreatedUnits: [],
+        groupStats: { atk_main: { rice: 100, morale: 50, training: 50 }, def_main: { rice: 100, morale: 50, training: 50 } },
+        warState: {
+            attacker: { ownerClan: 1, name: '攻撃軍', soldiers: 300, horses: 0, guns: 0 },
+            defender: { ownerClan: 2, name: '守備軍', fieldSoldiers: 200, fieldHorses: 0, fieldGuns: 0 },
+            deadSoldiers: { attacker: 0, defender: 0 }
+        }
+    });
+    field.releaseFieldWarVisualResources = () => {};
+    // WarManager.startWar()から渡される実コールバックと同じasync待機構造。
+    field.onComplete = async resultType => {
+        callbackStarted++;
+        assert.strictEqual(resultType, 'attacker_win');
+        await pendingSiegeMessage;
+        callbackEnded++;
+    };
+    const result = field.endFieldWar('attacker_win');
+    let settled = false;
+    result.then(() => { settled = true; });
+    for (let i = 0; i < 12; i++) await Promise.resolve();
+    assert.strictEqual(callbackStarted, 1, '戦争管理側の完了コールバックを起動');
+    assert.strictEqual(callbackEnded, 0, '籠城通知はまだ確認されていない');
+    assert.strictEqual(settled, false, '通知中に野戦完了Promiseを早期解放しない');
+    releaseSiege();
+    await result;
+    assert.strictEqual(callbackEnded, 1, '籠城通知後に完了する');
+    assert.ok(events.includes('after_field_war'), '野戦後イベントも処理する');
+});
+
 // r965: 総大将の「撤退する」確認は実際の野戦終了Promiseを共通UIへ返す。
 // 一般部隊の撤退は同期処理であり、混同して不要なPromiseを作らない。
 test('r965 野戦で総大将の撤退確認は非同期終了Promiseを共通UIへ引継ぐ', async () => {
@@ -45835,6 +45888,135 @@ test('SH-BUG-009 通常の現役武将の継承では現在の能力値を勝手
     f.child._leadership = 77;
     f.game.lifeSystem._placeSuccessionSuccessor(f.child, f.parent.clan, f.castle);
     assert.strictEqual(f.child._leadership, 77, '未登場者の早期元服以外は元の挙動を維持');
+});
+
+// SH-BUG-010: プレイヤーが実際の家督譲渡確認から実行した場合、
+// 確認後イベントは元服・改名を含む継承通知の完了を待つ。
+test('SH-BUG-010 生前家督譲渡の確認は継承処理と通知を完了してから後続イベントへ進む', async () => {
+    const ctx = createContext({COMMAND_SPECS: {}});
+    loadScript(ctx, 'js/command_system.js');
+    const Command = vm.runInContext('CommandSystem', ctx);
+    const heir = {id: 12, name: '後継者'};
+    const castle = {id: 1};
+    let onConfirm, closed = 0, before = 0, after = 0, successionCount = 0;
+    let finishSuccession;
+    const pendingSuccession = new Promise(resolve => { finishSuccession = resolve; });
+    const game = {
+        year: 1570, month: 8, currentIndex: 0, turnQueue: [castle],
+        playerClanId: 4, getBusho: id => Number(id) === heir.id ? heir : null,
+        turnManager: {captureTurnFlowGeneration: () => 1, isTurnFlowGenerationCurrent: g => g === 1},
+        ui: {
+            info: {closeCommonModal() {closed++;}},
+            showDialog(_msg, confirm, callback) {
+                assert.strictEqual(confirm, true);
+                onConfirm = callback;
+            }
+        },
+        eventManager: {async processEvents(stage) {
+            if (stage === 'before_command') before++;
+            if (stage === 'after_command') after++;
+        }},
+        lifeSystem: {executeSuccessionCommand(id) {
+            assert.strictEqual(Number(id), heir.id);
+            successionCount++;
+            return pendingSuccession;
+        }}
+    };
+    const command = new Command(game);
+    command.handleBushoSelection('succession_target', [heir.id], null, {});
+    assert.strictEqual(typeof onConfirm, 'function', '実際の家督譲渡確認経路を通る');
+    const completion = onConfirm();
+    assert.ok(completion && typeof completion.then === 'function', '確認は共通UIへPromiseを引き渡す');
+    assert.strictEqual(closed, 1, '候補一覧は確定時だけ閉じる');
+    try {
+        await new Promise(resolve => setImmediate(resolve));
+        assert.strictEqual(before, 1);
+        assert.strictEqual(successionCount, 1);
+        assert.strictEqual(after, 0, '継承通知中にafter_commandを実行してはならない');
+    } finally {
+        finishSuccession();
+    }
+    await completion;
+    assert.strictEqual(after, 1, '継承通知の完了後だけafter_commandを一回実行');
+});
+
+// r972: 他家戦争の戦況は計算結果の記録だけを読み、通知設定・陣営・段階を越えない。
+test('r972 他家攻城戦の開始・ラウンド終了の実兵糧・兵力を記録し、通知OFFと自勢力は完全に除外', async () => {
+    const ctx = createContext({ UserSettings: {aiWarNotify:true}, WarParams:{Military:{WarMaxRounds:15}} });
+    loadScript(ctx,'js/war.js'); loadScript(ctx,'js/war_effort.js');
+    const War = vm.runInContext('WarManager',ctx);
+    let shown = null, releases = 0;
+    const game = { playerClanId:1, getClan:id=>({name:`勢力${id}`}), ui:{showWarProgressAsync(data,frames) { shown={data,frames}; releases++; return Promise.resolve(true); }} };
+    const war = new War(game); game.warManager=war;
+    const s = war.state = {active:true,round:1,attacker:{ownerClan:2,soldiers:1000,rice:800},defender:{ownerClan:3,name:'城',soldiers:500,rice:600},selfReinforcement:{soldiers:200,rice:300},reinforcement:{soldiers:100,rice:80},defSelfReinforcement:{soldiers:50,rice:70},defReinforcement:{soldiers:150,rice:90},isPlayerInvolved:false,isPlayerFactionInvolved:false,atkBushos:[],defBusho:null};
+    war.processWarRound=()=>{};
+    war.resolveAutoWar(); // 製品の攻城戦開始経路
+    assert.ok(war._otherWarProgress);
+    assert.strictEqual(war._otherWarProgress.frames[0].attacker.soldiers,1300);
+    assert.strictEqual(war._otherWarProgress.frames[0].defender.rice,760);
+    s.phase='action';s.actionQueue=[];s.attacker.soldiers=800;
+    war.advanceWarTurn(); // 製品のラウンド末消費処理
+    assert.strictEqual(s.round,2);
+    const frame = war._otherWarProgress.frames[1];
+    assert.strictEqual(frame.attacker.soldiers,1100);
+    assert.strictEqual(frame.attacker.rice,1125); // 1180 - 40 - 10 - 5
+    assert.strictEqual(frame.defender.rice,726); // 760 - 25 - 2 - 7
+    s.defender.soldiers=100;
+    const before = JSON.stringify(s);
+    await war.playOtherWarProgress('siege',s,2,()=>war.getSiegeProgressFrame(s));
+    assert.strictEqual(JSON.stringify(s),before,'再生で戦闘状態を変更しない');
+    assert.strictEqual(shown.data.title,'攻城戦'); assert.strictEqual(shown.frames.length,3);
+    assert.strictEqual(shown.frames[0].attacker.soldiers,1300,'初期値は不変');
+    assert.strictEqual(shown.frames[2].defender.soldiers,300);
+    assert.strictEqual(war.playOtherWarProgress('siege',s,2,()=>war.getSiegeProgressFrame(s)),null);
+    assert.strictEqual(releases,1);
+    let reads=0; const read=()=>{reads++;return war.getSiegeProgressFrame(s);};
+    ctx.UserSettings.aiWarNotify=false; war.beginOtherWarProgress('siege',s,read); war.recordOtherWarProgress('siege',s,1,read);
+    assert.strictEqual(war.playOtherWarProgress('siege',s,1,read),null);
+    ctx.UserSettings.aiWarNotify=true; s.isPlayerFactionInvolved=true;war.beginOtherWarProgress('siege',s,read);
+    s.isPlayerFactionInvolved=false;s.isPlayerInvolved=true;war.beginOtherWarProgress('siege',s,read);
+    assert.strictEqual(reads,0,'通知OFF、自勢力、操作戦で記録を行わない');
+});
+
+test('r972 野戦の部隊・参加グループの実数だけを集計し、ラウンド末の兵糧を一度記録', () => {
+    const ctx=createContext();loadScript(ctx,'js/field_war.js');
+    const Field=vm.runInContext('FieldWarManager',ctx);const field=Object.create(Field.prototype);
+    const recorded=[];
+    field.game={warManager:{recordOtherWarProgress(phase,state,turn,read){recorded.push({phase,state,turn,frame:read()});}}};
+    Object.assign(field,{active:true,turnCount:1,turnQueue:[],warState:{},isHeavySnowBattle:false,
+        units:[{isAttacker:true,soldiers:300,groupId:'atk_main'},{isAttacker:true,soldiers:100,groupId:'atk_main'},{isAttacker:true,soldiers:200,groupId:'atk_ally'},{isAttacker:false,soldiers:100,groupId:'def_main'}],
+        groupStats:{atk_main:{rice:500},atk_ally:{rice:150},def_main:{rice:90},def_ally:{rice:999}}});
+    field.applyWeatherMoralePenalty=()=>{};field.checkMoraleCollapse=()=>{};field.checkEndCondition=()=>false;field.startTurn=()=>{};
+    const initial=field.getFieldProgressFrame();
+    assert.strictEqual(initial.attacker.soldiers,600);assert.strictEqual(initial.attacker.rice,650);assert.strictEqual(initial.defender.rice,90,'非参加・撤退済の兵糧は含まない');
+    field.processQueue();
+    assert.strictEqual(recorded.length,1);assert.strictEqual(recorded[0].turn,1);assert.strictEqual(recorded[0].frame.attacker.rice,647);
+    field.units=field.units.filter(u=>u.groupId!=='atk_ally');
+    assert.strictEqual(field.getFieldProgressFrame().attacker.rice,498,'撤退済援軍を再加算しない');
+});
+
+test('r972 戦況表示は同じ初期尺度を維持し、自動完了・省略・強制終了を一度だけ処理', async () => {
+    const elements=new Map(), timers=new Map();let nextTimer=0;
+    const make=()=>({textContent:'',style:{setProperty(k,v){this[k]=v;}},listeners:new Map(),classList:{v:new Set(['hidden']),add(...x){x.forEach(y=>this.v.add(y));},remove(...x){x.forEach(y=>this.v.delete(y));},toggle(x,b){if(b)this.add(x);else this.remove(x);},contains(x){return this.v.has(x);}},addEventListener(k,v){this.listeners.set(k,v);},removeEventListener(k,v){if(this.listeners.get(k)===v)this.listeners.delete(k);}});
+    for(const id of ['war-result-modal','war-result-close-btn','war-result-kicker','war-result-title','war-result-target','war-result-attacker','war-result-defender','war-result-attacker-leader','war-result-defender-leader','war-result-description'])elements.set(id,make());
+    for(const side of ['attacker','defender'])for(const metric of ['soldiers','rice'])for(const suffix of ['', '-bar'])elements.set(`war-progress-${side}-${metric}${suffix}`,make());
+    const ctx=createContext({document:{getElementById:id=>elements.get(id)||null},setTimeout(fn){timers.set(++nextTimer,fn);return nextTimer;},clearTimeout:id=>timers.delete(id)});
+    vm.runInContext('class UIManager {};this.UIManager=UIManager;',ctx);loadScript(ctx,'js/ui_war_result.js');
+    const ui=new ctx.UIManager();ui.prepareCoveredViewForOpen=modal=>modal.classList.remove('hidden');
+    const step=()=>{const [id,fn]=timers.entries().next().value;timers.delete(id);fn();};
+    const frame=(turn,a,d,ar,dr)=>({turn,attacker:{soldiers:a,rice:ar},defender:{soldiers:d,rice:dr}});
+    const data={title:'野戦',attacker:'甲',defender:'乙',target:'城'};
+    const frames=[frame(0,1000,250,500,1000),frame(1,600,100,400,800),frame(2,400,0,300,700)];
+    let promise=ui.showWarProgressAsync(data,frames);
+    assert.strictEqual(elements.get('war-progress-defender-soldiers-bar').style.transform,'scaleX(0.25)');
+    assert.strictEqual(elements.get('war-progress-attacker-rice-bar').style.transform,'scaleX(0.5)');
+    step();assert.strictEqual(elements.get('war-progress-attacker-soldiers-bar').style.transform,'scaleX(0.6)');
+    step();assert.strictEqual(elements.get('war-progress-defender-soldiers-bar').style.transform,'scaleX(0)');
+    step();assert.strictEqual(await promise,true);assert.strictEqual(timers.size,0);
+    promise=ui.showWarProgressAsync(data,frames);const old=timers.values().next().value;
+    const skip=elements.get('war-result-close-btn').listeners.get('click');skip();skip();assert.strictEqual(await promise,true);assert.strictEqual(timers.size,0);
+    promise=ui.showWarProgressAsync(data,frames);ui.dismissWarResult(true);assert.strictEqual(await promise,false);assert.strictEqual(timers.size,0);
+    ui.showWarResult({...data,title:'攻撃軍勝利'},()=>{});old();assert.strictEqual(elements.get('war-result-title').textContent,'攻撃軍勝利');assert.strictEqual(elements.get('war-result-close-btn').textContent,'閉じる');
 });
 
 Promise.all(pendingTests).then(() => {

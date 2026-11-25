@@ -236,7 +236,7 @@
         <!-- 戦争の決着だけを扱うリザルト。地図の戦域点滅・制圧演出を見せ終えた後に開く。 -->
         <div id="war-result-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="war-result-title">
             <div class="modal-content war-result-content">
-                <div class="war-result-kicker">合戦結果</div>
+                <div id="war-result-kicker" class="war-result-kicker">合戦結果</div>
                 <div id="war-result-title" class="war-result-title"></div>
                 <div id="war-result-target" class="war-result-target"></div>
                 <div class="war-result-armies">
@@ -244,12 +244,20 @@
                         <span class="war-result-army-label">攻撃軍</span>
                         <strong id="war-result-attacker" class="war-result-army-name"></strong>
                         <span id="war-result-attacker-leader" class="war-result-commander"></span>
+                        <div class="war-progress-metrics">
+                            <div class="war-progress-metric"><span>兵力</span><strong id="war-progress-attacker-soldiers">0</strong><div class="war-progress-track"><div id="war-progress-attacker-soldiers-bar" class="war-progress-fill"></div></div></div>
+                            <div class="war-progress-metric"><span>兵糧</span><strong id="war-progress-attacker-rice">0</strong><div class="war-progress-track"><div id="war-progress-attacker-rice-bar" class="war-progress-fill is-rice"></div></div></div>
+                        </div>
                     </div>
                     <div class="war-result-versus">対</div>
                     <div class="war-result-army">
                         <span class="war-result-army-label">守備軍</span>
                         <strong id="war-result-defender" class="war-result-army-name"></strong>
                         <span id="war-result-defender-leader" class="war-result-commander"></span>
+                        <div class="war-progress-metrics">
+                            <div class="war-progress-metric"><span>兵力</span><strong id="war-progress-defender-soldiers">0</strong><div class="war-progress-track"><div id="war-progress-defender-soldiers-bar" class="war-progress-fill"></div></div></div>
+                            <div class="war-progress-metric"><span>兵糧</span><strong id="war-progress-defender-rice">0</strong><div class="war-progress-track"><div id="war-progress-defender-rice-bar" class="war-progress-fill is-rice"></div></div></div>
+                        </div>
                     </div>
                 </div>
                 <div id="war-result-description" class="war-result-description"></div>

@@ -2337,8 +2337,8 @@ class CommandSystem {
     }
     
     executeSuccession(newDaimyoId) {
-        // ★家督相続の難しい処理は、専門の life_system.js にお任せして魔法を呼び出します！
-        this.game.lifeSystem.executeSuccessionCommand(newDaimyoId);
+        // 継承通知が完了するまで、共通の確認・命令後イベントの処理を待つ。
+        return this.game.lifeSystem.executeSuccessionCommand(newDaimyoId);
     }
 
     executeAdoptSon(targetId) {

@@ -695,6 +695,7 @@ class UIManager {
         };
         return visible('dialog-modal') ||
             visible('result-modal') ||
+            visible('war-result-modal') ||
             visible('intercept-confirm-modal') ||
             visible('unit-divide-modal') ||
             visible('selector-modal') ||
@@ -830,6 +831,7 @@ class UIManager {
             return (this.dialogQueue && this.dialogQueue.length > 0) ||
             isVisible('dialog-modal') ||
             isVisible('result-modal') ||
+            isVisible('war-result-modal') ||
             isVisible('intercept-confirm-modal') ||
             isVisible('unit-divide-modal') ||
             isVisible('selector-modal') || 

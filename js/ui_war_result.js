@@ -13,19 +13,38 @@ Object.assign(UIManager.prototype, {
             this.showDialog(String(data.description || ''), false, onConfirm, null, { closeBeforeOk: true });
             return;
         }
-        const setText = (id, value) => {
+        const setText = (id, value, compressAt = 0) => {
             const el = document.getElementById(id);
-            if (el) el.textContent = String(value ?? '');
+            if (!el) return;
+            const text = String(value ?? '');
+            el.title = text;
+            // 既存の武将・軍名表示と同じ文字圧縮を利用し、固定欄から溢れる場合だけ省略する。
+            if (compressAt && typeof this._getCompressedTextHtml === 'function') {
+                el.innerHTML = this._getCompressedTextHtml(text, compressAt);
+            } else el.textContent = text;
         };
+        const frames = Array.isArray(data.progressFrames) ? data.progressFrames : [];
+        const isProgress = frames.length > 0;
+        modal.classList.toggle('is-progress', isProgress);
+        setText('war-result-kicker', isProgress ? '戦況' : '合戦結果');
+        confirmBtn.textContent = isProgress ? '省略' : '閉じる';
         setText('war-result-title', data.title);
-        setText('war-result-target', data.target);
-        setText('war-result-attacker', data.attacker);
-        setText('war-result-defender', data.defender);
-        setText('war-result-attacker-leader', data.attackerLeader);
-        setText('war-result-defender-leader', data.defenderLeader);
+        setText('war-result-target', data.target, 16);
+        setText('war-result-attacker', data.attacker, 8);
+        setText('war-result-defender', data.defender, 8);
+        setText('war-result-attacker-leader', data.attackerLeader, 8);
+        setText('war-result-defender-leader', data.defenderLeader, 8);
         setText('war-result-description', data.description);
+        const description = document.getElementById('war-result-description');
+        if (description) description.scrollTop = 0;
         modal.classList.toggle('is-defeat', data.tone === 'defeat');
         modal.classList.toggle('is-retreat', data.tone === 'retreat');
+        // 公開前に初期値をセットし、前戦の数値を見せない。
+        const interval = Math.min(220, Math.max(65, Math.floor(1900 / Math.max(1, frames.length - 1))));
+        if (isProgress) {
+            modal.style.setProperty('--war-progress-step', `${Math.min(120, interval)}ms`);
+            this._renderWarProgressFrame(frames[0], frames[0], false);
+        }
         this.prepareCoveredViewForOpen(modal);
         const generation = Number(this._warResultGeneration || 0) + 1;
         this._warResultGeneration = generation;
@@ -51,7 +70,16 @@ Object.assign(UIManager.prototype, {
         };
         this._warResultConfirm = finish;
         confirmBtn.addEventListener('click', finish, { once: true });
-        if (autoCloseTime > 0) this._warResultTimer = setTimeout(finish, autoCloseTime);
+        if (isProgress) {
+            let index = 0;
+            const advance = () => {
+                if (generation !== this._warResultGeneration) return;
+                if (++index >= frames.length) { finish(); return; }
+                this._renderWarProgressFrame(frames[index], frames[0], true);
+                this._warResultTimer = setTimeout(advance, index === frames.length - 1 ? 380 : interval);
+            };
+            this._warResultTimer = setTimeout(advance, frames.length === 1 ? 650 : 300);
+        } else if (autoCloseTime > 0) this._warResultTimer = setTimeout(finish, autoCloseTime);
     },
 
     dismissWarResult(canceled = false) {
@@ -64,7 +92,7 @@ Object.assign(UIManager.prototype, {
         const modal = document.getElementById('war-result-modal');
         if (modal) {
             modal.classList.add('hidden');
-            modal.classList.remove('is-defeat', 'is-retreat');
+            modal.classList.remove('is-defeat', 'is-retreat', 'is-progress');
         }
         // cancelは旧戦争のPromiseを解決するだけで、戦後操作を発火させない。
         if (canceled && this._warResultCancel) {
@@ -74,6 +102,30 @@ Object.assign(UIManager.prototype, {
         } else if (!canceled) {
             this._warResultCancel = null;
         }
+    },
+
+    // 両軍共通の初期最大値を固定基準にする。バーはレイアウトを変えない。
+    _renderWarProgressFrame(frame, initial, animate) {
+        for (const side of ['attacker', 'defender']) {
+            for (const metric of ['soldiers', 'rice']) {
+                const value = frame[side][metric];
+                const max = Math.max(1, initial.attacker[metric], initial.defender[metric]);
+                const number = document.getElementById(`war-progress-${side}-${metric}`);
+                const bar = document.getElementById(`war-progress-${side}-${metric}-bar`);
+                if (number) number.textContent = value.toLocaleString('ja-JP');
+                if (bar) {
+                    bar.style.transition = animate ? '' : 'none';
+                    bar.style.transform = `scaleX(${Math.max(0, Math.min(1, value / max))})`;
+                }
+            }
+        }
+        const detail = document.getElementById('war-result-description');
+        if (detail) detail.textContent = `${frame.turn > 0 ? `第${frame.turn}ターン` : '開戦時'}\n兵力・兵糧は参加援軍を含む`;
+    },
+
+    showWarProgressAsync(data, frames) {
+        if (!frames.length || !document.getElementById('war-result-modal') || !document.getElementById('war-result-close-btn') || !document.getElementById('war-progress-attacker-soldiers-bar')) return Promise.resolve(true);
+        return this.showWarResultAsync({ ...data, progressFrames: frames });
     },
 
     showWarResultAsync(data, autoCloseTime = 0) {

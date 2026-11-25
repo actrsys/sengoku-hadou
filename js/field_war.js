@@ -658,6 +658,7 @@ class FieldWarManager {
             if (this.mapEl) this.mapEl.style.transition = '';
             this.processQueue();
         } else {
+            this.game.warManager?.beginOtherWarProgress?.('field', this.warState, () => this.getFieldProgressFrame());
             this.startTurn();
         }
     }
@@ -1228,6 +1229,18 @@ class FieldWarManager {
     // 撤退・壊滅した援軍のgroupStats自体は、戦後処理のため破棄しない。
     getActiveBattleGroupIds() {
         return new Set(this.units.map(unit => unit.groupId));
+    }
+
+    getFieldProgressFrame() {
+        const frame = { attacker: { soldiers: 0, rice: 0 }, defender: { soldiers: 0, rice: 0 } };
+        for (const unit of this.units) {
+            frame[unit.isAttacker ? 'attacker' : 'defender'].soldiers += Math.max(0, Number(unit.soldiers) || 0);
+        }
+        for (const groupId of this.getActiveBattleGroupIds()) {
+            const side = groupId.startsWith('atk_') ? 'attacker' : 'defender';
+            frame[side].rice += Math.max(0, Number(this.groupStats[groupId]?.rice) || 0);
+        }
+        return frame;
     }
 
     updateStatus() {
@@ -2505,6 +2518,7 @@ class FieldWarManager {
             
             // ★追加: 天候ダメージを受けた直後に士気崩壊をチェックします
             this.checkMoraleCollapse();
+            this.game.warManager?.recordOtherWarProgress?.('field', this.warState, this.turnCount - 1, () => this.getFieldProgressFrame());
             
             if (this.checkEndCondition()) return;
             this.startTurn();
@@ -2878,6 +2892,19 @@ class FieldWarManager {
         const fieldWarGeneration = Number(this._fieldWarGeneration || 0);
         this.active = false;
 
+        // 戦後の兵・兵糧再配分より前の戦線数値を再生する。
+        try {
+            const replay = this.game.warManager?.playOtherWarProgress?.('field', this.warState,
+                Math.min(this.turnCount, this.maxTurns), () => this.getFieldProgressFrame());
+            if (replay) {
+                await replay;
+                if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration, false)) return;
+            }
+        } catch (error) {
+            console.error('戦況演出に失敗しました:', error);
+            if (!this._isFieldWarLifecycleCurrent(fieldWarGeneration, false)) return;
+        }
+
         // ★追加：野戦の「戦闘終了前」の合図を出します
         if (this.game.eventManager) {
             await this.game.eventManager.processEvents('before_field_war_end', this.warState);
@@ -3129,7 +3156,9 @@ class FieldWarManager {
             if (this.onComplete) {
                 const onComplete = this.onComplete;
                 this.onComplete = null;
-                onComplete(resultType);
+                // 野戦後から籠城通知などへ進む非同期引継ぎも、
+                // 完了を待つ側（共通暗幕）へ返す。戦闘・表示の順序は維持する。
+                return onComplete(resultType);
             }
         };
 

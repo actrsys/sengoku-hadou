@@ -169,6 +169,7 @@ class WarManager {
         this._resolveWarCloseWaiters(null, false);
         this._warGeneration = Number(this._warGeneration || 0) + 1;
         this._warEnding = false;
+        this._otherWarProgress = null;
         return this._warGeneration;
     }
 
@@ -262,6 +263,7 @@ class WarManager {
         this._resolveWarCloseWaiters(null, false);
         this._warGeneration = Number(this._warGeneration || 0) + 1;
         this._warEnding = false;
+        this._otherWarProgress = null;
         if (this.state) this.state.active = false;
         this.pendingPrisoners = [];
         this.pendingKills = [];
@@ -637,6 +639,7 @@ class WarManager {
             // ★ここを大改造！：AI同士のオートバトルでも、プレイヤー用と同じように頭を使った攻城戦をやらせます！
             s.isPlayerInvolved = false; // 裏側でやるという印です
             s.plannedActions = s.plannedActions || {};
+            this.beginOtherWarProgress?.('siege', s, () => this.getSiegeProgressFrame(s));
 
             // 手動戦と同じ「ラウンドの進行」をスタートさせます！
             // 裏側で一瞬のうちに全部終わるようになります。
@@ -2205,6 +2208,7 @@ class WarManager {
                 if (s.defSelfReinforcement) s.defSelfReinforcement.rice = Math.max(0, s.defSelfReinforcement.rice - Math.floor(s.defSelfReinforcement.soldiers * 0.05));
                 if (s.defReinforcement) s.defReinforcement.rice = Math.max(0, s.defReinforcement.rice - Math.floor(s.defReinforcement.soldiers * 0.05));
 
+                this.recordOtherWarProgress?.('siege', s, s.round, () => this.getSiegeProgressFrame(s));
                 s.phase = 'init';
                 s.round++;
                 if (s.round > window.WarParams.Military.WarMaxRounds) { 

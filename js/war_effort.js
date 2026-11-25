@@ -87,6 +87,57 @@ Object.assign(WarManager.prototype, {
         return this.game.ui.showWarResultAsync(data, autoCloseTime);
     },
 
+    // 通知対象の他家戦のみ。履歴はセーブ・戦闘Stateに入れず戦争世代内で保持する。
+    shouldShowOtherWarProgress(state) {
+        return !!(state && !state.isPlayerInvolved && !state.isPlayerFactionInvolved
+            && this.canShowNotify(false, false) && typeof this.game?.ui?.showWarProgressAsync === 'function');
+    },
+
+    beginOtherWarProgress(phase, state, readFrame) {
+        this._otherWarProgress = null;
+        if (!this.shouldShowOtherWarProgress(state)) return;
+        this._otherWarProgress = { phase, state, frames: [] };
+        this.recordOtherWarProgress(phase, state, 0, readFrame);
+    },
+
+    recordOtherWarProgress(phase, state, turn, readFrame) {
+        const progress = this._otherWarProgress;
+        if (!progress || progress.phase !== phase || progress.state !== state) return;
+        const frame = { turn, ...readFrame() };
+        const previous = progress.frames[progress.frames.length - 1];
+        if (previous && previous.turn === frame.turn) progress.frames[progress.frames.length - 1] = frame;
+        else progress.frames.push(frame);
+    },
+
+    getSiegeProgressFrame(state) {
+        const sum = armies => armies.reduce((total, army) => {
+            if (army) {
+                total.soldiers += Math.max(0, Number(army.soldiers) || 0);
+                total.rice += Math.max(0, Number(army.rice) || 0);
+            }
+            return total;
+        }, { soldiers: 0, rice: 0 });
+        return {
+            attacker: sum([state.attacker, state.selfReinforcement, state.reinforcement]),
+            defender: sum([state.defender, state.defSelfReinforcement, state.defReinforcement])
+        };
+    },
+
+    playOtherWarProgress(phase, state, turn, readFrame) {
+        const progress = this._otherWarProgress;
+        if (!progress || progress.phase !== phase || progress.state !== state) return null;
+        // 決着がターン境界直後なら同じ数値で次ターンを捏造しない。
+        const finalFrame = readFrame();
+        const previous = progress.frames[progress.frames.length - 1];
+        if (!previous || ['attacker','defender'].some(side => ['soldiers','rice'].some(metric => previous[side][metric] !== finalFrame[side][metric]))) {
+            this.recordOtherWarProgress(phase, state, turn, () => finalFrame);
+        }
+        this._otherWarProgress = null;
+        if (!this.shouldShowOtherWarProgress(state)) return null;
+        const data = this.createWarResultPresentation('', false, false);
+        return this.game.ui.showWarProgressAsync({ ...data, title: phase === 'field' ? '野戦' : '攻城戦', tone: '', description: '' }, progress.frames);
+    },
+
     // 各援軍の攻城開始時兵数を保存する。野戦を経由した場合は野戦後の実数が基準。
     recordSiegeReinforcementStartingSoldiers(state = this.state) {
         if (!state || state._siegeReinforcementStartSoldiers) return;
@@ -1666,6 +1717,19 @@ Object.assign(WarManager.prototype, {
             this._resolveWarCloseWaiters(warGeneration, false);
             return false;
         };
+
+        // 攻城計算の実数を、制圧・帰還・捕虜処理より先に再生する。
+        try {
+            const lastRound = Math.min(endState.round || 1, window.WarParams?.Military?.WarMaxRounds || 15);
+            const replay = this.playOtherWarProgress('siege', endState, lastRound, () => this.getSiegeProgressFrame(endState));
+            if (replay) {
+                await replay;
+                if (!isCurrentWar()) return;
+            }
+        } catch (error) {
+            console.error('戦況演出に失敗しました:', error);
+            if (!isCurrentWar()) return;
+        }
 
         // ★追加：戦争全体の「終了処理前」の合図を出します
         if (this.game.eventManager) {
