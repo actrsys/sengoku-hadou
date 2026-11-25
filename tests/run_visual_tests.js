@@ -3058,6 +3058,30 @@ async function validateDisasterMapHandoff(cdp) {
     console.log('✓ r917 災害イベント地図 PC/スマホ 会話→地図公開・旧会話閉鎖・復帰/DOM解放 paint監視');
 }
 
+async function validateDialogToBattleMapHandoff(cdp) {
+    const css=fs.readFileSync(path.join(ROOT,'css','style.css'),'utf8');
+    const source=fs.readFileSync(path.join(ROOT,'js','ui.js'),'utf8')+'\n'+fs.readFileSync(path.join(ROOT,'js','ui_map.js'),'utf8');
+    const html=`<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div id="game-screen" style="position:absolute;inset:0"><div id="test-map" style="position:relative;width:120px;height:80px;background:#345434"></div><div id="ai-guard"><div>月末処理中...</div></div><div id="modal-handoff-backdrop" class="hidden"></div><div id="dialog-modal" class="modal hidden"><div class="modal-content modal-small"><div id="dialog-message" class="message-area"></div><div class="modal-footer"><button id="dialog-btn-ok">閉じる</button></div></div></div></div></body></html>`;
+    for(const [width,height,pc,watchMode] of [[1280,720,true,false],[390,844,false,true]]){
+        await cdp.call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:!pc});
+        const loaded=await cdp.call('Runtime.evaluate',{expression:`document.open();document.write(${JSON.stringify(html)});document.close();document.body.classList.toggle('is-pc',${pc});window.DataManager={castlePixelBounds:{1:{minX:10,minY:10,maxX:80,maxY:60}}};window.MapHandoffUI=(new Function(${JSON.stringify(source+'\nreturn UIManager;')}))();true`,returnByValue:true});
+        if(loaded.exceptionDetails)throw Error(JSON.stringify(loaded.exceptionDetails));
+        const result=await cdp.call('Runtime.evaluate',{expression:`(async()=>{
+            const ui=Object.create(window.MapHandoffUI.prototype);ui.dialogQueue=[];ui.game={ui,isProcessingAI:true,isWatchMode:${watchMode},mapWidth:120,mapHeight:80};ui.aiGuard=document.getElementById('ai-guard');ui.mapEl=document.getElementById('test-map');ui.pixelCastleMap=new Uint8Array(120*80).fill(1);ui._prepareDialogFaces=()=>Promise.resolve({leftImg:null,rightImg:null});ui._processingStatusText='月末処理中...';ui._initModalHandoffBackdrop();
+            const dialog=document.getElementById('dialog-modal'),backdrop=document.getElementById('modal-handoff-backdrop');const frames=[];let active=true,halfway=0;
+            const sample=()=>{if(!active)return;const blink=!!document.getElementById('battle-blink-overlay'),capture=!!document.getElementById('capture-effect-overlay');if(blink||capture)frames.push({blink,capture,dialog:!dialog.classList.contains('hidden'),backdrop:!backdrop.classList.contains('hidden'),text:!ui.aiGuard.classList.contains('hide-text'),guard:ui.mapGuardCount>0});requestAnimationFrame(sample);};requestAnimationFrame(sample);
+            ui.beginDialogHandoffHold();
+            const run=(async()=>{await ui.showDialogAsync('独立を宣言しました！');ui.showMapGuard();await ui.playBattleBlink(1,{r:255,g:0,b:0},{r:0,g:255,b:0},300,{focus:false});const gap={dialog:!dialog.classList.contains('hidden'),text:!ui.aiGuard.classList.contains('hide-text')};await ui.playCaptureEffect(1,()=>halfway++,{focus:false});ui.hideMapGuard();const released=ui.mapGuardCount===0;await ui.showDialogAsync('大名となりました！');ui.endDialogHandoffHold();return {gap,released};})();
+            const wait=async(label)=>{for(let i=0;i<350;i++){if(!dialog.classList.contains('hidden')&&document.getElementById('dialog-message').textContent===label)return;await new Promise(r=>setTimeout(r,10));}throw Error('通知なし '+label);};
+            await wait('独立を宣言しました！');if(!${watchMode})document.getElementById('dialog-btn-ok').click();await wait('大名となりました！');if(!${watchMode})document.getElementById('dialog-btn-ok').click();const state=await run;active=false;await ui.waitForCoveredMapPaint();return {state,halfway,blink:frames.filter(x=>x.blink).length,capture:frames.filter(x=>x.capture).length,overlap:frames.filter(x=>x.dialog||x.backdrop||x.text||!x.guard).length,dialogOverlap:frames.filter(x=>x.dialog).length,hold:ui._dialogHandoffHoldCount,canvas:!!document.getElementById('battle-blink-overlay')||!!document.getElementById('capture-effect-overlay')};
+        })()`,returnByValue:true,awaitPromise:true});
+        if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));const r=result.result.value;
+        console.log('  map handoff '+(pc?'PC':'SP')+' '+JSON.stringify(r));
+        assert.ok(r.blink>0&&r.capture>0,JSON.stringify(r));assert.strictEqual(r.overlap,0,JSON.stringify(r));assert.deepStrictEqual(r.state.gap,{dialog:false,text:false});assert.ok(r.state.released&&r.halfway===1&&r.hold===0&&!r.canvas,JSON.stringify(r));
+    }
+    console.log('✓ r977 地図点滅・制圧中の会話/暗幕/処理ラベル重複0、連続演出と結果通知 (PC手動/SP観戦)');
+}
+
 // 共通モーダルの階層値は前段の宣言を後段で打ち消さない。
 // 大名確認は選択地図の上、共通引継ぎ暗幕の上にあり、より上位の操作ダイアログには譲る。
 async function validateDaimyoConfirmStacking(cdp) {
@@ -3496,6 +3520,7 @@ async function main() {
         await validateSelectorCloseContentHandoff(cdp);
         await validateCoveredCloseSuccessorHandoff(cdp);
         await validateDisasterMapHandoff(cdp);
+        await validateDialogToBattleMapHandoff(cdp);
         await validateWarProgressAndResultLayout(cdp);
     } finally {
         if (cdp) cdp.close();

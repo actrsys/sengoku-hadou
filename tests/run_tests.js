@@ -4479,11 +4479,15 @@ test('地図上の所有変更・戦闘演出中はAI/月末処理テキスト�
     const map = read('js/ui_map.js');
     const independence = read('js/independence_system.js');
 
-    assert.ok(map.includes('async withAIGuardTextHiddenForMapEffect(task)'));
-    assert.ok(map.includes('this.hideAIGuardText();'));
-    assert.ok(map.includes('this.restoreAIGuardText();'));
-    assert.ok(map.includes('async playBattleBlink(castleIdOrIds, colorA, colorB, durationMs, options = {}) {\n        return this.withAIGuardTextHiddenForMapEffect(async () => {'));
-    assert.ok(map.includes('async playCaptureEffect(castleIdOrIds, onHalfway, options = {}) {\n        return this.withAIGuardTextHiddenForMapEffect(async () => {'));
+    assert.ok(map.includes('async withMapEffectPresentation(task)'));
+    assert.ok(map.includes('this.showMapGuard();'));
+    assert.ok(map.includes('this.hideMapGuard();'));
+    assert.ok(map.includes('this.completeDialogToViewHandoff();'));
+    const renderMap = map.slice(map.indexOf('    renderMap() {'), map.indexOf('    renderMap() {')+18000);
+    assert.ok(renderMap.includes('this.applyAIGuardTextState();'), '地図再描画でも共通判定を使用する');
+    assert.ok(!renderMap.includes("this.aiGuard.classList.remove('hide-text')"), '共通の非表示判定を上書きしない');
+    assert.ok(map.includes('async playBattleBlink(castleIdOrIds, colorA, colorB, durationMs, options = {}) {\n        return this.withMapEffectPresentation(async () => {'));
+    assert.ok(map.includes('async playCaptureEffect(castleIdOrIds, onHalfway, options = {}) {\n        return this.withMapEffectPresentation(async () => {'));
     assert.ok(independence.includes('await this.game.ui.playBattleBlink(changedCastleIds, oldColor, newColorRgb, 1000);'));
     assert.ok(independence.includes('await this.game.ui.playCaptureEffect(changedCastleIds, applyNewClanColor);'));
 });
@@ -14609,7 +14613,7 @@ test('地図演出Canvasはcontext喪失時もmap guardと資源を残さず本�
     assert.ok(blinkBlock.includes('if (!ctx)'));
     assert.ok(blinkBlock.includes("console.warn('戦闘点滅Canvasの準備を省略しました:'"));
     assert.ok(blinkBlock.includes('this._releaseEffectOverlay(overlay, maskInfo);'));
-    assert.ok(blinkBlock.includes('this.hideMapGuard();'));
+    assert.ok(blinkBlock.includes('this.withMapEffectPresentation('));
 
     const captureAt = source.indexOf('async playCaptureEffect(');
     const captureBlock = source.slice(captureAt, captureAt + 7600);
@@ -14660,7 +14664,7 @@ test('戦闘地図演出はImageData確保・overlay context準備例外でも�
         let released = 0;
         const owner = {
             game: { warManager: { state: {} } },
-            withAIGuardTextHiddenForMapEffect(fn) { return fn(); },
+            async withMapEffectPresentation(fn) { this.showMapGuard(); try { return await fn(); } finally { this.hideMapGuard(); } },
             async focusMapOnCastle() {},
             showMapGuard() { guard += 1; },
             hideMapGuard() { guard -= 1; },
@@ -43932,7 +43936,7 @@ test('r917 災害地図の生成失敗は元地図を復元後、旧会話hold�
 
 test('r917 共通モーダル暗幕は一律160ms保持せず、背景のpaintと明示holdで寿命管理する', () => {
     const ui=read('js/ui.js');
-    const sync=ui.slice(ui.indexOf('    _syncModalHandoffBackdrop() {'),ui.indexOf('    beginModalHandoff() {'));
+    const sync=ui.slice(ui.indexOf('    _syncModalHandoffBackdrop(revealMap = false) {'),ui.indexOf('    beginModalHandoff() {'));
     assert.ok(sync.includes('this._releaseModalHandoffBackdropAfterPaint();'));
     assert.ok(!sync.includes('160'), '画面準備とは無関係な固定待機を復活させない');
     assert.ok(sync.includes('await this.waitForCoveredMapPaint()'), '地図のpaintまで解放しない');

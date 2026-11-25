@@ -2064,12 +2064,8 @@ Object.assign(UIManager.prototype, {
                 // AI処理中なら絶対にバリアを張ります！
                 this.aiGuard.classList.remove('hidden'); 
                 
-                // ただし、ダイアログなどで一時的に隠したい時(guardTextHiddenCount)は、壁ごと消すのではなく文字だけを透明にして隠します！
-                if ((this.guardTextHiddenCount || 0) > 0) {
-                    this.aiGuard.classList.add('hide-text');
-                } else {
-                    this.aiGuard.classList.remove('hide-text');
-                }
+                // 再描画でも地図演出・会話後の遅延を含む共通の処理ラベル状態を維持する。
+                this.applyAIGuardTextState();
             } else {
                 // AI処理中でなければバリアを消します
                 this.aiGuard.classList.add('hidden'); 
@@ -2786,6 +2782,7 @@ Object.assign(UIManager.prototype, {
             document.body.appendChild(guard);
         }
         guard.style.display = 'block';
+        this.applyAIGuardTextState();
     },
     
     hideMapGuard(force = false) {
@@ -2801,6 +2798,7 @@ Object.assign(UIManager.prototype, {
                 guard.style.display = 'none';
             }
         }
+        this.applyAIGuardTextState();
     },
 
     // 戦闘点滅・制圧発光は固定マップDOM上の非同期Viewです。
@@ -2851,22 +2849,27 @@ Object.assign(UIManager.prototype, {
         const guard = this.aiGuard || document.getElementById('ai-guard');
         if (!guard) return;
         
-        if ((this.guardTextHiddenCount || 0) > 0 || this._processingStatusRevealDeferred) {
+        if ((this.guardTextHiddenCount || 0) > 0 || this._processingStatusRevealDeferred || (this.mapGuardCount || 0) > 0) {
             guard.classList.add('hide-text');
         } else {
             guard.classList.remove('hide-text');
         }
     },
 
-    // 地図上の所有変更・戦闘点滅など、プレイヤーに見せる演出中は
-    // 「思考中...」「月末処理中...」といった裏側の進捗文字を重ねない。
-    // スタック式の既存APIを共通利用し、呼び出し元ごとの隠し忘れを防ぐ。
-    async withAIGuardTextHiddenForMapEffect(task) {
-        this.hideAIGuardText();
+    // 会話から通常地図への引継ぎ。月次の会話holdは後続会話のため維持し、
+    // 完了済みの旧会話と暗幕だけをカメラ移動・点滅・制圧より前に閉じる。
+    // 既存の地図guardで入力と進捗文字を演出の全区間保護する。
+    async withMapEffectPresentation(task) {
+        const generation = Number(this._mapEffectGeneration || 0);
+        this.showMapGuard();
         try {
+            const closed = this.completeDialogToViewHandoff();
+            this._syncModalHandoffBackdrop(true);
+            if (closed) await this.waitForCoveredMapPaint();
+            if (generation !== Number(this._mapEffectGeneration || 0)) return false;
             return await task();
         } finally {
-            this.restoreAIGuardText();
+            if (generation === Number(this._mapEffectGeneration || 0)) this.hideMapGuard();
         }
     },
 
@@ -3035,7 +3038,7 @@ Object.assign(UIManager.prototype, {
     },
 
     async playBattleBlink(castleIdOrIds, colorA, colorB, durationMs, options = {}) {
-        return this.withAIGuardTextHiddenForMapEffect(async () => {
+        return this.withMapEffectPresentation(async () => {
         const effectGeneration = Number(this._mapEffectGeneration || 0);
         const isCurrentEffect = () => Number(this._mapEffectGeneration || 0) === effectGeneration;
         // 戦争中は開戦時に確定した戦場カメラを維持します。
@@ -3049,12 +3052,12 @@ Object.assign(UIManager.prototype, {
         }
         if (!isCurrentEffect()) return false;
         return new Promise(resolve => {
-            this.showMapGuard();
+
 
             // Round7: 対象城の周囲だけの小さなCanvasを使います。
             const maskInfo = this._buildCastleEffectMask(castleIdOrIds, 2, 24);
             if (!maskInfo) {
-                this.hideMapGuard();
+
                 resolve();
                 return;
             }
@@ -3071,13 +3074,13 @@ Object.assign(UIManager.prototype, {
             } catch (error) {
                 console.warn('戦闘点滅Canvasの準備を省略しました:', error);
                 this._releaseEffectOverlay(overlay, maskInfo);
-                this.hideMapGuard();
+
                 resolve();
                 return;
             }
             if (!ctx) {
                 this._releaseEffectOverlay(overlay, maskInfo);
-                this.hideMapGuard();
+
                 resolve();
                 return;
             }
@@ -3111,7 +3114,7 @@ Object.assign(UIManager.prototype, {
                 finished = true;
                 if (this._activeMapEffectCancels) this._activeMapEffectCancels.delete(cancelEffect);
                 this._releaseEffectOverlay(overlay, maskInfo);
-                this.hideMapGuard();
+
                 if (completed && this.game && typeof this.game.writeSystemDiagnostic === 'function') {
                     const firstId = Array.isArray(castleIdOrIds) ? castleIdOrIds[0] : castleIdOrIds;
                     this.game.writeSystemDiagnostic('battle_blink:done', this.game.getCastle(Number(firstId)) || null);
@@ -3164,7 +3167,7 @@ Object.assign(UIManager.prototype, {
     // ★城が落ちた時の、フワッと白く光る魔法！
     // ==========================================
     async playCaptureEffect(castleIdOrIds, onHalfway, options = {}) {
-        return this.withAIGuardTextHiddenForMapEffect(async () => {
+        return this.withMapEffectPresentation(async () => {
         const effectGeneration = Number(this._mapEffectGeneration || 0);
         const isCurrentEffect = () => Number(this._mapEffectGeneration || 0) === effectGeneration;
         // 戦争中は開始時から同じ戦場カメラを維持し、制圧演出でも再フォーカスしません。
@@ -3176,12 +3179,12 @@ Object.assign(UIManager.prototype, {
         }
         if (!isCurrentEffect()) return false;
         return new Promise((resolve, reject) => {
-            this.showMapGuard();
+
 
             // Round7: こちらも対象城周辺だけに限定します。
             const maskInfo = this._buildCastleEffectMask(castleIdOrIds, 0, 24);
             if (!maskInfo) {
-                this.hideMapGuard();
+
                 try {
                     if (typeof onHalfway === 'function') onHalfway();
                     resolve();
@@ -3200,7 +3203,7 @@ Object.assign(UIManager.prototype, {
                 // 制圧演出の準備だけ失敗した場合も、所有変更等の中間処理は必ず一度進める。
                 console.warn('制圧Canvasの準備を省略しました:', error);
                 this._releaseEffectOverlay(overlay, maskInfo);
-                this.hideMapGuard();
+
                 try {
                     if (typeof onHalfway === 'function') onHalfway();
                     resolve();
@@ -3225,7 +3228,7 @@ Object.assign(UIManager.prototype, {
                 finished = true;
                 if (this._activeMapEffectCancels) this._activeMapEffectCancels.delete(cancelEffect);
                 this._releaseEffectOverlay(overlay, maskInfo);
-                this.hideMapGuard();
+
                 resolve(completed);
             };
             const fail = (error) => {
@@ -3233,7 +3236,7 @@ Object.assign(UIManager.prototype, {
                 finished = true;
                 if (this._activeMapEffectCancels) this._activeMapEffectCancels.delete(cancelEffect);
                 this._releaseEffectOverlay(overlay, maskInfo);
-                this.hideMapGuard();
+
                 reject(error);
             };
             if (!this._activeMapEffectCancels) this._activeMapEffectCancels = new Set();

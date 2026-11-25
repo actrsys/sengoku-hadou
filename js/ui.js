@@ -688,7 +688,7 @@ class UIManager {
     // opacity:0 が残ることがありました。AI進捗を更新する瞬間を「表示状態の最終権威」にします。
     _hasAIProgressBlockingUI() {
         if (!this.game) return false;
-        if (this.game.selectionMode != null) return true;
+        if (this.game.selectionMode != null || (this.mapGuardCount || 0) > 0) return true;
         const visible = (id) => {
             const el = document.getElementById(id);
             return !!(el && !el.classList.contains('hidden'));
@@ -1047,7 +1047,7 @@ class UIManager {
         if (this._modalBackdrop) this._modalBackdrop.classList.add('hidden');
     }
 
-    _syncModalHandoffBackdrop() {
+    _syncModalHandoffBackdrop(revealMap = false) {
         const backdrop = this._modalBackdrop;
         if (!backdrop) return;
         // 画面外の旧モーダルではなく、今実際に開いている固定DOMだけを数える。
@@ -1055,6 +1055,13 @@ class UIManager {
             !modal.classList.contains('hidden') && modal.style.display !== 'none');
         if (visible.length) {
             this._modalBackdropLastVisible = visible[visible.length - 1];
+            this._modalBackdropEpoch = Number(this._modalBackdropEpoch || 0) + 1;
+            backdrop.classList.add('hidden');
+            return;
+        }
+        // 地図演出への明示的な引継ぎは暗幕の保持対象ではない。既存holdは維持する。
+        if (revealMap) {
+            this._modalBackdropLastVisible = null;
             this._modalBackdropEpoch = Number(this._modalBackdropEpoch || 0) + 1;
             backdrop.classList.add('hidden');
             return;
@@ -1159,6 +1166,10 @@ class UIManager {
     // 次の画面が実際に公開された時だけ旧会話を閉じる共通窓口。
     // 結果モーダル・通常モーダル・災害地図のいずれからも同じ契約を使う。
     completeDialogToViewHandoff() {
+        // 通常閉鎖がpaint待ちまで進んでいれば、同じfinalizerで確定する。
+        const dialog = document.getElementById('dialog-modal');
+        const pending = this._coveredClosePending?.get(dialog);
+        if (pending && typeof pending.finish === 'function') return pending.finish();
         if (typeof this._closeDialogForViewHandoff === 'function') {
             this._closeDialogForViewHandoff();
             return true;
