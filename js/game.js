@@ -1630,6 +1630,7 @@ class GameManager {
                     this.ui.clearCommandMenu();
                 }
                 if (this.ui.aiGuard) this.ui.aiGuard.classList.add('hidden');
+                if (typeof this.ui._resetTransientThinking === 'function') this.ui._resetTransientThinking('progress');
                 this.ui.renderMap();
 
                 // Round26：安全地点でAI進行を止めているため、担当勢力決定後に明示的に再開します。

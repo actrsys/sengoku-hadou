@@ -614,7 +614,17 @@ class TurnManager {
                 // 委任されている場合はAIに任せます！
                 this._scheduleAITurn(castle);
             } else {
-                // 直轄（今まで通りプレイヤーが動かす）の場合
+                // 直轄へ操作を返す境界だけで、すでに表示したAIラベルの不足時間を補う。
+                const presentationWait = game.ui?.waitForAIProgressMinimum?.();
+                if (presentationWait) {
+                    await presentationWait;
+                    if (!isCurrentFlow()) return;
+                    // 待機中に別の処理が拠点の状態を変更した場合は通常の入口で再判定する。
+                    if (castle.isDone || Number(castle.ownerClan) !== Number(game.playerClanId) || castle.isDelegated) {
+                        this._scheduleTurnFlowContinuation(() => game.processTurn(), 0, {expectedIndex: expectedTurnIndex, expectedCastle: castle});
+                        return;
+                    }
+                }
                 game.isProcessingAI = false; 
                 if (game.ui && typeof game.ui.clearProcessingStatus === 'function') game.ui.clearProcessingStatus();
                 if (typeof document !== 'undefined' && document.body) document.body.classList.remove('mobile-ai-light-mode');

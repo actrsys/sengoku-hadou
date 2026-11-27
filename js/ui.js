@@ -676,6 +676,7 @@ class UIManager {
             // 見えない間は既存hide-text状態も併用してGPU合成を止めます。
             // 最終restore時はguardTextHiddenCountを正本にapplyAIGuardTextState()で戻します。
             aiGuard.classList.add('hide-text');
+            if (typeof this._resetTransientThinking === 'function') this._resetTransientThinking('progress');
             this.guardHiddenCount = (this.guardHiddenCount || 0) + 1;
         } else if (this.guardHiddenCount > 0) {
             this.guardHiddenCount++; 
@@ -714,7 +715,7 @@ class UIManager {
         guard.style.opacity = '1';
         guard.style.display = '';
         guard.classList.remove('hidden');
-        guard.classList.remove('hide-text');
+        this.applyAIGuardTextState();
         return true;
     }
 
@@ -801,7 +802,6 @@ class UIManager {
         guard.style.opacity = '1';
         guard.style.display = '';
         guard.classList.remove('hidden');
-        guard.classList.remove('hide-text');
 
         let spinner = guard.querySelector('.loading-spinner');
         if (!spinner) {
@@ -816,6 +816,7 @@ class UIManager {
             guard.replaceChildren(spinner, status);
         }
         status.textContent = this._processingStatusText;
+        this.applyAIGuardTextState();
     }
 
     async waitForDialogs() {
@@ -874,6 +875,7 @@ class UIManager {
                         // マップで援軍の城を選んでいる最中は、絶対に膜を復活させない魔法！
                         if (!this.game.selectionMode) {
                             aiGuard.classList.remove('hidden');
+                            this.applyAIGuardTextState();
                         }
                     }
                 }
@@ -2618,7 +2620,8 @@ class UIManager {
         if(this.unitDivideModal) this.unitDivideModal.classList.add('hidden');
         if(this.aiGuard) {
             this.aiGuard.classList.add('hidden'); 
-            this.aiGuard.classList.remove('hide-text');
+            if (typeof this._resetTransientThinking === 'function') this._resetTransientThinking('progress');
+            this.aiGuard.classList.add('hide-text');
             this.aiGuard.style.opacity = '1'; // もし透明になっていたら元に戻しておきます！
             this.guardHiddenCount = 0;        // 何回隠したかの記憶もきれいに忘れます！
             this.guardTextHiddenCount = 0;    // 文字だけを隠す側のスタックも同時に初期化します
@@ -5201,14 +5204,19 @@ class UIManager {
         if (!el) {
             el = document.createElement('div');
             el.id = 'ai-war-thinking';
+            el.classList.add('hidden');
             el.innerText = '戦争思考中...';
             const gameScreen = document.getElementById('game-screen');
             if (gameScreen) gameScreen.appendChild(el);
         }
-        el.classList.remove('hidden');
+        const state = this.game?.warManager?.state;
+        this._syncTransientThinking('war', el, 'hidden', () => !!(state?.active
+            && this.game?.warManager?.state === state && !this.game.isRestoringSave
+            && !this._hasAIProgressBlockingUI()));
     }
 
     hideAIWarThinking() {
+        if (typeof this._resetTransientThinking === 'function') this._resetTransientThinking('war');
         const el = document.getElementById('ai-war-thinking');
         if (el) {
             el.classList.add('hidden');

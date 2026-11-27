@@ -2064,12 +2064,12 @@ Object.assign(UIManager.prototype, {
                 // AI処理中なら絶対にバリアを張ります！
                 this.aiGuard.classList.remove('hidden'); 
                 
-                // 再描画でも地図演出・会話後の遅延を含む共通の処理ラベル状態を維持する。
-                this.applyAIGuardTextState();
             } else {
                 // AI処理中でなければバリアを消します
                 this.aiGuard.classList.add('hidden'); 
             }
+            // 再描画・選択開始・終了でも同じ表示予約を更新する。
+            this.applyAIGuardTextState();
         }
 
         // 変更後
@@ -2849,11 +2849,59 @@ Object.assign(UIManager.prototype, {
         const guard = this.aiGuard || document.getElementById('ai-guard');
         if (!guard) return;
         
-        if ((this.guardTextHiddenCount || 0) > 0 || this._processingStatusRevealDeferred || (this.mapGuardCount || 0) > 0) {
-            guard.classList.add('hide-text');
-        } else {
-            guard.classList.remove('hide-text');
+        const eligible = () => !!(this.game && this.game.isProcessingAI && !this.game.isRestoringSave
+            && !guard.classList.contains('hidden') && guard.style.opacity !== '0'
+            && !((this.guardTextHiddenCount || 0) > 0 || this._processingStatusRevealDeferred || (this.mapGuardCount || 0) > 0)
+            && !(this.guardHiddenCount > 0) && !this.game.selectionMode
+            && !(typeof this._hasAIProgressBlockingUI === 'function' && this._hasAIProgressBlockingUI()));
+        this._syncTransientThinking('progress', guard, 'hide-text', eligible);
+    },
+
+    // 表示専用。AI処理・操作ロック・拠点ごとの更新とは独立した短命な予約。
+    _thinkingNow() {
+        return typeof performance !== 'undefined' ? performance.now() : Date.now();
+    },
+
+    _resetTransientThinking(key) {
+        const state = this._transientThinking?.[key];
+        if (!state) return;
+        if (state.timer != null) clearTimeout(state.timer);
+        state.element.classList.add(state.hiddenClass);
+        delete this._transientThinking[key];
+    },
+
+    _syncTransientThinking(key, element, hiddenClass, eligible) {
+        if (!this._transientThinking) this._transientThinking = Object.create(null);
+        let state = this._transientThinking[key];
+        if (!eligible()) {
+            this._resetTransientThinking(key);
+            element.classList.add(hiddenClass);
+            return;
         }
+        if (state && state.element === element) return; // 連続したカウント更新で猶予をリセットしない
+        this._resetTransientThinking(key);
+        element.classList.add(hiddenClass);
+        state = { element, hiddenClass, eligible, timer: null, shownAt: null };
+        this._transientThinking[key] = state;
+        state.timer = setTimeout(() => {
+            if (this._transientThinking?.[key] !== state) return;
+            state.timer = null;
+            if (!state.eligible()) { this._resetTransientThinking(key); return; }
+            element.classList.remove(hiddenClass);
+            state.shownAt = this._thinkingNow();
+        }, 100);
+    },
+
+    // 操作返却の境界だけで不足分を待つ。会話・地図演出への遷移は即時非表示を優先する。
+    waitForAIProgressMinimum() {
+        const state = this._transientThinking?.progress;
+        if (!state || state.shownAt == null || !state.eligible()
+            || state.element.classList.contains(state.hiddenClass)) {
+            this._resetTransientThinking('progress');
+            return null;
+        }
+        const remaining = Math.max(0, 300 - (this._thinkingNow() - state.shownAt));
+        return remaining > 0 ? new Promise(resolve => setTimeout(resolve, remaining)) : null;
     },
 
     // 会話から通常地図への引継ぎ。月次の会話holdは後続会話のため維持し、

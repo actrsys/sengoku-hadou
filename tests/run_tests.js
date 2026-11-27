@@ -46438,6 +46438,24 @@ test('新規開始月の攻撃作戦は即時出撃だけ翌月へ繰り延べ�
 
 });
 
+test('r987 AI進捗は100ms未満非表示、連続更新で猶予維持、通常操作返却のみ最低300ms', async () => {
+    let now=0, next=0; const timers=new Map();
+    const tick=ms=>{const end=now+ms; while(true){const pending=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!pending)break;now=pending[1].at;timers.delete(pending[0]);pending[1].fn();}now=end;};
+    const classes=new Set(['hide-text']);const guard={style:{opacity:'1'},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}};
+    const ctx=createContext({performance:{now:()=>now},setTimeout:(fn,ms)=>{timers.set(++next,{fn,at:now+ms});return next;},clearTimeout:id=>timers.delete(id),document:{getElementById:id=>id==='ai-guard'?guard:null}});
+    vm.runInContext('class UIManager {}',ctx);loadScript(ctx,'js/ui_map.js');
+    const ui=vm.runInContext('new UIManager()',ctx);ui.game={isProcessingAI:true};ui.aiGuard=guard;
+    ui.applyAIGuardTextState();tick(50);assert.ok(classes.has('hide-text'));assert.ok(!classes.has('hidden'));
+    assert.strictEqual(ui.waitForAIProgressMinimum(),null);tick(200);assert.ok(classes.has('hide-text'));assert.strictEqual(timers.size,0);
+    ui.applyAIGuardTextState();tick(60);ui.applyAIGuardTextState();tick(39);assert.ok(classes.has('hide-text'));tick(1);assert.ok(!classes.has('hide-text'));
+    tick(20);let finished=false;const pending=ui.waitForAIProgressMinimum().then(()=>finished=true);tick(279);await Promise.resolve();assert.ok(!finished);tick(1);await pending;assert.ok(finished);assert.strictEqual(ui.waitForAIProgressMinimum(),null);
+    ui.mapGuardCount=1;ui.applyAIGuardTextState();assert.ok(classes.has('hide-text'));ui.mapGuardCount=0;ui.applyAIGuardTextState();tick(50);ui.game.selectionMode='select';ui.applyAIGuardTextState();tick(100);assert.ok(classes.has('hide-text'));
+    ui.game.selectionMode=null;ui.applyAIGuardTextState();tick(50);ui._resetTransientThinking('progress');tick(200);assert.ok(classes.has('hide-text'));assert.strictEqual(timers.size,0);
+    // 別ラベルも同じ予約で処理し、終了後に遅延表示しない。
+    let war=true;ui._syncTransientThinking('war',guard,'hidden',()=>war);tick(99);assert.ok(classes.has('hidden'));war=false;ui._resetTransientThinking('war');tick(200);assert.ok(classes.has('hidden'));assert.strictEqual(timers.size,0);
+});
+
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);
