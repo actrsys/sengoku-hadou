@@ -544,6 +544,11 @@ class IndependenceSystem {
         }
 
         // 画面を勝手に触られないようにバリアを張ります
+        const mapPresentation = this.game.ui?.waitForThinkingPresentationMinimum?.();
+        if (mapPresentation) {
+            await mapPresentation;
+            if (!isCurrentFlow()) return;
+        }
         if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
 
         // ★Round23：カメラ移動はplayBattleBlink側へ一元化。
@@ -1143,6 +1148,11 @@ class IndependenceSystem {
             const isPlayerDaimyo = (oldClanId === this.game.playerClanId);
             
             if (!isPlayerDaimyo) {
+                const mapPresentation = this.game.ui?.waitForThinkingPresentationMinimum?.();
+                if (mapPresentation) {
+                    await mapPresentation;
+                    if (!isCurrentFlow()) return;
+                }
                 if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
                 
                 // ★Round23：カメラ移動はplayBattleBlink側へ一元化し、二重移動を防ぎます。

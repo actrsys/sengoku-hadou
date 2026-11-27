@@ -3147,6 +3147,37 @@ async function validateAIThinkingPresentation(cdp) {
     console.log('✓ r992 AI進捗の即時表示・連続更新・最低表示時間・強制非表示 (PC/SP)');
 }
 
+async function validateMonthlySavePresentation(cdp) {
+    const css=fs.readFileSync(path.join(ROOT,'css/style.css'),'utf8');
+    const saveSource=fs.readFileSync(path.join(ROOT,'js/save_manager.js'),'utf8');
+    // このabout:blank fixtureではIndexedDBを使えないので媒体境界だけを差し替える。
+    const source=['js/ui.js','js/ui_map.js'].map(f=>fs.readFileSync(path.join(ROOT,f),'utf8')).concat(saveSource.slice(0,saveSource.indexOf('const DB_NAME ='))).join('\n');
+    const html=`<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div id="game-screen" style="position:absolute;inset:0;background:#334438"><div id="ai-guard" class="hide-text"></div><div id="modal-handoff-backdrop" class="hidden"></div><div id="dialog-modal" class="modal hidden"><div class="modal-content modal-small"><div id="dialog-message" class="message-area"></div><div class="modal-footer"><button id="dialog-btn-ok">閉じる</button></div></div></div></div></body></html>`;
+    for(const [width,height,pc] of [[1280,720,true],[390,844,false]]) {
+        await cdp.call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:!pc});
+        const r=await cdp.call('Runtime.evaluate',{expression:`(async()=>{
+            document.open();document.write(${JSON.stringify(html)});document.close();document.body.classList.toggle('is-pc',${pc});
+            let saveDelay=15,writes=0;const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+            const classes=new Function('saveToDB',${JSON.stringify(source+'\nreturn {UIManager,SaveManager};')})(async()=>{await sleep(saveDelay);writes++;return true;});
+            const ui=Object.create(classes.UIManager.prototype),game={ui,isProcessingAI:true,phase:'game',scenarioFolder:'test',isWatchMode:false};ui.game=game;ui.aiGuard=document.getElementById('ai-guard');ui.dialogQueue=[];ui._initModalHandoffBackdrop();ui._prepareDialogFaces=async()=>({leftImg:null,rightImg:null});
+            const g=ui.aiGuard,modal=document.getElementById('dialog-modal'),visible=()=>!g.classList.contains('hide-text')&&g.style.opacity!=='0';
+            const frame=()=>new Promise(r=>requestAnimationFrame(r));
+            ui.showProcessingStatus('月初準備中...');const monthStartImmediate=visible();await frame();const initialFrame=performance.now();await ui.waitForAIProgressMinimum();const monthStartMs=performance.now()-initialFrame;ui.updateAIProgress(1,2);const changed=g.textContent.includes('思考中')&&visible();
+            await sleep(330);const longReady=ui.waitForAIProgressMinimum()===null;
+            ui.showProcessingStatus('月末処理中...');await frame();const endFrame=performance.now();ui.showDialog('月末イベント',false);let dialogsDone=false;const dialogWait=ui.waitForDialogs().then(()=>{dialogsDone=true;});await sleep(30);const kept=modal.classList.contains('hidden')&&visible()&&!dialogsDone;
+            for(let i=0;i<80&&modal.classList.contains('hidden');i++)await sleep(10);const endMs=performance.now()-endFrame;const opened=!modal.classList.contains('hidden')&&!visible();document.getElementById('dialog-btn-ok').click();
+            for(let i=0;i<150&&!modal.classList.contains('hidden');i++)await sleep(10);const resumed=modal.classList.contains('hidden')&&visible()&&g.textContent==='月末処理中...';await frame();const resumeFrame=performance.now();await ui.waitForAIProgressMinimum();const resumeMs=performance.now()-resumeFrame;await dialogWait;
+            ui.game.isProcessingAI=false;ui.clearProcessingStatus();
+            const save=new classes.SaveManager(game);save._createSaveDataObj=async()=>({year:1560,month:5});save._validateSaveDataStructure=()=>true;save._autoSaveStorageUnavailable=true;
+            const short=save.executeAutoSave();const sg=document.getElementById('save-guard');const saveImmediate=!sg.classList.contains('hidden')&&getComputedStyle(sg).pointerEvents==='all';await frame();const saveFrame=performance.now();await sleep(50);const saveHeld=!sg.classList.contains('hidden')&&game._autoSaveInProgress;await short;const saveMs=performance.now()-saveFrame;const saveClosed=sg.classList.contains('hidden')&&!game._autoSaveInProgress;
+            saveDelay=400;const longAt=performance.now();await save.executeAutoSave();const longMs=performance.now()-longAt;return {monthStartImmediate,monthStartMs,changed,longReady,kept,endMs,opened,resumed,resumeMs,saveImmediate,saveHeld,saveMs,saveClosed,longMs,writes};
+        })()`,awaitPromise:true,returnByValue:true});
+        if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));const v=r.result.value;console.log('  monthly/save '+(pc?'PC':'SP')+' '+JSON.stringify(v));
+        assert.ok(v.monthStartImmediate&&v.monthStartMs>=295&&v.changed&&v.longReady&&v.kept&&v.endMs>=295&&v.opened&&v.resumed&&v.resumeMs>=280&&v.saveImmediate&&v.saveHeld&&v.saveMs>=295&&v.saveClosed&&v.longMs>=395&&v.longMs<650&&v.writes===2,JSON.stringify(v));
+    }
+    console.log('✓ r993 月初・月末と会話の引継ぎ、実オートセーブ入口の最低表示時間 (PC/SP)');
+}
+
 async function validateDialogToBattleMapHandoff(cdp) {
     const css=fs.readFileSync(path.join(ROOT,'css','style.css'),'utf8');
     const source=fs.readFileSync(path.join(ROOT,'js','ui.js'),'utf8')+'\n'+fs.readFileSync(path.join(ROOT,'js','ui_map.js'),'utf8');
@@ -3621,6 +3652,7 @@ async function main() {
         await validateCoveredCloseSuccessorHandoff(cdp);
         await validateDisasterMapHandoff(cdp);
         await validateAIThinkingPresentation(cdp);
+        await validateMonthlySavePresentation(cdp);
         await validateDialogToBattleMapHandoff(cdp);
         await validateWarProgressAndResultLayout(cdp);
     } finally {

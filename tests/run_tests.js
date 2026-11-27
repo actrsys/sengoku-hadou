@@ -16824,24 +16824,23 @@ test('PCレイアウトのタブレットはhover前提にせず既存タッチ�
 
 
 
-test('月初月末の処理ラベルは会話直後に即復帰せず短い会話間ギャップを吸収する', () => {
+test('月初月末の処理ラベルは即時復帰し、次の表示への切替で不足時間を待つ', () => {
     const ui = read('js/ui.js');
     const uiMap = read('js/ui_map.js');
     const turn = read('js/turn_manager.js');
-
-    assert.ok(ui.includes("this._processingStatusRevealTimer = null;"));
-    assert.ok(ui.includes("this._processingStatusRevealDeferred = false;"));
-    assert.ok(ui.includes("_deferProcessingStatusReveal(delayMs = 1200)"), '会話後の処理ラベルは1.2秒の静穏期間後だけ復帰する');
-    assert.ok(ui.includes("const deferredProcessingStatus = !!(this._processingStatusText && this.game && this.game.isProcessingAI);"));
-    assert.ok(ui.includes("if (deferredProcessingStatus) this._deferProcessingStatusReveal(1200);"));
-    assert.ok(ui.includes("this.clearProcessingStatus();"), 'AI城進捗へ切り替える時は月次ラベルの遅延状態を破棄する');
-    assert.ok(uiMap.includes("(this.guardTextHiddenCount || 0) > 0 || this._processingStatusRevealDeferred"), 'hide-textの正本に遅延復帰状態も含める');
-
+    assert.ok(!ui.includes('_deferProcessingStatusReveal'));
+    assert.ok(!ui.includes('_processingStatusRevealDeferred'));
+    assert.ok(!uiMap.includes('_processingStatusRevealDeferred'));
+    assert.ok(ui.includes('this.clearProcessingStatus();'));
+    assert.ok(ui.includes('this.waitForThinkingPresentationMinimum?.()'));
+    assert.ok(ui.includes('return this.isDialogShowing || (this.dialogQueue'), '会話公開前の表示待ちでも月次処理を先行させない');
+    assert.ok(turn.includes('await monthStartPresentation;'));
+    assert.ok(turn.includes('await monthEndPresentation;'));
     const waitAt = turn.indexOf('const waitIfBusy = async () => {');
     const waitEnd = turn.indexOf('// ==========================================', waitAt + 1);
     const waitBlock = turn.slice(waitAt, waitEnd);
     assert.ok(waitBlock.includes('await game.ui.waitForDialogs();'));
-    assert.ok(!waitBlock.includes('setTimeout(resolve, 300)'), 'waitForDialogs後の重複300ms待機を残さない');
+    assert.ok(!waitBlock.includes('setTimeout(resolve, 300)'));
 });
 
 
@@ -46446,7 +46445,7 @@ test('新規開始月の攻撃作戦は即時出撃だけ翌月へ繰り延べ�
 
 });
 
-test('r992 AI進捗は即時表示、連続更新で開始時刻維持、通常操作返却のみ最低300ms', async () => {
+test('r993 AI進捗は即時表示、連続更新で開始時刻維持、引継ぎ時最低300ms', async () => {
     let now=0, next=0; const timers=new Map();
     const tick=ms=>{const end=now+ms; while(true){const pending=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!pending)break;now=pending[1].at;timers.delete(pending[0]);pending[1].fn();}now=end;};
     const classes=new Set(['hide-text']);const guard={style:{opacity:'1'},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}};
@@ -46653,6 +46652,50 @@ test('r991 外交計画復元は既存6種の値を維持し無効な計画だ�
     for(const plan of plans){const row={id:1,leaderId:10,currentDiplomacyTarget:{targetId:2,...plan}},rows=[row,{id:2,leaderId:20}];const game={clans:rows.map(x=>new Clan(x)),playerClanId:99};const saver=new ctx.SaveManager(game);saver._restoreSavedDiplomacyPlans(rows);assert.deepStrictEqual(JSON.parse(JSON.stringify(game.clans[0].currentDiplomacyTarget)),row.currentDiplomacyTarget);assert.notStrictEqual(game.clans[0].currentDiplomacyTarget,row.currentDiplomacyTarget);}
     for(const plan of [null,[],{action:'unknown',targetId:2,gold:0},{action:'marriage',targetId:1,gold:0},{action:'marriage',targetId:3,gold:0},{action:'goodwill',targetId:2,gold:-1},{action:'goodwill',targetId:2,gold:1.5},{action:'truce',targetId:2,gold:0,score:NaN}]){const rows=[{id:1,leaderId:10,currentDiplomacyTarget:plan},{id:2,leaderId:20}];const game={clans:rows.map(x=>new Clan(x)),playerClanId:99};new ctx.SaveManager(game)._restoreSavedDiplomacyPlans(rows);assert.strictEqual(game.clans[0].currentDiplomacyTarget,null);}
     const rows=[{id:1,leaderId:10,currentDiplomacyTarget:{action:'marriage',targetId:2,gold:0}},{id:2,leaderId:20}];const game={clans:rows.map(x=>new Clan(x)),playerClanId:2};new ctx.SaveManager(game)._restoreSavedDiplomacyPlans(rows);assert.strictEqual(game.clans[0].currentDiplomacyTarget,null);
+});
+
+
+test('r993 保存ガードの最低表示時間・遅い初回フレーム・重複保存を共通時計で管理', async () => {
+    let now=0, next=0; const timers=new Map(),frames=new Map(),els=new Map();
+    const tick=ms=>{const end=now+ms;while(true){const t=[...timers].filter(([,v])=>v.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!t)break;now=t[1].at;timers.delete(t[0]);t[1].fn();}now=end;};
+    const paint=()=>{const all=[...frames];frames.clear();all.forEach(([,fn])=>fn());};
+    const element=()=>{const el={_classes:new Set(),isConnected:true,appendChild(){}};Object.defineProperty(el,'className',{set:v=>el._classes=new Set(v.split(' '))});el.classList={add:x=>el._classes.add(x),remove:x=>el._classes.delete(x),contains:x=>el._classes.has(x)};return el;};
+    const ctx=createContext({performance:{now:()=>now},setTimeout:(fn,ms)=>{timers.set(++next,{fn,at:now+ms});return next;},clearTimeout:id=>timers.delete(id),requestAnimationFrame:fn=>{frames.set(++next,fn);return next;},cancelAnimationFrame:id=>frames.delete(id),document:{hidden:false,getElementById:id=>els.get(id)||null,createElement:element,body:{appendChild:el=>els.set(el.id,el)}}});
+    vm.runInContext('class UIManager {}',ctx);loadScript(ctx,'js/ui_map.js');loadScript(ctx,'js/save_manager.js');
+    const ui=vm.runInContext('new UIManager()',ctx);const save=new ctx.SaveManager({ui});
+    save.showSaveGuard();const guard=els.get('save-guard');assert.ok(!guard.classList.contains('hidden'));
+    tick(400); // 同期処理が長く、まだ1フレームも描けていない。
+    let finished=false;const closing=save.hideSaveGuard().then(()=>finished=true);tick(10);paint();tick(299);await Promise.resolve();assert.ok(!finished);assert.ok(!guard.classList.contains('hidden'));
+    tick(1);await closing;assert.ok(finished&&guard.classList.contains('hidden'));
+    save.showSaveGuard();paint();tick(30);save.showSaveGuard();assert.strictEqual(save.hideSaveGuard(),undefined);assert.ok(!guard.classList.contains('hidden'));
+    const last=save.hideSaveGuard();tick(100);save.showSaveGuard();tick(170);await last;assert.ok(!guard.classList.contains('hidden'),'旧完了は新規保存を閉じない');
+    assert.strictEqual(save.hideSaveGuard(),undefined);assert.ok(guard.classList.contains('hidden'));
+    save.showSaveGuard();paint();tick(400);assert.strictEqual(save.hideSaveGuard(),undefined);assert.ok(guard.classList.contains('hidden'),'十分な表示後は追加待機しない');
+    save.showSaveGuard();assert.strictEqual(save.hideSaveGuard(()=>false),undefined);assert.ok(guard.classList.contains('hidden'),'失効した要求は待機しない');assert.strictEqual(frames.size,0);
+    save.showSaveGuard();paint();const old=save.hideSaveGuard();assert.ok(timers.size>0);save.cancelCompletedSavePresentation();assert.strictEqual(timers.size,0);
+    save.showSaveGuard();paint();await old;assert.ok(!guard.classList.contains('hidden'),'強制遷移前の待機完了で新規ガードを閉じない');
+    save.cancelCompletedSavePresentation();assert.ok(!guard.classList.contains('hidden'),'保存処理中は強制遷移でもガード保持');tick(300);save.hideSaveGuard();assert.ok(guard.classList.contains('hidden'));
+});
+
+
+test('r993 実月初・月末の表示待ちが次の拠点・翌月への進行を制御し強制遷移で失効する', async () => {
+    const ctx=createContext({setTimeout,clearTimeout,EconomyRules:{updateMonthlyProvinceMarketRates(){}}});
+    loadScript(ctx,'js/turn_manager.js');const TM=vm.runInContext('TurnManager',ctx);
+    for(const stage of ['startMonth','endMonth']) for(const abort of [false,true]) {
+        let label='',release,signal,progressed=0;const noop=()=>{};
+        const ready=new Promise(r=>signal=r);
+        const ui={showCutin:async()=>{},log:noop,showProcessingStatus:t=>{label=t;},waitForNextPaint:async()=>{},waitForDialogs:async()=>{},
+            waitForAIProgressMinimum(){if(!label)return null;return new Promise(r=>{release=r;signal();});}};
+        const game={phase:'game',year:1560,month:4,playerClanId:1,clans:[],castles:[],bushos:[],getCurrentTurnCastle:()=>null,
+            writeSystemDiagnostic:noop,ui,eventManager:{async processEvents(){}},lifeSystem:{async processStartMonth(){}},
+            factionSystem:{applyStartMonthSameFactionEffects:noop,async processStartMonth(){}},affiliationSystem:{processRoninMovements:noop},
+            updateAllCastlesLords:noop,updateAllClanPrestige:noop,updateClanDisplayNames:noop,courtRankSystem:{processMonthlyPromotions:()=>[]},
+            tryProcessQueuedWatchReturn:async()=>false,processTurn(){progressed++;},endingSystem:{async checkEnding(){return false;}},async startMonth(){progressed++;}};
+        const tm=game.turnManager=new TM(game);const running=tm[stage]();await ready;
+        assert.strictEqual(label,stage==='startMonth'?'月初準備中...':'月末処理中...');assert.strictEqual(progressed,0);assert.strictEqual(game.month,4);
+        if(abort)tm.abortForScenarioTransition();release();await running;
+        assert.strictEqual(progressed,abort?0:1);assert.strictEqual(game.month,!abort&&stage==='endMonth'?5:4);
+    }
 });
 
 Promise.all(pendingTests).then(() => {

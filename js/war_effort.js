@@ -812,6 +812,14 @@ Object.assign(WarManager.prototype, {
             return;
         }
         
+        const openingPresentation = this.game.ui?.waitForThinkingPresentationMinimum?.();
+        if (openingPresentation) {
+            await openingPresentation;
+            if (!isCurrentWar() || !isCurrentStartContext()) {
+                this._resolveWarCloseWaiters(warGeneration, false);
+                return;
+            }
+        }
         this.state = this.state || {};
         this.state.active = true;
 
@@ -909,6 +917,11 @@ Object.assign(WarManager.prototype, {
                     if (!isCurrentWar()) return;
 
                     // ★追加：メッセージを閉じた後からバリアを張ります！
+                    const mapPresentation = this.game.ui?.waitForThinkingPresentationMinimum?.();
+                    if (mapPresentation) {
+                        await mapPresentation;
+                        if (!isCurrentWar()) return;
+                    }
                     if (typeof this.game.ui.showMapGuard === 'function') this.game.ui.showMapGuard();
 
                     // ★Round23：戦場へのカメラ移動はplayBattleBlink側へ一元化しました。
@@ -1756,6 +1769,12 @@ Object.assign(WarManager.prototype, {
             return false;
         };
 
+        // 非表示戦闘が短く終わった場合も戦争思考表示を最低時間維持する。
+        const endingPresentation = this.game.ui?.waitForThinkingPresentationMinimum?.();
+        if (endingPresentation) {
+            await endingPresentation;
+            if (!isCurrentWar()) return;
+        }
         // 攻城計算の実数を、制圧・帰還・捕虜処理より先に再生する。
         try {
             const lastRound = Math.min(endState.round || 1, window.WarParams?.Military?.WarMaxRounds || 15);

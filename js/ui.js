@@ -354,12 +354,8 @@ class UIManager {
         this._coveredClosePending = new Map();
         // 会話・選択・結果など異種モーダルの表示切替は、暗幕の連続性をここで共通管理する。
         this._initModalHandoffBackdrop();
-        // 月初／月末の処理ラベルは、会話が閉じた直後に即復帰すると
-        // 次の会話との間で「月末処理中…」等が一瞬だけ見える。
-        // 実際に静かな処理が続いた時だけ再表示するため、会話後の短い猶予をUI側で一元管理する。
+        // 月次ラベルは即時表示。最短時間は共通の表示境界で確保する。
         this._processingStatusText = '';
-        this._processingStatusRevealTimer = null;
-        this._processingStatusRevealDeferred = false;
 
         document.addEventListener('click', (e) => {
             const btn = e.target.closest('button');
@@ -662,13 +658,6 @@ class UIManager {
 
     hideAIGuardTemporarily() {
         const aiGuard = document.getElementById('ai-guard');
-        // 次の会話が始まった時点で、月初／月末処理ラベルの遅延復帰予約は不要です。
-        // 同じJSタスク内で会話側のhide-textへ移るため、ここでは表示状態を再適用しません。
-        if (this._processingStatusRevealTimer) {
-            clearTimeout(this._processingStatusRevealTimer);
-            this._processingStatusRevealTimer = null;
-        }
-        this._processingStatusRevealDeferred = false;
         // ★変更：壁そのものを消すのではなく、文字だけを透明にして壁を残します！
         if (aiGuard && !aiGuard.classList.contains('hidden') && aiGuard.style.opacity !== '0') {
             aiGuard.style.opacity = '0';
@@ -719,44 +708,10 @@ class UIManager {
         return true;
     }
 
-    _cancelProcessingStatusReveal() {
-        if (this._processingStatusRevealTimer) {
-            clearTimeout(this._processingStatusRevealTimer);
-            this._processingStatusRevealTimer = null;
-        }
-    }
-
     clearProcessingStatus() {
-        this._cancelProcessingStatusReveal();
+        if (this._processingStatusText) this._resetTransientThinking?.('progress');
         this._processingStatusText = '';
-        this._processingStatusRevealDeferred = false;
         if (typeof this.applyAIGuardTextState === 'function') this.applyAIGuardTextState();
-    }
-
-    _deferProcessingStatusReveal(delayMs = 1200) {
-        if (!this._processingStatusText || !this.game || !this.game.isProcessingAI) return false;
-        this._cancelProcessingStatusReveal();
-        this._processingStatusRevealDeferred = true;
-        if (typeof this.applyAIGuardTextState === 'function') this.applyAIGuardTextState();
-
-        const tryReveal = () => {
-            this._processingStatusRevealTimer = null;
-            if (!this._processingStatusText || !this.game || !this.game.isProcessingAI) {
-                this._processingStatusRevealDeferred = false;
-                if (typeof this.applyAIGuardTextState === 'function') this.applyAIGuardTextState();
-                return;
-            }
-            // 会話・結果画面等がまだ前面なら、処理ラベルをその背後で復帰させません。
-            if ((this.guardHiddenCount || 0) > 0 || this._hasAIProgressBlockingUI()) {
-                this._processingStatusRevealTimer = setTimeout(tryReveal, 200);
-                return;
-            }
-            this._processingStatusRevealDeferred = false;
-            if (typeof this.applyAIGuardTextState === 'function') this.applyAIGuardTextState();
-        };
-
-        this._processingStatusRevealTimer = setTimeout(tryReveal, Math.max(0, Number(delayMs) || 0));
-        return true;
     }
 
     // AI思考中に進捗を表示する魔法です！
@@ -794,9 +749,9 @@ class UIManager {
         const guard = this.aiGuard || document.getElementById('ai-guard');
         if (!guard) return;
 
-        this._cancelProcessingStatusReveal();
-        this._processingStatusText = String(text || '処理中...');
-        this._processingStatusRevealDeferred = false;
+        const nextText = String(text || '処理中...');
+        if (this._processingStatusText !== nextText) this._resetTransientThinking?.('progress');
+        this._processingStatusText = nextText;
         this.guardHiddenCount = 0;
         this.guardTextHiddenCount = 0;
         guard.style.opacity = '1';
@@ -829,7 +784,8 @@ class UIManager {
 
         // チェックする条件をひとまとめにします
         const checkActive = () => {
-            return (this.dialogQueue && this.dialogQueue.length > 0) ||
+            // 顔画像準備・最低表示時間待ちでまだ公開していない会話も進行中として扱う。
+            return this.isDialogShowing || (this.dialogQueue && this.dialogQueue.length > 0) ||
             isVisible('dialog-modal') ||
             isVisible('result-modal') ||
             isVisible('war-result-modal') ||
@@ -866,11 +822,8 @@ class UIManager {
                     // ★修正：プレイヤーのターン中など、すぐに表示しない場合でも透明化の魔法だけは確実に解いておきます！
                     aiGuard.style.opacity = '1';
 
-                    // 月初／月末ラベルだけは、会話直後に即復帰させると次の会話との間で点滅して見えます。
-                    // 本当に静かな処理が1.2秒以上続いた時だけ再表示し、短い会話間の隙間では隠したままにします。
-                    const deferredProcessingStatus = !!(this._processingStatusText && this.game && this.game.isProcessingAI);
-                    if (deferredProcessingStatus) this._deferProcessingStatusReveal(1200);
-                    else if (typeof this.applyAIGuardTextState === 'function') this.applyAIGuardTextState();
+                    // 会話から戻ったら猶予で隠さず即時復帰する。
+                    if (typeof this.applyAIGuardTextState === 'function') this.applyAIGuardTextState();
                     if (this.game && this.game.isProcessingAI) {
                         // マップで援軍の城を選んでいる最中は、絶対に膜を復活させない魔法！
                         if (!this.game.selectionMode) {
@@ -1385,6 +1338,16 @@ class UIManager {
 
         // forceResetModals() 後に完了した旧decodeは、現在の固定DOM・新しい会話状態へ一切触れない。
         if (dialogGeneration !== Number(this._dialogGeneration || 0)) return;
+
+        // 初回会話への引継ぎだけ、直前の処理表示が短ければ不足分を待つ。
+        // 連続会話のhandoffや強制リセットは遅らせない。
+        if (!this._dialogGuardHeld) {
+            const presentationWait = this.waitForThinkingPresentationMinimum?.();
+            if (presentationWait) {
+                await presentationWait;
+                if (dialogGeneration !== Number(this._dialogGeneration || 0)) return;
+            }
+        }
 
         // ★Round12：ここまでは現在表示中の会話画面に一切触れません。
         // 次の顔が準備できた後で初めて前回の配置を掃除し、同じ処理単位で次の内容へ切り替えます。
@@ -2525,9 +2488,8 @@ class UIManager {
         this.dialogQueue = [];
         this.isDialogShowing = false;
         this._dialogGuardHeld = false;
-        this._cancelProcessingStatusReveal();
         this._processingStatusText = '';
-        this._processingStatusRevealDeferred = false;
+        this.game?.saveManager?.cancelCompletedSavePresentation?.();
         const dialogModal = document.getElementById('dialog-modal');
         if (dialogModal && this._currentEventClickHandler) {
             dialogModal.removeEventListener('click', this._currentEventClickHandler);

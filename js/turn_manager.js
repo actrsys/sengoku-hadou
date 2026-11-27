@@ -433,6 +433,13 @@ class TurnManager {
         game.currentIndex = 0; 
         game.writeSystemDiagnostic('month_start:before_turn_queue');
     
+        // 月初ラベルからAI進捗・観戦終了確認への引継ぎ前に不足時間だけ待つ。
+        const monthStartPresentation = game.ui?.waitForAIProgressMinimum?.();
+        if (monthStartPresentation) {
+            await monthStartPresentation;
+            if (!isCurrentFlow()) return;
+        }
+
         // Round26：月末～月初の一連処理中に観戦終了が予約されていた場合は、
         // ここを「月処理が完全に一段落した安全地点」として帰還確認へ移ります。
         if (await game.tryProcessQueuedWatchReturn('month_start_complete')) return;
@@ -721,6 +728,10 @@ class TurnManager {
         if (game.ui && game.ui.aiGuard) {
             game.ui.aiGuard.classList.remove('hidden');
             game.ui.restoreAIGuardText(true); // ★透明マントを脱いで文字を見せます！
+            // プレイヤーからの切替で古い月初／月末ラベルを一瞬再表示しない。
+            if (!wasProcessingAI && game.turnQueue.length > 0) {
+                game.ui.updateAIProgress?.(Math.min(game.currentIndex + 1, game.turnQueue.length), game.turnQueue.length);
+            }
         }
         
         // ★追加：月末のイベント処理中（独立や反乱など）は、ここでストップします！
@@ -776,6 +787,11 @@ class TurnManager {
             // 月末の派閥・独立・外交・寿命などは端末によって数秒かかることがあるため、
             // 既存のAIガードを再利用して「停止ではなく処理中」であることを明示する。
             if (game.ui && typeof game.ui.showProcessingStatus === 'function') {
+                const priorPresentation = game.ui.waitForAIProgressMinimum?.();
+                if (priorPresentation) {
+                    await priorPresentation;
+                    if (!isCurrentFlow()) return;
+                }
                 game.ui.showProcessingStatus('月末処理中...');
                 if (typeof game.ui.waitForNextPaint === 'function') {
                     await game.ui.waitForNextPaint();
@@ -854,6 +870,13 @@ class TurnManager {
             }
             if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
+            // 月末ラベルから次月カットインへ移る前に不足時間だけ待つ。
+            const monthEndPresentation = game.ui?.waitForAIProgressMinimum?.();
+            if (monthEndPresentation) {
+                await monthEndPresentation;
+                if (!isCurrentFlow()) return;
+            }
+
             // すべての月末イベントとメッセージが完全に終わってから、ようやく時間を進めます！
             this._initialNewGameTurn = false;
             game.month++;

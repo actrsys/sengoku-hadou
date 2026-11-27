@@ -2851,7 +2851,7 @@ Object.assign(UIManager.prototype, {
         
         const eligible = () => !!(this.game && this.game.isProcessingAI && !this.game.isRestoringSave
             && !guard.classList.contains('hidden') && guard.style.opacity !== '0'
-            && !((this.guardTextHiddenCount || 0) > 0 || this._processingStatusRevealDeferred || (this.mapGuardCount || 0) > 0)
+            && !((this.guardTextHiddenCount || 0) > 0 || (this.mapGuardCount || 0) > 0)
             && !(this.guardHiddenCount > 0) && !this.game.selectionMode
             && !(typeof this._hasAIProgressBlockingUI === 'function' && this._hasAIProgressBlockingUI()));
         this._syncTransientThinking('progress', guard, 'hide-text', eligible);
@@ -2865,8 +2865,11 @@ Object.assign(UIManager.prototype, {
     _resetTransientThinking(key) {
         const state = this._transientThinking?.[key];
         if (!state) return;
+        if (state.frameId != null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(state.frameId);
         state.element.classList.add(state.hiddenClass);
         delete this._transientThinking[key];
+        // 強制切替後に古い表示待機タイマーを残さない。呼出側の既存世代照合で進行も止める。
+        for (const finish of state.waiters) finish();
     },
 
     _syncTransientThinking(key, element, hiddenClass, eligible) {
@@ -2884,19 +2887,54 @@ Object.assign(UIManager.prototype, {
         }
         this._resetTransientThinking(key);
         element.classList.remove(hiddenClass);
-        this._transientThinking[key] = { element, hiddenClass, eligible, shownAt: this._thinkingNow() };
+        state = this._transientThinking[key] = { element, hiddenClass, eligible, shownAt: this._thinkingNow(), frameId: null, waiters: new Set() };
+        // 長い同期処理でDOM公開後の最初の描画が遅れても、表示時間を使い切らない。
+        if (typeof requestAnimationFrame === 'function' && !document.hidden) {
+            state.frameId = requestAnimationFrame(() => {
+                state.frameId = null;
+                if (this._transientThinking?.[key] === state && state.eligible()) {
+                    state.shownAt = this._thinkingNow();
+                }
+            });
+        }
     },
 
-    // 操作返却の境界だけで不足分を待つ。会話・地図演出への遷移は即時非表示を優先する。
+    // 通常の表示引継ぎ境界でだけ、実際に表示された時間の不足分を待つ。
+    // 処理時間や拠点数に比例した固定ウェイトは入れない。
+    waitForTransientThinkingMinimum(key) {
+        const state = this._transientThinking?.[key];
+        const isVisible = () => !!(state && this._transientThinking?.[key] === state
+            && state.eligible() && !state.element.classList.contains(state.hiddenClass));
+        if (!isVisible()) return null;
+        // まだ最初の描画が来ていない場合は、この境界から最低時間を確保する。
+        if (state.frameId != null) state.shownAt = this._thinkingNow();
+        const remaining = () => Math.max(0, 300 - (this._thinkingNow() - state.shownAt));
+        const ms = remaining();
+        if (ms <= 0) return null;
+        return new Promise(resolve => {
+            let timer = null;
+            const finish = () => {
+                if (timer != null) clearTimeout(timer);
+                state.waiters.delete(finish);
+                resolve();
+            };
+            const check = () => {
+                timer = null;
+                if (!isVisible() || remaining() <= 0) { finish(); return; }
+                timer = setTimeout(check, Math.ceil(remaining()));
+            };
+            state.waiters.add(finish);
+            timer = setTimeout(check, Math.ceil(ms));
+        });
+    },
+
     waitForAIProgressMinimum() {
-        const state = this._transientThinking?.progress;
-        if (!state || state.shownAt == null || !state.eligible()
-            || state.element.classList.contains(state.hiddenClass)) {
-            this._resetTransientThinking('progress');
-            return null;
-        }
-        const remaining = Math.max(0, 300 - (this._thinkingNow() - state.shownAt));
-        return remaining > 0 ? new Promise(resolve => setTimeout(resolve, remaining)) : null;
+        return this.waitForTransientThinkingMinimum('progress');
+    },
+
+    waitForThinkingPresentationMinimum() {
+        const waits = ['progress', 'war'].map(key => this.waitForTransientThinkingMinimum(key)).filter(Boolean);
+        return waits.length ? Promise.all(waits) : null;
     },
 
     // 会話から通常地図への引継ぎ。月次の会話holdは後続会話のため維持し、
@@ -2904,6 +2942,11 @@ Object.assign(UIManager.prototype, {
     // 既存の地図guardで入力と進捗文字を演出の全区間保護する。
     async withMapEffectPresentation(task) {
         const generation = Number(this._mapEffectGeneration || 0);
+        const presentationWait = this.waitForThinkingPresentationMinimum();
+        if (presentationWait) {
+            await presentationWait;
+            if (generation !== Number(this._mapEffectGeneration || 0)) return false;
+        }
         this.showMapGuard();
         try {
             const closed = this.completeDialogToViewHandoff();

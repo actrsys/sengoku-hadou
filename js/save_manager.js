@@ -31,16 +31,37 @@ class SaveManager {
             el.appendChild(message);
             document.body.appendChild(el);
         }
-        el.classList.remove('hidden');
+        if (this.game.ui?._syncTransientThinking) {
+            this.game.ui._syncTransientThinking('save', el, 'hidden', () => el.isConnected !== false);
+        } else {
+            el.classList.remove('hidden');
+        }
     }
 
-    hideSaveGuard() {
+    hideSaveGuard(isRequestCurrent = null) {
         this._saveGuardCount = Math.max(0, this._saveGuardCount - 1);
         if (this._saveGuardCount !== 0) return;
         const el = document.getElementById('save-guard');
-        if (el) {
+        if (!el) return;
+        const ui = this.game.ui;
+        const state = ui?._transientThinking?.save;
+        const close = () => {
+            // 追加保存や別の表示周期が始まっていれば、古い完了は閉じない。
+            if (this._saveGuardCount !== 0 || (state && ui?._transientThinking?.save !== state)) return;
+            ui?._resetTransientThinking?.('save');
             el.classList.add('hidden');
-        }
+        };
+        const wait = (!isRequestCurrent || isRequestCurrent()) && ui?.waitForTransientThinkingMinimum?.('save');
+        if (wait) return wait.then(close);
+        close();
+    }
+
+    // 強制遷移では完了済み保存の表示ウェイトだけを中断する。
+    // 実際の保存が継続中なら、従来どおり最後の保存までガードを維持する。
+    cancelCompletedSavePresentation() {
+        if (this._saveGuardCount !== 0) return;
+        this.game.ui?._resetTransientThinking?.('save');
+        document.getElementById('save-guard')?.classList.add('hidden');
     }
 
     // 同一スロットへの複数の保存要求を要求順に処理する。
@@ -998,7 +1019,7 @@ class SaveManager {
             console.error('ファイルセーブに失敗しました:', e);
             if (isRequestCurrent() && this.game.ui) this.game.ui.showDialog('ファイルセーブに失敗しました。エラー原因: ' + e.message, false);
         } finally {
-            this.hideSaveGuard(); // ★追加：保存が終わったらバリアを解除します
+            await this.hideSaveGuard(isRequestCurrent); // 表示の不足時間も満たしてから操作を返す
         }
     }
     
@@ -1113,7 +1134,7 @@ class SaveManager {
                 this.game.ui.showDialog("セーブに失敗しました。エラー原因: " + e.message, false);
             }
         } finally {
-            this.hideSaveGuard();
+            await this.hideSaveGuard(isRequestCurrent);
         }
     }
 
@@ -1227,12 +1248,13 @@ class SaveManager {
         } catch (e) {
             console.error('オートセーブに失敗しました:', e);
         } finally {
+            // 最低表示時間中も同じオートセーブを二重起動させない。
+            await this.hideSaveGuard(request.isCurrent);
             // 古い保存のfinallyで新しい保存中フラグを解除しない。
             if (this._activeAutoSaveRequest === request) {
                 this._activeAutoSaveRequest = null;
                 this.game._autoSaveInProgress = false;
             }
-            this.hideSaveGuard();
         }
     }
 
