@@ -2277,19 +2277,64 @@ class DiplomacyManager {
         if (!this._isDiplomacyOrderCurrent(order)) return false;
         const sourceClan = this.game.getClan(order.clanId);
         const targetDaimyo = this.game.getClanDaimyo(order.targetClanId);
-        const family = Array.isArray(targetBusho?.familyIds) ? targetBusho.familyIds : [];
-        const leaderFamily = Array.isArray(targetDaimyo?.familyIds) ? targetDaimyo.familyIds : [];
         return !!(princess && targetBusho && sourceClan && targetDaimyo
             && this.game.getPrincess(princess.id) === princess
             && this.game.getBusho(targetBusho.id) === targetBusho
             && princess.status === 'unmarried'
             && sourceClan.princessIds?.some(id => Number(id) === Number(princess.id))
             && Number(targetBusho.clan) === order.targetClanId
-            && !targetBusho.female
+            && this._isMarriageGroomEligible(targetBusho, targetDaimyo));
+    }
+
+    _isMarriageGroomEligible(targetBusho, targetDaimyo) {
+        const family = Array.isArray(targetBusho?.familyIds) ? targetBusho.familyIds : [];
+        const leaderFamily = Array.isArray(targetDaimyo?.familyIds) ? targetDaimyo.familyIds : [];
+        return !!(targetBusho && targetDaimyo && !targetBusho.female
             && (typeof window.BushoStatusRules?.isActive !== 'function' || window.BushoStatusRules.isActive(targetBusho))
             && (Number(targetBusho.id) === Number(targetDaimyo.id)
                 || family.some(id => Number(id) === Number(targetDaimyo.id))
                 || leaderFamily.some(id => Number(id) === Number(targetBusho.id))));
+    }
+
+    // 通常AI婚姻の候補は月初と実行直前で同じ資格を使う。和睦条件の候補とは別。
+    getAIMarriagePair(myClanId, targetClanId, myPower, targetPower) {
+        myClanId = Number(myClanId);
+        targetClanId = Number(targetClanId);
+        const playerId = Number(this.game.playerClanId);
+        if (myClanId <= 0 || targetClanId <= 0 || myClanId === targetClanId
+            || myClanId === playerId || targetClanId === playerId
+            || !Number.isFinite(myPower) || !Number.isFinite(targetPower) || !(myPower < targetPower)) return null;
+        const source = this.game.getClan(myClanId);
+        const target = this.game.getClan(targetClanId);
+        if (!source || source.isDestroyed || !target || target.isDestroyed || !source.princessIds?.length) return null;
+        const rel = this.getRelation(myClanId, targetClanId);
+        if (!rel || rel.isMarriage || rel.isEvent || window.DiplomacyRules.isVassalRelation(rel.status)) return null;
+        const myLeader = this.game.getClanDaimyo(myClanId);
+        const targetLeader = this.game.getClanDaimyo(targetClanId);
+        if (!myLeader || !targetLeader || targetLeader.nemesisIds?.includes(myLeader.id)) return null;
+        const targetCastle = this.game.getCastle(targetLeader.castleId);
+        if (!targetCastle || Number(targetCastle.ownerClan) !== targetClanId) return null;
+        const ops = this.game.aiOperationManager?.operations?.[myClanId] || {};
+        if (Object.values(ops).some(op => op?.type === '攻撃' && op.attackTargets?.some(t =>
+            Number(this.game.getCastle(t.targetId)?.ownerClan) === targetClanId))) return null;
+        // 通常婚姻と同じ当主一門の姫に限定し、AIは生成姫だけを使用する。
+        const familyIds = new Set((myLeader.familyIds || []).map(Number));
+        const princesses = source.princessIds.map(id => this.game.getPrincess(id)).filter(p => p
+            && Number(p.id) >= 90000 && p.status === 'unmarried' && !Number(p.husbandId || 0)
+            && Number(p.currentClanId) === myClanId
+            && p.familyIds?.some(id => familyIds.has(Number(id))));
+        if (!princesses.length) return null;
+        const grooms = this.game.getClanBushos(targetClanId).filter(b => b
+            && Number(b.clan) === targetClanId && this._isMarriageGroomEligible(b, targetLeader)
+            && !b.wifeIds?.length && !b.isHostage);
+        if (!grooms.length) return null;
+        // 当主本人を優先し、同資格なら年齢差の小さい組を選ぶ。配偶者がいる武将は対象外。
+        const pairs = princesses.flatMap(princess => grooms.map(groom => ({ princess, groom, targetCastle })));
+        pairs.sort((a, b) => Number(Number(b.groom.id) === Number(targetLeader.id)) - Number(Number(a.groom.id) === Number(targetLeader.id))
+            || Math.abs(Number(a.princess.birthYear || 0) - Number(a.groom.birthYear || 0))
+             - Math.abs(Number(b.princess.birthYear || 0) - Number(b.groom.birthYear || 0))
+            || Number(a.princess.id) - Number(b.princess.id) || Number(a.groom.id) - Number(b.groom.id));
+        return pairs[0];
     }
 
     /**
@@ -2987,11 +3032,8 @@ class DiplomacyManager {
         if (!this._isDiplomacyOrderCurrent(order)) return;
         
         const targetClanId = targetCastle.ownerClan;
-        const targetClan = this.game.getClan(targetClanId);
         const targetBusho = this.game.getBusho(targetBushoId);
         const princess = this.game.getPrincess(princessId);
-        // 婚姻の成否どちらでも当事者名を使うため、分岐前に取得する。
-        const doerClan = this.game.getClan(doer.clan);
         if (this.game.commandSystem && !this._isMarriageSelectionCurrent(order, princess, targetBusho)) return;
 
         const isSuccess = this.checkDiplomacySuccess(doerId, targetCastleId, 'marriage');
@@ -3006,27 +3048,50 @@ class DiplomacyManager {
         }
 
         if (!this._isDiplomacyOrderCurrent(order)) return;
-        this.calcDiplomacyExp(doer, 'marriage', isSuccess, true);
+        this._completeOrdinaryMarriage(doer, targetClanId, princessId, targetBushoId, princess, targetBusho, isSuccess, true);
+    }
 
+    // AI同士は会話待ちを発生させず、その場で成立・不成立を確定する。
+    executeAIMarriage(doerId, targetCastleId) {
+        const doer = this.game.getBusho(doerId);
+        const castle = this.game.getCastle(targetCastleId);
+        if (!doer || !castle || doer.isActionDone || !window.BushoStatusRules.isActive(doer)) return false;
+        const sourceCastle = this.game.getCastle(doer.castleId);
+        if (!sourceCastle || Number(sourceCastle.ownerClan) !== Number(doer.clan)) return false;
+        const order = this._captureDiplomacyOrder(doer, castle, 'marriage');
+        if (!this._isDiplomacyOrderCurrent(order) || order.isPlayerOrder) return false;
+        const ai = this.game.aiEngine;
+        const pair = this.getAIMarriagePair(order.clanId, order.targetClanId,
+            ai.getClanPrestige(order.clanId), ai.getClanPrestige(order.targetClanId));
+        if (!pair || pair.targetCastle !== castle || !this._isMarriageSelectionCurrent(order, pair.princess, pair.groom)) return false;
+        if (!(this.getDiplomacyProb(doerId, targetCastleId, 'marriage') > 0)) return false;
+        const success = this.checkDiplomacySuccess(doerId, targetCastleId, 'marriage');
+        this._completeOrdinaryMarriage(doer, order.targetClanId, pair.princess.id, pair.groom.id, pair.princess, pair.groom, success, false);
+        return true;
+    }
+
+    _completeOrdinaryMarriage(doer, targetClanId, princessId, targetBushoId, princess, targetBusho, isSuccess, isPlayer) {
+        const doerClan = this.game.getClan(doer.clan);
+        const targetClan = this.game.getClan(targetClanId);
+        this.calcDiplomacyExp(doer, 'marriage', isSuccess, true);
         if (isSuccess) {
-            this.applyMarriageData(princessId, targetBushoId, targetClanId, true); 
+            if (isPlayer) this.applyMarriageData(princessId, targetBushoId, targetClanId, true);
+            else this.applyMarriageLinkData(princessId, targetBushoId, doer.clan, targetClanId, { isMainWife: true, boostSentiment: true });
             doer.isActionDone = true;
             doer.achievementTotal += Math.floor(doer.diplomacy * 0.2) + 20;
             this.game.factionSystem.updateRecognition(doer, 30);
-
             const msg = `${targetClan.name}と婚姻関係を結びました！\n${princess.name}は${targetBusho.name}の正室として迎えられました。`;
             const logMsg = `${doerClan.name}が${targetClan.name}と婚姻関係を結びました`;
-
-            this.showDiplomacyResult(doer.clan, true, msg, logMsg, "", null, [doer.clan, targetClanId]);
+            const aiMsg = `${doerClan.name}の${princess.name}が${targetClan.name}の${targetBusho.name}へ嫁ぎ、婚姻が成立しました。`;
+            this.showDiplomacyResult(doer.clan, isPlayer, msg, isPlayer ? logMsg : '', isPlayer ? '' : aiMsg, null, [doer.clan, targetClanId]);
         } else {
             this.updateSentiment(doer.clan, targetClanId, window.MainParams.Diplomacy.FailureSentiment.Alliance);
             doer.isActionDone = true;
             doer.achievementTotal += 5;
             this.game.factionSystem.updateRecognition(doer, 10);
-
             const msg = `${targetClan.name}との婚姻交渉に失敗しました……`;
             this._recordDiplomacyHistory(`【外交】${doerClan.name}と${targetClan.name}の婚姻交渉は成立しませんでした。`, [doer.clan, targetClanId]);
-            this.showDiplomacyResult(doer.clan, true, msg, "", "", null, [doer.clan, targetClanId]);
+            this.showDiplomacyResult(doer.clan, isPlayer, msg, '', '', null, [doer.clan, targetClanId]);
         }
     }
 
@@ -3714,6 +3779,14 @@ class DiplomacyManager {
         let sendProbModifier = 1.0;
         if (allyCount >= 2) {
             sendProbModifier = Math.max(0.1, 1.0 - (allyCount - 1) * 0.2); 
+        }
+
+        // 劣勢の家だけが通常婚姻を検討する。和睦の緊急判断は優先し、
+        // 成功見込みがなければ親善・同盟など既存の外交へ進む。
+        const marriagePair = this.getAIMarriagePair(myClanId, targetClanId, myPower, targetClanTotal);
+        if (marriagePair && this.getDiplomacyProb(myDaimyo.id, marriagePair.targetCastle.id, 'marriage') > 0
+            && Math.random() < smartness * sendProbModifier) {
+            return { action: 'marriage', gold: 0 };
         }
 
         // 自分がどこかに従属しているかチェックします

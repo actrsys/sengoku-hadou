@@ -3334,7 +3334,15 @@ class AIEngine {
         const targetCastleId = targetCastle.id;
         
         // 記憶されていた作戦（親善、同盟、支配）を実行します！
-        if (targetData.action === 'dominate') {
+        if (targetData.action === 'marriage') {
+            // 失効した計画を再実行しない。成否を問わず、一計画につき一度だけ交渉する。
+            const clan = this.game.getClan(castle.ownerClan);
+            if (!clan || clan.currentDiplomacyTarget !== targetData
+                || Number(castellan.clan) !== Number(castle.ownerClan)) return;
+            const attempted = Number(targetCastle.ownerClan) === Number(targetClanId)
+                && this.game.diplomacyManager.executeAIMarriage(castellan.id, targetCastleId);
+            if (attempted && clan.currentDiplomacyTarget === targetData) clan.currentDiplomacyTarget = null;
+        } else if (targetData.action === 'dominate') {
             if (Number(targetClanId) === Number(this.game.playerClanId)) {
                 this.game.diplomacyManager.proposeDiplomacyToPlayer(castellan, targetClanId, 'dominate', 0, () => {
                     castellan.isActionDone = true;

@@ -661,6 +661,7 @@ class InterviewSystem {
         const actionText = {
             goodwill: '関係を深めておく',
             alliance: '同盟を視野に入れる',
+            marriage: '婚姻を検討する',
             truce: '和睦を探る',
             court_truce: '和睦を探る',
             subordinate: '従属関係を検討する'

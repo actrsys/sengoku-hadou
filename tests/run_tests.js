@@ -46519,6 +46519,117 @@ test('r988 豊作・凶作の収入倍率を維持して収穫後に一度だけ
     }
 });
 
+// r990: 実際の月次外交・AI実行入口・通常の外交履行を接続する。
+function makeAIOrdinaryMarriageFixture() {
+    const random = Object.create(Math); random.random = () => 0;
+    const ctx = createContext({Math: random, MapGraphService: {isAdjacent: (a,b) => a.adjacentCastleIds.includes(b.id)}});
+    for (const f of ['constants','config','family_system','diplomacy','ai','ai_operation']) loadScript(ctx, `js/${f}.js`);
+    const DM = vm.runInContext('DiplomacyManager',ctx), AI = vm.runInContext('AIEngine',ctx), OP = vm.runInContext('AIOperationManager',ctx), FL = vm.runInContext('FamilyLinker',ctx);
+    const sender = {id:101,name:'甲当主',clan:1,castleId:10,birthYear:1520,status:'active',isDaimyo:true,diplomacy:95,intelligence:95,duty:60,achievementTotal:0,wifeIds:[]};
+    const groom = {id:201,name:'乙当主',clan:2,castleId:20,birthYear:1540,status:'active',isDaimyo:true,diplomacy:70,wifeIds:[]};
+    const other = {id:202,name:'乙家臣',clan:2,castleId:20,birthYear:1540,status:'active',wifeIds:[]};
+    const princess = {id:90001,name:'生成姫',status:'unmarried',birthYear:1544,realFatherId:101,currentClanId:1,originalClanId:1,husbandId:0};
+    const historic = {id:80,name:'史実姫',status:'unmarried',birthYear:1544,realFatherId:101,currentClanId:1,originalClanId:1,husbandId:0};
+    const unrelated = {id:90002,name:'引取姫',status:'unmarried',birthYear:1544,currentClanId:1,originalClanId:1,husbandId:0};
+    const clans = [{id:1,name:'甲家',leaderId:101,daimyoPrestige:5000,princessIds:[80,90002,90001],diplomacyValue:{}},{id:2,name:'乙家',leaderId:201,daimyoPrestige:10000,princessIds:[],diplomacyValue:{}}];
+    const castles = [{id:10,ownerClan:1,adjacentCastleIds:[20],soldiers:4000},{id:20,ownerClan:2,adjacentCastleIds:[10],soldiers:8000}];
+    const bushos=[sender,groom,other], princesses=[princess,historic,unrelated], entries=[],dialogs=[],recognition=[];
+    const game={clans,castles,bushos,princesses,year:1560,month:7,playerClanId:99,isProcessingAI:true,
+        getClan(id){return clans.find(c=>c.id===Number(id));},getCastle(id){return castles.find(c=>c.id===Number(id));},
+        getBusho(id){return bushos.find(b=>b.id===Number(id));},getPrincess(id){return princesses.find(p=>p.id===Number(id));},
+        getClanDaimyo(id){return this.getBusho(this.getClan(id)?.leaderId);},getClanBushos(id){return bushos.filter(b=>b.clan===Number(id));},
+        getClanCastles(id){return castles.filter(c=>c.ownerClan===Number(id));},getClanTotalSoldiers(id){return this.getClanCastles(id).reduce((n,c)=>n+c.soldiers,0);},
+        factionSystem:{updateRecognition:(b,n)=>recognition.push([b.id,n])},historySystem:{record:(text,meta)=>entries.push({text,meta})},ui:{showDialog:t=>dialogs.push(t),showResultModal(){throw Error('AI同士のプレイヤー結果モーダル');}}};
+    FL.rebuildAllFamilyIds(bushos,princesses);
+    const dm=game.diplomacyManager=new DM(game), ai=game.aiEngine=new AI(game), op=game.aiOperationManager=new OP(game);
+    game.getRelation=(...a)=>dm.getRelation(...a);
+    const plan=()=>{op.thinkMonthlyDiplomacy(clans[0]);return clans[0].currentDiplomacyTarget;};
+    const exec=()=>ai.execAIDiplomacy(castles[0],sender,0.95,clans[0].currentDiplomacyTarget);
+    return {ctx,random,game,dm,ai,op,clans,castles,sender,groom,other,princess,historic,unrelated,entries,dialogs,recognition,plan,exec};
+}
+test('r990 劣勢の通常AI婚姻が月次立案・AI実行・一門再構築・履歴を通じて成立',()=>{
+    const f=makeAIOrdinaryMarriageFixture();
+    assert.strictEqual(f.plan()?.action,'marriage');
+    const prob=f.dm.getDiplomacyProb(101,20,'marriage'); assert.ok(prob>0&&prob<100);
+    f.exec();
+    assert.strictEqual(f.princess.status,'married');assert.strictEqual(f.princess.currentClanId,2);assert.strictEqual(f.princess.husbandId,201);
+    assert.strictEqual(f.princess.originalClanId,1);assert.deepStrictEqual(Array.from(f.clans[0].princessIds),[80,90002]);
+    assert.deepStrictEqual(Array.from(f.groom.wifeIds),[90001]);assert.strictEqual(f.historic.status,'unmarried');assert.strictEqual(f.unrelated.status,'unmarried');
+    assert.strictEqual(f.dm.getRelation(1,2).isMarriage,true);assert.strictEqual(f.dm.getRelation(2,1).isMarriage,true);
+    assert.strictEqual(f.dm.getRelation(1,2).sentiment,f.dm.getRelation(2,1).sentiment);assert.ok(f.dm.getRelation(1,2).sentiment>50);
+    assert.strictEqual(f.sender.isActionDone,true);assert.strictEqual(f.sender.expDiplomacy,15);assert.strictEqual(f.sender.achievementTotal,39);assert.deepStrictEqual(f.recognition,[[101,30]]);
+    assert.strictEqual(f.clans[0].currentDiplomacyTarget,null);assert.strictEqual(f.entries.length,1);assert.deepStrictEqual(Array.from(f.entries[0].meta.clanIds),[1,2]);assert.match(f.entries[0].text,/甲家の生成姫が乙家の乙当主/);assert.strictEqual(f.dialogs[0],f.entries[0].text);
+    assert.strictEqual(f.dm.getAIMarriagePair(1,2,5000,10000),null);
+});
+test('r990 通常AI婚姻拒否は一度だけ失敗履歴・功績・経験値を更新し姫を消費しない',()=>{
+    const f=makeAIOrdinaryMarriageFixture(); assert.strictEqual(f.plan()?.action,'marriage');
+    const p=f.clans[0].currentDiplomacyTarget;f.random.random=()=>0.999;
+    f.exec();assert.strictEqual(f.princess.status,'unmarried');assert.strictEqual(f.dm.getRelation(1,2).isMarriage,false);
+    assert.strictEqual(f.sender.isActionDone,true);assert.strictEqual(f.sender.expDiplomacy,5);assert.strictEqual(f.sender.achievementTotal,5);
+    assert.strictEqual(f.clans[0].currentDiplomacyTarget,null);assert.strictEqual(f.entries.length,1);assert.match(f.entries[0].text,/成立しませんでした/);assert.strictEqual(f.dialogs.length,0);
+    f.sender.isActionDone=false; // 次の拠点の未行動使者を模し、失効済み計画だけで二度目を実行しない。
+    f.ai.execAIDiplomacy(f.castles[0],f.sender,0.95,p);assert.strictEqual(f.entries.length,1);assert.strictEqual(f.sender.isActionDone,false);
+});
+test('r990 AI婚姻候補と立案後の失効・実行直前再評価',()=>{
+    const mutations=[
+        f=>f.clans[0].daimyoPrestige=10000,f=>f.clans[0].daimyoPrestige=10001,
+        f=>f.game.playerClanId=1,f=>f.game.playerClanId=2,
+        f=>f.princess.status='married',f=>f.princess.currentClanId=2,f=>f.princess.husbandId=201,
+        f=>f.princess.familyIds=[],f=>f.groom.wifeIds=[123],f=>f.groom.status='dead',f=>f.groom.isHostage=true,
+        f=>f.groom.female=true,f=>f.groom.nemesisIds=[101],f=>f.clans[1].isDestroyed=true,
+        f=>f.dm.getRelation(1,2).isMarriage=true,f=>f.dm.getRelation(1,2).isEvent=true,
+        f=>f.dm.changeStatus(1,2,'従属'),f=>f.op.operations[1]={0:{type:'攻撃',attackTargets:[{targetId:20}]}},
+        f=>f.castles[1].ownerClan=1
+    ];
+    for(const mutate of mutations){const f=makeAIOrdinaryMarriageFixture();assert.strictEqual(f.plan()?.action,'marriage');mutate(f);f.sender.isActionDone=false;
+        assert.strictEqual(f.dm.getAIMarriagePair(1,2,f.clans[0].daimyoPrestige,f.clans[1].daimyoPrestige),null);
+        assert.strictEqual(f.dm.executeAIMarriage(101,20),false);assert.strictEqual(f.sender.isActionDone,false);assert.strictEqual(f.entries.length,0);
+    }
+});
+test('r990 AI通常婚姻は威信同等以上・成功率ゼロの場合に立案しない',()=>{
+    for(const mode of ['equal','strong','prob0']){const f=makeAIOrdinaryMarriageFixture();
+        if(mode==='equal')f.clans[0].daimyoPrestige=10000;if(mode==='strong')f.clans[0].daimyoPrestige=11000;if(mode==='prob0')f.sender.diplomacy=0;
+        assert.notStrictEqual(f.plan()?.action,'marriage');}
+});
+
+test('r990 1560・1570の実シナリオ初期姫生成と月次外交から通常AI婚姻へ到達できる',()=>{
+    for(const folder of ['1560_okehazama','1570_anegawa']){
+        const rng=Object.create(Math);rng.random=()=>0;
+        const ctx=createContext({Math:rng,PortraitRules:{getLatestYearFace(){return null;}},addEventListener(){}});
+        for(const f of ['config','constants','models','family_system','data_manager','life_system','map_graph','economy_rules','courtRank_system','game','diplomacy','ai','ai_operation'])loadScript(ctx,`js/${f}.js`);
+        const C=key=>vm.runInContext(key,ctx), DM=C('DataManager'), GM=C('GameManager');
+        const {common,scenario}=getRuntimeData(folder);ctx.MainParams.StartYear=Number(scenario.scenario.startYear);ctx.MainParams.StartMonth=Number(scenario.scenario.startMonth);
+        DM.genericPrincessProfiles=common.genericPrincessProfiles;
+        const rows=(m,s,k,o)=>DM.mergeMasterAndState(m,s,folder,o).map(d=>new (C(k))(d));
+        const clans=DM.applyDiplomacyToClanRows(DM.mergeMasterAndState(common.clansMaster,scenario.clansState,folder,{enabledOnly:true}),scenario.diplomacy).map(d=>new (C('Clan'))(d));
+        const castles=rows(common.castlesMaster,scenario.castlesState,'Castle',{enabledOnly:true});
+        const bushos=rows(common.warriorsMaster,scenario.warriorsState,'Busho',{requireAllMaster:true});
+        const princesses=rows(common.princessMaster,scenario.princessState,'Princess',{requireAllMaster:true});
+        const legions=scenario.legions.map(d=>new (C('Legion'))(d));
+        DM.joinData(clans,castles,bushos,princesses,legions);
+        const cmap=new Map(clans.map(c=>[c.id,c])),bmap=new Map(bushos.map(b=>[b.id,b])),castmap=new Map(castles.map(c=>[c.id,c]));
+        const group=(arr,key)=>{const map=new Map();for(const item of arr){if(!map.has(item[key]))map.set(item[key],[]);map.get(item[key]).push(item);}return map;};
+        const cc=group(castles,'ownerClan'),cb=group(bushos,'clan');const entries=[];
+        const game={year:ctx.MainParams.StartYear,month:ctx.MainParams.StartMonth,playerClanId:-100,isWatchMode:true,isProcessingAI:true,clans,castles,bushos,princesses,legions,
+            getClan:id=>cmap.get(Number(id)),getCastle:id=>castmap.get(Number(id)),getBusho:id=>bmap.get(Number(id)),getPrincess:id=>princesses.find(p=>p.id===Number(id)),
+            getClanDaimyo(id){return this.getBusho(this.getClan(id)?.leaderId);},getClanCastles:id=>cc.get(Number(id))||[],getClanBushos:id=>cb.get(Number(id))||[],
+            getClanTotalSoldiers(id){return this.getClanCastles(id).reduce((n,c)=>n+c.soldiers,0);},
+            updateClanPrestige:GM.prototype.updateClanPrestige,historySystem:{record:(text,meta)=>entries.push({text,meta})},factionSystem:{updateRecognition(){}},ui:{showDialog(){},showResultModal(){throw Error('unexpected modal');}}};
+        C('Busho').configureRuntime({getClanDaimyo:id=>game.getClanDaimyo(id)});
+        const dm=game.diplomacyManager=new (C('DiplomacyManager'))(game),ai=game.aiEngine=new (C('AIEngine'))(game),op=game.aiOperationManager=new (C('AIOperationManager'))(game);
+        game.getRelation=(...a)=>dm.getRelation(...a);game.courtRankSystem=new (C('CourtRankSystem'))(game);game.courtRankSystem.setRankData(common.courtRanks.map(d=>new (C('CourtRank'))(d)));
+        new (C('LifeSystem'))(game).distributeInitialPrincesses();
+        let plans=0,executed=0;for(const clan of clans){if(clan.id<=0||clan.isDestroyed||!game.getClanDaimyo(clan.id))continue;
+            op.thinkMonthlyDiplomacy(clan);const plan=clan.currentDiplomacyTarget;if(plan?.action!=='marriage')continue;plans++;
+            const doer=game.getClanDaimyo(clan.id);const castle=game.getCastle(doer.castleId);if(!castle||castle.ownerClan!==clan.id)continue;
+            ai.execAIDiplomacy(castle,doer,0.95,plan);if(clan.currentDiplomacyTarget===null&&doer.isActionDone)executed++;
+        }
+        console.log(`  r990 ${folder} fixed-zero isolated plans=${plans} executed=${executed}`);
+        assert.ok(plans>0&&executed>0,`${folder}: 現行データから到達可能`);
+        assert.ok(princesses.filter(p=>p.id>=90000&&p.status==='married').length>=executed);
+    }
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);
