@@ -3479,6 +3479,24 @@ async function validateWarProgressAndResultLayout(cdp) {
         const logSingleLine=getComputedStyle(document.getElementById('war-progress-log')).whiteSpace==='nowrap';
         const detail=document.getElementById('war-result-description'),detailRect=detail.getBoundingClientRect(),turnRect=document.getElementById('war-progress-turn').getBoundingClientRect(),logBox=document.getElementById('war-progress-log').getBoundingClientRect();
         const logReadable=turnRect.height>0&&logBox.height>0&&turnRect.top>=detailRect.top&&logBox.bottom<=detailRect.bottom+0.5&&logBox.top>=turnRect.bottom-0.5&&detail.scrollHeight<=detail.clientHeight+1;
+        // 文字数ではなく実描画幅で圧縮し、行やモーダルの矩形を変えない。
+        const log=document.getElementById('war-progress-log'),logText=document.getElementById('war-progress-log-text');
+        const retreat='野戦では決着がつかず、攻撃軍は撤退を余儀なくされた！';
+        const measureLog=()=>{
+            const naturalNode=document.createElement('span');naturalNode.textContent=log.textContent;
+            Object.assign(naturalNode.style,{position:'absolute',visibility:'hidden',whiteSpace:'nowrap',width:'max-content'});
+            log.appendChild(naturalNode);const natural=naturalNode.getBoundingClientRect().width;naturalNode.remove();
+            const textRect=logText.getBoundingClientRect(),box=log.getBoundingClientRect();
+            return {natural,available:box.width,scale:Number(logText.style.getPropertyValue('--war-log-scale')||1),contained:textRect.left>=box.left-0.5&&textRect.right<=box.right+0.5,font:getComputedStyle(logText).fontSize,baseFont:getComputedStyle(log).fontSize,ellipsized:logText.scrollWidth>logText.clientWidth+1,title:log.title,text:log.textContent};
+        };
+        const logFits=[];
+        for(const message of ['守備本隊が全滅','兵糧が尽き、攻撃軍は撤退を余儀なくされた！',retreat,huge[1].logs[0],'<>&',retreat]){
+            ui._renderWarProgressLog(message);logFits.push(measureLog());
+        }
+        // 表示中の実幅変化だけで再計測し、次のログを待たずに圧縮を解除する。
+        log.style.width='160px';await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);const logNarrow=measureLog();
+        log.style.width='';await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);const logRestored=measureLog();
+        const logFitRect=rect('#war-progress-log');
         const metricContained=Array.from(document.querySelectorAll('.war-progress-metric')).every(el=>{const r=el.getBoundingClientRect(),card=el.closest('.war-result-army').getBoundingClientRect();return r.bottom<=card.bottom+0.5&&r.top>=card.top-0.5&&r.left>=card.left-0.5&&r.right<=card.right+0.5;});
         await ui.showWarResult({...short,title:'攻撃軍勝利',description:'稲葉山城を制圧しました。'},()=>{});const resultShort=snapshot();
         await ui.showWarResult({...long,title:'守備軍勝利',description:'長い戦後報告。'.repeat(100)},()=>{});const resultLong=snapshot(),resultFaces=['#war-result-attacker-face','#war-result-defender-face'].map(rect);
@@ -3522,7 +3540,7 @@ async function validateWarProgressAndResultLayout(cdp) {
         await progress(short,frames);const fieldDefenseHidden=getComputedStyle(defense).visibility==='hidden';
         const siegePreview=[frame(0,30000,18000,24000,36000),frame(3,11200,3400,2300,0)];siegePreview[0].defender.defense=750;siegePreview[1].defender.defense=0;siegePreview[1].logs=['城の防御力が尽きた'];
         await progress({...short,title:'攻城戦'},siegePreview);ui._renderWarProgressFrame(siegePreview[1],siegePreview[0],false,true);window.__warLayoutPreview={ui,short,frames};
-        return {fontRects,outcomeOK,revealRect,finishedRect,faceRects,resultFaces,facesReady,fallbackOK,initial,after,lengthy,metricInitial,metricAfter,metricLong,resultShort,resultLong,ratios,finalRatios,metricContained,scrollable,defenseVisible,fieldDefenseHidden,defenseZero,defenseRatio,terminalLabel,logSingleLine,logReadable,logRect,logFinalRect,defenseRect,defenseFinalRect,siegeFinal};
+        return {fontRects,outcomeOK,revealRect,finishedRect,faceRects,resultFaces,facesReady,fallbackOK,initial,after,lengthy,metricInitial,metricAfter,metricLong,resultShort,resultLong,ratios,finalRatios,metricContained,scrollable,defenseVisible,fieldDefenseHidden,defenseZero,defenseRatio,terminalLabel,logSingleLine,logReadable,logRect,logFinalRect,defenseRect,defenseFinalRect,siegeFinal,logFits,logNarrow,logRestored,logFitRect};
     })()`;
     for (const dev of [{name:'PC',w:1280,h:720,pc:true},{name:'SP',w:360,h:640,pc:false}]) {
         await cdp.call('Emulation.setDeviceMetricsOverride',{width:dev.w,height:dev.h,deviceScaleFactor:1,mobile:!dev.pc});
@@ -3535,6 +3553,12 @@ async function validateWarProgressAndResultLayout(cdp) {
         same(v.faceRects.map(r=>[r[0],r[2],r[3]]),v.resultFaces.map(r=>[r[0],r[2],r[3]]),'顔枠幅・高さ・横位置固定');assert.ok(v.facesReady&&v.fallbackOK,dev.name+' 顔画像decode・欠損フォールバック・不在消去');
         same(v.initial,v.after,'数値変動後');same(v.initial,v.lengthy,'長い名前・7桁');same(v.initial,v.siegeFinal,'攻城戦の決着時');same([v.logRect],[v.logFinalRect],'ログ欄固定');same([v.defenseRect],[v.defenseFinalRect],'防御力欄固定');
         assert.ok(v.defenseVisible&&v.fieldDefenseHidden&&v.defenseZero&&v.logSingleLine&&v.logReadable,dev.name+' 防御力と固定ログ表示');assert.strictEqual(v.terminalLabel,'第1ターン・決着');approx(v.defenseRatio,0,.01,dev.name+' 防御0');
+        for(const fit of [...v.logFits,v.logNarrow,v.logRestored]){
+            approx(fit.scale,Math.max(.65,Math.min(1,fit.available/fit.natural)),.005,dev.name+' 実幅に基づく圧縮');
+            assert.ok(fit.contained&&fit.font===fit.baseFont&&fit.title===fit.text,dev.name+' ログの高さ・幅・原文保持');
+        }
+        assert.ok(v.logFits[0].scale===1&&v.logFits[1].scale===1&&v.logFits[3].ellipsized&&v.logFits[4].text==='<>&',dev.name+' 収まるログは無圧縮、極長文は省略、文字列は安全に表示');
+        assert.ok(v.logNarrow.scale<v.logRestored.scale,dev.name+' 表示中の幅変化に追従');same([v.logRect],[v.logFitRect],'圧縮・幅復帰後の固定欄');
         same(v.metricInitial,v.metricAfter,'ゲージ枠と数値欄');same(v.metricInitial,v.metricLong,'長い名称と多桁');
         same(v.resultShort,v.resultLong,'長い戦後文');same(v.initial,v.resultShort,'戦況→結果の外形');
         for(let i=0;i<4;i++)approx(v.ratios[i],[1,.6,2/3,1][i],.015,dev.name+' 初期比 '+i);

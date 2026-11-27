@@ -1538,6 +1538,13 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
     display: block; height: 1.5em; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #war-progress-log { color: #e4d1a1; }
+/* 実幅が不足する時だけ水平圧縮する。文字の高さ・字間・1行枠は維持する。 */
+#war-progress-log-text {
+    display: block; position: relative; left: 50%; width: max-content;
+    max-width: calc(100% / var(--war-log-scale, 1));
+    transform: translateX(-50%) scaleX(var(--war-log-scale, 1));
+    overflow: hidden; text-overflow: ellipsis;
+}
 @media (prefers-reduced-motion: reduce) { .war-progress-fill { transition: none; } }
 body:not(.is-pc) #war-result-modal .war-result-content { width: 93%; height: 382px; padding: 10px; gap: 6px; grid-template-rows: 16px 36px 20px minmax(0, 1fr) 58px; }
 body:not(.is-pc) .war-result-title { font-size: 1.7rem; }

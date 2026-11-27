@@ -77,6 +77,17 @@ Object.assign(UIManager.prototype, {
         const publish = () => {
             if (!isCurrent()) return false;
             this.prepareCoveredViewForOpen(modal);
+            if (isProgress) {
+                // 非表示中は実幅を測れない。公開と同じ描画単位で初回の幅を確定する。
+                this._fitWarProgressLog();
+                const log = document.getElementById('war-progress-log');
+                if (log && typeof ResizeObserver === 'function') {
+                    this._warProgressLogObserver = new ResizeObserver(() => {
+                        if (isCurrent()) this._fitWarProgressLog();
+                    });
+                    this._warProgressLogObserver.observe(log);
+                }
+            }
             if (typeof data.onOpen === 'function') data.onOpen();
             const enableConfirm = () => {
                 if (!isCurrent()) return;
@@ -162,6 +173,10 @@ Object.assign(UIManager.prototype, {
 
     dismissWarResult(canceled = false) {
         this._warResultGeneration = Number(this._warResultGeneration || 0) + 1;
+        if (this._warProgressLogObserver) {
+            this._warProgressLogObserver.disconnect();
+            this._warProgressLogObserver = null;
+        }
         if (this._warResultFaceHandoff) {
             this._warResultFaceHandoff();
             this._warResultFaceHandoff = null;
@@ -221,8 +236,27 @@ Object.assign(UIManager.prototype, {
         if (!log) return;
         const text = String(message || '');
         log.title = text;
-        if (typeof this._getCompressedTextHtml === 'function') log.innerHTML = this._getCompressedTextHtml(text, 20);
-        else log.textContent = text;
+        const content = document.getElementById('war-progress-log-text') || log;
+        content.textContent = text;
+        this._fitWarProgressLog();
+    },
+
+    _fitWarProgressLog() {
+        const log = document.getElementById('war-progress-log');
+        const content = document.getElementById('war-progress-log-text');
+        if (!log || !content) return;
+        content.style.removeProperty('--war-log-scale');
+        if (!content.textContent) return;
+        const available = log.getBoundingClientRect().width;
+        if (available <= 0) return;
+        // 字数ではなく、現在の書体・端末・表示枠での無圧縮幅を基準とする。
+        content.style.maxWidth = 'none';
+        const natural = content.getBoundingClientRect().width;
+        content.style.maxWidth = '';
+        if (natural > available) {
+            // 従来の圧縮下限を保ち、なお収まらない文字列は1行欄内で省略する。
+            content.style.setProperty('--war-log-scale', Math.max(0.65, available / natural));
+        }
     },
 
     showWarProgressAsync(data, frames) {
