@@ -1501,7 +1501,8 @@ body:not(.is-pc) #dialog-left-name { left: 3px; }
 .war-result-versus { align-self: center; color: #bba36e; font-family: var(--font-decorative-ja); font-weight: bold; }
 .war-result-description { white-space: normal; overflow-wrap: anywhere; min-height: 0; overflow-y: auto; overscroll-behavior: contain; font-size: .93rem; line-height: 1.5; color: #f2ead6; border-top: 1px solid rgba(212, 175, 55, .26); padding: 8px 4px 0; box-sizing: border-box; }
 #war-result-modal .war-result-footer { justify-content: center; }
-#war-result-close-btn { min-width: 120px; }
+/* 省略／閉じるで書体の行メトリクスが変わっても、共通の操作枠を動かさない。 */
+#war-result-close-btn { min-width: 120px; line-height: 28px; }
 /* 結果だけを明暗で示す。半透明の黒を明るくするだけでは下地が変わらないため、面・境界・内容を同時に変化させる。 */
 #war-result-modal.is-outcome-pending #war-result-close-btn { visibility: hidden; pointer-events: none; }
 #war-result-modal.is-attacker-victory .war-result-army:first-child,

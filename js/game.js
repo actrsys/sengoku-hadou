@@ -449,6 +449,7 @@ class GameManager {
             // ★修正：ゲーム開始時の年と月を、ゲーム本体にしっかり記憶させます！
             this.gameStartYear = this.year;
             this.gameStartMonth = this.month;
+            turnManager.beginNewGameFirstTurn();
             
             // ★追加：今のシナリオのフォルダ名をゲーム全体で覚えておく魔法です！
             this.scenarioFolder = folder;

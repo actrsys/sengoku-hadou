@@ -74,6 +74,13 @@
       "status": "current"
     },
     {
+      "id": "RULE-INITIAL-MOVEMENT",
+      "area": "ゲーム固有仕様",
+      "owner": "TurnManager/AIStaffing",
+      "anchor": "新規開始月の自主移動抑制：",
+      "status": "current"
+    },
+    {
       "id": "RULE-CASTLE",
       "area": "ゲーム固有仕様",
       "owner": "CastleManager/UI",

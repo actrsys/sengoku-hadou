@@ -5,9 +5,10 @@
 
 class AIStaffing {    
     // プレイヤー委任城の「武将移動 不可」は、通常の配置換えにも国主居城移転にも共通で適用する。
-    // 他家AIの行動や観戦時の扱いは従来のままとする。
+    // 新規開始月は委任・観戦を含む全AIの自主的な配置移動を見送る。
     canMoveFromCastle(castle) {
-        return !!castle && (Number(castle.ownerClan) !== Number(this.game.playerClanId)
+        return !this.game.turnManager?.isInitialNewGameTurn?.()
+            && !!castle && (Number(castle.ownerClan) !== Number(this.game.playerClanId)
             || !castle.isDelegated || castle.allowMove === true);
     }
 
@@ -304,6 +305,8 @@ class AIStaffing {
     
     // ★追加：AI大名が軍団を新設する機能
     createNewLegionIfNeeded(clanId) {
+        // 国主・随伴者の転任を伴う自発的な軍団新設は次の定例人事まで見送る。
+        if (this.game.turnManager?.isInitialNewGameTurn?.()) return false;
         // ★追加：すでに軍団が最大数（8個）に達している場合は作らない！
         if (this.game.legions) {
             const activeLegionsCount = this.game.legions.filter(l => l.clanId === clanId && l.commanderId > 0).length;
@@ -837,6 +840,7 @@ class AIStaffing {
 
     // お城のターンが来た時に、武将をお引越しさせるか決めます
     planMoveAction(castle, availableBushos) {
+        if (this.game.turnManager?.isInitialNewGameTurn?.()) return [];
         this.clearCacheIfNeeded();
         const clanId = castle.ownerClan;
         

@@ -47,13 +47,13 @@
     async function run() {
         const sources = Array.from(manifest.content.querySelectorAll('script[src]'),
             element => element.getAttribute('src'));
-        if (!sources.length || sources[sources.length - 1] !== 'js/game.js') {
+        if (!sources.length || sources[sources.length - 1].split('?')[0] !== 'js/game.js') {
             throw new Error('起動用スクリプト一覧が正しくありません');
         }
         // 最初のpaint。ゲーム用font-faceや複雑なCSSはまだ存在しない。
         await givePaintOpportunity();
         await Promise.all([
-            loadStylesheet('css/style.css?v=981'),
+            loadStylesheet('css/style.css?v=984'),
             loadStylesheet('css/animation.css')
         ]);
         await givePaintOpportunity();

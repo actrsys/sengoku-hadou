@@ -20,9 +20,21 @@ class TurnManager {
         this._endMonthRun = null;
         // 同年月・同世代で重なった月初は、先行処理だけが月次副作用を確定する。
         this._startMonthRun = null;
+        // 新規開始の最初の月だけ有効。セーブには含めない。
+        this._initialNewGameTurn = false;
+    }
+
+    // 年月の一致だけではロードを新規開始と誤認するため、開始経路からのみ設定する。
+    beginNewGameFirstTurn() {
+        this._initialNewGameTurn = true;
+    }
+
+    isInitialNewGameTurn() {
+        return this._initialNewGameTurn === true;
     }
 
     abortForScenarioTransition() {
+        this._initialNewGameTurn = false;
         this._turnFlowGeneration = Number(this._turnFlowGeneration || 0) + 1;
         // 独立・謀反の途中で切替が始まった場合、旧演出の勢力色遮断を
         // 新シナリオへ持ち越さない。演出の入力ガードはUI側のresetが所有する。
@@ -257,7 +269,7 @@ class TurnManager {
         // 次の全国処理へ入る前にブラウザへ一度制御を返します。
         await new Promise(resolve => setTimeout(resolve, 0));
         if (!isCurrentFlow()) return;
-        game.affiliationSystem.processRoninMovements();
+        if (!this.isInitialNewGameTurn()) game.affiliationSystem.processRoninMovements();
         
         game.updateAllCastlesLords();
         
@@ -832,6 +844,7 @@ class TurnManager {
             if (!(await waitIfBusy())) return; // 終わったら、画面が空っぽになるまで絶対に待つ！
     
             // すべての月末イベントとメッセージが完全に終わってから、ようやく時間を進めます！
+            this._initialNewGameTurn = false;
             game.month++;
             if(game.month > 12) { game.month = 1; game.year++; }
             // この月送りだけは意図した変化。以後のエンディング待機は進めた先の年月を照合する。

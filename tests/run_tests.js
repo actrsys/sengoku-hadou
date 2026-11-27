@@ -33074,7 +33074,7 @@ test('r682 タイトルの早期HTML構築と操作案内の有効化時点を�
     const title = html.indexOf('<div id="title-screen">');
     const pako = html.indexOf('<script src="js/pako.min.js"></script>');
     const dataManager = html.indexOf('<script src="js/data_manager.js"></script>');
-    const game = html.indexOf('<script src="js/game.js"></script>');
+    const game = html.search(/<script src="js\/game\.js(?:\?[^"\s]+)?"><\/script>/);
     assert.ok(headEnd > 0 && title > headEnd && pako > title, 'タイトルDOMを作る前に圧縮ライブラリでHTML解析を止めない');
     assert.ok(pako < dataManager && dataManager < game, 'シナリオBIN展開より前に圧縮ライブラリを用意する');
     assert.strictEqual(html.match(/<script src="js\/pako\.min\.js"><\/script>/g)?.length, 1, '読み込みは一度だけ');
@@ -46279,6 +46279,93 @@ test('製品の月初進行で各拠点の難易度補正・人口差分・兵�
         assert.strictEqual(game.incomeInputs[2][1],10000+expected[1][0]);
         assert.strictEqual(draws-before,castles.length-1,'既存の順番抽選だけ');assert.strictEqual(finished,1);
     }
+});
+
+test('新規開始月だけAI配置換え・居城移転・軍団新設を抑制し、委任・観戦も同様に扱う', () => {
+    const ctx=createContext({setTimeout,clearTimeout});
+    loadScript(ctx,'js/turn_manager.js');loadScript(ctx,'js/ai_staffing.js');
+    const TM=vm.runInContext('TurnManager',ctx),Staff=vm.runInContext('AIStaffing',ctx);
+    const game={year:1560,month:4,gameStartYear:1560,gameStartMonth:4,playerClanId:1,legions:[],getClanCastles:()=>[],getProvince:()=>null};
+    const tm=game.turnManager=new TM(game), staff=new Staff(game);
+    const own={id:1,ownerClan:1,isDelegated:true,allowMove:true},other={id:2,ownerClan:2};
+    const leader={id:1,isDaimyo:true,castleId:1};
+    let searches=0;staff._getReachableOwnCastles=c=>{searches++;return [c];};
+    assert.strictEqual(staff.canMoveFromCastle(other),true,'同じ開始年月でも初期状態は非抑制');
+    tm.beginNewGameFirstTurn();
+    for(const playerClanId of [1,-100]){
+        game.playerClanId=playerClanId;
+        for(const castle of [own,other]){
+            assert.strictEqual(staff.canMoveFromCastle(castle),false);
+            assert.strictEqual(staff.relocateDaimyo(castle,leader),false);
+            assert.strictEqual(staff.planMoveAction(castle,[]).length,0);
+        }
+        assert.strictEqual(staff.createNewLegionIfNeeded(2),false);
+    }
+    assert.strictEqual(searches,0);
+    tm.abortForScenarioTransition();
+    assert.strictEqual(tm.isInitialNewGameTurn(),false);
+    assert.strictEqual(staff.canMoveFromCastle(other),true);
+    game.playerClanId=1;own.allowMove=false;
+    assert.strictEqual(staff.canMoveFromCastle(own),false,'既存の委任移動制限');
+    own.allowMove=true;assert.strictEqual(staff.canMoveFromCastle(own),true);
+    staff.relocateDaimyo(own,leader);assert.strictEqual(searches,1,'通常の居城探索に復帰');
+    const src=read('js/game.js'), save=read('js/save_manager.js');
+    assert.strictEqual((src.match(/beginNewGameFirstTurn\(\)/g)||[]).length,1);
+    assert.ok(src.indexOf('turnManager.beginNewGameFirstTurn();')>src.indexOf('this.gameStartMonth = this.month;'));
+    assert.ok(!save.includes('beginNewGameFirstTurn')&&!save.includes('_initialNewGameTurn'));
+});
+
+test('開始月の月末イベント完了まで抑制し、年越し・次月に解除する', async () => {
+    const ctx=createContext({setTimeout,clearTimeout});loadScript(ctx,'js/turn_manager.js');
+    const TM=vm.runInContext('TurnManager',ctx),observed=[];
+    const game={phase:'game',year:1560,month:12,writeSystemDiagnostic(){},updateClanDisplayNames(){},
+        eventManager:{async processEvents(type){observed.push([type,game.turnManager.isInitialNewGameTurn()]);}},
+        endingSystem:{async checkEnding(){return false;}},async startMonth(){observed.push(['next',game.turnManager.isInitialNewGameTurn()]);}};
+    const tm=game.turnManager=new TM(game);tm.beginNewGameFirstTurn();await tm.endMonth();
+    assert.deepStrictEqual(observed,[['endMonth_before',true],['endMonth_after',true],['next',false]]);
+    assert.strictEqual(game.year,1561);assert.strictEqual(game.month,1);
+});
+
+test('セーブ復元の入口で開始月抑制を解除し同年月でも新規開始扱いにしない', async () => {
+    let release;const ctx=createContext({setTimeout,clearTimeout,DataManager:{loadScenarioDefinitions:()=>new Promise(r=>{release=r;})}});
+    loadScript(ctx,'js/turn_manager.js');loadScript(ctx,'js/save_manager.js');
+    const TM=vm.runInContext('TurnManager',ctx),game={year:1560,month:4,gameStartYear:1560,gameStartMonth:4};
+    const tm=game.turnManager=new TM(game),manager=new ctx.SaveManager(game);
+    tm.beginNewGameFirstTurn();manager._validateSaveDataStructure=()=>{assert.strictEqual(tm.isInitialNewGameTurn(),false);throw Error('stop at validation');};
+    const pending=manager._restoreSaveDataObj({year:1560,month:4,gameStartYear:1560,gameStartMonth:4});
+    assert.strictEqual(tm.isInitialNewGameTurn(),false);release();await assert.rejects(pending,/stop at validation/);
+});
+
+test('新規開始月の月初では浪人自主移動だけを見送り、月初イベントと定例処理を維持する', async () => {
+    const ctx=createContext({setTimeout,clearTimeout,EconomyRules:{updateMonthlyProvinceMarketRates(){}}});
+    loadScript(ctx,'js/turn_manager.js');const TM=vm.runInContext('TurnManager',ctx);
+    const observed=[],noop=()=>{};
+    const game={phase:'game',year:1560,month:4,playerClanId:1,clans:[],castles:[],bushos:[],getCurrentTurnCastle:()=>null,
+        writeSystemDiagnostic:noop,ui:{showCutin:async()=>{},log:noop},
+        eventManager:{async processEvents(type){observed.push(type);}},
+        lifeSystem:{async processStartMonth(){observed.push('life');}},
+        factionSystem:{applyStartMonthSameFactionEffects:noop,async processStartMonth(){observed.push('faction');}},
+        affiliationSystem:{processRoninMovements(){observed.push('ronin');}},updateAllCastlesLords:noop,updateAllClanPrestige:noop,
+        courtRankSystem:{processMonthlyPromotions:()=>[]},aiStaffing:{async processQuarterlyStaffing(){observed.push('staffing');}},
+        aiOperationManager:{async processMonthlyOperations(){observed.push('operations');}},tryProcessQueuedWatchReturn:async()=>false,
+        processTurn(){observed.push('turn');}};
+    const tm=game.turnManager=new TM(game);tm.beginNewGameFirstTurn();await tm.startMonth();
+    assert.deepStrictEqual(observed,['startMonth_before','life','faction','startMonth_after','staffing','operations','turn']);
+    tm.abortForScenarioTransition();observed.length=0;await tm.startMonth();
+    assert.deepStrictEqual(observed,['startMonth_before','life','faction','ronin','startMonth_after','staffing','operations','turn']);
+});
+
+test('版付きgame.jsを含む実際の起動manifestをStartupLoaderが受理する', async () => {
+    const manifest=read('index.html').split('<template id="startup-script-manifest">')[1].split('</template>')[0];
+    const sources=[...manifest.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m=>m[1]);
+    const overlay={hidden:false,classList:{add(){}},setAttribute(){}},errorPanel={hidden:true};
+    const loaded=[];let done;
+    const complete=new Promise(r=>{done=r;});
+    const fakeDocument={getElementById:id=>({'startup-loading-screen':overlay,'startup-error':errorPanel,'startup-script-manifest':{content:{querySelectorAll:()=>sources.map(src=>({getAttribute:()=>src}))}}}[id]||null),
+        createElement:()=>({}),head:{appendChild(el){el.onload();}},body:{appendChild(el){loaded.push(el.src);el.onload();}}};
+    Object.defineProperty(overlay,'hidden',{set(v){if(v)done(true);},get(){return false;}});
+    const ctx=createContext({document:fakeDocument,GameApp:{ui:{}},setTimeout:fn=>fn(),requestAnimationFrame:fn=>fn(),console:{...console,error(){done(false);}}});
+    loadScript(ctx,'js/startup_loader.js');assert.strictEqual(await complete,true);assert.deepStrictEqual(loaded,sources);assert.strictEqual(errorPanel.hidden,true);
 });
 
 Promise.all(pendingTests).then(() => {

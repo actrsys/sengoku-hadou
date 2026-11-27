@@ -3443,6 +3443,15 @@ async function validateWarProgressAndResultLayout(cdp) {
         await ui.showWarResult({...short,attackerFace:'missing_test.webp',defenderFace:null},()=>{});const fallback=document.getElementById('war-result-attacker-face'),absent=document.getElementById('war-result-defender-face');const fallbackOK=fallback.getAttribute('src').endsWith('/unknown_face.webp')&&fallback.naturalWidth>0&&getComputedStyle(fallback).visibility==='visible'&&!absent.hasAttribute('src')&&getComputedStyle(absent).visibility==='hidden';
         // 本番CSSの実アニメーション中と完了時を計測。
         const modal=document.getElementById('war-result-modal'),button=document.getElementById('war-result-close-btn'),cards=[...modal.querySelectorAll('.war-result-army')];
+        const oldFont=button.style.fontFamily, oldText=button.textContent;
+        const fontRects=[];
+        // 字形のメトリクスに依存しない固定外形を、フォント差と両文言で確認する。
+        for (const font of ['Arial, sans-serif','"Noto Serif CJK JP", serif','"Noto Sans CJK JP", sans-serif']) {
+            button.style.fontFamily=font;
+            for (const label of ['省略','閉じる']) {button.textContent=label;fontRects.push({font,label,rect:rect('#war-result-close-btn'),lineHeight:getComputedStyle(button).lineHeight});}
+        }
+        button.style.fontFamily=oldFont;button.textContent=oldText;
+
         const waitUntil=async predicate=>{const end=performance.now()+3500;while(!predicate()){if(performance.now()>end)throw new Error('明暗演出完了待ち timeout');await new Promise(requestAnimationFrame);}};
         const filters=()=>cards.map(el=>getComputedStyle(el).filter);
         const surfaces=()=>cards.map(el=>{const css=getComputedStyle(el);return [css.backgroundColor,css.borderTopColor].join('/');});
@@ -3470,7 +3479,7 @@ async function validateWarProgressAndResultLayout(cdp) {
         await progress(short,frames);const fieldDefenseHidden=getComputedStyle(defense).visibility==='hidden';
         const siegePreview=[frame(0,30000,18000,24000,36000),frame(3,11200,3400,2300,0)];siegePreview[0].defender.defense=750;siegePreview[1].defender.defense=0;siegePreview[1].logs=['城の防御力が尽きた'];
         await progress({...short,title:'攻城戦'},siegePreview);ui._renderWarProgressFrame(siegePreview[1],siegePreview[0],false,true);window.__warLayoutPreview={ui,short,frames};
-        return {outcomeOK,revealRect,finishedRect,faceRects,resultFaces,facesReady,fallbackOK,initial,after,lengthy,metricInitial,metricAfter,metricLong,resultShort,resultLong,ratios,finalRatios,metricContained,scrollable,defenseVisible,fieldDefenseHidden,defenseZero,defenseRatio,terminalLabel,logSingleLine,logReadable,logRect,logFinalRect,defenseRect,defenseFinalRect,siegeFinal};
+        return {fontRects,outcomeOK,revealRect,finishedRect,faceRects,resultFaces,facesReady,fallbackOK,initial,after,lengthy,metricInitial,metricAfter,metricLong,resultShort,resultLong,ratios,finalRatios,metricContained,scrollable,defenseVisible,fieldDefenseHidden,defenseZero,defenseRatio,terminalLabel,logSingleLine,logReadable,logRect,logFinalRect,defenseRect,defenseFinalRect,siegeFinal};
     })()`;
     for (const dev of [{name:'PC',w:1280,h:720,pc:true},{name:'SP',w:360,h:640,pc:false}]) {
         await cdp.call('Emulation.setDeviceMetricsOverride',{width:dev.w,height:dev.h,deviceScaleFactor:1,mobile:!dev.pc});
@@ -3478,6 +3487,7 @@ async function validateWarProgressAndResultLayout(cdp) {
         if(res.exceptionDetails)throw new Error(JSON.stringify(res.exceptionDetails));
         const v=res.result.value;assert.ok(v,dev.name+' 計測値なし');
         const same=(a,b,label)=>a.forEach((r,i)=>r.forEach((n,j)=>approx(b[i][j],n,0.6,dev.name+' '+label+' '+i+':'+j)));
+        for(const probe of v.fontRects) same([v.resultShort[8]],[probe.rect],'ボタン書体・文言固定 '+probe.font+' '+probe.label);
         assert.ok(v.outcomeOK,dev.name+' 明暗演出の順序・反転・操作禁止・戦況の中立復帰');same(v.revealRect,v.finishedRect,'演出前後の外形');
         same(v.faceRects.map(r=>[r[0],r[2],r[3]]),v.resultFaces.map(r=>[r[0],r[2],r[3]]),'顔枠幅・高さ・横位置固定');assert.ok(v.facesReady&&v.fallbackOK,dev.name+' 顔画像decode・欠損フォールバック・不在消去');
         same(v.initial,v.after,'数値変動後');same(v.initial,v.lengthy,'長い名前・7桁');same(v.initial,v.siegeFinal,'攻城戦の決着時');same([v.logRect],[v.logFinalRect],'ログ欄固定');same([v.defenseRect],[v.defenseFinalRect],'防御力欄固定');
