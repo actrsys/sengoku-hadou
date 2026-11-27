@@ -612,7 +612,7 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         });
     };
 
-    const cleanupOverlay = async (mapOverlay) => {
+    const cleanupOverlay = async (mapOverlay, showNextDialog = null) => {
         const restoreState = mapOverlay ? mapOverlay._eventMapRestoreState : null;
         // イベント地図の映像は背景の復旧が実際に描画されるまで保つ。
         // 先にCanvasを1pxへ縮めたりimg.srcを空にすると、復旧待ちの2フレームに
@@ -629,52 +629,90 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             && restoreState?.isPC && !restoreState.hidMainMap && restoreState.scroll
             && restoreState.scroll.style.display !== 'none' && !ui?._mapPresentationNeedsFullRecovery
             && !ui?._mapLayoutRefreshPending && ui?._isClanColorOverlayHealthy?.());
-        if (restoreState) {
-            if (restoreState.hidMainMap && restoreState.scroll) {
-                restoreState.scroll.style.display = restoreState.oldDisplay;
-            }
-            if (restoreState.pausedByUs && restoreState.ui && typeof restoreState.ui.resumeBackgroundUpdates === 'function') {
-                backgroundRecovery = restoreState.ui.resumeBackgroundUpdates('event_map_close');
-            }
-        }
-
-        // 非表示・復旧が必要な地図は従来どおりcover下の2paintを待つ。
-        // 既に可視で健全なPC地図だけ、同期更新とshell除去を同じ描画単位で行う。
-        if (mapOverlay && mapOverlay.parentNode) {
-            if (backgroundRecovery && typeof backgroundRecovery.then === 'function') {
-                await backgroundRecovery;
-            } else if (!canCloseWithBackgroundUpdate) {
-                if (typeof ui?.waitForCoveredMapPaint === 'function') {
-                    await ui.waitForCoveredMapPaint();
-                } else {
-                    await nextPaint();
-                    await nextPaint();
+        const recoverBackground = () => {
+            if (restoreState) {
+                if (restoreState.hidMainMap && restoreState.scroll) {
+                    restoreState.scroll.style.display = restoreState.oldDisplay;
+                }
+                if (restoreState.pausedByUs && restoreState.ui && typeof restoreState.ui.resumeBackgroundUpdates === 'function') {
+                    backgroundRecovery = restoreState.ui.resumeBackgroundUpdates('event_map_close');
                 }
             }
-            if (mapOverlay.parentNode) {
-                mapOverlay.parentNode.removeChild(mapOverlay);
-                // 通常地図の復旧・公開境界でだけ進捗を復帰させる。強制遷移で既に
-                // shellが外された場合は旧イベントから現在の表示を触らない。
-                restoreState?.ui?.applyAIGuardTextState?.();
+        };
+        // 後続通知が確定している場合だけ、旧地図を次の会話公開まで保持する。
+        // 正常PCは背景更新も公開時に揃え、r996で解消した背後の先行更新を復活させない。
+        const handoff = !!(showNextDialog && mapOverlay?.parentNode
+            && mapOverlay.style?.visibility === 'visible'
+            && typeof ui?.beginVisualHandoff === 'function' && typeof ui?.completeVisualHandoff === 'function');
+        const deferRecovery = handoff && canCloseWithBackgroundUpdate;
+        const dialogGeneration = Number(ui?._dialogGeneration || 0);
+        let closed = false;
+        const finishClose = () => {
+            if (closed) return;
+            closed = true;
+            const current = Number(ui?._dialogGeneration || 0) === dialogGeneration;
+            try {
+                if (deferRecovery && current) recoverBackground();
+            } catch (error) {
+                console.warn('災害地図の背景復旧に失敗しました:', error);
+            } finally {
+                if (mapOverlay?.parentNode) {
+                    mapOverlay.parentNode.removeChild(mapOverlay);
+                    if (current) ui?.applyAIGuardTextState?.();
+                }
+                // 公開前の異常終了でも古いholdと会話の閉鎖予約を残さない。
+                if (mapOverlay && typeof mapOverlay._eventMapFinishHandoff === 'function') {
+                    const finish = mapOverlay._eventMapFinishHandoff;
+                    mapOverlay._eventMapFinishHandoff = null;
+                    finish();
+                }
+                // shell除去後にだけ素材を解放する。
+                canvases.forEach(canvas => {
+                    try { canvas.width = 1; canvas.height = 1; } catch (e) {}
+                });
+                images.forEach(img => {
+                    try { img.src = ''; } catch (e) {}
+                });
+                if (mapOverlay) {
+                    mapOverlay._eventMapRestoreState = null;
+                    mapOverlay._eventMapFinishHandoff = null;
+                }
             }
+        };
+        try {
+            // 非表示・復旧が必要な地図は従来どおりcover下の2paintを待つ。
+            if (!deferRecovery) {
+                recoverBackground();
+                if (mapOverlay?.parentNode) {
+                    if (backgroundRecovery && typeof backgroundRecovery.then === 'function') {
+                        await backgroundRecovery;
+                    } else if (!canCloseWithBackgroundUpdate) {
+                        if (typeof ui?.waitForCoveredMapPaint === 'function') {
+                            await ui.waitForCoveredMapPaint();
+                        } else {
+                            await nextPaint();
+                            await nextPaint();
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            // 補助地図の復旧失敗で、確定済みの被災通知まで止めない。
+            console.warn('災害地図の背景復旧に失敗しました:', error);
+            finishClose();
         }
-        // 公開前の異常終了でも古いholdと会話の閉鎖予約を残さない。
-        if (mapOverlay && typeof mapOverlay._eventMapFinishHandoff === 'function') {
-            const finish = mapOverlay._eventMapFinishHandoff;
-            mapOverlay._eventMapFinishHandoff = null;
-            finish();
-        }
-        // 画面から外した後なら、キャンバス解放・画像デコード参照の解除で
-        // 黒い空地図がフレームとして表示されることはない。
-        canvases.forEach(canvas => {
-            try { canvas.width = 1; canvas.height = 1; } catch (e) {}
-        });
-        images.forEach(img => {
-            try { img.src = ''; } catch (e) {}
-        });
-        if (mapOverlay) {
-            mapOverlay._eventMapRestoreState = null;
-            mapOverlay._eventMapFinishHandoff = null;
+        if (handoff && !closed && Number(ui._dialogGeneration || 0) === dialogGeneration) {
+            try {
+                ui.beginVisualHandoff(finishClose);
+                await showNextDialog();
+            } finally {
+                // 会話が公開されなかった場合も、この引継ぎの所有者だけを解放する。
+                if (ui._visualHandoffCloseFn === finishClose) ui.completeVisualHandoff();
+                finishClose();
+            }
+        } else {
+            finishClose();
+            if (showNextDialog) await showNextDialog();
         }
     };
 
@@ -732,6 +770,27 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
     if (!isCurrentEventFlow()) {
         fx.writeDiag(game, `${diagPrefix}:flow_cancelled_after_dialog`);
         return;
+    }
+
+    const playerAffectedProvinces = new Set();
+    game.castles.forEach(c => {
+        if (c.ownerClan === game.playerClanId && affectedProvIds.has(c.provinceId)) {
+            playerAffectedProvinces.add(c.provinceId);
+        }
+    });
+
+    const notifications = [];
+    for (const pid of playerAffectedProvinces) {
+        const p = game.getProvince(pid);
+        const pName = p ? p.province : 'どこかの国';
+        let msg = '';
+        if (eventType === '豊作') msg = `${pName}は豊作です！`;
+        else if (eventType === '凶作') msg = `${pName}は凶作に見舞われています……`;
+        else if (eventType === '飢饉') msg = `${pName}で飢饉が発生し、甚大な被害が出ています……`;
+        else if (eventType === '疫病') msg = `${pName}で恐ろしい疫病が猛威を振るっています……`;
+        else if (eventType === '地震') msg = `${pName}で大地震による甚大な被害が出ています……`;
+        else if (eventType === '大雪') msg = `${pName}は深い雪に閉ざされています……`;
+        if (msg) notifications.push(msg);
     }
 
     let mapOverlay = null;
@@ -800,16 +859,13 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
     } catch (error) {
         // 災害のゲーム処理と結果通知は継続し、補助地図だけを省略する。
         console.warn(`${eventType}の地図演出中にエラーが出たため、演出を省略します:`, error);
-    } finally {
-        if (mapOverlay) {
-            fx.writeDiag(game, `${diagPrefix}:cleanup`);
-            try {
-                await fx.cleanupOverlay(mapOverlay);
-            } catch (cleanupError) {
-                console.warn(`${eventType}の地図演出後始末に失敗しました:`, cleanupError);
-            }
-            fx.writeDiag(game, `${diagPrefix}:cleanup_done`);
-        }
+    }
+    if (mapOverlay) {
+        fx.writeDiag(game, `${diagPrefix}:cleanup`);
+        await fx.cleanupOverlay(mapOverlay, isCurrentEventFlow() && notifications.length
+            ? () => isCurrentEventFlow() ? _commonEventShowDialogAsync(game, notifications.shift(), false, 0) : undefined
+            : null);
+        fx.writeDiag(game, `${diagPrefix}:cleanup_done`);
     }
 
     if (!isCurrentEventFlow()) {
@@ -817,27 +873,9 @@ window.playProvinceMapEffect = async function(game, eventType, initialMsg, affec
         return;
     }
 
-    const playerAffectedProvinces = new Set();
-    game.castles.forEach(c => {
-        if (c.ownerClan === game.playerClanId && affectedProvIds.has(c.provinceId)) {
-            playerAffectedProvinces.add(c.provinceId);
-        }
-    });
-
-    for (const pid of playerAffectedProvinces) {
-        const p = game.getProvince(pid);
-        const pName = p ? p.province : 'どこかの国';
-        let msg = '';
-        if (eventType === '豊作') msg = `${pName}は豊作です！`;
-        else if (eventType === '凶作') msg = `${pName}は凶作に見舞われています……`;
-        else if (eventType === '飢饉') msg = `${pName}で飢饉が発生し、甚大な被害が出ています……`;
-        else if (eventType === '疫病') msg = `${pName}で恐ろしい疫病が猛威を振るっています……`;
-        else if (eventType === '地震') msg = `${pName}で大地震による甚大な被害が出ています……`;
-        else if (eventType === '大雪') msg = `${pName}は深い雪に閉ざされています……`;
-        if (msg) {
-            await _commonEventShowDialogAsync(game, msg, false, 0);
-            if (!isCurrentEventFlow()) return;
-        }
+    for (const msg of notifications) {
+        await _commonEventShowDialogAsync(game, msg, false, 0);
+        if (!isCurrentEventFlow()) return;
     }
 };
 

@@ -373,39 +373,30 @@ window.GameEvents.push({
                     try { canvas.width = 1; canvas.height = 1; } catch (ignore) {}
                 }
             }
+            let resultMessage = "今回は大きな被害はなかったようです。";
+            if (damagedProvinceMap.size > 0) {
+                let maxDamageScale = 0;
+                damagedCastleMap.forEach(scale => {
+                    if (scale > maxDamageScale) maxDamageScale = scale;
+                });
+                if (maxDamageScale <= 3) resultMessage = "小規模な台風により、各地で軽微な被害が発生しているようです……";
+                else if (maxDamageScale <= 7) resultMessage = "強い台風が上陸し、各地で被害が発生しているようです……";
+                else resultMessage = "猛烈な台風が直撃し、各地で甚大な被害が発生しているようです……";
+            }
             writeDiag('cleanup');
-            await fx.cleanupOverlay(mapOverlay);
+            await fx.cleanupOverlay(mapOverlay, () => isCurrentEventFlow()
+                ? _typhoonEventShowDialogAsync(game, resultMessage, false, 0) : undefined);
             overlayCleaned = true;
             writeDiag('cleanup_done');
             if (!isCurrentEventFlow()) {
                 writeDiag('flow_cancelled_after_overlay');
                 return;
             }
-
-            if (damagedProvinceMap.size > 0) {
-                let maxDamageScale = 0;
-                damagedCastleMap.forEach(scale => {
-                    if (scale > maxDamageScale) maxDamageScale = scale;
-                });
-
-                if (maxDamageScale <= 3) {
-                    await _typhoonEventShowDialogAsync(game, "小規模な台風により、各地で軽微な被害が発生しているようです……", false, 0);
-                } else if (maxDamageScale <= 7) {
-                    await _typhoonEventShowDialogAsync(game, "強い台風が上陸し、各地で被害が発生しているようです……", false, 0);
-                } else {
-                    await _typhoonEventShowDialogAsync(game, "猛烈な台風が直撃し、各地で甚大な被害が発生しているようです……", false, 0);
-                }
-            } else {
-                await _typhoonEventShowDialogAsync(game, "今回は大きな被害はなかったようです。", false, 0);
-            }
         } else {
-            await fx.cleanupOverlay(mapOverlay);
+            await fx.cleanupOverlay(mapOverlay, () => isCurrentEventFlow()
+                ? _typhoonEventShowDialogAsync(game, "今回は大きな被害はなかったようです。", false, 0) : undefined);
             overlayCleaned = true;
-            if (!isCurrentEventFlow()) {
-                writeDiag('flow_cancelled_after_overlay');
-                return;
-            }
-            await _typhoonEventShowDialogAsync(game, "今回は大きな被害はなかったようです。", false, 0);
+            if (!isCurrentEventFlow()) return;
         }
 
         await new Promise(resolve => setTimeout(resolve, 1000));

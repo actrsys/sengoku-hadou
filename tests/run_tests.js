@@ -11050,14 +11050,14 @@ test('親一覧から開いた数量画面は背景復帰paintまで最後のcov
 
 test('イベント専用地図は通常地図を復帰・paintしてから暗幕を外す', () => {
     const events = read('js/event/common_events.js');
-    const start = events.indexOf('const cleanupOverlay = async (mapOverlay) => {');
+    const start = events.indexOf('const cleanupOverlay = async (mapOverlay, showNextDialog = null) => {');
     const end = events.indexOf('\n    return {', start);
     const block = events.slice(start, end);
     assert.ok(start >= 0);
     const restoreAt = block.indexOf("resumeBackgroundUpdates('event_map_close')");
     const finalPaintAt = block.indexOf('await nextPaint();', restoreAt);
-    const removeAt = block.indexOf('mapOverlay.parentNode.removeChild(mapOverlay)', restoreAt);
-    assert.ok(restoreAt >= 0 && finalPaintAt > restoreAt && removeAt > finalPaintAt, '通常地図compositorの復帰paintを暗幕で覆った後にだけremoveする');
+    const finishAt = block.indexOf('finishClose();', finalPaintAt);
+    assert.ok(restoreAt >= 0 && finalPaintAt > restoreAt && finishAt > finalPaintAt, '通常地図compositorの復帰paintを暗幕で覆った後に終了窓口を呼ぶ');
 });
 
 test('国主評定の確定から結果画面への引継ぎで旧評定を即時終了し背景を不要に復帰しない', () => {
@@ -35347,7 +35347,7 @@ test('r719 プレイヤーの生前家督相続は移動直後の当主所在を
 // A-038: 災害イベント地図の暗幕は、復旧Promiseが描画境界を完了するまで残す。
 test('イベント地図を閉じる時は通常地図の2フレーム復旧完了を暗幕で覆う', async () => {
     const source = read('js/event/common_events.js');
-    const start = source.indexOf('    const cleanupOverlay = async (mapOverlay) => {');
+    const start = source.indexOf('    const cleanupOverlay = async (mapOverlay, showNextDialog = null) => {');
     const end = source.indexOf('\n    return {', start);
     assert.ok(start >= 0 && end > start);
     const frames = [];
@@ -43979,7 +43979,7 @@ test('r917 共通モーダル暗幕は一律160ms保持せず、背景のpaint�
     assert.ok(!sync.includes('160'), '画面準備とは無関係な固定待機を復活させない');
     assert.ok(sync.includes('await this.waitForCoveredMapPaint()'), '地図のpaintまで解放しない');
     const events=read('js/event/common_events.js');
-    const cleanup=events.slice(events.indexOf('    const cleanupOverlay = async (mapOverlay) => {'),events.indexOf('\n    return {',events.indexOf('    const cleanupOverlay = async (mapOverlay) => {')));
+    const cleanup=events.slice(events.indexOf('    const cleanupOverlay = async (mapOverlay, showNextDialog = null) => {'),events.indexOf('\n    return {',events.indexOf('    const cleanupOverlay = async (mapOverlay, showNextDialog = null) => {')));
     assert.ok(cleanup.indexOf('removeChild(mapOverlay)')<cleanup.indexOf('canvas.width = 1'), 'イベント地図は画面から外してから素材を解放');
 });
 
@@ -46729,7 +46729,7 @@ test('災害地図の公開中は旧会話の暗幕とAI進捗を復帰させず
 // 災害地図終了時、可視で健全なPC地図だけ背景更新と旧shell除去を一括する。
 test('災害地図の終了でPCの背景だけ先行更新せず、復旧が必要な地図はpaintを待つ', async () => {
     const src=read('js/event/common_events.js');
-    const start=src.indexOf('    const cleanupOverlay = async (mapOverlay) => {');
+    const start=src.indexOf('    const cleanupOverlay = async (mapOverlay, showNextDialog = null) => {');
     const end=src.indexOf('\n    return {',start);
     for(const mode of ['pc','mobile','full','layout','unhealthy','async','unpublished']) {
         const order=[];let finish;
@@ -46748,6 +46748,41 @@ test('災害地図の終了でPCの背景だけ先行更新せず、復旧が必
         if(mode==='pc')assert.deepStrictEqual(order,['update','remove','progress']);
         else {assert.ok(overlay.parentNode,mode);assert.strictEqual(canvas.width,50);assert.ok(finish,mode);finish();}
         await done;assert.deepStrictEqual(order.slice(-2),['remove','progress']);assert.strictEqual(canvas.width,1);
+    }
+});
+
+// 後続通知の公開まで災害地図を保持し、通常PCの背景先行更新も防ぐ。
+test('災害地図から確定済み通知へ直接引き継ぎ、終了・失敗時に素材と所有権を解放する', async () => {
+    const src=read('js/event/common_events.js');
+    const start=src.indexOf('    const cleanupOverlay = async (mapOverlay, showNextDialog = null) => {');
+    const end=src.indexOf('\n    return {',start);
+    for(const mode of ['pc','mobile','unpublished','dialog-reject','recovery-reject','no-publish']) {
+        const order=[];
+        const ctx=vm.createContext({console:{warn(){}},nextPaint:async()=>{throw Error('unexpected fallback')}});
+        vm.runInContext(src.slice(start,end)+'\nthis.cleanupOverlay=cleanupOverlay;',ctx);
+        const ui={_isClanColorOverlayHealthy:()=>true,
+            resumeBackgroundUpdates(){order.push('update');if(mode==='recovery-reject')return Promise.reject(Error('recovery'));},
+            waitForCoveredMapPaint(){order.push('paint');return Promise.resolve();},
+            beginVisualHandoff(fn){this._visualHandoffCloseFn=fn;order.push('handoff');},
+            completeVisualHandoff(){const fn=this._visualHandoffCloseFn;this._visualHandoffCloseFn=null;if(fn)fn();},
+            applyAIGuardTextState(){order.push('progress-sync');}};
+        const canvas={width:50,height:50};
+        const overlay={style:{visibility:mode==='unpublished'?'hidden':'visible'},
+            parentNode:{removeChild(n){order.push('remove');n.parentNode=null;}},querySelectorAll:s=>s==='canvas'?[canvas]:[],
+            _eventMapRestoreState:{ui,isPC:!['mobile','recovery-reject'].includes(mode),hidMainMap:mode==='mobile',pausedByUs:true,scroll:{style:{display:''}},oldDisplay:''}};
+        let notified=0;
+        const done=ctx.cleanupOverlay(overlay, async()=>{
+            notified++;order.push('prepare-dialog');
+            if(['unpublished','recovery-reject'].includes(mode))assert.strictEqual(overlay.parentNode,null,mode);
+            else {assert.ok(overlay.parentNode,mode);assert.strictEqual(canvas.width,50);}
+            if(mode==='dialog-reject')throw Error('dialog');
+            if(mode!=='no-publish') {order.push('publish-dialog');ui.completeVisualHandoff();}
+        });
+        if(mode==='dialog-reject')await assert.rejects(done,/dialog/);else await done;
+        assert.strictEqual(notified,1);assert.strictEqual(overlay.parentNode,null);assert.strictEqual(canvas.width,1);
+        assert.ok(!ui._visualHandoffCloseFn);assert.strictEqual(order.filter(x=>x==='remove').length,1);
+        if(mode==='pc')assert.deepStrictEqual(order,['handoff','prepare-dialog','publish-dialog','update','remove','progress-sync']);
+        if(mode==='mobile')assert.deepStrictEqual(order,['update','paint','handoff','prepare-dialog','publish-dialog','remove','progress-sync']);
     }
 });
 
