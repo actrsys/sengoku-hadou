@@ -1211,7 +1211,7 @@ Object.assign(WarManager.prototype, {
                                                         let finalAtkAssignments = [];
                                                         
                                                         // 敵のメイン軍を忘れずにリストに追加します！
-                                                        finalAtkAssignments = finalAtkAssignments.concat(this.autoDivideSoldiers(atkBushos, atkSoldierCount, atkHorses, atkGuns));
+                                                        finalAtkAssignments = finalAtkAssignments.concat(this.autoDivideSoldiers(atkBushos, atkSoldierCount, atkHorses, atkGuns, false, false, true));
 
                                                         if (this.state.reinforcement) {
                                                             const r = this.state.reinforcement;
@@ -1407,7 +1407,7 @@ Object.assign(WarManager.prototype, {
                                 let finalDefAssignments = [];
                                 const finishDef = () => {
                                     const deploySoldiers = TroopAllocationService.clampArmySoldiers(defCastle.soldiers, defBushos, defCastle.soldiers);
-                                    const mainAssigns = this.autoDivideSoldiers(defBushos, deploySoldiers, defCastle.horses || 0, defCastle.guns || 0);
+                                    const mainAssigns = this.autoDivideSoldiers(defBushos, deploySoldiers, defCastle.horses || 0, defCastle.guns || 0, false, false, true);
                                     callback(mainAssigns.concat(finalDefAssignments));
                                 };
                                 const processNextDef = () => {
@@ -1428,7 +1428,7 @@ Object.assign(WarManager.prototype, {
                                             callback(defAssigns, mainAssigns.concat(finalAtkAssignments));
                                         });
                                     } else {
-                                        const mainAssigns = this.autoDivideSoldiers(atkBushos, atkSoldierCount, atkHorses, atkGuns);
+                                        const mainAssigns = this.autoDivideSoldiers(atkBushos, atkSoldierCount, atkHorses, atkGuns, false, false, true);
                                         callback(defAssigns, mainAssigns.concat(finalAtkAssignments));
                                     }
                                 };

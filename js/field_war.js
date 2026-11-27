@@ -4194,6 +4194,16 @@ class FieldWarManager {
         return bonus;
     }
 
+    // 味方総大将の直接交戦を無視しない範囲で敵総大将への集中攻撃を強める。
+    _getAIEnemyGeneralBonus(enemy, engagementContext) {
+        if (!enemy.isGeneral) return 0;
+        const config = WarParams.FieldAI;
+        const rescueOther = engagementContext?.generalThreatEnemyIds.size > 0 &&
+            !engagementContext.generalThreatEnemyIds.has(enemy.id);
+        return this.warState?.isSeaBattle || rescueOther
+            ? config.EnemyGeneralBaseBonus : config.EnemyGeneralBonus;
+    }
+
     _getAISupportUrgency(targetEnemy, engagementContext) {
         if (!targetEnemy || !engagementContext) return 0;
         if (engagementContext.generalThreatEnemyIds.has(targetEnemy.id)) return WarParams.FieldAI.Support.GeneralThreatUrgency;
@@ -4226,7 +4236,7 @@ class FieldWarManager {
             let score = 0;
             if (enemy.id === preferredTargetId) score += WarParams.FieldAI.Support.PreferredAttackTargetBonus;
             score += this._getAITargetEngagementBonus(unit, enemy, engagementContext);
-            if (enemy.isGeneral) score += 30;
+            score += this._getAIEnemyGeneralBonus(enemy, engagementContext);
             if (enemy.troopType === 'teppo') score += 20;
 
             if (!best || score > best.score) {
@@ -4311,7 +4321,7 @@ class FieldWarManager {
             
             score += (50 - d * 2); 
             score += ((maxEnemySoldiers - e.soldiers) / maxEnemySoldiers) * 20; 
-            if (e.isGeneral) score += 30; 
+            score += this._getAIEnemyGeneralBonus(e, engagementContext); 
             if (e.troopType === 'teppo') score += 20; 
             
             // 交戦中の味方、とくに総大将へ取り付いている敵を優先する。
@@ -4700,7 +4710,7 @@ class FieldWarManager {
                 let d = this.getDistance(unit.x, unit.y, e.x, e.y);
                 score += (50 - d * 2); 
                 if (maxEnemySoldiers > 0) score += ((maxEnemySoldiers - e.soldiers) / maxEnemySoldiers) * 20; 
-                if (e.isGeneral) score += 30; 
+                score += this._getAIEnemyGeneralBonus(e, engagementContext); 
                 if (e.troopType === 'teppo') score += 20; 
                 
                 if (targetEnemy && e.id === targetEnemy.id) score += 50; 

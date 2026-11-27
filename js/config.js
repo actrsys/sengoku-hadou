@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r982'
+        Version: 'r983'
     },
 
     Ending: {
@@ -234,12 +234,15 @@ window.GameConfig = {
             // 1武将が率いる1部隊の兵数上限。出撃軍全体は選択武将数×この値まで。
             MaxSoldiersPerUnit: 15000,
             GeneralRatio: 1.3,
+            AIFieldMainGeneralRatio: 3,
             EquipmentMinimumRatio: 0.5,
             MaxTeppoUnitRatio: 0.5,
             // 兵科装備の自動割当では能力値を主軸にしつつ、対応適性1段階につきこの値を加点する。
             EquipmentAptitudeWeight: 6
         },
         FieldAI: {
+            EnemyGeneralBonus: 400,
+            EnemyGeneralBaseBonus: 30,
             // 味方の交戦、とくに総大将の直接交戦をターゲット・移動・攻撃の全段階で同じ基準にする。
             Support: {
                 GeneralThreatTargetBonus: 100,

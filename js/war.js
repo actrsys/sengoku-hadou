@@ -280,7 +280,7 @@ class WarManager {
     /**
      * 兵力配分の互換窓口。計算本体は TroopAllocationService に一元化する。
      */
-    autoDivideSoldiers(bushos, totalSoldiers, totalHorses = 0, totalGuns = 0, isSeaBattleParam = false, isPlayerUI = false) {
+    autoDivideSoldiers(bushos, totalSoldiers, totalHorses = 0, totalGuns = 0, isSeaBattleParam = false, isPlayerUI = false, isFieldMainArmy = false) {
         const isSeaBattle = isSeaBattleParam || !!(this.state && this.state.isSeaBattle);
         return TroopAllocationService.autoDivideSoldiers({
             bushos,
@@ -288,7 +288,8 @@ class WarManager {
             totalHorses,
             totalGuns,
             isSeaBattle,
-            isPlayerUI
+            isPlayerUI,
+            isFieldMainArmy
         });
     }
     

@@ -12213,6 +12213,15 @@ test('野戦AIは交戦支援をターゲット・移動・攻撃で共通評価
     assert.ok(context.generalThreatEnemyIds.has('threat'));
     assert.ok(manager._getAITargetEngagementBonus(unit, threat, context) > manager._getAITargetEngagementBonus(unit, other, context), '総大将へ取り付く敵へ追加優先度を与える');
     assert.strictEqual(manager._getAISupportUrgency(threat, context), ctx.WarParams.FieldAI.Support.GeneralThreatUrgency);
+    const config = ctx.WarParams.FieldAI;
+    assert.strictEqual(manager._getAIEnemyGeneralBonus(other, context), config.EnemyGeneralBaseBonus, '味方総大将の危機時は別の敵総大将への強化を停止');
+    assert.strictEqual(manager._getAIEnemyGeneralBonus(threat, context), 0, '一般部隊に敵総大将加点を付けない');
+    assert.strictEqual(manager._getAIEnemyGeneralBonus({...threat, isGeneral: true}, context), config.EnemyGeneralBonus, '敵総大将自身が救援対象なら集中攻撃可能');
+    const calm = manager._buildAIEngagementContext(unit, [other], [general, ally]);
+    assert.strictEqual(manager._getAIEnemyGeneralBonus(other, calm), config.EnemyGeneralBonus);
+    manager.warState = { isSeaBattle: true };
+    assert.strictEqual(manager._getAIEnemyGeneralBonus(other, calm), config.EnemyGeneralBaseBonus, '海戦は旧評価を維持');
+
 
     assert.strictEqual(manager._getAIMoveBudget(unit, 0), 2, '通常時は攻撃1APを残す');
     assert.strictEqual(manager._getAIMoveBudget(unit, 1), 3, '交戦救援時は川越え等のため全APを前進へ使える');
@@ -16873,6 +16882,28 @@ test('r934 兵数0の候補は装備割当枠を消費せず、兵数のある�
         assert.ok(assignments.filter(a => a.soldiers === 0).every(a => a.troopType === 'ashigaru'),
             '出陣しない0人候補へ装備部隊の属性を付けない');
         assert.strictEqual(assignments.reduce((sum, a) => sum + a.soldiers, 0), 5, '総兵数は不変');
+    }
+});
+
+test('野戦AI本隊の総大将重点配分は手動・援軍・海戦へ波及せず兵数と装備上限を維持する', () => {
+    const ctx = createContext({ SkillManager: { getAptitudeLevel: () => 0 } });
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/troop_allocation.js');
+    const service = ctx.TroopAllocationService;
+    const bushos = Array.from({length: 5}, (_, i) => ({id:i+1, leadership:80-i, strength:70-i}));
+    const allocate = (opts={}) => service.autoDivideSoldiers({bushos, totalSoldiers: 10000, ...opts});
+    const legacy = allocate();
+    const main = allocate({isFieldMainArmy:true});
+    assert.ok(main[0].soldiers > legacy[0].soldiers);
+    for (const options of [{isPlayerUI:true,isFieldMainArmy:true}, {isSeaBattle:true,isFieldMainArmy:true}, {}]) {
+        assert.deepStrictEqual(allocate(options).map(a=>a.soldiers), legacy.map(a=>a.soldiers));
+    }
+    for (let count=1; count<=5; count++) for (const total of [1,5,499,10000,15000,15001,30000,75000,99999]) for (const stock of [0,2500,99999]) {
+        const a=allocate({bushos:bushos.slice(0,count), totalSoldiers:total, totalHorses:stock,totalGuns:stock,isFieldMainArmy:true});
+        assert.strictEqual(a.reduce((sum,x)=>sum+x.soldiers,0), service.clampArmySoldiers(total,count));
+        assert.ok(a.every(x=>x.soldiers>=0&&x.soldiers<=service.getMaxSoldiersPerUnit()));
+        for (const type of ['kiba','teppo']) assert.ok(a.filter(x=>x.troopType===type).reduce((sum,x)=>sum+x.soldiers,0)<=stock);
+        assert.ok(a.filter(x=>x.troopType==='teppo').length<=Math.floor(count*ctx.WarParams.TroopAllocation.MaxTeppoUnitRatio));
     }
 });
 

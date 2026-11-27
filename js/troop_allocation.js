@@ -71,7 +71,7 @@ class TroopAllocationService {
             }
         });
 
-        // 総大将の1.3倍配分で溢れた分は、他部隊へ戻す。全軍上限を先に掛けているので必ず収まる。
+        // 総大将への重点配分で溢れた分は、他部隊へ戻す。全軍上限を先に掛けているので必ず収まる。
         const refillOrder = assignments.length > 1
             ? assignments.slice(1).concat(assignments[0])
             : assignments;
@@ -105,7 +105,8 @@ class TroopAllocationService {
         totalHorses = 0,
         totalGuns = 0,
         isSeaBattle = false,
-        isPlayerUI = false
+        isPlayerUI = false,
+        isFieldMainArmy = false
     }) {
         if (!bushos || bushos.length === 0) return [];
 
@@ -118,7 +119,9 @@ class TroopAllocationService {
         }
 
         const config = this._getConfig();
-        const generalRatio = config.GeneralRatio;
+        const generalRatio = isFieldMainArmy && !isPlayerUI && !isSeaBattle
+            ? config.AIFieldMainGeneralRatio
+            : config.GeneralRatio;
         const equipmentMinimumRatio = config.EquipmentMinimumRatio;
         const maxTeppoUnitRatio = config.MaxTeppoUnitRatio;
         const equipmentAptitudeWeight = config.EquipmentAptitudeWeight;
