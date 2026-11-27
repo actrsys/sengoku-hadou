@@ -463,6 +463,16 @@ class EconomyRules {
         return income;
     }
 
+    /** 年次収入確定後の現在値の減耗。上限値・収入額・乱数には影響させない。 */
+    static applyAnnualIncomeWear(castle, month) {
+        const params = window.MainParams.Economy;
+        const field = month === 3 ? 'commerce' : month === 9 ? 'kokudaka' : null;
+        if (!field) return;
+        const cap = month === 3 ? params.AnnualCommerceWearMax : params.AnnualKokudakaWearMax;
+        const loss = Math.min(cap, Math.floor(castle[field] * params.AnnualIncomeWearPercent / 100));
+        castle[field] = Math.max(0, castle[field] - loss);
+    }
+
     static calcMonthlyTradeLimit(castle) {
         return Math.floor((castle.population / 50) + (castle.kokudaka * 4));
     }

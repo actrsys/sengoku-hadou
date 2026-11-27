@@ -6091,6 +6091,14 @@ test('r783 指南書は内部用語を表示せずプレイヤーの言葉で説
     assert.ok(rendered.includes('「通常」「軽量」'), '実際の設定名は変えない');
 });
 
+test('r989 技能の案内は公開範囲の断り書きなしで効果を説明する', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/guide_data.js');
+    const section = vm.runInContext("GUIDE_ARTICLES.find(a => a.id === 'busho').sections.find(s => s.heading === '適性と技能').text", ctx);
+    assert.ok(section.includes('技能を選ぶと効果を確認できます。'));
+    assert.ok(!section.includes('ゲーム内で公開されている'));
+});
+
 test('指南書は固定論理画面内で記事切替し通常長文スクロールに依存しない', () => {
     const css = read('css/style.css');
     const view = read('js/guide_view.js');
@@ -46455,6 +46463,61 @@ test('r987 AI進捗は100ms未満非表示、連続更新で猶予維持、通�
     let war=true;ui._syncTransientThinking('war',guard,'hidden',()=>war);tick(99);assert.ok(classes.has('hidden'));war=false;ui._resetTransientThinking('war');tick(200);assert.ok(classes.has('hidden'));assert.strictEqual(timers.size,0);
 });
 
+
+test('r988 年次収入後の現在石高・鉱山減耗は5％切捨て・上限を守り最大値を変えない', () => {
+    const ctx=createContext();loadScript(ctx,'js/config.js');loadScript(ctx,'js/economy_rules.js');
+    for(const v of [0,1,19,20,21,99,100,399,400,401,599,600,601,1000,99999]) {
+        for(let month=1;month<=12;month++) {
+            const c={kokudaka:v,commerce:v,maxKokudaka:v+100,maxCommerce:v+100,rice:123,gold:456};
+            ctx.EconomyRules.applyAnnualIncomeWear(c,month);
+            assert.strictEqual(c.kokudaka,v-(month===9?Math.min(30,Math.floor(v*5/100)):0));
+            assert.strictEqual(c.commerce,v-(month===3?Math.min(20,Math.floor(v*5/100)):0));
+            assert.strictEqual(c.maxKokudaka,v+100);assert.strictEqual(c.maxCommerce,v+100);
+            assert.strictEqual(c.rice,123);assert.strictEqual(c.gold,456);
+        }
+    }
+});
+
+test('r988 実月初と収穫イベントは減耗前の収入を確定し自他家・一揆・中立を区別する', async () => {
+    const math=Object.create(Math);math.random=()=>0.5;
+    const ctx=createContext({Math:math,setTimeout,clearTimeout,PersonnelRules:{},GameEvents:[]});
+    for(const f of ['config','user_settings','economy_rules','domestic_rules','turn_manager','event/common_events'])loadScript(ctx,`js/${f}.js`);
+    const E=ctx.EconomyRules, TM=vm.runInContext('TurnManager',ctx);
+    const harvest=ctx.GameEvents.find(e=>e.id==='harvest_event_september');
+    const base={population:10000,peoplesLoyalty:80,kokudaka:600,commerce:400,maxKokudaka:800,maxCommerce:500,defense:500,soldiers:0,gold:100,rice:100,provinceId:1,adjacentCastleIds:[]};
+    const noop=()=>{};
+    for(const month of [3,4,9,10]) {
+        const castles=[{...base,id:1,ownerClan:1,isDelegated:true},{...base,id:2,ownerClan:2},{...base,id:3,ownerClan:2,statusEffects:['一揆']},{...base,id:4,ownerClan:0},{...base,id:5,ownerClan:1,gold:ctx.GameConfig.Limits.CastleStock,rice:ctx.GameConfig.Limits.CastleStock}];
+        const provinces=[{id:1,marketRate:2,statusEffects:[]}];
+        const game={phase:'game',year:1560,month,playerClanId:1,castles,provinces,clans:[],bushos:[],getProvince:id=>provinces.find(p=>p.id===id),getBusho:()=>null,getClanCastles:id=>castles.filter(c=>c.ownerClan===id),getCastleBushos:()=>[],getCurrentTurnCastle:()=>null,
+          writeSystemDiagnostic:noop,ui:{showCutin:async()=>{},log:noop},factionSystem:{applyStartMonthSameFactionEffects:noop,processStartMonth:async()=>{},optimizeCastellans:noop},lifeSystem:{processStartMonth:async()=>{}},affiliationSystem:{processRoninMovements:noop},updateAllCastlesLords:noop,updateAllClanPrestige:noop,courtRankSystem:{processMonthlyPromotions:()=>[]},tryProcessQueuedWatchReturn:async()=>false,processTurn:noop,
+          eventManager:{async processEvents(timing){if(timing==='startMonth_after'&&harvest.checkCondition(game))await harvest.execute(game);}}};
+        const expected=castles.map(c=>({gold:Math.min(ctx.GameConfig.Limits.CastleStock,c.gold+(c.ownerClan?E.calcMonthlyGoldIncome(c,game):0)),rice:Math.min(ctx.GameConfig.Limits.CastleStock,c.rice+(c.ownerClan&&month===9?Math.floor(E.calcBaseRiceIncome(c)/(c.statusEffects?4:1)):0))}));
+        await new TM(game).startMonth();
+        for(const [i,c] of castles.entries()) {
+            assert.strictEqual(c.gold,expected[i].gold);assert.strictEqual(c.rice,expected[i].rice);
+            assert.strictEqual(c.commerce,400-(c.ownerClan&&month===3?20:0));
+            assert.strictEqual(c.kokudaka,600-(c.ownerClan&&month===9?30:0));
+            assert.strictEqual(c.maxCommerce,500);assert.strictEqual(c.maxKokudaka,800);
+        }
+    }
+});
+
+test('r988 豊作・凶作の収入倍率を維持して収穫後に一度だけ石高を減らす', async () => {
+    const math=Object.create(Math);math.random=()=>0.5;
+    const ctx=createContext({Math:math,GameEvents:[],MapGraphService:{isAdjacent:()=>false}});
+    for(const f of ['config','economy_rules','event/common_events'])loadScript(ctx,`js/${f}.js`);
+    ctx.playProvinceMapEffect=async()=>{};
+    const harvest=ctx.GameEvents.find(e=>e.id==='harvest_event_september');
+    for(const [status,rate] of [['goodHarvest',1.3],['badHarvest',0.8]]) {
+        const c={id:1,ownerClan:1,provinceId:1,kokudaka:600,commerce:400,maxKokudaka:800,maxCommerce:500,peoplesLoyalty:80,rice:0};
+        const province={id:1,regionId:2,marketRate:2,statusEffects:[status]};
+        const game={month:9,castles:[c],provinces:[province],getProvince:()=>province};
+        await harvest.execute(game);
+        assert.strictEqual(c.rice,Math.floor(4800*rate));
+        assert.strictEqual(c.kokudaka,570);assert.strictEqual(c.commerce,400);assert.strictEqual(c.maxKokudaka,800);
+    }
+});
 
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);

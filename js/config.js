@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r987'
+        Version: 'r989'
     },
 
     Ending: {
@@ -176,6 +176,9 @@ window.GameConfig = {
         Economy: {
             IncomeGoldRate: 1,
             IncomeFluctuation: 0.15,
+            AnnualIncomeWearPercent: 5,
+            AnnualKokudakaWearMax: 30,
+            AnnualCommerceWearMax: 20,
             ConsumeRicePerSoldier: 0.03,
             // 米相場は「金1で得られる兵糧量」。2.0なら金1＝兵糧2.0。
             TradeRateBase: 2.0,

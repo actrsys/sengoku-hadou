@@ -305,6 +305,7 @@ class TurnManager {
             const populationBeforeGrowth = castle.population;
             const income = EconomyRules.calcMonthlyGoldIncome(castle, game, clanPopulationById.get(clanPopulationKey));
             castle.gold = Math.min(GameConfig.Limits.CastleStock, castle.gold + income);
+            if (game.month === 3) EconomyRules.applyAnnualIncomeWear(castle, game.month);
 
             const neighborMultiplier = DomesticRules.calcNeighborGrowthMultiplier(castle, game);
             const growthPercent = DomesticRules.getMonthlyGrowthPercent(castle, game);

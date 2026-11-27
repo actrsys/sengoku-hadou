@@ -1296,6 +1296,7 @@ window.GameEvents.push({
                 riceIncome = Math.floor(riceIncome / 4);
             }
             c.rice = Math.min(GameConfig.Limits.CastleStock, c.rice + riceIncome);
+            EconomyRules.applyAnnualIncomeWear(c, game.month);
         });
 
         // =========================================================
