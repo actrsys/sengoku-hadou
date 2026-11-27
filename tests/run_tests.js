@@ -20793,10 +20793,10 @@ test('r477 拠点情報・攻城戦の可変名称と顔画像も表示境界で
     const ui = read('js/ui.js');
     assert.ok(ui.includes('StatPresenter.escapePlainText(provinceName)'));
     assert.ok(ui.includes('StatPresenter.escapePlainText(castle.name)'));
-    assert.ok(ui.includes('StatPresenter.safeFaceIconPath(castellan.faceIcon)'));
+    assert.ok(ui.includes('StatPresenter.safeFaceIconPath(castellan.faceIcon, this.game)'));
     assert.ok(ui.includes('StatPresenter.escapePlainText(s.defender.name)'));
-    assert.ok(ui.includes('StatPresenter.safeFaceIconPath(busho && busho.faceIcon)'));
-    assert.ok(ui.includes('StatPresenter.safeFaceIconPath(leader && leader.faceIcon)'));
+    assert.ok(ui.includes('StatPresenter.safeFaceIconPath(busho && busho.faceIcon, this.game)'));
+    assert.ok(ui.includes('StatPresenter.safeFaceIconPath(leader && leader.faceIcon, this.game)'));
 });
 
 // r478: 共通一覧と姫詳細・部隊分割は、外部セーブ由来の名称をHTMLと解釈しない。
@@ -27038,7 +27038,7 @@ test('r564 共通マスターの年次差分顔を実際にロード・decodeし
     const commonDataCache = {
         warriorsMaster: [
             {faceIcon:'oda_nobunaga.webp|1579:oda_nobunaga2.webp'},
-            {faceIcon:'test_icon.webp|daimyo:test_daimyo.webp'},
+            {faceIcon:'test_icon.webp|daimyo:test_daimyo.webp/1570:test_year.webp'},
             {faceIcon:'https://invalid.example/a.webp'}
         ],
         princessMaster: [{faceIcon:'unknown_princess_face.webp'}]
@@ -27057,11 +27057,47 @@ test('r564 共通マスターの年次差分顔を実際にロード・decodeし
     assert.ok(urls.some(url => url.endsWith('oda_nobunaga.webp')));
     assert.ok(urls.some(url => url.endsWith('oda_nobunaga2.webp')));
     assert.ok(urls.some(url => url.endsWith('test_daimyo.webp')));
+    assert.ok(urls.some(url => url.endsWith('test_year.webp')));
+    assert.ok(urls.some(url => url.endsWith('takugen_souon.webp')));
     assert.ok(urls.some(url => url.endsWith('unknown_face.webp')));
     assert.ok(!urls.some(url => url.includes('invalid.example')));
     assert.strictEqual(decoded,urls.length);
     assert.strictEqual(updates[updates.length-1],1);
     assert.ok(game._facePreloadedImages.has('oda_nobunaga2.webp'));
+});
+
+test('r998 圧縮顔は開始時取得したURLを全表示に共有し、切替と中断で解放する', async () => {
+    const fetched = [], revoked = [];
+    let next = 0;
+    const ctx = createContext({
+        document: {body: {classList: {contains: () => false}}},
+        __mobileLowMemoryMode: true,
+        fetch: async path => { fetched.push(path); return {ok: true, blob: async () => ({size: 1})}; },
+        URL: {createObjectURL: () => `blob:fixture/${++next}`, revokeObjectURL: url => revoked.push(url)},
+        DataManager: {commonDataCache: {warriorsMaster: [{faceIcon:'a.webp|1570:b.webp/daimyo:c.webp'}], princessMaster: []}, yieldToBrowser: async () => {}},
+        addEventListener() {}
+    });
+    loadScript(ctx, 'js/game.js'); loadScript(ctx, 'js/stat_presenter.js'); loadScript(ctx, 'js/ui_info.js');
+    const game = Object.create(vm.runInContext('GameManager', ctx).prototype);
+    const info = Object.create(vm.runInContext('UIInfoManager', ctx).prototype); info.game = game;
+    game._loadAssetImage = async src => ({src});
+    assert.strictEqual(await game.preloadFaceIcons(), true);
+    const count = fetched.length;
+    assert.ok(fetched.some(path => path.endsWith('/b.webp')) && fetched.some(path => path.endsWith('/c.webp')));
+    const src = game.getPreparedFaceUrl('a.webp');
+    assert.ok(src.startsWith('blob:'));
+    assert.strictEqual(ctx.StatPresenter.safeFaceIconPath('a.webp', game), src);
+    assert.strictEqual(info._safeFaceIconPath('a.webp'), src);
+    assert.strictEqual(game.getPreparedFaceUrl('../bad.webp'), game.getPreparedFaceUrl('unknown_face.webp'));
+    assert.strictEqual(fetched.length, count);
+    game._releasePreparedFaceUrls();
+    assert.strictEqual(revoked.length, count);
+    assert.strictEqual(game.getPreparedFaceUrl('a.webp'), 'data/images/faceicons/a.webp');
+    let current = true;
+    const before = revoked.length;
+    assert.strictEqual(await game.preloadFaceIcons(() => current, () => { current = false; }), false);
+    assert.strictEqual(revoked.length - before, 2, '中断世代の2枚のみ解放');
+    assert.strictEqual(game._preparedFaceUrls, null);
 });
 
 test('r564 音声は先行ロードして共有し、SEの初回再生で再生成しない', async () => {

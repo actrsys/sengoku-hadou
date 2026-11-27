@@ -272,6 +272,7 @@ class GameManager {
         // PC向け顔画像のアイドル先読みが旧シナリオのまま後続batchを開始しないよう世代を進める。
         this._facePreloadGeneration = Number(this._facePreloadGeneration || 0) + 1;
         this._facePreloadedImages = null;
+        this._releasePreparedFaceUrls();
         if (this.ui) {
             this.ui.pixelCastleMap = null;
             this.ui.pixelProvinceMap = null;
@@ -732,54 +733,98 @@ class GameManager {
         });
     }
 
-    // 全顔画像は大容量の地図とは異なり、現行は約1.3MiB/96枚。
-    // ただしデコード後は約24MiBなので、スマホでは残すImage参照を限定する。
-    // 低メモリ端末もダウンロード・一度のdecodeはロード幕内に行い、
-    // 同時decode枚数を抑え、ブラウザが破棄可能な参照を保持し続けない。
+    // 圧縮顔画像はゲーム中だけ保持し、全表示窓口で同じURLを使う。
+    _releasePreparedFaceUrls(urls = this._preparedFaceUrls) {
+        if (urls && typeof window.URL?.revokeObjectURL === 'function') {
+            for (const url of urls.values()) window.URL.revokeObjectURL(url);
+            urls.clear();
+        }
+        if (urls === this._preparedFaceUrls) this._preparedFaceUrls = null;
+    }
+
+    getPreparedFaceUrl(name) {
+        const safeName = typeof name === 'string' && /^[A-Za-z0-9_-]+\.(?:webp|png|jpe?g)$/.test(name)
+            ? name : 'unknown_face.webp';
+        return this._preparedFaceUrls?.get(safeName) || `data/images/faceicons/${safeName}`;
+    }
+
+    // 圧縮約1.3MiB。スマホでは従来のImage保持上限を維持する。
     async preloadFaceIcons(isCurrent = () => true, onProgress = () => {}) {
         const preloadGeneration = Number(this._facePreloadGeneration || 0) + 1;
         this._facePreloadGeneration = preloadGeneration;
         const isCurrentGeneration = () => preloadGeneration === Number(this._facePreloadGeneration || 0) && isCurrent();
         this._facePreloadedImages = null;
-        const files = new Set(['unknown_face.webp', 'unknown_princess_face.webp', 'koshou.webp', 'kochou.webp']);
-        const addFace = value => {
-            String(value || '').split('|').forEach(part => {
-                const name = part.trim().split(':').pop().trim();
-                if (/^[a-z0-9_-]+\.webp$/i.test(name)) files.add(name);
+        this._releasePreparedFaceUrls();
+        const files = new Set(['unknown_face.webp', 'unknown_princess_face.webp', 'koshou.webp', 'kochou.webp', 'takugen_souon.webp']);
+        const addName = name => { if (/^[A-Za-z0-9_-]+\.webp$/.test(name)) files.add(name); };
+        const addChanges = value => {
+            String(value || '').split('/').forEach(entry => {
+                const match = /^\s*[^:/|]+:\s*([A-Za-z0-9_-]+\.webp)\s*$/.exec(entry);
+                if (match) addName(match[1]);
             });
+        };
+        const addFace = value => {
+            const [name, changes] = String(value || '').split('|');
+            addName(name.trim());
+            if (changes) addChanges(changes);
         };
         const common = typeof DataManager !== 'undefined' && DataManager.commonDataCache;
         if (common && Array.isArray(common.warriorsMaster)) {
             common.warriorsMaster.forEach(b => addFace(b.faceIcon));
             (common.princessMaster || []).forEach(p => addFace(p.faceIcon));
-        } else {
-            (this.bushos || []).forEach(b => { addFace(b.faceIcon); addFace(b.faceChange); });
-            (this.princesses || []).forEach(p => addFace(p.faceIcon));
         }
-        // ロード元に不正な外部URLがあっても、同梱WebPファイル名だけを受け付ける。
+        (this.bushos || []).forEach(b => { addFace(b.faceIcon); addChanges(b.faceChange); });
+        (this.princesses || []).forEach(p => addFace(p.faceIcon));
         const names = Array.from(files);
         const lowMemory = window.__mobileLowMemoryMode === true;
         const mobile = !document.body.classList.contains('is-pc');
         const keepLimit = lowMemory ? 12 : mobile ? 32 : names.length;
         const retained = new Map();
+        const urls = new Map();
         const batchSize = lowMemory ? 2 : mobile ? 4 : 6;
-        for (let i = 0; i < names.length; i += batchSize) {
-            if (!isCurrentGeneration()) return false;
-            const batch = names.slice(i, i + batchSize);
-            await Promise.all(batch.map(async (name, index) => {
-                const image = await this._loadAssetImage(`./data/images/faceicons/${name}`, i + index < keepLimit);
-                if (image && isCurrentGeneration()) retained.set(name, image);
-            }));
-            if (!isCurrentGeneration()) return false;
-            onProgress(Math.min(1, (i + batch.length) / names.length));
-            // 大量のWebPのdecodeを同期連続させず、ロード幕の描画機会を確保。
-            if (typeof DataManager !== 'undefined' && typeof DataManager.yieldToBrowser === 'function') {
-                await DataManager.yieldToBrowser();
+        const canKeepCompressed = typeof window.fetch === 'function' && typeof window.URL?.createObjectURL === 'function'
+            && typeof window.URL?.revokeObjectURL === 'function';
+        try {
+            for (let i = 0; i < names.length; i += batchSize) {
+                if (!isCurrentGeneration()) return false;
+                const batch = names.slice(i, i + batchSize);
+                await Promise.all(batch.map(async (name, index) => {
+                    const path = `data/images/faceicons/${name}`;
+                    let src = path;
+                    if (canKeepCompressed) {
+                        try {
+                            const response = await window.fetch(path);
+                            if (response.ok) {
+                                const blob = await response.blob();
+                                if (!isCurrentGeneration()) return;
+                                if (blob.size > 0) {
+                                    src = window.URL.createObjectURL(blob);
+                                    urls.set(name, src);
+                                }
+                            }
+                        } catch (_) { /* 通常のImage取得へフォールバック */ }
+                    }
+                    if (!isCurrentGeneration()) return;
+                    let image = await this._loadAssetImage(src, true);
+                    if (!isCurrentGeneration()) return;
+                    if (!image && src !== path) {
+                        window.URL.revokeObjectURL(src);
+                        urls.delete(name);
+                        image = await this._loadAssetImage(path, true);
+                    }
+                    if (image && isCurrentGeneration() && i + index < keepLimit) retained.set(name, image);
+                }));
+                if (!isCurrentGeneration()) return false;
+                onProgress(Math.min(1, (i + batch.length) / names.length));
+                if (typeof DataManager !== 'undefined' && typeof DataManager.yieldToBrowser === 'function') await DataManager.yieldToBrowser();
             }
+            if (!isCurrentGeneration()) return false;
+            this._facePreloadedImages = retained;
+            this._preparedFaceUrls = urls;
+            return true;
+        } finally {
+            if (this._preparedFaceUrls !== urls) this._releasePreparedFaceUrls(urls);
         }
-        if (!isCurrentGeneration()) return false;
-        this._facePreloadedImages = retained;
-        return true;
     }
 
     handleDaimyoSelect(castle) {

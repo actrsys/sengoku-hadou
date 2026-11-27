@@ -876,7 +876,7 @@ class UIManager {
         if (!faceIcon || typeof Image === 'undefined') return Promise.resolve(null);
         // 外部セーブから復元した顔名は、共通Presenterで同梱ファイル名だけに限定する。
         // URLへの連結前に正規化し、不正値を巨大なキャッシュキーとして保持しない。
-        const safeSrc = StatPresenter.safeFaceIconPath(faceIcon);
+        const safeSrc = StatPresenter.safeFaceIconPath(faceIcon, this.game);
         if (!this._dialogFacePreloadCache) this._dialogFacePreloadCache = new Map();
 
         if (this._dialogFacePreloadCache.has(safeSrc)) {
@@ -929,8 +929,9 @@ class UIManager {
 
         const promise = (async () => {
             let img = await loadOne(safeSrc);
-            if (!img && safeSrc !== 'data/images/faceicons/unknown_face.webp') {
-                img = await loadOne('data/images/faceicons/unknown_face.webp');
+            const fallbackSrc = StatPresenter.safeFaceIconPath('unknown_face.webp', this.game);
+            if (!img && safeSrc !== fallbackSrc) {
+                img = await loadOne(fallbackSrc);
             }
             return img;
         })();
@@ -3106,7 +3107,7 @@ class UIManager {
         
         let faceHtml = "";
         if (castellan && castellan.faceIcon) {
-            faceHtml = `<img class="sp-castellan-face" src="${StatPresenter.safeFaceIconPath(castellan.faceIcon)}">`;
+            faceHtml = `<img class="sp-castellan-face" src="${StatPresenter.safeFaceIconPath(castellan.faceIcon, this.game)}">`;
         }
 
         // 拠点の在城者は Castle.samuraiIds が正本。全武将を走査せず、同じ拠点の数十人だけを1回見ます。
@@ -3833,7 +3834,7 @@ class UIManager {
     // 顔がロード済みでもdecode完了前に公開すると旧画像が残って見える端末がある。
     async _waitForWarFaceImage(img, isCurrent = () => true) {
         if (!img || !isCurrent()) return;
-        const fallbackSrc = 'data/images/faceicons/unknown_face.webp';
+        const fallbackSrc = this.game?.getPreparedFaceUrl?.('unknown_face.webp') || 'data/images/faceicons/unknown_face.webp';
         const waitReady = async () => {
             if (typeof img.decode === 'function') {
                 try {
@@ -4514,10 +4515,10 @@ class UIManager {
         const updateFace = (id, busho) => {
             const el = document.getElementById(id);
             if (!el) return;
-            const nextSrc = StatPresenter.safeFaceIconPath(busho && busho.faceIcon);
+            const nextSrc = StatPresenter.safeFaceIconPath(busho && busho.faceIcon, this.game);
             if (el.getAttribute('src') !== nextSrc) {
                 el.onerror = () => {
-                    if (el.getAttribute('src') === nextSrc) setSrcEl(el, 'data/images/faceicons/unknown_face.webp');
+                    if (el.getAttribute('src') === nextSrc) setSrcEl(el, StatPresenter.safeFaceIconPath('unknown_face.webp', this.game));
                 };
                 setSrcEl(el, nextSrc);
             }
@@ -4748,11 +4749,11 @@ class UIManager {
                 // ★修正：魔法を使って武将名を縮小します！
                 const leaderNameHtml = leader ? getCompressedBushoNameHtml(leader, isMobile) + "軍" : "不明";
                 
-                const leaderFaceSrc = StatPresenter.safeFaceIconPath(leader && leader.faceIcon);
+                const leaderFaceSrc = StatPresenter.safeFaceIconPath(leader && leader.faceIcon, this.game);
                 if (faceImg) faceImg.style.visibility = '';
                 if (faceImg && faceImg.getAttribute('src') !== leaderFaceSrc) {
                     faceImg.onerror = () => {
-                        if (faceImg.getAttribute('src') === leaderFaceSrc) setSrcEl(faceImg, 'data/images/faceicons/unknown_face.webp');
+                        if (faceImg.getAttribute('src') === leaderFaceSrc) setSrcEl(faceImg, StatPresenter.safeFaceIconPath('unknown_face.webp', this.game));
                     };
                     setSrcEl(faceImg, leaderFaceSrc);
                 }

@@ -13,10 +13,11 @@ class StatPresenter {
     }
 
     // 顔画像は同梱画像のファイル名のみ認め、外部セーブによる属性・パス混入を防ぐ。
-    static safeFaceIconPath(value) {
+    static safeFaceIconPath(value, game) {
         const name = typeof value === 'string' ? value : '';
         const safeName = /^[A-Za-z0-9_-]+\.(?:webp|png|jpe?g)$/.test(name) ? name : 'unknown_face.webp';
-        return `data/images/faceicons/${safeName}`;
+        return game?.getPreparedFaceUrl?.(safeName)
+            || `data/images/faceicons/${safeName}`;
     }
 
     static getGradeParts(val) {

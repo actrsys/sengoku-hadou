@@ -491,8 +491,8 @@ Object.assign(UIInfoManager.prototype, {
             const detailFace = listContainer.querySelector('.busho-detail-face');
             if (detailFace) {
                 detailFace.addEventListener('error', () => {
-                    const fallback = 'data/images/faceicons/unknown_face.webp';
-                    if (!detailFace.src.endsWith('/unknown_face.webp')) detailFace.src = fallback;
+                    const fallback = this._safeFaceIconPath('unknown_face.webp');
+                    if (detailFace.getAttribute('src') !== fallback) detailFace.src = fallback;
                 }, { once: true });
             }
 

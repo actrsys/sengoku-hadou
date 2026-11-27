@@ -459,12 +459,12 @@ class InterviewView {
             const img = document.createElement('img');
             img.className = 'interview-session-person-face';
             img.src = window.StatPresenter
-                ? StatPresenter.safeFaceIconPath(busho.faceIcon)
+                ? StatPresenter.safeFaceIconPath(busho.faceIcon, this.game)
                 : 'data/images/faceicons/unknown_face.webp';
             img.alt = '';
             img.onerror = () => {
                 img.onerror = null;
-                img.src = 'data/images/faceicons/unknown_face.webp';
+                img.src = window.StatPresenter ? StatPresenter.safeFaceIconPath('unknown_face.webp', this.game) : 'data/images/faceicons/unknown_face.webp';
             };
 
             const textWrap = document.createElement('span');
@@ -553,7 +553,7 @@ class InterviewView {
         this.dialogName.textContent = busho.name || '';
         this.dialogName.classList.remove('hidden');
         const src = window.StatPresenter
-            ? StatPresenter.safeFaceIconPath(busho.faceIcon)
+            ? StatPresenter.safeFaceIconPath(busho.faceIcon, this.game)
             : 'data/images/faceicons/unknown_face.webp';
         // 同じ話者の台詞送りでは顔画像の読み込みとDOMの張り替えを繰り返さない。
         // 画像の差替えが必要な場合のみ新しいimgを挿入する。
@@ -568,7 +568,7 @@ class InterviewView {
         img.alt = '';
         img.onerror = () => {
             img.onerror = null;
-            img.src = 'data/images/faceicons/unknown_face.webp';
+            img.src = window.StatPresenter ? StatPresenter.safeFaceIconPath('unknown_face.webp', this.game) : 'data/images/faceicons/unknown_face.webp';
         };
         wrapper.appendChild(img);
         this.dialogFace.appendChild(wrapper);

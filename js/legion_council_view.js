@@ -140,7 +140,7 @@ class LegionCouncilView {
         return `
             <div class="legion-council-seat" data-legion-no="${legionNo}" role="button" tabindex="0">
                 <div class="legion-council-seat-heading">${labels[legionNo]}国主</div>
-                <img class="legion-council-face" src="data/images/faceicons/unknown_face.webp" alt="">
+                <img class="legion-council-face" src="${this.game?.getPreparedFaceUrl?.('unknown_face.webp') || 'data/images/faceicons/unknown_face.webp'}" alt="">
                 <div class="legion-council-name"></div>
                 <div class="legion-council-policy-summary">${this._policySummaryHtml(policy)}</div>
                 <div class="legion-council-seat-hint">選択して命令を変更</div>
@@ -168,10 +168,10 @@ class LegionCouncilView {
                 const candidate = member && member.commander && member.commander.faceIcon;
                 const face = typeof candidate === 'string' && /^[A-Za-z0-9_-]+\.(?:webp|png|jpe?g)$/.test(candidate)
                     ? candidate : 'unknown_face.webp';
-                img.src = `data/images/faceicons/${face}`;
+                img.src = this.game?.getPreparedFaceUrl?.(face) || `data/images/faceicons/${face}`;
                 img.onerror = () => {
                     img.onerror = null;
-                    img.src = 'data/images/faceicons/unknown_face.webp';
+                    img.src = this.game?.getPreparedFaceUrl?.('unknown_face.webp') || 'data/images/faceicons/unknown_face.webp';
                 };
             }
             const open = () => this.openOrderEditor(legionNo);

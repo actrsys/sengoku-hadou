@@ -15,7 +15,8 @@ class UIInfoManager {
     _safeFaceIconPath(value) {
         const name = typeof value === 'string' ? value : '';
         const safeName = /^[A-Za-z0-9_-]+\.(?:webp|png|jpe?g)$/.test(name) ? name : 'unknown_face.webp';
-        return `data/images/faceicons/${safeName}`;
+        return this.game?.getPreparedFaceUrl?.(safeName)
+            || `data/images/faceicons/${safeName}`;
     }
 
     // 勢力・拠点の一覧で共通する長い名称の表示。文字圧縮は同じHTMLとCSS変数を用いる。
@@ -1125,7 +1126,7 @@ class UIInfoManager {
                     <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
                     <div class="info-detail-header">
                         <div class="info-detail-face-column">
-                            <img src="${faceSrc}" class="info-detail-face" data-face-fallback="data/images/faceicons/unknown_face.webp">
+                            <img src="${faceSrc}" class="info-detail-face" data-face-fallback="${this._safeFaceIconPath('unknown_face.webp')}">
                         </div>
                         <div class="info-detail-main">
                             <!-- 勢力名 -->
@@ -2842,7 +2843,7 @@ class UIInfoManager {
                     <!-- 【ヘッダー部】 左上に顔グラ、右にテキスト情報 -->
                     <div class="info-detail-header">
                         <div class="info-detail-face-column">
-                            <img src="${faceSrc}" class="info-detail-face" data-face-fallback="data/images/faceicons/unknown_face.webp">
+                            <img src="${faceSrc}" class="info-detail-face" data-face-fallback="${this._safeFaceIconPath('unknown_face.webp')}">
                         </div>
                         <div class="info-detail-main">
                             <!-- 国名＆諸勢力名 -->
@@ -3251,7 +3252,7 @@ class UIInfoManager {
         if (!shell) return;
         const { listContainer } = shell;
 
-        let faceHtml = princess.faceIcon ? `<img src="${this._safeFaceIconPath(princess.faceIcon)}" class="daimyo-detail-face" data-face-fallback="data/images/faceicons/unknown_princess_face.webp">` : `<img src="data/images/faceicons/unknown_princess_face.webp" class="daimyo-detail-face">`;
+        let faceHtml = princess.faceIcon ? `<img src="${this._safeFaceIconPath(princess.faceIcon)}" class="daimyo-detail-face" data-face-fallback="${this._safeFaceIconPath('unknown_princess_face.webp')}">` : `<img src="${this._safeFaceIconPath('unknown_princess_face.webp')}" class="daimyo-detail-face">`;
 
         let affiliationName = "無所属";
         let isFamily = false;

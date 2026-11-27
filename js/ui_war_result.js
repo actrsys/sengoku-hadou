@@ -135,7 +135,7 @@ Object.assign(UIManager.prototype, {
             img.style.visibility = 'hidden';
             const face = data[`${side}Face`];
             if (!face) { img.removeAttribute('src'); continue; }
-            img.setAttribute('src', StatPresenter.safeFaceIconPath(face));
+            img.setAttribute('src', StatPresenter.safeFaceIconPath(face, this.game));
             faces.push(img);
         }
         if (!faces.length) return publish();
