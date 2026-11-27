@@ -676,9 +676,16 @@ class UIManager {
     // Round24：AI進捗表示の状態を正規化します。
     // 戦争・援軍・迎撃などで一時非表示カウンタが複数段積まれ、restoreが1回だけだと
     // opacity:0 が残ることがありました。AI進捗を更新する瞬間を「表示状態の最終権威」にします。
+    // 準備中の非公開shellでは旧会話を維持する。実際に公開された災害地図だけを
+    // AI進捗と共通暗幕の復帰を止める表示境界として扱う。
+    _hasPublishedEventMap() {
+        return Array.from(document.querySelectorAll?.('.event-map-overlay') || [])
+            .some(overlay => overlay.style.visibility === 'visible');
+    }
+
     _hasAIProgressBlockingUI() {
         if (!this.game) return false;
-        if (this.game.selectionMode != null || (this.mapGuardCount || 0) > 0) return true;
+        if (this.game.selectionMode != null || (this.mapGuardCount || 0) > 0 || this._hasPublishedEventMap()) return true;
         const visible = (id) => {
             const el = document.getElementById(id);
             return !!(el && !el.classList.contains('hidden'));
@@ -1014,8 +1021,10 @@ class UIManager {
             backdrop.classList.add('hidden');
             return;
         }
-        // 地図演出への明示的な引継ぎは暗幕の保持対象ではない。既存holdは維持する。
-        if (revealMap) {
+        // 地図演出への引継ぎは暗幕の保持対象ではない。災害専用地図は
+        // それ自体がcoverなので、旧会話のMutationObserverでも二重暗幕を作らない。
+        // 月次の既存holdは後続会話のため維持する。
+        if (revealMap || this._hasPublishedEventMap()) {
             this._modalBackdropLastVisible = null;
             this._modalBackdropEpoch = Number(this._modalBackdropEpoch || 0) + 1;
             backdrop.classList.add('hidden');

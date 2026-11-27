@@ -46698,6 +46698,75 @@ test('r993 実月初・月末の表示待ちが次の拠点・翌月への進行
     }
 });
 
+// 災害地図の公開直後に旧会話の監視通知が来ても、背面へ暗幕・処理文字を復活させない。
+test('災害地図の公開中は旧会話の暗幕とAI進捗を復帰させず、終了後だけ進捗を戻す', async () => {
+    const node = () => { const classes = new Set(); return {style:{},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)},querySelectorAll:()=>[]}; };
+    const guard=node(), dialog=node(), backdrop=node(), overlay=node();
+    dialog.id='dialog-modal'; backdrop.classList.add('hidden'); overlay.style.visibility='hidden';
+    let attached=true;
+    overlay.parentNode={removeChild(){attached=false;overlay.parentNode=null;}};
+    const ctx=createContext({document:{hidden:true,getElementById:id=>id==='dialog-modal'?dialog:id==='ai-guard'?guard:null,querySelectorAll:()=>attached?[overlay]:[]},getComputedStyle:()=>({background:'rgba(0,0,0,.6)'}),setTimeout,clearTimeout});
+    loadScript(ctx,'js/ui.js');loadScript(ctx,'js/ui_map.js');ctx.GameEvents=[];loadScript(ctx,'js/event/common_events.js');
+    const ui=vm.runInContext('Object.create(UIManager.prototype)',ctx);
+    Object.assign(ui,{game:{isProcessingAI:true},aiGuard:guard,_modalBackdrop:backdrop,_modalBackdropModals:[dialog],_modalBackdropEpoch:0,_modalBackdropHolds:0,_dialogHandoffHoldCount:1,_dialogGuardHeld:true,guardHiddenCount:1,guardTextHiddenCount:0,waitForCoveredMapPaint:async()=>{}});
+    guard.style.opacity='0';guard.classList.add('hide-text');
+    ui._syncModalHandoffBackdrop();
+    assert.strictEqual(ui._hasPublishedEventMap(),false,'非公開shellはまだ表示境界ではない');
+    overlay._eventMapRestoreState={ui};
+    overlay._eventMapFinishHandoff=()=>{dialog.classList.add('hidden');ui.restoreAIGuard();};
+    ctx.EventMapEffects.publishOverlay(overlay);
+    ui._syncModalHandoffBackdrop(); // 実ブラウザのMutationObserverと同じ順序
+    assert.ok(backdrop.classList.contains('hidden'),'旧会話の暗幕を重ねない');
+    assert.ok(guard.classList.contains('hide-text'),'災害地図の背後で進捗を再開しない');
+    assert.strictEqual(ui._dialogHandoffHoldCount,1,'月次会話holdは解除しない');
+    assert.strictEqual(ui._hasAIProgressBlockingUI(),true);
+    await ctx.EventMapEffects.cleanupOverlay(overlay);
+    assert.ok(!guard.classList.contains('hide-text'),'地図を取り外してから通常表示へ戻る');
+    assert.ok(backdrop.classList.contains('hidden'));
+    assert.strictEqual(ui._hasAIProgressBlockingUI(),false);
+});
+
+// 災害地図終了時、可視で健全なPC地図だけ背景更新と旧shell除去を一括する。
+test('災害地図の終了でPCの背景だけ先行更新せず、復旧が必要な地図はpaintを待つ', async () => {
+    const src=read('js/event/common_events.js');
+    const start=src.indexOf('    const cleanupOverlay = async (mapOverlay) => {');
+    const end=src.indexOf('\n    return {',start);
+    for(const mode of ['pc','mobile','full','layout','unhealthy','async','unpublished']) {
+        const order=[];let finish;
+        const ctx=vm.createContext({console,nextPaint:async()=>{throw Error('unexpected fallback')}});
+        vm.runInContext(src.slice(start,end)+'\nthis.cleanupOverlay=cleanupOverlay;',ctx);
+        const ui={_mapPresentationNeedsFullRecovery:mode==='full',_mapLayoutRefreshPending:mode==='layout',
+            _isClanColorOverlayHealthy:()=>mode!=='unhealthy',
+            resumeBackgroundUpdates(){order.push('update');if(mode==='async')return new Promise(r=>{finish=r;});},
+            waitForCoveredMapPaint(){order.push('wait');return new Promise(r=>{finish=r;});},
+            applyAIGuardTextState(){order.push('progress');}};
+        const canvas={width:50,height:50};
+        const overlay={style:{visibility:mode==='unpublished'?'hidden':'visible'},
+            parentNode:{removeChild(n){order.push('remove');n.parentNode=null;}},querySelectorAll:s=>s==='canvas'?[canvas]:[],
+            _eventMapRestoreState:{ui,isPC:mode!=='mobile',hidMainMap:mode==='mobile',pausedByUs:true,scroll:{style:{display:mode==='mobile'?'none':''}},oldDisplay:''}};
+        const done=ctx.cleanupOverlay(overlay);
+        if(mode==='pc')assert.deepStrictEqual(order,['update','remove','progress']);
+        else {assert.ok(overlay.parentNode,mode);assert.strictEqual(canvas.width,50);assert.ok(finish,mode);finish();}
+        await done;assert.deepStrictEqual(order.slice(-2),['remove','progress']);assert.strictEqual(canvas.width,1);
+    }
+});
+
+test('初雪追加だけでは健全な勢力色Canvasを付け直さず、欠損時は従来どおり再提示する', () => {
+    const src=read('js/ui_map.js');const start=src.indexOf('    recoverPersistentMapPresentation(forceFull = false) {');
+    const end=src.indexOf('    _schedulePersistentMapPresentationRecovery(',start);
+    for(const mode of ['new','missing','forced','unhealthy']) {
+        const ctx=vm.createContext({document:{body:{classList:{contains:()=>true}},getElementById:()=>mode==='missing'?{width:1,height:1}:null}});
+        vm.runInContext('this.obj={'+src.slice(start,end)+'};',ctx);
+        let refreshed=0,snow=0;
+        const ui=Object.assign(ctx.obj,{game:{phase:'game',provinces:[{statusEffects:['heavySnow']}]},mapEl:{},
+            _snowOverlayDirty:true,lastSnowHash:null,_lastSnowOverlay:null,
+            _isClanColorOverlayHealthy:()=>mode!=='unhealthy',_invalidatePersistentMapCanvasesForRecovery(){},
+            updateSnowOverlay(){snow++;},_refreshPersistentMapCompositeLayers(){refreshed++;return true;}});
+        ui.recoverPersistentMapPresentation(mode==='forced');
+        assert.strictEqual(snow,1);assert.strictEqual(refreshed,mode==='new'?0:1,mode);
+    }
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);

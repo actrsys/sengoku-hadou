@@ -265,6 +265,10 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         const finish = mapOverlay._eventMapFinishHandoff;
         mapOverlay._eventMapFinishHandoff = null;
         if (typeof finish === 'function') finish();
+        // 公開・旧会話閉鎖と同じ処理単位で共通表示を同期する。
+        const ui = mapOverlay._eventMapRestoreState?.ui;
+        ui?._syncModalHandoffBackdrop?.();
+        ui?.applyAIGuardTextState?.();
         return true;
     };
 
@@ -617,6 +621,14 @@ window.EventMapEffects = window.EventMapEffects || (() => {
         const images = mapOverlay ? Array.from(mapOverlay.querySelectorAll('img')) : [];
         // 共有IDマップはゲーム本体側で継続利用し、イベント専用の巨大RGBAキャッシュは作らない。
         let backgroundRecovery = null;
+        // PCの半透明coverでは、通常地図を隠していないのに復旧後のpaintを待つと、
+        // 雪・勢力色などの変更だけが旧災害地図の背後に先行して見える。
+        // 実際に非表示化・全復旧・レイアウト変更した場合は従来のcover待機を維持する。
+        const ui = restoreState?.ui;
+        const canCloseWithBackgroundUpdate = !!(mapOverlay?.style?.visibility === 'visible'
+            && restoreState?.isPC && !restoreState.hidMainMap && restoreState.scroll
+            && restoreState.scroll.style.display !== 'none' && !ui?._mapPresentationNeedsFullRecovery
+            && !ui?._mapLayoutRefreshPending && ui?._isClanColorOverlayHealthy?.());
         if (restoreState) {
             if (restoreState.hidMainMap && restoreState.scroll) {
                 restoreState.scroll.style.display = restoreState.oldDisplay;
@@ -626,19 +638,25 @@ window.EventMapEffects = window.EventMapEffects || (() => {
             }
         }
 
-        // r437の最終coverと同様、復帰処理が返す2フレームの完了までイベント地図の
-        // 暗幕を保持する。1回のrAF直後にshellを外すと、display:noneから戻した
-        // 地図のcompositor commitより暗幕除去が先行する端末がある。
+        // 非表示・復旧が必要な地図は従来どおりcover下の2paintを待つ。
+        // 既に可視で健全なPC地図だけ、同期更新とshell除去を同じ描画単位で行う。
         if (mapOverlay && mapOverlay.parentNode) {
             if (backgroundRecovery && typeof backgroundRecovery.then === 'function') {
                 await backgroundRecovery;
-            } else if (restoreState && restoreState.ui && typeof restoreState.ui.waitForCoveredMapPaint === 'function') {
-                await restoreState.ui.waitForCoveredMapPaint();
-            } else {
-                await nextPaint();
-                await nextPaint();
+            } else if (!canCloseWithBackgroundUpdate) {
+                if (typeof ui?.waitForCoveredMapPaint === 'function') {
+                    await ui.waitForCoveredMapPaint();
+                } else {
+                    await nextPaint();
+                    await nextPaint();
+                }
             }
-            if (mapOverlay.parentNode) mapOverlay.parentNode.removeChild(mapOverlay);
+            if (mapOverlay.parentNode) {
+                mapOverlay.parentNode.removeChild(mapOverlay);
+                // 通常地図の復旧・公開境界でだけ進捗を復帰させる。強制遷移で既に
+                // shellが外された場合は旧イベントから現在の表示を触らない。
+                restoreState?.ui?.applyAIGuardTextState?.();
+            }
         }
         // 公開前の異常終了でも古いholdと会話の閉鎖予約を残さない。
         if (mapOverlay && typeof mapOverlay._eventMapFinishHandoff === 'function') {

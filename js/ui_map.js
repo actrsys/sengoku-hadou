@@ -695,12 +695,16 @@ Object.assign(UIManager.prototype, {
             const snowOverlay = document.getElementById('snow-overlay');
             const snowMissing = !snowOverlay || snowOverlay.width <= 1 || snowOverlay.height <= 1;
             if (forced || snowMissing) {
+                // 初雪は新規レイヤーの追加であって、健全な既存地図の合成面欠損ではない。
+                // 通常のPC地図で全レイヤーを付け直すと、災害終了時のflashを誘発する。
+                const newSnowLayer = document.body.classList.contains('is-pc')
+                    && !forced && clanHealthy && !snowOverlay && this._snowOverlayDirty && this.lastSnowHash == null && !this._lastSnowOverlay;
                 this.lastSnowHash = null;
                 this._snowOverlayDirty = true;
                 this._lastSnowOverlay = null;
                 if (typeof this.updateSnowOverlay === 'function') this.updateSnowOverlay();
                 recovered = true;
-                needsCompositeRefresh = true;
+                if (!newSnowLayer) needsCompositeRefresh = true;
             }
         }
 
