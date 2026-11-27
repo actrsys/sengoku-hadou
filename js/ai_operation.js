@@ -1323,6 +1323,10 @@ class AIOperationManager {
                     prepTurns = Math.round(((ratio - 0.25) / 1.05) * 4);
                 }
                 
+                // 新規開始月の自主攻撃は、即時出撃だけを翌月へ繰り延べる。
+                // 候補ごとに先に補正し、既存の積雪・軍団間の予定競合調整と作戦期限に反映する。
+                if (prepTurns === 0 && turnManager?.isInitialNewGameTurn?.()) prepTurns = 1;
+
                 // ★雪国かどうかを判定するための準備をします
                 // 陸奥、出羽、越後、越中、越前、加賀、能登、若狭、信濃、上野、下野、飛騨、佐渡、蝦夷
                 const snowProvs = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 28, 65, 67];

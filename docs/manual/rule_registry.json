@@ -76,7 +76,7 @@
     {
       "id": "RULE-INITIAL-MOVEMENT",
       "area": "ゲーム固有仕様",
-      "owner": "TurnManager/AIStaffing",
+      "owner": "TurnManager/AIStaffing/AIOperationManager",
       "anchor": "新規開始月の自主移動抑制：",
       "status": "current"
     },

@@ -46368,6 +46368,76 @@ test('版付きgame.jsを含む実際の起動manifestをStartupLoaderが受理�
     loadScript(ctx,'js/startup_loader.js');assert.strictEqual(await complete,true);assert.deepStrictEqual(loaded,sources);assert.strictEqual(errorPanel.hidden,true);
 });
 
+test('新規開始月の攻撃作戦は即時出撃だけ翌月へ繰り延べ、予備目標・期限・積雪・競合を維持する', async () => {
+    const math=Object.create(Math); math.random=()=>0;
+    const ctx = createContext({
+        Math:math,
+        document: {body: {classList: {contains: () => true}}},
+        MainParams: {StartYear: 1560, StartMonth: 1},
+        DiplomacyRules: {isProtectedFromImmediateAttack: () => false}
+    });
+    loadScript(ctx, 'js/turn_manager.js');
+    loadScript(ctx, 'js/ai_operation.js');
+    const Manager = vm.runInContext('AIOperationManager', ctx);
+    const a = {id:1, name:'甲', ownerClan:1, legionId:0, castellanId:101, provinceId:25,
+        soldiers:11000, kokudaka:30, defense:10, adjacentCastleIds:[2,10]};
+    const b = {id:2, name:'乙', ownerClan:1, legionId:0, castellanId:102, provinceId:25,
+        soldiers:12000, kokudaka:30, defense:10, adjacentCastleIds:[1,10]};
+    const target = {id:10, name:'敵城', ownerClan:2, provinceId:25,
+        soldiers:500, defense:100, adjacentCastleIds:[1,2]};
+    const other={...target,id:11,name:'第二敵城'}; b.adjacentCastleIds.push(11); other.adjacentCastleIds=[2];
+    const byId = new Map([a,b,target,other].map(c=>[c.id,c]));
+    const game = {
+        gameStartYear:1560, gameStartMonth:4, year:1560, month:4, phase:'game', playerClanId:99,
+        clans:[{id:1}, {id:2}], provinces:[],
+        getClanCastles:id => [a,b,target,other].filter(c=>c.ownerClan === id),
+        getCastle:id => byId.get(id), getBusho:id => ({id,isActionDone:false}),
+        getClanDaimyo:()=>({intelligence:80}), getRelation:()=>({status:'敵対'}),
+        getCurrentTurnId:()=>10, getClanTotalSoldiers:()=>23000,
+        diplomacyManager:{isNonAggression:()=>false},
+        kunishuSystem:{getKunishusInCastle:()=>[]},
+        aiEngine:{decideAttackTarget: (origin, general, candidates)=>({
+            target:candidates.find(t=>t.id===(origin.id===1?10:11)), score:origin.id===1?85:75, sendSoldiers:300, sendRice:300
+        })}
+    };
+    const tm=game.turnManager=new (vm.runInContext('TurnManager',ctx))(game);
+    tm.beginNewGameFirstTurn();
+    const manager = new Manager(game);
+    manager.operations[1] = {};
+    manager.grandObjectives[1] = {0:{type:'国攻略',targetProvId:25}};
+    manager.getOperationLogInfo = () => ({clanName:'甲家',commanderName:'甲',grandObjStr:'国攻略'});
+    await manager.generateOperation(1,0);
+    const plan = manager.operations[1][0];
+    assert.strictEqual(plan.type,'攻撃');assert.strictEqual(plan.status,'準備中');
+    assert.strictEqual(plan.turnsRemaining,1);assert.strictEqual(plan.maxTurns,4);
+    assert.strictEqual(plan.attackTargets.length,2);
+    for(const t of plan.attackTargets){assert.strictEqual(t.turnsRemaining,1);assert.strictEqual(t.maxTurns,4);}
+    tm.abortForScenarioTransition();game.month++;await manager.updateOperation(1,0);
+    assert.strictEqual(plan.status,'実行中');assert.strictEqual(plan.turnsRemaining,0);assert.strictEqual(plan.maxTurns,3);
+    async function regenerate(){delete manager.operations[1][0];await manager.generateOperation(1,0);return manager.operations[1][0];}
+    game.month=4;const loaded=await regenerate();assert.strictEqual(loaded.turnsRemaining,0);assert.strictEqual(loaded.status,'実行中');
+    target.soldiers=8000;const normal=await regenerate();tm.beginNewGameFirstTurn();const later=await regenerate();assert.strictEqual(later.turnsRemaining,normal.turnsRemaining);assert.ok(later.turnsRemaining>0);
+    target.soldiers=500;manager.operations[1][1]={type:'攻撃',targetId:10,isKunishuTarget:false,turnsRemaining:1};
+    const clash=await regenerate();assert.strictEqual(clash.turnsRemaining,2);assert.strictEqual(clash.maxTurns,5);delete manager.operations[1][1];
+    game.month=11;a.provinceId=b.provinceId=target.provinceId=other.provinceId=1;
+    const snow=await regenerate();assert.strictEqual(snow.turnsRemaining,4);assert.strictEqual(snow.maxTurns,7);
+    game.month=12;a.provinceId=b.provinceId=target.provinceId=other.provinceId=25;
+    const december=await regenerate();assert.strictEqual(december.turnsRemaining,1);
+    // 空き拠点と諸勢力の自主鎮圧も同じ攻撃候補を通る。
+    target.ownerClan=0;const vacant=await regenerate();assert.strictEqual(vacant.targetId,10);assert.strictEqual(vacant.turnsRemaining,1);
+    target.ownerClan=2;
+    const k={id:50,soldiers:200,defense:0,getRelation:()=>0,getName:()=> '諸勢力'};
+    Object.assign(game.kunishuSystem,{getKunishusInCastle:id=>id===1?[k]:[],getSubjugationEligibility:()=>({eligible:true}),calcMilitaryStrength:()=>200,getKunishu:()=>k});
+    const decide=game.aiEngine.decideAttackTarget;
+    game.aiEngine.decideAttackTarget=(origin,general,candidates)=>origin.id===1?{target:candidates.find(t=>t.isKunishuTarget),score:85,sendSoldiers:300,sendRice:300}:decide(origin,general,candidates);
+    const subjugate=await regenerate();assert.strictEqual(subjugate.isKunishuTarget,true);assert.strictEqual(subjugate.targetId,50);assert.strictEqual(subjugate.turnsRemaining,1);
+    // 保存された延期計画は、ロード時のフラグ解除で書き換えない。
+    const saved=JSON.parse(JSON.stringify(manager.save()));tm.abortForScenarioTransition();
+    const restored=new Manager(game);restored.load(saved);assert.strictEqual(restored.operations[1][0].turnsRemaining,1);
+    assert.strictEqual(restored.operations[1][0].status,'準備中');
+
+});
+
 Promise.all(pendingTests).then(() => {
     console.log(`\n${passed} passed, ${failed} failed, ${skipped} skipped`);
     if (failed > 0) process.exit(1);
