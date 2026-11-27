@@ -46446,21 +46446,21 @@ test('新規開始月の攻撃作戦は即時出撃だけ翌月へ繰り延べ�
 
 });
 
-test('r987 AI進捗は100ms未満非表示、連続更新で猶予維持、通常操作返却のみ最低300ms', async () => {
+test('r992 AI進捗は即時表示、連続更新で開始時刻維持、通常操作返却のみ最低300ms', async () => {
     let now=0, next=0; const timers=new Map();
     const tick=ms=>{const end=now+ms; while(true){const pending=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!pending)break;now=pending[1].at;timers.delete(pending[0]);pending[1].fn();}now=end;};
     const classes=new Set(['hide-text']);const guard={style:{opacity:'1'},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)}};
     const ctx=createContext({performance:{now:()=>now},setTimeout:(fn,ms)=>{timers.set(++next,{fn,at:now+ms});return next;},clearTimeout:id=>timers.delete(id),document:{getElementById:id=>id==='ai-guard'?guard:null}});
     vm.runInContext('class UIManager {}',ctx);loadScript(ctx,'js/ui_map.js');
     const ui=vm.runInContext('new UIManager()',ctx);ui.game={isProcessingAI:true};ui.aiGuard=guard;
-    ui.applyAIGuardTextState();tick(50);assert.ok(classes.has('hide-text'));assert.ok(!classes.has('hidden'));
-    assert.strictEqual(ui.waitForAIProgressMinimum(),null);tick(200);assert.ok(classes.has('hide-text'));assert.strictEqual(timers.size,0);
-    ui.applyAIGuardTextState();tick(60);ui.applyAIGuardTextState();tick(39);assert.ok(classes.has('hide-text'));tick(1);assert.ok(!classes.has('hide-text'));
-    tick(20);let finished=false;const pending=ui.waitForAIProgressMinimum().then(()=>finished=true);tick(279);await Promise.resolve();assert.ok(!finished);tick(1);await pending;assert.ok(finished);assert.strictEqual(ui.waitForAIProgressMinimum(),null);
-    ui.mapGuardCount=1;ui.applyAIGuardTextState();assert.ok(classes.has('hide-text'));ui.mapGuardCount=0;ui.applyAIGuardTextState();tick(50);ui.game.selectionMode='select';ui.applyAIGuardTextState();tick(100);assert.ok(classes.has('hide-text'));
-    ui.game.selectionMode=null;ui.applyAIGuardTextState();tick(50);ui._resetTransientThinking('progress');tick(200);assert.ok(classes.has('hide-text'));assert.strictEqual(timers.size,0);
-    // 別ラベルも同じ予約で処理し、終了後に遅延表示しない。
-    let war=true;ui._syncTransientThinking('war',guard,'hidden',()=>war);tick(99);assert.ok(classes.has('hidden'));war=false;ui._resetTransientThinking('war');tick(200);assert.ok(classes.has('hidden'));assert.strictEqual(timers.size,0);
+    ui.applyAIGuardTextState();assert.ok(!classes.has('hide-text'));assert.ok(!classes.has('hidden'));assert.strictEqual(timers.size,0);
+    tick(50);ui.applyAIGuardTextState();assert.ok(!classes.has('hide-text'));assert.strictEqual(ui._transientThinking.progress.shownAt,0);
+    let finished=false;const pending=ui.waitForAIProgressMinimum().then(()=>finished=true);tick(249);await Promise.resolve();assert.ok(!finished);tick(1);await pending;assert.ok(finished);assert.strictEqual(ui.waitForAIProgressMinimum(),null);
+    ui.mapGuardCount=1;ui.applyAIGuardTextState();assert.ok(classes.has('hide-text'));ui.mapGuardCount=0;ui.applyAIGuardTextState();assert.ok(!classes.has('hide-text'));assert.strictEqual(ui._transientThinking.progress.shownAt,300);
+    ui.game.selectionMode='select';ui.applyAIGuardTextState();assert.ok(classes.has('hide-text'));assert.strictEqual(ui.waitForAIProgressMinimum(),null);
+    ui.game.selectionMode=null;ui.applyAIGuardTextState();assert.ok(!classes.has('hide-text'));tick(20);ui._resetTransientThinking('progress');tick(200);assert.ok(classes.has('hide-text'));assert.strictEqual(timers.size,0);
+    // 戦争思考中も表示可能なら即時表示し、非表示後に予約を残さない。
+    let war=true;ui._syncTransientThinking('war',guard,'hidden',()=>war);assert.ok(!classes.has('hidden'));war=false;ui._syncTransientThinking('war',guard,'hidden',()=>war);assert.ok(classes.has('hidden'));tick(200);assert.ok(classes.has('hidden'));assert.strictEqual(timers.size,0);
 });
 
 
@@ -46628,6 +46628,31 @@ test('r990 1560・1570の実シナリオ初期姫生成と月次外交から通�
         assert.ok(plans>0&&executed>0,`${folder}: 現行データから到達可能`);
         assert.ok(princesses.filter(p=>p.id>=90000&&p.status==='married').length>=executed);
     }
+});
+
+// r991: 保存済みの外交計画をClan初期化で失わない。
+test('r991 婚姻計画の現行セーブ往復と消費済み計画の再実行防止', async()=>{
+    const f=makeAIOrdinaryMarriageFixture();assert.strictEqual(f.plan()?.action,'marriage');
+    Object.assign(f.ctx,{TextEncoder,TextDecoder,Uint8Array,SCENARIOS:[]});
+    loadScript(f.ctx,'js/models.js');loadScript(f.ctx,'js/save_manager.js');
+    const Clan=vm.runInContext('Clan',f.ctx),saver=new f.ctx.SaveManager(f.game);
+    Object.assign(f.game,{scenarioFolder:'1560_okehazama',scenarioName:'試験',provinces:[],legions:[],kunishuSystem:{kunishus:[]},turnQueue:f.castles,currentIndex:0,historySystem:{serialize:()=>[],record:(text,meta)=>f.entries.push({text,meta})}});
+    const snapshot=JSON.parse(JSON.stringify(await saver._createSaveDataObj({includeThumbnail:false})));
+    assert.strictEqual(snapshot.clans[0].currentDiplomacyTarget.action,'marriage');
+    // 製品ロードと同じClan初期化→保存計画復元の順序。画像等はこの試験では呼ばない。
+    const restore=rows=>{const restored=rows.map(row=>new Clan(row));f.clans.splice(0,f.clans.length,...restored);saver._restoreSavedDiplomacyPlans(rows);};
+    restore(snapshot.clans);assert.strictEqual(f.clans[0].currentDiplomacyTarget?.action,'marriage');
+    f.exec();assert.strictEqual(f.princess.status,'married');assert.strictEqual(f.entries.length,1);assert.strictEqual(f.clans[0].currentDiplomacyTarget,null);
+    const after=JSON.parse(JSON.stringify(await saver._createSaveDataObj({includeThumbnail:false})));
+    restore(after.clans);assert.strictEqual(f.clans[0].currentDiplomacyTarget,null);assert.strictEqual(f.entries.length,1);
+});
+test('r991 外交計画復元は既存6種の値を維持し無効な計画だけを隔離する',()=>{
+    const ctx=createContext();loadScript(ctx,'js/config.js');loadScript(ctx,'js/constants.js');loadScript(ctx,'js/models.js');loadScript(ctx,'js/save_manager.js');
+    const Clan=vm.runInContext('Clan',ctx);
+    const plans=[{action:'goodwill',gold:300,reason:'vassal_peaceful_upgrade'},{action:'alliance',gold:0,reason:''},{action:'dominate',gold:0,reason:''},{action:'truce',gold:0,reason:'',score:93.5},{action:'court_truce',gold:2000,reason:''},{action:'marriage',gold:0,reason:''}];
+    for(const plan of plans){const row={id:1,leaderId:10,currentDiplomacyTarget:{targetId:2,...plan}},rows=[row,{id:2,leaderId:20}];const game={clans:rows.map(x=>new Clan(x)),playerClanId:99};const saver=new ctx.SaveManager(game);saver._restoreSavedDiplomacyPlans(rows);assert.deepStrictEqual(JSON.parse(JSON.stringify(game.clans[0].currentDiplomacyTarget)),row.currentDiplomacyTarget);assert.notStrictEqual(game.clans[0].currentDiplomacyTarget,row.currentDiplomacyTarget);}
+    for(const plan of [null,[],{action:'unknown',targetId:2,gold:0},{action:'marriage',targetId:1,gold:0},{action:'marriage',targetId:3,gold:0},{action:'goodwill',targetId:2,gold:-1},{action:'goodwill',targetId:2,gold:1.5},{action:'truce',targetId:2,gold:0,score:NaN}]){const rows=[{id:1,leaderId:10,currentDiplomacyTarget:plan},{id:2,leaderId:20}];const game={clans:rows.map(x=>new Clan(x)),playerClanId:99};new ctx.SaveManager(game)._restoreSavedDiplomacyPlans(rows);assert.strictEqual(game.clans[0].currentDiplomacyTarget,null);}
+    const rows=[{id:1,leaderId:10,currentDiplomacyTarget:{action:'marriage',targetId:2,gold:0}},{id:2,leaderId:20}];const game={clans:rows.map(x=>new Clan(x)),playerClanId:2};new ctx.SaveManager(game)._restoreSavedDiplomacyPlans(rows);assert.strictEqual(game.clans[0].currentDiplomacyTarget,null);
 });
 
 Promise.all(pendingTests).then(() => {

@@ -676,6 +676,32 @@ class SaveManager {
         }
     }
     
+    // 月初の外交計画はClanの保存値に含まれる。モデル初期化後に有効な計画だけを復元し、
+    // 立案の再抽選は行わない。欠損・失効した計画はその計画だけ破棄する。
+    _restoreSavedDiplomacyPlans(savedClans) {
+        const restored = new Map(this.game.clans.map(clan => [Number(clan.id), clan]));
+        const actions = new Set(['goodwill', 'alliance', 'dominate', 'truce', 'court_truce', 'marriage']);
+        for (const row of savedClans) {
+            const source = restored.get(Number(row.id));
+            const plan = row.currentDiplomacyTarget;
+            if (!source || source.isDestroyed || !plan || typeof plan !== 'object' || Array.isArray(plan)) continue;
+            const target = restored.get(Number(plan.targetId));
+            if (!target || target.isDestroyed || target.id <= 0 || source.id <= 0 || target === source
+                || !Number.isSafeInteger(plan.targetId) || !actions.has(plan.action)
+                || !Number.isSafeInteger(plan.gold) || plan.gold < 0) continue;
+            // 通常婚姻はAI同士のみ。その他の外交ではプレイヤー宛も既存の正規経路。
+            if (plan.action === 'marriage' && (Number(source.id) === Number(this.game.playerClanId)
+                || Number(target.id) === Number(this.game.playerClanId))) continue;
+            const next = { targetId: plan.targetId, action: plan.action, gold: plan.gold,
+                reason: plan.reason === 'vassal_peaceful_upgrade' ? plan.reason : '' };
+            if (plan.action === 'truce') {
+                if (!Number.isFinite(plan.score) || plan.score < 0) continue;
+                next.score = plan.score;
+            }
+            source.currentDiplomacyTarget = next;
+        }
+    }
+
     // どんな方法でロードした時も、この魔法で「受け取ったデータ」をゲーム内に展開します
     async _restoreSaveDataObj(d) {
         // 復元処理は最初のawaitより前に遷移世代を所有する。
@@ -829,6 +855,7 @@ class SaveManager {
 
         this.game.kunishuSystem.setKunishuData(d.kunishus.map(k => new Kunishu(k)));
         this.game.clans = d.clans.map(c => new Clan(c));
+        this._restoreSavedDiplomacyPlans(d.clans);
         
         const commonData = await DataManager.loadCommonData();
         if (!isRestoreFlowLatest()) return false;

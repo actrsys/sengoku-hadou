@@ -3135,16 +3135,16 @@ async function validateDisasterMapHandoff(cdp) {
     console.log('✓ r917 災害イベント地図 PC/スマホ 会話→地図公開・旧会話閉鎖・復帰/DOM解放 paint監視');
 }
 
-async function validateAIThinkingDebounce(cdp) {
+async function validateAIThinkingPresentation(cdp) {
     const css=fs.readFileSync(path.join(ROOT,'css/style.css'),'utf8');
     const source=fs.readFileSync(path.join(ROOT,'js/ui.js'),'utf8')+'\n'+fs.readFileSync(path.join(ROOT,'js/ui_map.js'),'utf8');
     const html=`<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div id="game-screen" style="position:absolute;inset:0;background:#334438"><div id="ai-guard" class="hide-text"><div class="loading-spinner"></div><div>思考中...</div></div><div id="dialog-modal" class="hidden"></div></div></body></html>`;
     for(const [width,height,pc] of [[1280,720,true],[390,844,false]]){
         await cdp.call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:!pc});
-        const r=await cdp.call('Runtime.evaluate',{expression:`(async()=>{document.open();document.write(${JSON.stringify(html)});document.close();document.body.classList.toggle('is-pc',${pc});const UI=new Function(${JSON.stringify(source+'\nreturn UIManager;')})();const ui=Object.create(UI.prototype);ui.game={isProcessingAI:true};ui.aiGuard=document.getElementById('ai-guard');const g=ui.aiGuard,sleep=ms=>new Promise(r=>setTimeout(r,ms));const visible=()=>!g.classList.contains('hide-text');ui.updateAIProgress(1,100);await sleep(35);const short=!visible()&&getComputedStyle(g).pointerEvents==='auto';ui.waitForAIProgressMinimum();await sleep(130);const cancelled=!visible();ui.updateAIProgress(2,100);await sleep(50);ui.updateAIProgress(3,100);await sleep(75);const shown=visible(),count=g.querySelector('[data-ai-progress-current]').textContent;const at=performance.now();await ui.waitForAIProgressMinimum();const waited=performance.now()-at,held=visible();ui.hideAIGuardTemporarily();const hiddenImmediately=!visible();ui.restoreAIGuard();await sleep(30);const gap=!visible();await sleep(100);const restored=visible();ui.game.isProcessingAI=false;ui.clearProcessingStatus();const stopped=!visible();return {short,cancelled,shown,count,waited,held,hiddenImmediately,gap,restored,stopped};})()`,awaitPromise:true,returnByValue:true});
-        if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));const v=r.result.value;console.log('  AI thinking '+(pc?'PC':'SP')+' '+JSON.stringify(v));assert.ok(v.short&&v.cancelled&&v.shown&&v.count==='3'&&v.held&&v.hiddenImmediately&&v.gap&&v.restored&&v.stopped&&v.waited>=100&&v.waited<350,JSON.stringify(v));
+        const r=await cdp.call('Runtime.evaluate',{expression:`(async()=>{document.open();document.write(${JSON.stringify(html)});document.close();document.body.classList.toggle('is-pc',${pc});const UI=new Function(${JSON.stringify(source+'\nreturn UIManager;')})();const ui=Object.create(UI.prototype);ui.game={isProcessingAI:true};ui.aiGuard=document.getElementById('ai-guard');const g=ui.aiGuard,sleep=ms=>new Promise(r=>setTimeout(r,ms));const visible=()=>!g.classList.contains('hide-text');ui.updateAIProgress(1,100);const immediate=visible()&&getComputedStyle(g).pointerEvents==='auto';await sleep(35);const short=visible();const shortAt=performance.now();await ui.waitForAIProgressMinimum();const shortWait=performance.now()-shortAt;ui.game.isProcessingAI=false;ui.clearProcessingStatus();await sleep(130);const cancelled=!visible();ui.game.isProcessingAI=true;ui.updateAIProgress(2,100);await sleep(50);ui.updateAIProgress(3,100);await sleep(75);const shown=visible(),count=g.querySelector('[data-ai-progress-current]').textContent;const at=performance.now();await ui.waitForAIProgressMinimum();const waited=performance.now()-at,held=visible();ui.hideAIGuardTemporarily();const hiddenImmediately=!visible();ui.restoreAIGuard();const restoredImmediately=visible();await sleep(30);const restored=visible();ui.game.isProcessingAI=false;ui.clearProcessingStatus();const stopped=!visible();return {immediate,short,shortWait,cancelled,shown,count,waited,held,hiddenImmediately,restoredImmediately,restored,stopped};})()`,awaitPromise:true,returnByValue:true});
+        if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));const v=r.result.value;console.log('  AI thinking '+(pc?'PC':'SP')+' '+JSON.stringify(v));assert.ok(v.immediate&&v.short&&v.shortWait>=200&&v.shortWait<380&&v.cancelled&&v.shown&&v.count==='3'&&v.held&&v.hiddenImmediately&&v.restoredImmediately&&v.restored&&v.stopped&&v.waited>=100&&v.waited<350,JSON.stringify(v));
     }
-    console.log('✓ r987 AI進捗の短時間非表示・連続更新・最低表示時間・強制非表示 (PC/SP)');
+    console.log('✓ r992 AI進捗の即時表示・連続更新・最低表示時間・強制非表示 (PC/SP)');
 }
 
 async function validateDialogToBattleMapHandoff(cdp) {
@@ -3620,7 +3620,7 @@ async function main() {
         await validateSelectorCloseContentHandoff(cdp);
         await validateCoveredCloseSuccessorHandoff(cdp);
         await validateDisasterMapHandoff(cdp);
-        await validateAIThinkingDebounce(cdp);
+        await validateAIThinkingPresentation(cdp);
         await validateDialogToBattleMapHandoff(cdp);
         await validateWarProgressAndResultLayout(cdp);
     } finally {

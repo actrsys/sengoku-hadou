@@ -2857,7 +2857,7 @@ Object.assign(UIManager.prototype, {
         this._syncTransientThinking('progress', guard, 'hide-text', eligible);
     },
 
-    // 表示専用。AI処理・操作ロック・拠点ごとの更新とは独立した短命な予約。
+    // 表示専用。AI処理・操作ロックとは独立して表示開始時刻を管理する。
     _thinkingNow() {
         return typeof performance !== 'undefined' ? performance.now() : Date.now();
     },
@@ -2865,7 +2865,6 @@ Object.assign(UIManager.prototype, {
     _resetTransientThinking(key) {
         const state = this._transientThinking?.[key];
         if (!state) return;
-        if (state.timer != null) clearTimeout(state.timer);
         state.element.classList.add(state.hiddenClass);
         delete this._transientThinking[key];
     },
@@ -2878,18 +2877,14 @@ Object.assign(UIManager.prototype, {
             element.classList.add(hiddenClass);
             return;
         }
-        if (state && state.element === element) return; // 連続したカウント更新で猶予をリセットしない
+        if (state && state.element === element && state.hiddenClass === hiddenClass
+            && !element.classList.contains(hiddenClass)) {
+            state.eligible = eligible;
+            return; // 連続したカウント更新で表示開始時刻をリセットしない
+        }
         this._resetTransientThinking(key);
-        element.classList.add(hiddenClass);
-        state = { element, hiddenClass, eligible, timer: null, shownAt: null };
-        this._transientThinking[key] = state;
-        state.timer = setTimeout(() => {
-            if (this._transientThinking?.[key] !== state) return;
-            state.timer = null;
-            if (!state.eligible()) { this._resetTransientThinking(key); return; }
-            element.classList.remove(hiddenClass);
-            state.shownAt = this._thinkingNow();
-        }, 100);
+        element.classList.remove(hiddenClass);
+        this._transientThinking[key] = { element, hiddenClass, eligible, shownAt: this._thinkingNow() };
     },
 
     // 操作返却の境界だけで不足分を待つ。会話・地図演出への遷移は即時非表示を優先する。
