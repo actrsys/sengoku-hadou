@@ -370,6 +370,28 @@ class UIInfoManager {
         });
     }
 
+    // 関係列の順序は表示上の規則。ゲーム内の外交判定には使わない。
+    _getDiplomacyStatusRank(status) {
+        const S = window.GameConstants.DiplomacyStatus;
+        switch (status) {
+            case '自家': return 0;
+            case S.ALLIANCE: return 1;
+            case S.DOMINANT: return 2;
+            case S.SUBORDINATE: return 3;
+            case S.FRIENDLY: return 4;
+            case S.TRUCE: return 5;
+            case S.HOSTILE: return 7;
+            default: return 6;
+        }
+    }
+
+    // 外交状態の意味はRules、文字色は情報一覧が担当する。婚姻は別列。
+    _getDiplomacyStatusClass(status) {
+        if (window.DiplomacyRules.isHostile(status)) return 'text-red';
+        if (window.DiplomacyRules.isPeaceful(status)) return 'text-green';
+        return 'text-white';
+    }
+
     // --- ソート状態の一元管理 ---
     // ★新機能：全リスト共通で「前回の並び順（ベース）」を取得する魔法
     _prepareStableSortBase(listId, baseArray, sortKey) {
@@ -836,9 +858,8 @@ class UIInfoManager {
                         valB = b.id === this.game.playerClanId ? 999 : b.friendScore;
                         break;
                     case 'relation':
-                        const relationRank = { "自家": 0, "同盟": 1, "支配": 2, "従属": 3, "友好": 4, "和睦": 5, "普通": 6, "敵対": 7 };
-                        valA = relationRank[a.friendStatus] !== undefined ? relationRank[a.friendStatus] : 6;
-                        valB = relationRank[b.friendStatus] !== undefined ? relationRank[b.friendStatus] : 6;
+                        valA = this._getDiplomacyStatusRank(a.friendStatus);
+                        valB = this._getDiplomacyStatusRank(b.friendStatus);
                         break;
                     case 'marriage': valA = a.isMarriage ? 1 : 0; valB = b.isMarriage ? 1 : 0; break;
                 }
@@ -933,10 +954,7 @@ class UIInfoManager {
 
             let cells = [];
             if (this.daimyoCurrentTab === 'status') {
-                let statusClass = "text-white";
-                if (d.friendStatus === '敵対') statusClass = 'text-red';
-                else if (['同盟', '支配', '従属', '婚姻', '和睦', '友好'].includes(d.friendStatus)) statusClass = 'text-green';
-                else if (d.friendStatus === '自家') statusClass = 'text-orange';
+                const statusClass = d.friendStatus === '自家' ? 'text-orange' : this._getDiplomacyStatusClass(d.friendStatus);
 
                 const powerBarHtml = this._createBarHtml((d.power / maxPower) * 100, 'power');
                 const friendBarHtml = d.id === this.game.playerClanId ? "" : this._createBarHtml(d.friendScore, 'friend');
@@ -1327,9 +1345,8 @@ class UIInfoManager {
                     case 'name': valA = a.name; valB = b.name; break;
                     case 'sentiment': valA = a.sentiment; valB = b.sentiment; break;
                     case 'status':
-                        const relationRank = { "自家": 0, "同盟": 1, "支配": 2, "従属": 3, "友好": 4, "和睦": 5, "普通": 6, "敵対": 7 };
-                        valA = relationRank[a.status] !== undefined ? relationRank[a.status] : 6;
-                        valB = relationRank[b.status] !== undefined ? relationRank[b.status] : 6;
+                        valA = this._getDiplomacyStatusRank(a.status);
+                        valB = this._getDiplomacyStatusRank(b.status);
                         break;
                     case 'period': valA = a.trucePeriod || 0; valB = b.trucePeriod || 0; break;
                     case 'marriage': valA = a.isMarriage ? 1 : 0; valB = b.isMarriage ? 1 : 0; break;
@@ -1350,9 +1367,7 @@ class UIInfoManager {
 
         let items = [];
         relations.forEach(r => {
-            let statusClass = "text-white";
-            if (r.status === '敵対') statusClass = 'text-red';
-            else if (['同盟', '支配', '従属', '婚姻', '和睦', '友好'].includes(r.status)) statusClass = 'text-green';
+            const statusClass = this._getDiplomacyStatusClass(r.status);
 
             const friendBarHtml = this._createBarHtml(r.sentiment, 'friend');
 
@@ -3028,9 +3043,9 @@ class UIInfoManager {
             const friendBarHtml = this._createBarHtml(relVal, 'friend');
             
             let relStatus = "普通";
-            let relClass = "text-white";
-            if (relVal >= 70) { relStatus = "友好"; relClass = "text-green"; }
-            else if (relVal < 40) { relStatus = "敵対"; relClass = "text-red"; }
+            if (relVal >= 70) relStatus = "友好";
+            else if (relVal < 40) relStatus = "敵対";
+            const relClass = this._getDiplomacyStatusClass(relStatus);
 
             const isSelected = this.commonSelectedIds && this.commonSelectedIds.includes(kunishu.id);
             let onClickStr = null;
@@ -3178,23 +3193,21 @@ class UIInfoManager {
 
             let relVal = 50;
             let relStatus = "普通";
-            let statusClass = "text-white";
 
             if (force.isKunishu) {
                 const k = this.game.kunishuSystem.getKunishu(force.id);
                 if (k) relVal = k.getRelation(this.game.playerClanId);
                 
-                if (relVal >= 70) { relStatus = "友好"; statusClass = "text-green"; }
-                else if (relVal < 40) { relStatus = "敵対"; statusClass = "text-red"; }
+                if (relVal >= 70) relStatus = "友好";
+                else if (relVal < 40) relStatus = "敵対";
             } else {
                 const rel = this.game.getRelation(this.game.playerClanId, force.id);
                 if (rel) {
                     relVal = rel.sentiment;
                     relStatus = rel.status;
-                    if (relStatus === '敵対') statusClass = 'text-red';
-                    else if (['同盟', '支配', '従属', '和睦', '友好'].includes(relStatus)) statusClass = 'text-green';
                 }
             }
+            const statusClass = this._getDiplomacyStatusClass(relStatus);
             const friendBarHtml = this._createBarHtml(relVal, 'friend');
             const isSelected = this.commonSelectedIds && this.commonSelectedIds.includes(index);
             

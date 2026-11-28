@@ -165,9 +165,7 @@ class DiplomacyManager {
 
         relationSnapshots.forEach(snapshot => {
             const inverted = Math.max(30, Math.min(50, 100 - snapshot.sentiment));
-            let status = window.GameConstants.DiplomacyStatus.NORMAL;
-            if (inverted >= 70) status = window.GameConstants.DiplomacyStatus.FRIENDLY;
-            if (inverted <= 30) status = window.GameConstants.DiplomacyStatus.HOSTILE;
+            const status = window.DiplomacyRules.getBasicStatusForSentiment(inverted);
 
             this.changeStatus(successorClanId, snapshot.otherId, status);
             // 再編の友好度も通常外交と同じ双方向更新窓口を正本にする。
@@ -631,11 +629,7 @@ class DiplomacyManager {
         this.setSentimentAbsolute(clanId, targetId, nextSentiment);
         if (!window.DiplomacyRules.isBasicSentimentStatus(relation.status)) return;
 
-        const nextStatus = nextSentiment >= 70
-            ? window.GameConstants.DiplomacyStatus.FRIENDLY
-            : nextSentiment <= 30
-                ? window.GameConstants.DiplomacyStatus.HOSTILE
-                : window.GameConstants.DiplomacyStatus.NORMAL;
+        const nextStatus = window.DiplomacyRules.getBasicStatusForSentiment(nextSentiment);
         if (nextStatus !== relation.status) {
             this.changeStatus(clanId, targetId, nextStatus);
         }
@@ -753,11 +747,7 @@ class DiplomacyManager {
         for (const [clanAId, clanBId] of expiredTrucePairs.values()) {
             const relation = this.getRelation(clanAId, clanBId);
             if (!relation || relation.status !== window.GameConstants.DiplomacyStatus.TRUCE) continue;
-            const nextStatus = relation.sentiment >= 70
-                ? window.GameConstants.DiplomacyStatus.FRIENDLY
-                : relation.sentiment <= 30
-                    ? window.GameConstants.DiplomacyStatus.HOSTILE
-                    : window.GameConstants.DiplomacyStatus.NORMAL;
+            const nextStatus = window.DiplomacyRules.getBasicStatusForSentiment(relation.sentiment);
             this.changeStatus(clanAId, clanBId, nextStatus);
             if (nextStatus === window.GameConstants.DiplomacyStatus.HOSTILE) {
                 recordHostilePair(clanAId, clanBId);
@@ -1521,9 +1511,7 @@ class DiplomacyManager {
         this.updateSentiment(doerClanId, targetClanId, targetDrop);
 
         const newRel = this.getRelation(doerClanId, targetClanId);
-        let newStatus = '普通';
-        if (newRel.sentiment <= 30) newStatus = '敵対';
-        else if (newRel.sentiment >= 70) newStatus = '友好';
+        const newStatus = window.DiplomacyRules.getBasicStatusForSentiment(newRel.sentiment);
         this.changeStatus(doerClanId, targetClanId, newStatus);
 
         if (isBetrayal) {

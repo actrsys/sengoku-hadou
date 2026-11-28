@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r1001'
+        Version: 'r1003'
     },
 
     Ending: {
@@ -74,6 +74,11 @@ window.GameConfig = {
             }
         },
         Diplomacy: {
+            // 大名家間の通常外交状態を友好度から求める境界。諸勢力の表示や断交ペナルティの条件とは別。
+            BasicSentiment: {
+                FriendlyMin: 70,
+                HostileMax: 30
+            },
             Marriage: {
                 // 婚姻は基本外交状態を上書きせず、両家の関係に重なる恒久的な補正として扱う。
                 SentimentFloor: 75,

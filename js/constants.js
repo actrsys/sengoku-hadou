@@ -120,6 +120,15 @@ window.DiplomacyRules = Object.freeze({
         return status === window.GameConstants.DiplomacyStatus.HOSTILE;
     },
 
+    // 大名家間の通常外交状態だけを求める。特殊関係の維持・解除はManagerが担当する。
+    getBasicStatusForSentiment(sentiment) {
+        const S = window.GameConstants.DiplomacyStatus;
+        const cfg = window.GameConfig.Main.Diplomacy.BasicSentiment;
+        if (sentiment >= cfg.FriendlyMin) return S.FRIENDLY;
+        if (sentiment <= cfg.HostileMax) return S.HOSTILE;
+        return S.NORMAL;
+    },
+
     isBasicSentimentStatus(status) {
         const S = window.GameConstants.DiplomacyStatus;
         return status === S.NORMAL || status === S.FRIENDLY || status === S.HOSTILE;

@@ -20862,6 +20862,7 @@ test('r478 姫詳細の名前・所属・親族名・顔画像を無害化する
 
 test('r478 外交関係・派閥の一覧は名称と保存済み関係表記を無害化する', () => {
     const ctx = createContext({ document: { body: { classList: { contains: () => true } } } });
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/ui_info.js');
     const UI = vm.runInContext('UIInfoManager', ctx);
     const view = Object.create(UI.prototype);
@@ -20894,6 +20895,7 @@ test('r478 外交関係・派閥の一覧は名称と保存済み関係表記を
 
 test('r478 諸勢力選択の可変名称・説明はHTML化せず、装飾要素は維持する', () => {
     const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/ui_info.js');
     const UI = vm.runInContext('UIInfoManager', ctx);
     const view = Object.create(UI.prototype);
@@ -21266,6 +21268,7 @@ test('r482 不正なシナリオfolderをindex読込時に拒否し、正規fold
 // r483: 援軍の勢力選択で、名称だけでなく外交状態と兵数も復元データ由来となる。
 test('r483 援軍勢力選択は保存された関係名と兵数もHTMLとして解釈しない', () => {
     const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/ui_info.js');
     const UI = vm.runInContext('UIInfoManager', ctx);
     const view = Object.create(UI.prototype);
@@ -46940,6 +46943,131 @@ test('初雪追加だけでは健全な勢力色Canvasを付け直さず、欠�
             updateSnowOverlay(){snow++;},_refreshPersistentMapCompositeLayers(){refreshed++;return true;}});
         ui.recoverPersistentMapPresentation(mode==='forced');
         assert.strictEqual(snow,1);assert.strictEqual(refreshed,mode==='new'?0:1,mode);
+    }
+});
+
+test('外交情報一覧は関係の表示順位と色の正本を共用し、婚姻を独立表示する', () => {
+    const states = ['同盟', '支配', '従属', '友好', '和睦', '普通', '敵対'];
+    const expectedClass = status => status === '敵対' ? 'text-red' : status === '普通' ? 'text-white' : 'text-green';
+    for (const isPc of [true, false]) {
+        for (const marriage of [false, true]) {
+            const ctx = createContext({ document: { body: { classList: { contains: () => isPc } } } });
+            loadScript(ctx, 'js/config.js');
+            loadScript(ctx, 'js/constants.js');
+            loadScript(ctx, 'js/ui_info.js');
+            const UI = vm.runInContext('UIInfoManager', ctx);
+            const view = Object.create(UI.prototype);
+            const clans = [{ id: 1, name: '自家', daimyoPrestige: 100 }, ...states.map((status, i) => ({ id: i + 2, name: status, daimyoPrestige: 10 }))].reverse();
+            const getRelation = (_from, to) => ({status: states[to - 2], sentiment: 50, isMarriage: marriage, trucePeriod: 3});
+            const kunishus = [0, 39, 40, 69, 70, 100].map((score, i) => ({id: 20+i, name: `勢力${i}`, getName(){return this.name;}, getRelation(){return score;}, soldiers: 100, daimyoRelations: {1: {status: score >= 70 ? '友好' : score < 40 ? '敵対' : '普通'}}}));
+            view.game = {playerClanId: 1, clans, getClanCastles: () => [{}], getClanBushos: () => [], getBusho: () => null, getCastle: () => null,
+                updateAllClanPrestige(){}, getRelation, kunishuSystem: {getKunishu: id => kunishus.find(k => k.id === id), getAliveKunishus: () => kunishus}};
+            let rendered;
+            view._renderListModal = config => {rendered = config;};
+            view.updateCommonConfirmBtn = () => {};
+            const textOf = cell => cell.match(/>([^<>]*)<\/span>/)?.[1];
+            for (const asc of [true, false]) {
+                view._stableSortBases = {};
+                view.daimyoCurrentSortKey = 'relation'; view.isDaimyoSortAsc = asc;
+                view._renderDaimyoList();
+                const all = ['自家', ...states];
+                if (!asc) all.reverse();
+                assert.deepStrictEqual(Array.from(rendered.items, item => textOf(item.cells[5])), all);
+                for (const item of rendered.items) {
+                    const status = textOf(item.cells[5]);
+                    assert.ok(item.cells[5].includes(status === '自家' ? 'text-orange' : expectedClass(status)));
+                    assert.strictEqual(textOf(item.cells[6]), marriage && status !== '自家' ? '◯' : '');
+                }
+                view.diploCurrentSortKey = 'status'; view.isDiploSortAsc = asc;
+                view._renderDiplomacyList(1, '自家', 'daimyo', null);
+                assert.deepStrictEqual(Array.from(rendered.items, item => textOf(item.cells[2])), all.filter(s => s !== '自家'));
+                for (const item of rendered.items) {
+                    const status = textOf(item.cells[2]);
+                    assert.ok(item.cells[2].includes(expectedClass(status)));
+                    assert.strictEqual(textOf(item.cells[3]), status === '和睦' ? '3ヶ月' : '');
+                    assert.strictEqual(textOf(item.cells[4]), marriage ? '◯' : '');
+                }
+            }
+            view._renderForceSelector(clans.filter(c => c.id !== 1).map(c => ({id:c.id, name:c.name, soldiers:100})), () => {}, null);
+            for (const item of rendered.items) assert.ok(item.cells[4].includes(expectedClass(textOf(item.cells[4]))));
+            view._renderForceSelector(kunishus.map(k => ({...k,isKunishu:true})), () => {}, null);
+            const expected = ['敵対','敵対','普通','普通','友好','友好'];
+            assert.deepStrictEqual(Array.from(rendered.items, item => textOf(item.cells[4])), expected);
+            for (const item of rendered.items) assert.ok(item.cells[4].includes(expectedClass(textOf(item.cells[4]))));
+            view._renderKunishuList(kunishus, null);
+            assert.deepStrictEqual(Array.from(rendered.items, item => textOf(item.cells[6])), expected);
+            for (const item of rendered.items) assert.ok(item.cells[6].includes(expectedClass(textOf(item.cells[6]))));
+        }
+    }
+    const src = read('js/ui_info.js');
+    assert.ok(!src.includes('const relationRank ='), '二つの順位表を残さない');
+    assert.ok(!/\[\s*'同盟',\s*'支配',\s*'従属'/.test(src), '平和関係の意味集合を表示側で再定義しない');
+    assert.ok(src.includes('window.DiplomacyRules.isPeaceful(status)'), '状態の意味は共通Rulesから取得する');
+});
+
+test('通常外交状態の復帰判定は友好度更新・和睦満了・断交・政権再編で同じRulesを使用する', async () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/config.js');
+    loadScript(ctx, 'js/constants.js');
+    loadScript(ctx, 'js/diplomacy.js');
+    const originalRules = ctx.DiplomacyRules;
+    const actualDelegations = [];
+    const expectedDelegations = [];
+    ctx.DiplomacyRules = {...originalRules, getBasicStatusForSentiment(score) {
+        actualDelegations.push(score);
+        return originalRules.getBasicStatusForSentiment(score);
+    }};
+    const Manager = vm.runInContext('DiplomacyManager', ctx);
+    const make = () => {
+        const clans = [1, 2].map(id => ({id, diplomacyValue: {}}));
+        const game = {clans, bushos: [], princesses: [], getClan: id => clans.find(c => c.id === Number(id))};
+        return new Manager(game);
+    };
+    const expected = score => score >= 70 ? '友好' : score <= 30 ? '敵対' : '普通';
+    for (let score = 0; score <= 100; score++) {
+        const dm = make();
+        dm.changeStatus(1, 2, '普通');
+        dm.updateSentiment(1, 2, score - 50);
+        expectedDelegations.push(score);
+        assert.strictEqual(dm.getRelation(1, 2).status, expected(score));
+        assert.strictEqual(dm.getRelation(2, 1).status, expected(score));
+        dm.changeStatus(1, 2, '和睦', 1);
+        dm.setMarriageRelation(1, 2, true);
+        dm.updateSentiment(1, 2, 0);
+        assert.strictEqual(dm.getRelation(1, 2).status, '和睦');
+        await dm.processEndMonth();
+        expectedDelegations.push(score);
+        assert.strictEqual(dm.getRelation(1, 2).status, expected(score));
+        assert.strictEqual(dm.getRelation(2, 1).status, expected(score));
+        assert.strictEqual(dm.getRelation(1, 2).isMarriage, true);
+        assert.strictEqual(dm.getRelation(1, 2).trucePeriod, 0);
+        const reorg = make();
+        reorg.changeStatus(1, 2, '同盟');
+        reorg.setSentimentAbsolute(1, 2, score);
+        assert.strictEqual(reorg.reorganizeRelationsAfterRebellion(1, 1), true);
+        const inverted = Math.max(30, Math.min(50, 100 - score));
+        expectedDelegations.push(inverted);
+        assert.strictEqual(reorg.getRelation(1, 2).sentiment, inverted);
+        assert.strictEqual(reorg.getRelation(1, 2).status, expected(inverted));
+        assert.strictEqual(reorg.getRelation(2, 1).status, expected(inverted));
+        for (const status of ['同盟', '支配', '従属']) {
+            const br = make();
+            br.changeStatus(1, 2, status);
+            br.setSentimentAbsolute(1, 2, score);
+            const result = br.applyBreakAlliancePenalty(1, 2);
+            const drop = status === '支配' || (status === '従属' && score >= 70) ? 100 : status === '同盟' && score >= 70 ? 70 : 60;
+            const after = Math.max(0, score - drop);
+            expectedDelegations.push(after);
+            assert.strictEqual(br.getRelation(1, 2).sentiment, after);
+            assert.strictEqual(br.getRelation(1, 2).status, expected(after));
+            assert.strictEqual(br.getRelation(2, 1).status, expected(after));
+            assert.strictEqual(result.newStatus, expected(after));
+        }
+    }
+    // 呼出回数のソース文字列ではなく、各実経路の実行時委譲を検査。
+    assert.deepStrictEqual(actualDelegations, expectedDelegations);
+    for (let score = 0; score <= 100; score++) {
+        assert.strictEqual(originalRules.getBasicStatusForSentiment(score), expected(score));
     }
 });
 
