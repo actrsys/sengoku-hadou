@@ -804,25 +804,27 @@ class SaveManager {
         // ロード時も巨大画像を同時decodeしません。基本地図だけを先に確認し、
         // 城色・国色マップは後でDataManagerが1枚ずつ解析します。
         if (this.game.ui) this.game.ui.updateLoadingProgress(12, '地図の大きさを確認しています');
-        await new Promise(resolve => {
+        const mapDimensions = await new Promise(resolve => {
             const img = new Image();
             img.decoding = 'async';
             const finish = (loaded) => {
-                if (loaded) {
-                    this.game.mapWidth = img.naturalWidth || img.width || this.game.mapWidth || 1200;
-                    this.game.mapHeight = img.naturalHeight || img.height || this.game.mapHeight || 800;
-                }
+                const dimensions = loaded ? { width: img.naturalWidth || img.width, height: img.naturalHeight || img.height } : null;
                 img.onload = null;
                 img.onerror = null;
                 // 寸法確認だけの一時Imageなので、次の巨大地図解析へ進む前にdecode資源を解放する。
                 try { img.src = ''; } catch (e) {}
-                resolve();
+                resolve(dimensions);
             };
             img.onload = () => finish(true);
             img.onerror = () => finish(false);
             img.src = './data/images/map/japan_map.png';
         });
         if (!isRestoreFlowLatest()) return false;
+        // 旧画像の完了callbackではゲーム状態を変更せず、既存の世代・操作権確認後だけ反映する。
+        if (mapDimensions) {
+            this.game.mapWidth = mapDimensions.width || this.game.mapWidth || 1200;
+            this.game.mapHeight = mapDimensions.height || this.game.mapHeight || 800;
+        }
         if (this.game.ui && typeof this.game.ui.waitForNextPaint === 'function') await this.game.ui.waitForNextPaint();
         if (!isRestoreFlowLatest()) return false;
 

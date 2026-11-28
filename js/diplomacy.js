@@ -1577,7 +1577,7 @@ class DiplomacyManager {
      * 指定した関係が「攻撃してはいけない関係（不可侵）」かどうかを判定します
      */
     isNonAggression(status) {
-        return ['同盟', '支配', '従属', '和睦'].includes(status);
+        return window.DiplomacyRules.isProtectedFromImmediateAttack(status);
     }
 
     /**
@@ -4211,7 +4211,7 @@ class DiplomacyManager {
                         const isEnemyMaxGoodwill = enemyRel && enemyRel.sentiment >= 100;
                         
                         // 敵と仲良し過ぎないかチェック（戦争相手と同盟・支配・従属等ではないか）
-                        if (!isEnemyAlly && !isEnemyMaxGoodwill && (!enemyRel || !this.isNonAggression(enemyRel.status))) {
+                        if (!isEnemyAlly && !isEnemyMaxGoodwill) {
                             
                             // ★自分と「同盟・支配・従属」関係にあるかをチェックします！
                             const myRel = this.getRelation(Number(myClanId), cOwnerClanId);

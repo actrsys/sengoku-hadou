@@ -4857,6 +4857,22 @@ test('状態の意味判定は共通Rulesを正本として使える', () => {
     assert.strictEqual(ctx.DiplomacyRules.isProtectedFromImmediateAttack(D.TRUCE), true);
     assert.strictEqual(ctx.DiplomacyRules.isBasicSentimentStatus(D.NORMAL), true);
     assert.strictEqual(ctx.DiplomacyRules.isBasicSentimentStatus(D.ALLIANCE), false);
+    // 外交Managerの既存窓口も同じRulesに従う。和睦は不可侵だが通行許可ではない。
+    loadScript(ctx, 'js/diplomacy.js');
+    const manager = new (vm.runInContext('DiplomacyManager', ctx))({});
+    const expectedProtected = new Set([D.ALLIANCE, D.DOMINANT, D.SUBORDINATE, D.TRUCE]);
+    for (const status of [...Object.values(D), null, undefined, '']) {
+        assert.strictEqual(manager.isNonAggression(status), expectedProtected.has(status));
+        assert.strictEqual(manager.isNonAggression(status), ctx.DiplomacyRules.isProtectedFromImmediateAttack(status));
+    }
+    assert.strictEqual(ctx.DiplomacyRules.canPassTerritory(D.TRUCE), false);
+    // 一致する別定義ではなく、実際に共通窓口を利用していることを検出する。
+    const rules = ctx.DiplomacyRules;
+    let received;
+    ctx.DiplomacyRules = { ...rules, isProtectedFromImmediateAttack(status) { received = status; return true; } };
+    assert.strictEqual(manager.isNonAggression(D.NORMAL), true);
+    assert.strictEqual(received, D.NORMAL);
+    ctx.DiplomacyRules = rules;
 });
 
 test('実行時コードは武将active/ronin/dead/unbornを文字列で直接比較しない', () => {
@@ -42390,6 +42406,71 @@ test('r860 別タブへ操作権を失ったセーブ復元は非同期読込後
     releaseDefinitions();
     await assert.rejects(currentRestore, /操作権のある通常復元は構造検証まで進む/);
     assert.strictEqual(validations, 1, '現行所有タブの正常な復元入口を塞がない');
+});
+
+// セーブ復元の地図Imageの完了は、操作権喪失後に旧状態を書き戻してはいけない。
+// 共有ストレージの所有権移動には実TabSessionCoordinatorを、世代には実TurnManagerを使用する。
+test('セーブ復元の地図寸法は現在の操作権がある時だけ反映する', async () => {
+    const png = fs.readFileSync(path.join(ROOT, 'data/images/map/japan_map.png'));
+    const width = png.readUInt32BE(16), height = png.readUInt32BE(20);
+    const outcomes = [];
+    for (const mode of ['lost', 'success', 'error']) {
+        let pendingImage;
+        let resolvePaint;
+        let paintCalls = 0;
+        const shared = new Map();
+        const host = id => ({crypto: {randomUUID: () => id}, localStorage: {
+            getItem: key => shared.get(key) || null,
+            setItem: (key, value) => shared.set(key, value)
+        }, addEventListener() {}}); // storage通知の遅延を模擬する
+        class PendingImage {
+            constructor() { pendingImage = this; this.naturalWidth = width; this.naturalHeight = height; }
+            set src(value) { this.source = value; }
+        }
+        const ctx = createContext({Image: PendingImage, EventManager: class {}, DataManager: {
+            loadScenarioDefinitions: async () => {}, getScenarioDefinition: () => null
+        }});
+        loadScript(ctx, 'js/tab_session.js');
+        loadScript(ctx, 'js/turn_manager.js');
+        loadScript(ctx, 'js/save_manager.js');
+        const oldTab = new ctx.TabSessionCoordinator(host('old'));
+        const newTab = new ctx.TabSessionCoordinator(host('new'));
+        const game = {tabSession: oldTab, aiOperationManager: {load() {}}, ui: {
+            updateLoadingProgress() {}, clearWarLog() {},
+            waitForNextPaint() { paintCalls++; return new Promise(resolve => { resolvePaint = resolve; }); }
+        }};
+        game.turnManager = new ctx.TurnManager(game);
+        const writes = [];
+        for (const key of ['mapWidth', 'mapHeight']) {
+            let value;
+            Object.defineProperty(game, key, {get: () => value, set: next => { writes.push({key, next}); value = next; }});
+        }
+        const manager = new ctx.SaveManager(game);
+        // 本試験は画像待機境界に限定。保存構造とBIN復元は既存の別回帰に委ねる。
+        manager._validateSaveDataStructure = () => true;
+        const restoring = manager._restoreSaveDataObj({mapWidth: width, mapHeight: height});
+        await new Promise(resolve => setImmediate(resolve));
+        assert.ok(pendingImage && pendingImage.onload, '製品の地図画像読込待機へ到達');
+        assert.strictEqual(writes.length, 2, '保存された初期寸法のみ反映済み');
+        if (mode === 'lost') assert.strictEqual(newTab.claim(), true);
+        if (mode === 'error') pendingImage.onerror(); else pendingImage.onload();
+        await new Promise(resolve => setImmediate(resolve));
+        if (mode !== 'lost') {
+            assert.strictEqual(paintCalls, 1, '有効な復元は次のpaint待機へ進む');
+            assert.strictEqual(newTab.claim(), true); // 次の既存待機境界で停止させる
+            resolvePaint();
+        }
+        assert.strictEqual(await restoring, false);
+        assert.strictEqual(newTab.isOwner(), true, '新タブの所有権維持');
+        assert.strictEqual(game.mapWidth, width);
+        assert.strictEqual(game.mapHeight, height);
+        assert.strictEqual(pendingImage.source, '', '寸法確認用画像を解放');
+        assert.strictEqual(pendingImage.onload, null);
+        assert.strictEqual(pendingImage.onerror, null);
+        outcomes.push([mode, writes.length, paintCalls]);
+    }
+    assert.deepStrictEqual(outcomes, [['lost', 2, 0], ['success', 4, 1], ['error', 2, 1]],
+        '失効後の画像完了だけを抑止し、成功・失敗時の既存の寸法確定と継続を維持する');
 });
 
 // r859: 所有者確認後の IndexedDB.open() は非同期。別タブが接続待機中に
