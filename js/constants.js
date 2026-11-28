@@ -120,7 +120,7 @@ window.DiplomacyRules = Object.freeze({
         return status === window.GameConstants.DiplomacyStatus.HOSTILE;
     },
 
-    // 大名家間の通常外交状態だけを求める。特殊関係の維持・解除はManagerが担当する。
+    // 大名家間・諸勢力の通常外交状態を求める。特殊関係の維持・解除はManagerが担当する。
     getBasicStatusForSentiment(sentiment) {
         const S = window.GameConstants.DiplomacyStatus;
         const cfg = window.GameConfig.Main.Diplomacy.BasicSentiment;

@@ -230,7 +230,7 @@ class AIEngine {
                         } else {
                             // 諸勢力がまだ生きているか、仲良しになっていないか（友好度30以下）をチェックします
                             const targetKunishu = this.game.kunishuSystem.getKunishu(myOperation.targetId);
-                            if (targetKunishu && targetKunishu.getRelation(castle.ownerClan) <= 30 &&
+                            if (targetKunishu && window.DiplomacyRules.isHostile(window.DiplomacyRules.getBasicStatusForSentiment(targetKunishu.getRelation(castle.ownerClan))) &&
                                 this.game.kunishuSystem.getSubjugationEligibility(targetKunishu, castle.ownerClan, castle).eligible) {
                                 isStillEnemy = true;
 
@@ -851,7 +851,7 @@ class AIEngine {
                 const ks = this.game.kunishuSystem.getKunishusInCastle(c.id);
                 if (!ks) return;
                 ks.forEach(k => {
-                    if (k.getRelation(myClanId) <= 30 && k.ideology !== '商人') count++;
+                    if (window.DiplomacyRules.isHostile(window.DiplomacyRules.getBasicStatusForSentiment(k.getRelation(myClanId))) && k.ideology !== '商人') count++;
                 });
             });
             hostileKunishuCountForDecision = count;
@@ -2261,7 +2261,7 @@ class AIEngine {
                     const kunishus = this.game.kunishuSystem.getKunishusInCastle(castle.id);
                     for (const k of kunishus) {
                         // 仲良し度が30以下なら敵対しているとみなします
-                        if (k.getRelation(castle.ownerClan) <= 30) {
+                        if (window.DiplomacyRules.isHostile(window.DiplomacyRules.getBasicStatusForSentiment(k.getRelation(castle.ownerClan)))) {
                             hasEnemy = true;
                             if (k.soldiers > maxEnemyTotalSoldiers) {
                                 maxEnemyTotalSoldiers = k.soldiers;

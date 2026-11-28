@@ -10,7 +10,7 @@
  */
 window.GameConfig = {
     Meta: {
-        Version: 'r1003'
+        Version: 'r1010'
     },
 
     Ending: {
@@ -74,7 +74,7 @@ window.GameConfig = {
             }
         },
         Diplomacy: {
-            // 大名家間の通常外交状態を友好度から求める境界。諸勢力の表示や断交ペナルティの条件とは別。
+            // 大名家間・諸勢力の通常外交状態を友好度から求める共通境界。断交ペナルティ等の固有条件とは別。
             BasicSentiment: {
                 FriendlyMin: 70,
                 HostileMax: 30

@@ -71,7 +71,7 @@ function createContext(extra = {}) {
         JSON,
         Date,
         RegExp,
-        GameConfig: { Limits: { ...global.GameConfig.Limits } },
+        GameConfig: { Limits: { ...global.GameConfig.Limits }, Main: { Diplomacy: global.GameConfig.Main.Diplomacy } },
         ...extra
     };
     context.window = context;
@@ -90,6 +90,12 @@ function loadScript(context, relativePath) {
         const dependency = path.join(ROOT, 'js/personnel_rules.js');
         vm.runInContext(fs.readFileSync(dependency, 'utf8'), context, { filename: dependency });
         context.__autoLoadedPersonnelRules = true;
+    }
+    // 本番の共通状態RulesはModel・各専門Systemより先にロードされる。
+    if (['js/models.js','js/kunishu_system.js'].includes(relativePath)
+        && typeof context.DiplomacyRules === 'undefined') {
+        const dependency = path.join(ROOT, 'js/constants.js');
+        vm.runInContext(fs.readFileSync(dependency, 'utf8'), context, {filename: dependency});
     }
     const filename = path.join(ROOT, relativePath);
     const code = fs.readFileSync(filename, 'utf8');
@@ -578,7 +584,7 @@ test('r651 拠点資源・人口の上限は共通設定を正本とし別種の
     assert.ok(events.includes('Math.min(99999, inabayama.maxKokudaka + 500)'));
     assert.ok(court.includes('Math.min(99999, (clan.courtContribution || 0) + goldAmount)'));
     const script = read('index.html');
-    assert.ok(script.indexOf('src="js/config.js"') < script.indexOf('src="js/models.js"'));
+    assert.ok(script.indexOf('src="js/config.js') >= 0 && script.indexOf('src="js/config.js') < script.indexOf('src="js/models.js'));
 });
 
 test('GameConfig / GameConstants が中央定義として読み込める', () => {
@@ -7850,7 +7856,7 @@ test('r372では甲賀・大和の旧主家参照を整理し、椎名家を1570
         [27, '1:友好:90'],
         [28, '1:敵対:0|18:友好:100'],
         [30, '1:敵対:30'],
-        [47, '1:友好:65|20:敵対:30'],
+        [47, '1:友好:70|20:敵対:30'],
         [63, '2:友好:90'],
         [10016, '2:敵対:0|7:敵対:0|19:友好:100|21:友好:100'],
         [10017, '2:敵対:0|7:敵対:0|19:友好:100|21:友好:100'],
@@ -12708,18 +12714,17 @@ test('国主就任は軍師兼任を残さず、軍師選択UIも国主を候補
 });
 
 
-test('プレイヤー軍団新設は Legion 正規モデルを使い発足月を必ず保持する', () => {
+test('軍団新設・空席再利用の確定は CastleManager の正規モデルと発足月へ統一する', () => {
     const command = read('js/command_system.js');
-    const at = command.indexOf('executeAppointLegionLeader(bushoId');
-    const block = command.slice(at, at + 3300);
-    assert.ok(block.includes('legion = new Legion(legionData);'));
-    assert.ok(block.includes('establishedTurnId: this.game.getCurrentTurnId()'));
-    assert.ok(block.includes('legion.establishedTurnId = this.game.getCurrentTurnId();'));
-    assert.ok(!block.includes('window.Legion'));
-
+    const block = command.slice(command.indexOf('executeAppointLegionLeader(bushoId'), command.indexOf('executeTrade(type, amount)'));
     const staffing = read('js/ai_staffing.js');
-    assert.ok(staffing.includes('const newLegion = new Legion({'));
-    assert.ok(!staffing.includes("typeof Legion !== 'undefined' ? new Legion"));
+    const auto = staffing.slice(staffing.indexOf('assignNewLegion(clanId, commanderId)'), staffing.indexOf('createNewLegionIfNeeded(clanId)'));
+    const manager = read('js/castle_manager.js');
+    const seat = manager.slice(manager.indexOf('establishLegionSeat(clanId, legionNo, commanderId)'), manager.indexOf('disbandLegion(legionId)'));
+    assert.ok(block.includes('this.game.castleManager.establishLegionSeat(clanId, legionNo, busho.id)'));
+    assert.ok(auto.includes('this.game.castleManager.establishLegionSeat(numericClanId, newLegionNo, numericCommanderId)'));
+    assert.ok(seat.includes('new Legion(') && seat.includes('this.game.getCurrentTurnId()') && seat.includes('legion.establishedTurnId = establishedTurnId'));
+    for (const caller of [block, auto]) assert.ok(!/new Legion\(|\.establishedTurnId\s*=/.test(caller));
 });
 
 test('コマンド候補ソートは DomesticRules と StrategySystem の現行APIへ直接委譲する', () => {
@@ -12899,8 +12904,8 @@ test('軍団割当は同じ武将を同一家の複数軍団長へ重複登録�
     const block = staffing.slice(at, at + 2100);
     assert.ok(block.includes('const currentLegion = clanLegions.find'));
     assert.ok(block.includes('if (currentLegion) return Number(currentLegion.legionNo) || -1;'));
-    assert.ok(block.includes('emptyLegion.commanderId = numericCommanderId;'));
-    assert.ok(block.includes('commanderId: numericCommanderId'));
+    assert.ok(block.includes('this.game.castleManager.establishLegionSeat(numericClanId, newLegionNo, numericCommanderId)'));
+    assert.ok(block.indexOf('if (currentLegion) return') < block.indexOf('establishLegionSeat('));
 });
 
 
@@ -18752,6 +18757,7 @@ test('r446 国主任命は出陣中の本拠地を拒否し、通常拠点は任
     const home = { id: 1, ownerClan: 4, legionId: 0, castellanId: 40 };
     const normal = { id: 2, ownerClan: 4, legionId: 0, castellanId: 0 };
     const commander = { id: 44, clan: 4, isCommander: false, isCastellan: false };
+    loadScript(ctx, 'js/castle_manager.js');
     const game = {
         playerClanId: 4, legions: [],
         getCastle: id => [home, normal].find(c => c.id === Number(id)),
@@ -18764,6 +18770,7 @@ test('r446 国主任命は出陣中の本拠地を拒否し、通常拠点は任
     installCastellanSetterFixture(game);
     const cmd = new Command(game);
     cmd.finishCommand = () => {};
+    game.castleManager = Object.assign(new (vm.runInContext('CastleManager', ctx))(game), game.castleManager);
     cmd.executeAppointLegionLeader(44, 1, home.id);
     assert.strictEqual(game.legions.length, 0, '本拠への任命を拒否');
     assert.strictEqual(home.legionId, 0);
@@ -22927,6 +22934,7 @@ test('r510 解任後の空席は同一Legionを再利用して正常任命でき
     let released = 0;
     let moved = 0;
     let results = 0;
+    loadScript(ctx, 'js/castle_manager.js');
     const game = {
         playerClanId: 4, legions: [emptySeat],
         getCastle: id => [home, target].find(c => Number(c.id) === Number(id)),
@@ -22940,6 +22948,7 @@ test('r510 解任後の空席は同一Legionを再利用して正常任命でき
     installCastellanSetterFixture(game);
     const command = new Command(game);
     command.finishCommand = () => results++;
+    game.castleManager = Object.assign(new (vm.runInContext('CastleManager', ctx))(game), game.castleManager);
     command.executeAppointLegionLeader(44, 1, 2);
     assert.strictEqual(game.legions.length, 1, '空席のLegionを再利用');
     assert.strictEqual(emptySeat.commanderId, 44);
@@ -25282,6 +25291,7 @@ test('r544 AI作戦候補では商人勢力を鎮圧対象に入れない', asyn
         document: {body: {classList: {contains: () => true}}},
         MainParams: {StartYear: 1570, StartMonth: 1}
     });
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/ai_operation.js');
     const castle = {id: 10, ownerClan: 1, legionId: 0, castellanId: 1, provinceId: 1, adjacentCastleIds: []};
     const general = {id: 1, isActionDone: false};
@@ -25315,6 +25325,9 @@ test('r544 AI出陣直前も商人勢力の鎮圧可否を専門部署で再確�
         AIParams: {AI: {Difficulty: 'normal', AbilityBase: 50, AbilitySensitivity: 1}},
         setTimeout: (fn) => {fn(); return 1;}
     });
+    const fixtureBushoRules = ctx.BushoStatusRules;
+    loadScript(ctx, 'js/constants.js');
+    if (fixtureBushoRules) ctx.BushoStatusRules = fixtureBushoRules;
     loadScript(ctx, 'js/ai.js');
     const castle = {id: 10, ownerClan: 1, legionId: 0, castellanId: 1, provinceId: 1, soldiers:1000,rice:2000};
     const general = {id: 1, name: '城主', clan: 1, isActionDone: false, intelligence: 90};
@@ -26097,6 +26110,7 @@ test('r549 表示済みの観戦帰還確認は同月内の別ターンから操
 // r550: 国内平定の目標数は、実際の鎮圧候補と同じKunishuSystemの正本を使う。
 test('r550 国内平定の目標数は鎮圧できない商人を数えず通常の国衆を残す', () => {
     const ctx = createContext();
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/ai_operation.js');
     const castle = {id: 12, ownerClan: 1, legionId: 0};
     const candidates = [
@@ -26131,6 +26145,7 @@ test('r550 国内平定の進捗判定は商人しか残らなければ達成と
         document: {body: {classList: {contains: () => true}}},
         MapGraphService: {getReachableTerritory: (_game, castle) => ({myCastles: [castle], enemyCastles: []})}
     });
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/ai_operation.js');
     const castle = {id: 12, ownerClan: 1, legionId: 0, adjacentCastleIds: []};
     const merchant = {id: 100, castleId: 12, ideology: '商人', getRelation: () => 0};
@@ -29558,6 +29573,7 @@ test('r618 AI軍団新設は新国主と随伴予定者を移した後の留守�
     }));
     const bushoMap = new Map(bushos.map(b => [b.id, b]));
     bushos.forEach(b => castleMap.get(b.castleId).samuraiIds.push(b.id));
+    loadScript(ctx, 'js/castle_manager.js');
     const game = {
         year: 1570, month: 1, phase: 'game', playerClanId: 22,
         castles, bushos, legions: scenario.legions.filter(l => l.clanId === 1).map(l => ({ ...l })),
@@ -29593,6 +29609,8 @@ test('r618 AI軍団新設は新国主と随伴予定者を移した後の留守�
         game.factionSystem.recordBattle(takagi, 48);
     }
     assert.ok(takagi.achievementTotal >= 1000, '通常の合戦功績で国主候補となる');
+    game.castleManager = Object.assign(new (vm.runInContext('CastleManager', ctx))(game), game.castleManager);
+    game.getLegionByClanNo = (clan, no) => game.legions.find(l => Number(l.clanId) === Number(clan) && Number(l.legionNo) === Number(no));
     assert.strictEqual(staffing.createNewLegionIfNeeded(1), false, '単独城主の移出で無人化する場合は新設しない');
     assert.strictEqual(takagi.castleId, 57);
     assert.strictEqual(narumi.castellanId, takagi.id, '元の城主を保持');
@@ -29728,6 +29746,7 @@ test('r621 プレイヤー国主任命は実際の異動だけ在城履歴を記
     const castles = [home, source, target];
     const bushoById = new Map([[44, commander], [42, oldLord]]);
     let confirmations = 0;
+    loadScript(ctx, 'js/castle_manager.js');
     const game = {
         year: 1570, month: 6, playerClanId: 4, legions: [],
         getCastle: id => castles.find(c => c.id === Number(id)),
@@ -29747,6 +29766,7 @@ test('r621 プレイヤー国主任命は実際の異動だけ在城履歴を記
     game.affiliationSystem.updateUI = () => {};
     const command = new Command(game);
     command.finishCommand = () => { confirmations++; };
+    game.castleManager = Object.assign(new (vm.runInContext('CastleManager', ctx))(game), game.castleManager);
     command.executeAppointLegionLeader(44, 1, 2);
     assert.strictEqual(confirmations, 1, 'プレイヤーの任命が正規に成功する');
     assert.strictEqual(commander.castleId, 2);
@@ -32022,6 +32042,7 @@ test('r655 MapGraph進軍到達と海路種別は共通BFSで最短経路・断�
 // 外交・奪還履歴・国内平定の各意味は旧実装と同値であることを固定する。
 test('r656 AI大方針の目標数は全5種・変動外交/履歴で旧数式と一致する', () => {
     const ctx = createContext({ DiplomacyRules: { isFriendly: s => s === '友好' || s === '同盟' } });
+    loadScript(ctx, 'js/constants.js');
     loadScript(ctx, 'js/ai_operation.js');
     const Manager = vm.runInContext('AIOperationManager', ctx);
     let seed = 1560656;
@@ -40333,6 +40354,7 @@ test('r808 プレイヤー国主任命は転任先の仮城主任命を記録し
         {id:3, name:'新国主本拠', ownerClan:4, legionId:0, castellanId:0, samuraiIds:[31]}
     ];
     const history=[];
+    loadScript(ctx, 'js/castle_manager.js');
     const game={playerClanId:4, phase:'game', year:1570, month:5, legions:[], bushos:people, castles,
         getCurrentTurnId:()=>1570*12+5,
         getCastle:id=>castles.find(c=>c.id===Number(id)),
@@ -40350,6 +40372,7 @@ test('r808 プレイヤー国主任命は転任先の仮城主任命を記録し
     game.updateCastleLord=c=>game.affiliationSystem.updateCastleLord(c);
     const cmd=new Command(game);
     cmd.finishCommand=()=>{};
+    game.castleManager = Object.assign(new (vm.runInContext('CastleManager', ctx))(game), game.castleManager);
     cmd.executeAppointLegionLeader(20,1,3);
     assert.strictEqual(game.legions[0].commanderId,20);
     assert.strictEqual(castles[2].castellanId,20);
@@ -40373,6 +40396,7 @@ test('r808 同城国主任命は名簿の順序と着任履歴を維持する', 
     const castles=[{id:1,name:'居城',ownerClan:4,legionId:0,castellanId:1,samuraiIds:[1]},
        {id:2,name:'任命城',ownerClan:4,legionId:0,castellanId:3,samuraiIds:[2,3]}];
     const moved=[]; const history=[];
+    loadScript(ctx, 'js/castle_manager.js');
     const game={playerClanId:4,phase:'game',legions:[],bushos,castles,
       getCurrentTurnId:()=>10,getCastle:id=>castles.find(c=>c.id===Number(id)),getBusho:id=>bushos.find(b=>b.id===Number(id)),
       getClan:()=>({name:'家'}),getClanDaimyo:()=>bushos[0],getDaimyoHomeCastle:()=>castles[0],
@@ -40384,6 +40408,7 @@ test('r808 同城国主任命は名簿の順序と着任履歴を維持する', 
     game.affiliationSystem=new Aff(game);game.affiliationSystem.updateUI=()=>{};
     const cmd=new Cmd(game);cmd.finishCommand=()=>{};
     const before=castles[1].samuraiIds.slice();
+    game.castleManager = Object.assign(new (vm.runInContext('CastleManager', ctx))(game), game.castleManager);
     cmd.executeAppointLegionLeader(2,1,2);
     assert.deepStrictEqual(castles[1].samuraiIds,before,'転任しないので在城名簿の順序は維持する');
     assert.strictEqual(moved.length,0,'移動しないので在城履歴を増やさない');
@@ -40398,7 +40423,7 @@ test('r808 AI国主新設は転任途中の仮城主任命履歴と重複描画�
         BushoStatusRules:{isActive:b=>b.status==='active'},
         LifeStatusRules:{isPresent:b=>b.status==='active'}
     });
-    loadScript(ctx,'js/affiliation_system.js'); loadScript(ctx,'js/ai_staffing.js');
+    loadScript(ctx,'js/affiliation_system.js'); loadScript(ctx,'js/ai_staffing.js'); loadScript(ctx,'js/castle_manager.js');
     const Aff=vm.runInContext('AffiliationSystem',ctx), Staff=vm.runInContext('AIStaffing',ctx);
     const castles=Array.from({length:8},(_,i)=>({id:i+1,ownerClan:4,legionId:0,
         provinceId:i===0?1:2,castellanId:0,samuraiIds:[],
@@ -40435,6 +40460,7 @@ test('r808 AI国主新設は転任途中の仮城主任命履歴と重複描画�
     game.updateCastleLord=c=>game.affiliationSystem.updateCastleLord(c);
     const staffing=new Staff(game);
     staffing._hasPotentialEnemyNeighbor=()=>true;
+    game.castleManager = new (vm.runInContext('CastleManager', ctx))(game);
     const created=staffing.createNewLegionIfNeeded(4);
     assert.strictEqual(created,true,'正常な8直轄城と前線を持つAIの軍団新設は成立する');
     assert.strictEqual(candidate.isCommander,true);
@@ -46527,6 +46553,9 @@ test('新規開始月の攻撃作戦は即時出撃だけ翌月へ繰り延べ�
         MainParams: {StartYear: 1560, StartMonth: 1},
         DiplomacyRules: {isProtectedFromImmediateAttack: () => false}
     });
+    const fixtureDiplomacyRules = ctx.DiplomacyRules;
+    loadScript(ctx, 'js/constants.js');
+    ctx.DiplomacyRules = {...ctx.DiplomacyRules, ...fixtureDiplomacyRules};
     loadScript(ctx, 'js/turn_manager.js');
     loadScript(ctx, 'js/ai_operation.js');
     const Manager = vm.runInContext('AIOperationManager', ctx);
@@ -46959,7 +46988,7 @@ test('外交情報一覧は関係の表示順位と色の正本を共用し、�
             const view = Object.create(UI.prototype);
             const clans = [{ id: 1, name: '自家', daimyoPrestige: 100 }, ...states.map((status, i) => ({ id: i + 2, name: status, daimyoPrestige: 10 }))].reverse();
             const getRelation = (_from, to) => ({status: states[to - 2], sentiment: 50, isMarriage: marriage, trucePeriod: 3});
-            const kunishus = [0, 39, 40, 69, 70, 100].map((score, i) => ({id: 20+i, name: `勢力${i}`, getName(){return this.name;}, getRelation(){return score;}, soldiers: 100, daimyoRelations: {1: {status: score >= 70 ? '友好' : score < 40 ? '敵対' : '普通'}}}));
+            const kunishus = [0, 39, 40, 69, 70, 100].map((score, i) => ({id: 20+i, name: `勢力${i}`, getName(){return this.name;}, getRelation(){return score;}, soldiers: 100, daimyoRelations: {1: {status: score >= 70 ? '友好' : score <= 30 ? '敵対' : '普通'}}}));
             view.game = {playerClanId: 1, clans, getClanCastles: () => [{}], getClanBushos: () => [], getBusho: () => null, getCastle: () => null,
                 updateAllClanPrestige(){}, getRelation, kunishuSystem: {getKunishu: id => kunishus.find(k => k.id === id), getAliveKunishus: () => kunishus}};
             let rendered;
@@ -46991,7 +47020,7 @@ test('外交情報一覧は関係の表示順位と色の正本を共用し、�
             view._renderForceSelector(clans.filter(c => c.id !== 1).map(c => ({id:c.id, name:c.name, soldiers:100})), () => {}, null);
             for (const item of rendered.items) assert.ok(item.cells[4].includes(expectedClass(textOf(item.cells[4]))));
             view._renderForceSelector(kunishus.map(k => ({...k,isKunishu:true})), () => {}, null);
-            const expected = ['敵対','敵対','普通','普通','友好','友好'];
+            const expected = ['敵対','普通','普通','普通','友好','友好'];
             assert.deepStrictEqual(Array.from(rendered.items, item => textOf(item.cells[4])), expected);
             for (const item of rendered.items) assert.ok(item.cells[4].includes(expectedClass(textOf(item.cells[4]))));
             view._renderKunishuList(kunishus, null);
@@ -47068,6 +47097,150 @@ test('通常外交状態の復帰判定は友好度更新・和睦満了・断�
     assert.deepStrictEqual(actualDelegations, expectedDelegations);
     for (let score = 0; score <= 100; score++) {
         assert.strictEqual(originalRules.getBasicStatusForSentiment(score), expected(score));
+    }
+});
+
+test('諸勢力の初期読込・復元・状態更新・表示・ソート・援軍選択は30/70の分類正本を使用する', () => {
+    const scores = [40, 39.9, 30, 30.1, 70, 69.9, 0, 100, ...Array.from({length:101}, (_, i) => i)];
+    const expected = score => score >= 70 ? '友好' : score <= 30 ? '敵対' : '普通';
+    const expectedClass = s => s === '友好' ? 'text-green' : s === '敵対' ? 'text-red' : 'text-white';
+    for (const pc of [true, false]) {
+        const ctx = createContext({document:{body:{classList:{contains:()=>pc}}}});
+        for (const file of ['js/config.js','js/constants.js','js/models.js','js/ui_info.js']) loadScript(ctx,file);
+        const rules = ctx.DiplomacyRules, actual = rules.getBasicStatusForSentiment;
+        const calls = [];
+        ctx.DiplomacyRules = {...rules, getBasicStatusForSentiment(score) {
+            calls.push(score);
+            return actual.call(rules, score);
+        }};
+        const Kunishu = vm.runInContext('Kunishu',ctx), UI = vm.runInContext('UIInfoManager',ctx);
+        const factions = scores.map((score,i) => {
+            const k = new Kunishu({id:20+i,name:`勢力${i}`,castleId:1,leaderId:1,soldiers:100});
+            k.setRelation(1,score);
+            assert.strictEqual(k.daimyoRelations[1].status,expected(score));
+            return k;
+        });
+        assert.deepStrictEqual(calls.splice(0),scores,'モデル更新でも同じ分類正本を使用する');
+        for (const score of scores) {
+            const fromText = new Kunishu({id:1,daimyoRelations:`1:友好:${score}`});
+            const fromSave = new Kunishu({id:1,daimyoRelations:{1:{status:'敵対',sentiment:score}}});
+            for (const k of [fromText,fromSave]) {
+                assert.strictEqual(k.getRelation(1),score);
+                assert.strictEqual(k.daimyoRelations[1].status,expected(score));
+            }
+        }
+        assert.deepStrictEqual(calls.splice(0),scores.flatMap(score=>[score,score]),'初期読込・復元も委譲');
+        const view = Object.create(UI.prototype);
+        view.game = {playerClanId:1,clans:[{id:1,name:'自家'}],getClanCastles:()=>[{}],getBusho:()=>null,getCastle:()=>null,kunishuSystem:{getAliveKunishus:()=>factions,getKunishu:id=>factions.find(k=>k.id===id)}};
+        let rendered;
+        view._renderListModal = cfg => {rendered=cfg;};
+        view.updateCommonConfirmBtn = ()=>{};
+        const textOf = cell => cell.match(/>([^<>]*)<\/(?:span|strong)>/)?.[1];
+        const rank = s => ({'友好':0,'普通':1,'敵対':2})[s];
+        const assertRows = (ordered,col) => {
+            assert.deepStrictEqual(Array.from(rendered.items,row=>textOf(row.cells[0])),ordered.map(k=>k.name));
+            for(let i=0;i<ordered.length;i++){
+                const status=expected(ordered[i].getRelation(1));
+                assert.strictEqual(textOf(rendered.items[i].cells[col]),status);
+                assert.ok(rendered.items[i].cells[col].includes(expectedClass(status)));
+            }
+        };
+        view._renderKunishuList(factions,null);
+        assertRows(factions,6);
+        const listCalls = calls.splice(0);
+        for (const asc of [true,false]) {
+            view._stableSortBases = {}; view.kunishuCurrentSortKey='relation'; view.isKunishuSortAsc=asc;
+            view._renderKunishuList(factions,null,true);
+            const ordered = [...factions].sort((a,b)=>(asc?1:-1)*(rank(expected(a.getRelation(1)))-rank(expected(b.getRelation(1)))));
+            assertRows(ordered,6);
+        }
+        const sortCalls = calls.splice(0);
+        view._renderForceSelector(factions.map(k=>({id:k.id,name:k.name,soldiers:k.soldiers,isKunishu:true})),()=>{},null);
+        assertRows(factions,4);
+        const forceCalls = calls.splice(0);
+        // 外交詳細は共通分類で確定済みの関係状態を表示する。
+        view.diploCurrentTab='kunishu'; view.diploCurrentSortKey=null;
+        view._renderDiplomacyList(1,'自家','daimyo',null);
+        const detail = [...factions].sort((a,b)=>b.getRelation(1)-a.getRelation(1));
+        assert.deepStrictEqual(Array.from(rendered.items,row=>textOf(row.cells[2])),detail.map(k=>expected(k.getRelation(1))));
+        assert.deepStrictEqual(calls,[]);
+        assert.deepStrictEqual(listCalls,scores,'諸勢力一覧の分類委譲');
+        assert.deepStrictEqual(forceCalls,scores,'援軍選択の分類委譲');
+        assert.ok(sortCalls.length>scores.length*2,'ソートでも同じ正本を使用する');
+        assert.strictEqual(typeof actual,'function');
+        for(const score of scores) assert.strictEqual(actual.call(rules,score),expected(score));
+    }
+});
+
+test('諸勢力の実シナリオ関係名は友好度から確定し、数値・関係先を変えない', () => {
+    const ctx=createContext();
+    for (const file of ['js/config.js','js/constants.js','js/models.js']) loadScript(ctx,file);
+    const Kunishu=vm.runInContext('Kunishu',ctx);
+    const changes=[];
+    for(const scenarioId of ['1560_okehazama','1570_anegawa']) {
+        const {scenario}=getRuntimeData(scenarioId);
+        for(const row of scenario.kunishus) {
+            const k=new Kunishu(row);
+            const restored=new Kunishu(JSON.parse(JSON.stringify(k)));
+            const expectedIds=[];
+            for(const part of String(row.daimyoRelations||'').split('|')) {
+                const [id,oldStatus,score]=part.split(':');
+                if(score===undefined || !Number.isFinite(Number(id)) || !Number.isFinite(Number(score))) continue;
+                const v=Number(score), expected=v<=30?'敵対':v>=70?'友好':'普通';
+                expectedIds.push(String(Number(id)));
+                assert.strictEqual(k.getRelation(Number(id)),v);
+                assert.strictEqual(k.daimyoRelations[Number(id)].status,expected);
+                assert.strictEqual(restored.getRelation(Number(id)),v);
+                assert.strictEqual(restored.daimyoRelations[Number(id)].status,expected);
+                if(oldStatus!==expected) changes.push([scenarioId,row.name,Number(id),v,oldStatus,expected]);
+            }
+            assert.deepStrictEqual(Object.keys(k.daimyoRelations).sort(),[...new Set(expectedIds)].sort());
+        }
+    }
+    console.log('諸勢力初期関係名変更:',JSON.stringify(changes));
+    assert.deepStrictEqual(changes, [], '実シナリオの関係名と友好度が共通分類に一致する');
+    const terasaki = new Kunishu(getRuntimeData('1560_okehazama').scenario.kunishus.find(row=>Number(row.id)===63));
+    for (const k of [terasaki, new Kunishu(JSON.parse(JSON.stringify(terasaki)))]) {
+        assert.strictEqual(k.getRelation(11),85,'寺崎家の神保家への友好度は作者修正の85');
+        assert.strictEqual(k.daimyoRelations[11].status,'友好');
+        assert.strictEqual(k.getRelation(2),30,'長尾家への敵対関係を維持');
+        assert.strictEqual(k.daimyoRelations[2].status,'敵対');
+    }
+    const {scenario}=getRuntimeData('1570_anegawa');
+    for (const [id, targetId] of [[47,1],[71,20]]) {
+        const k=new Kunishu(scenario.kunishus.find(row=>Number(row.id)===id));
+        assert.strictEqual(k.getRelation(targetId),70);
+        assert.strictEqual(k.daimyoRelations[targetId].status,'友好');
+    }
+});
+
+test('諸勢力の月次献上・略奪・占領時関係変動・AI敵対目標は30/70の境界を共有する', async () => {
+    const math=Object.create(Math); math.random=()=>0.1;
+    const ctx=createContext({Math:math});
+    for(const file of ['js/config.js','js/constants.js','js/models.js','js/kunishu_system.js','js/ai_operation.js']) loadScript(ctx,file);
+    const Kunishu=vm.runInContext('Kunishu',ctx), Sys=vm.runInContext('KunishuSystem',ctx), AI=vm.runInContext('AIOperationManager',ctx);
+    const scores=[0,29.9,30,30.1,39.9,40,69,69.1,69.9,70,70.1,100];
+    const actor={id:1,charm:100,strength:100,affinity:25};
+    const castle={id:1,name:'城',ownerClan:1,castellanId:1,provinceId:1,gold:1000,rice:1000};
+    let current,logs=[];
+    const game={playerClanId:99,clans:[],getBusho:()=>actor,getClan:()=>({name:'大名'}),getProvince:()=>null,
+      ui:{log:msg=>logs.push(msg)},getClanCastles:()=>[castle]};
+    const sys=game.kunishuSystem=new Sys(game);
+    sys.calcIdeologyAffinity=()=>25;
+    sys.getHonganjiClan=()=>null;
+    sys.getKunishusInCastle=()=>[current];
+    sys.getSubjugationEligibility=()=>({eligible:true});
+    const ai=new AI(game);
+    for(const score of scores){
+        current=new Kunishu({id:2,castleId:1,leaderId:1,soldiers:900,ideology:'地縁',daimyoRelations:`1:普通:${score}`});
+        logs=[];castle.gold=castle.rice=1000;
+        await sys.executeActionToLord(current,castle);
+        assert.strictEqual(logs.length, score<=30||score>=70?1:0,`月次行動 ${score}`);
+        if(score<=30) assert.ok(logs[0].includes('略奪'));
+        if(score>=70) assert.ok(logs[0].includes('献上'));
+        assert.strictEqual(ai._countPacificationTargets(1,[castle]),score<=30?1:0);
+        sys.applyRelationDropOnCastleCapture(castle,1);
+        assert.strictEqual(current.getRelation(1),score>=70?score:Math.max(0,score-20),`占領 ${score}`);
     }
 });
 

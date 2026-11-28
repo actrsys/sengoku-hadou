@@ -160,7 +160,7 @@ class AIOperationManager {
             const connectedCastleIds = new Set([Number(castle.id)]);
             const candidates = kunishuSystem.getKunishusInCastle(castle.id);
             for (const kunishu of candidates) {
-                if (kunishu.getRelation(clanId) <= 30
+                if (window.DiplomacyRules.isHostile(window.DiplomacyRules.getBasicStatusForSentiment(kunishu.getRelation(clanId)))
                     && kunishuSystem.getSubjugationEligibility(kunishu, clanId, castle, connectedCastleIds).eligible) {
                     count++;
                 }
@@ -1099,7 +1099,7 @@ class AIOperationManager {
                     const vCastle = this.game.getCastle(visitedCastleId);
                     if (vCastle) {
                         const kunishusInCastle = this.game.kunishuSystem.getKunishusInCastle(vCastle.id).filter(k =>
-                            k.getRelation(clanId) <= 30 &&
+                            window.DiplomacyRules.isHostile(window.DiplomacyRules.getBasicStatusForSentiment(k.getRelation(clanId))) &&
                             this.game.kunishuSystem.getSubjugationEligibility(k, clanId, myCastle, visited).eligible
                         );
                         kunishusInCastle.forEach(k => {

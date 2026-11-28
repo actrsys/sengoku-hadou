@@ -204,7 +204,7 @@ class KunishuSystem {
             }
 
             const currentRel = kunishu.getRelation(clanId);
-            if (currentRel > 69) continue;
+            if (window.DiplomacyRules.isFriendly(window.DiplomacyRules.getBasicStatusForSentiment(currentRel))) continue;
 
             const newRel = Math.max(0, currentRel - window.MainParams.Kunishu.CaptureRelationDrop);
             this.setRelation(kunishu, clanId, newRel);
@@ -496,7 +496,7 @@ class KunishuSystem {
 
                     const rel = kunishu.daimyoRelations[clanIdNum];
                     // 友好度が70以上（献上してくれるライン）の場合のみ
-                    if (rel && rel.sentiment >= 70) {
+                    if (rel && window.DiplomacyRules.isFriendly(window.DiplomacyRules.getBasicStatusForSentiment(rel.sentiment))) {
                         // その大名のいる「居城」を探して、そこにお届け物をします
                         const daimyo = this.game.getClanDaimyo(clanIdNum);
                         if (daimyo && daimyo.castleId) {
@@ -544,7 +544,7 @@ class KunishuSystem {
                 const currentRel = kunishu.getRelation(myCastle.ownerClan);
                 
                 // ★追加：友好度が70以上で、かつ減少しようとしている時は、減少をストップする魔法！
-                if (currentRel >= 70 && change < 0) {
+                if (window.DiplomacyRules.isFriendly(window.DiplomacyRules.getBasicStatusForSentiment(currentRel)) && change < 0) {
                     change = 0;
                 }
                 
@@ -605,10 +605,12 @@ class KunishuSystem {
             badMult = 1.0 + ((affinityDiff - 25) / 25);
         }
 
+        const relationStatus = window.DiplomacyRules.getBasicStatusForSentiment(currentRel);
+        const relationBounds = window.GameConfig.Main.Diplomacy.BasicSentiment;
         // 友好 (70以上)
-        if (currentRel >= 70) {
+        if (window.DiplomacyRules.isFriendly(relationStatus)) {
             // 贈り物の基本確率は20%（0.20）。友好度100で+15%（0.15）アップします
-            let giftChance = (0.20 + ((currentRel - 70) / 30) * 0.15) * goodMult;
+            let giftChance = (0.20 + ((currentRel - relationBounds.FriendlyMin) / (100 - relationBounds.FriendlyMin)) * 0.15) * goodMult;
             
             if (Math.random() < giftChance) {
                 // 献上 (無から湧く、最大現在兵力÷3、魅力で増加)
@@ -639,7 +641,7 @@ class KunishuSystem {
             }
         } 
         // 敵対 (30以下)
-        else if (currentRel <= 30) {
+        else if (window.DiplomacyRules.isHostile(relationStatus)) {
             // ★追加：お城のある国が大雪の時は、諸勢力も身動きが取れないので略奪や反乱を起こしません！
             const province = this.game.getProvince(castle.provinceId);
             if (province && province.statusEffects && province.statusEffects.includes('heavySnow')) {
@@ -655,7 +657,7 @@ class KunishuSystem {
             
             // まずは「略奪」の判定から行います！
             // 略奪の基本確率は20%（0.20）。友好度0で+15%（0.15）アップします
-            let robChance = (0.20 + ((30 - currentRel) / 30) * 0.15) * badMult;
+            let robChance = (0.20 + ((relationBounds.HostileMax - currentRel) / relationBounds.HostileMax) * 0.15) * badMult;
             
             if (Math.random() < robChance) {
                 // 妨害（略奪）: 城から奪う、武力で軽減

@@ -1902,24 +1902,7 @@ class CommandSystem {
             });
         }
 
-        if (!this.game.legions) this.game.legions = [];
-        let legion = existingSeat;
-        if (!legion) {
-            const maxId = this.game.legions.length > 0 ? Math.max(...this.game.legions.map(l => Number(l.id) || 0)) : 0;
-            const legionData = {
-                id: maxId + 1,
-                clanId: this.game.playerClanId,
-                legionNo: legionNo,
-                commanderId: busho.id,
-                establishedTurnId: this.game.getCurrentTurnId()
-            };
-            legion = new Legion(legionData);
-            this.game.legions.push(legion);
-        } else {
-            legion.commanderId = busho.id;
-            // 解散済み席次の再利用も「新設」と同じ扱いにして、24ヶ月の整理猶予を正しくリセットする。
-            legion.establishedTurnId = this.game.getCurrentTurnId();
-        }
+        this.game.castleManager.establishLegionSeat(clanId, legionNo, busho.id);
 
         this.game.affiliationSystem.setCastellanRaw(castle, busho);
         busho.isCommander = true;

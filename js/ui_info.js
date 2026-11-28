@@ -3000,14 +3000,8 @@ class UIInfoManager {
                         valB = b.getRelation(this.game.playerClanId);
                         break;
                     case 'relation':
-                        const getRelRank = (k) => {
-                            const r = k.getRelation(this.game.playerClanId);
-                            if (r >= 70) return 0; // 友好
-                            if (r < 40) return 2;  // 敵対
-                            return 1;              // 普通
-                        };
-                        valA = getRelRank(a);
-                        valB = getRelRank(b);
+                        valA = this._getDiplomacyStatusRank(window.DiplomacyRules.getBasicStatusForSentiment(a.getRelation(this.game.playerClanId)));
+                        valB = this._getDiplomacyStatusRank(window.DiplomacyRules.getBasicStatusForSentiment(b.getRelation(this.game.playerClanId)));
                         break;
                 }
 
@@ -3042,9 +3036,7 @@ class UIInfoManager {
             const relVal = kunishu.getRelation(this.game.playerClanId);
             const friendBarHtml = this._createBarHtml(relVal, 'friend');
             
-            let relStatus = "普通";
-            if (relVal >= 70) relStatus = "友好";
-            else if (relVal < 40) relStatus = "敵対";
+            const relStatus = window.DiplomacyRules.getBasicStatusForSentiment(relVal);
             const relClass = this._getDiplomacyStatusClass(relStatus);
 
             const isSelected = this.commonSelectedIds && this.commonSelectedIds.includes(kunishu.id);
@@ -3198,8 +3190,7 @@ class UIInfoManager {
                 const k = this.game.kunishuSystem.getKunishu(force.id);
                 if (k) relVal = k.getRelation(this.game.playerClanId);
                 
-                if (relVal >= 70) relStatus = "友好";
-                else if (relVal < 40) relStatus = "敵対";
+                relStatus = window.DiplomacyRules.getBasicStatusForSentiment(relVal);
             } else {
                 const rel = this.game.getRelation(this.game.playerClanId, force.id);
                 if (rel) {

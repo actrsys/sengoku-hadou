@@ -839,16 +839,17 @@ class Kunishu {
                 const items = part.split(':');
                 if (items.length >= 3) { // ★ID、状態、関係値の3つがあるかチェックします
                     const targetId = Number(items[0].trim());
-                    const statusStr = items[1].trim(); // 状態（友好など）
                     const value = Number(items[2].trim()); // 関係値
                     if (!isNaN(targetId) && !isNaN(value)) {
                         // 状態と関係値をセットにして箱にしまいます
-                        this.daimyoRelations[targetId] = { status: statusStr, sentiment: value };
+                        this.daimyoRelations[targetId] = { status: window.DiplomacyRules.getBasicStatusForSentiment(value), sentiment: value };
                     }
                 }
             });
         } else if (typeof data.daimyoRelations === 'object') {
-            this.daimyoRelations = data.daimyoRelations;
+            for (const [targetId, relation] of Object.entries(data.daimyoRelations)) {
+                this.daimyoRelations[targetId] = { ...relation, status: window.DiplomacyRules.getBasicStatusForSentiment(relation.sentiment) };
+            }
         }
         
         this.isDestroyed = data.isDestroyed === true;
@@ -903,17 +904,10 @@ class Kunishu {
         
         let newVal = Math.max(0, Math.min(100, value));
         
-        // ★友好度の数値に合わせて、状態（status）の文字も自動で切り替える魔法です！
-        let newStatus = '普通';
-        if (newVal >= 70) {
-            newStatus = '友好';
-        } else if (newVal <= 30) {
-            newStatus = '敵対';
-        }
-
-        if (!this.daimyoRelations[targetId]) this.daimyoRelations[targetId] = { status: '普通', sentiment: 50 };
+        // 友好度を正本とし、保存する状態名も共通分類から確定する。
+        if (!this.daimyoRelations[targetId]) this.daimyoRelations[targetId] = {};
         this.daimyoRelations[targetId].sentiment = newVal;
-        this.daimyoRelations[targetId].status = newStatus; // ★状態も更新します
+        this.daimyoRelations[targetId].status = window.DiplomacyRules.getBasicStatusForSentiment(newVal);
     }
     
 }

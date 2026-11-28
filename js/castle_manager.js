@@ -281,6 +281,22 @@ class CastleManager {
         }
     }
 
+    // 新設・解散済み席の再利用を確定する。席次選定・任命資格・転任の順序は呼出元が管理する。
+    establishLegionSeat(clanId, legionNo, commanderId) {
+        if (!this.game.legions) this.game.legions = [];
+        const establishedTurnId = this.game.getCurrentTurnId();
+        const legion = this.game.getLegionByClanNo(clanId, legionNo);
+        if (legion) {
+            legion.commanderId = Number(commanderId);
+            legion.establishedTurnId = establishedTurnId;
+            return legion;
+        }
+        const maxId = this.game.legions.reduce((max, l) => Math.max(max, Number(l.id) || 0), 0);
+        const newLegion = new Legion({ id: maxId + 1, clanId, legionNo, commanderId, establishedTurnId });
+        this.game.legions.push(newLegion);
+        return newLegion;
+    }
+
     // 軍団解散の正規窓口。軍団モデル・所属城・AI計画を一度に初期化します。
     disbandLegion(legionId) {
         if (!legionId || legionId === 0 || !this.game.legions) return 0;

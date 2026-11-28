@@ -267,39 +267,22 @@ class AIStaffing {
         if (currentLegion) return Number(currentLegion.legionNo) || -1;
 
         const activeNos = clanLegions.filter(l => Number(l.commanderId) > 0).map(l => Number(l.legionNo));
-        
-        let newLegionNo = -1;
         const emptyLegion = clanLegions.find(l => l.commanderId === 0);
-        
-        // すでに解散済みの空っぽの軍団があれば、その枠を再利用します
+        let newLegionNo = -1;
+        // 解散済み席を優先し、なければ空いている最小の席次を選ぶ。
         if (emptyLegion) {
             newLegionNo = emptyLegion.legionNo;
-            emptyLegion.commanderId = numericCommanderId;
-            emptyLegion.establishedTurnId = this.game.getCurrentTurnId(); // 発足月をリセットします
         } else {
-            // 無ければ1から8の間で空いている番号を探します
             for (let i = 1; i <= 8; i++) {
                 if (!activeNos.includes(i)) {
                     newLegionNo = i;
                     break;
                 }
             }
-            // 空き番号が見つかったら、新しく軍団のデータを作ります
-            if (newLegionNo !== -1) {
-                let maxLegionId = 0;
-                this.game.legions.forEach(l => { if (l.id > maxLegionId) maxLegionId = l.id; });
-                const newLegion = new Legion({
-                    id: maxLegionId + 1,
-                    clanId: numericClanId,
-                    legionNo: newLegionNo,
-                    commanderId: numericCommanderId,
-                    establishedTurnId: this.game.getCurrentTurnId()
-                });
-                this.game.legions.push(newLegion);
-            }
         }
-        
-        // 無事に軍団が割り当てられたらその番号を、失敗したら-1を返します
+        if (newLegionNo !== -1) {
+            this.game.castleManager.establishLegionSeat(numericClanId, newLegionNo, numericCommanderId);
+        }
         return newLegionNo;
     }
     
