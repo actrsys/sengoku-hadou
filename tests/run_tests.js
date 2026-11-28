@@ -84,7 +84,8 @@ function loadScript(context, relativePath) {
     // 本番index.htmlではPersonnelRulesが継承担当より先に読み込まれる。
     // 単体VMでもその読み込み順を維持し、実装側へテスト専用fallbackを作らない。
     if (relativePath === 'js/personnel_rules.js' && context.__autoLoadedPersonnelRules === true) return;
-    if ((relativePath === 'js/life_system.js' || relativePath === 'js/kunishu_system.js')
+    if ((['js/life_system.js', 'js/kunishu_system.js', 'js/affiliation_system.js',
+         'js/event/common_events.js', 'js/event/historical_event.js'].includes(relativePath))
         && typeof context.PersonnelRules === 'undefined') {
         const dependency = path.join(ROOT, 'js/personnel_rules.js');
         vm.runInContext(fs.readFileSync(dependency, 'utf8'), context, { filename: dependency });
@@ -10078,6 +10079,28 @@ test('武将の噂は表面態度で情報量を変え同一面談中は再抽�
     system.activeInterviewAttitude = 'cold';
     system.executeInterviewRumor({ id: 1 });
     assert.ok(messages[messages.length - 1][0].includes('申し上げることはございませぬ'), '冷淡な態度では噂を教えない');
+});
+
+test('相性差の円環計算は所属・月次イベント・史実イベントでもPersonnelRulesを正本とする', () => {
+    const ctx = createContext();
+    loadScript(ctx, 'js/personnel_rules.js');
+    const rules = ctx.PersonnelRules;
+    // 管理値の全整数範囲で旧円環式と同じ結果を維持する。
+    for (let a = 0; a <= 100; a++) for (let b = 0; b <= 100; b++) {
+        const oldDiff = Math.abs(a - b);
+        assert.strictEqual(rules.calcAffinityDiff(a, b), Math.min(oldDiff, 100 - oldDiff));
+    }
+    const files = ['js/affiliation_system.js', 'js/event/common_events.js', 'js/event/historical_event.js'];
+    for (const f of files) {
+        const source = read(f);
+        assert.ok(!/Math\.abs\([^\n]*(?:affinity|Affinity)/.test(source), `${f}: 相性差を再定義しない`);
+    }
+    assert.ok(read(files[0]).includes('PersonnelRules.calcAffinityDiff(busho.affinity, lord.affinity)'));
+    assert.ok(read(files[1]).includes('PersonnelRules.calcAffinityDiff(ronin.affinity, daimyo.affinity)'));
+    assert.ok(read(files[1]).includes('PersonnelRules.calcAffinityDiff(targetDaimyo.affinity, aiDaimyo.affinity)'));
+    assert.ok(read(files[2]).includes('PersonnelRules.calcAffinityDiff(yoshimoto.affinity, a.affinity)'));
+    assert.ok(read(files[2]).includes('PersonnelRules.calcAffinityDiff(yoshimoto.affinity, b.affinity)'));
+    assert.ok(read(files[2]).includes('PersonnelRules.calcAffinityDiff(candidate.affinity, b.affinity)'));
 });
 
 test('協調性を廃止し人物関係は義理・野望・相性差を正本にする', () => {
@@ -29398,21 +29421,22 @@ test('r616 出奔した浪人の行動済みは月替わりで解除され、同
     loadScript(ctx, 'js/affiliation_system.js');
     const AffiliationSystem = vm.runInContext('AffiliationSystem', ctx);
     const PersonnelRules = vm.runInContext('PersonnelRules', ctx);
-    const castleA = { id: 10, ownerClan: 1, castellanId: 12, samuraiIds: [40], adjacentCastleIds: [20] };
+    const castleA = { id: 10, ownerClan: 1, castellanId: 12, samuraiIds: [40], adjacentCastleIds: [30, 20] };
     const castleB = { id: 20, ownerClan: 2, castellanId: 13, samuraiIds: [], adjacentCastleIds: [10] };
-    const castles = [castleA, castleB];
+    const castleC = { id: 30, ownerClan: 3, castellanId: 14, samuraiIds: [], adjacentCastleIds: [10] };
+    const castles = [castleA, castleB, castleC];
     const busho = {
         id: 40, name: '元家臣', clan: 1, castleId: 10, status: 'active',
         isActionDone: true, isInterviewed: true, isCastellan: false,
         isDaimyo: false, isCommander: false, wifeIds: [],
-        nemesisIds: [], nemesisList: [], affinity: 50, achievementTotal: 100
+        nemesisIds: [], nemesisList: [], affinity: 0, achievementTotal: 100
     };
     const game = {
         playerClanId: 2, castles, bushos: [busho],
         getCastle: id => castles.find(c => c.id === Number(id)),
         getBusho: id => Number(id) === busho.id ? busho : null,
         getClanCastles: id => castles.filter(c => c.ownerClan === Number(id)),
-        getClanDaimyo: () => ({ id: 90, affinity: 50 }),
+        getClanDaimyo: id => ({ id: 90, affinity: id === 2 ? 97 : 15 }),
         factionSystem: { updateFactions() {} },
         getCastleBushos: id => {
             const castle = castles.find(c => c.id === Number(id));
@@ -29425,7 +29449,7 @@ test('r616 出奔した浪人の行動済みは月替わりで解除され、同
     affiliation.updateUI = () => {};
     affiliation.becomeRonin(busho, 'desertion');
     assert.strictEqual(busho.status, 'ronin');
-    assert.strictEqual(busho.castleId, 20, '隣家へ通常の出奔移動をした');
+    assert.strictEqual(busho.castleId, 20, '同距離の隣家から円環相性差3の城を差15より優先する');
     assert.strictEqual(busho.isActionDone, true, '出奔した同月の行動済みは保持する');
     PersonnelRules.processMonthlyBushoMaintenance(busho, game);
     assert.strictEqual(busho.isActionDone, false, '翌月に浪人の行動済みが解除される');

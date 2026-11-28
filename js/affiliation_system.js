@@ -371,8 +371,7 @@ class AffiliationSystem {
                         }
                         let affDiff = 50;
                         if (lord) {
-                            const diff = Math.abs(busho.affinity - lord.affinity);
-                            affDiff = Math.min(diff, 100 - diff);
+                            affDiff = PersonnelRules.calcAffinityDiff(busho.affinity, lord.affinity);
                         }
                         foundCandidates.push({ castle, steps, affDiff });
                     }

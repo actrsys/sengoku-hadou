@@ -1983,13 +1983,7 @@ window.GameEvents.push({
             if (hasNemesis) continue; 
             
             // 大名と浪人の相性のズレを計算します（0〜50の数字になります）
-            let affDiff = 50;
-            if (typeof PersonnelRules !== 'undefined' && PersonnelRules.calcAffinityDiff) {
-                affDiff = PersonnelRules.calcAffinityDiff(ronin.affinity, daimyo.affinity);
-            } else {
-                const diff = Math.abs(ronin.affinity - daimyo.affinity);
-                affDiff = Math.min(diff, 100 - diff);
-            }
+            const affDiff = PersonnelRules.calcAffinityDiff(ronin.affinity, daimyo.affinity);
             
             // 確率を計算します。
             // 基本確率2%(0.02) + 相性による変動分(最大±3%。相性差0で+3%, 25で0%, 50で-3%)
@@ -2144,13 +2138,7 @@ window.GameEvents.push({
                         if (targetClan.daimyoPrestige < clan.daimyoPrestige * 12) return;
 
                         // 大名同士の相性のズレを計算します（0〜50の数字になります）
-                        let affDiff = 25;
-                        if (typeof PersonnelRules !== 'undefined' && PersonnelRules.calcAffinityDiff) {
-                            affDiff = PersonnelRules.calcAffinityDiff(targetDaimyo.affinity, aiDaimyo.affinity);
-                        } else {
-                            const diff = Math.abs(targetDaimyo.affinity - aiDaimyo.affinity);
-                            affDiff = Math.min(diff, 100 - diff);
-                        }
+                        const affDiff = PersonnelRules.calcAffinityDiff(targetDaimyo.affinity, aiDaimyo.affinity);
 
                         // 確率の計算です（相性差50で0%、0で2%になります）
                         let prob = 2.0 * (1.0 - (affDiff / 50));

@@ -703,10 +703,8 @@ window.GameEvents.push({
         // 3. 相性が近くて功績最高
         if (!juushinF && imagawaBushosForF.length > 0) {
             juushinF = [...imagawaBushosForF].sort((a, b) => {
-                const diffA = Math.abs((yoshimoto.affinity || 0) - (a.affinity || 0));
-                const trueDiffA = Math.min(diffA, 100 - diffA);
-                const diffB = Math.abs((yoshimoto.affinity || 0) - (b.affinity || 0));
-                const trueDiffB = Math.min(diffB, 100 - diffB);
+                const trueDiffA = PersonnelRules.calcAffinityDiff(yoshimoto.affinity, a.affinity);
+                const trueDiffB = PersonnelRules.calcAffinityDiff(yoshimoto.affinity, b.affinity);
                 
                 if (trueDiffA !== trueDiffB) {
                     return trueDiffA - trueDiffB; // 相性が近い順
@@ -3110,8 +3108,7 @@ window.GameEvents.push({
             
             // 全員と将軍の相性の差を計算して、一番差が小さい人を見つけます
             followers.forEach(b => {
-                const absDiff = Math.abs(candidate.affinity - b.affinity);
-                const diff = Math.min(absDiff, 100 - absDiff); // 円環（0と100が繋がっている）の計算です
+                const diff = PersonnelRules.calcAffinityDiff(candidate.affinity, b.affinity);
                 if (diff < minDiff) {
                     minDiff = diff;
                     bestFollower = b;
